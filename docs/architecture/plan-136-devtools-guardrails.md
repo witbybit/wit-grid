@@ -6,12 +6,12 @@
 
 ### Pre-existing guard failures fixed
 
-| Guard                                    | Before                                              | After                              |
-| ---------------------------------------- | --------------------------------------------------- | ---------------------------------- |
-| `store.ts` line count                    | 1205 lines (over 1150 budget)                       | 1107 lines ✅                      |
-| `GridEngine.ts` line count               | 1161 lines (over 1150 budget)                       | 1148 lines ✅                      |
-| `core/index.ts` imports from `features/` | 3 direct `./features/dataIntegrity/` imports        | Routed through `./integrity.js` ✅ |
-| Demo `@eregister/open-grid-core` import            | `RealtimeDashboard.tsx` imported from core directly | Uses `@eregister/open-grid-react` ✅         |
+| Guard                                    | Before                                              | After                                |
+| ---------------------------------------- | --------------------------------------------------- | ------------------------------------ |
+| `store.ts` line count                    | 1205 lines (over 1150 budget)                       | 1107 lines ✅                        |
+| `GridEngine.ts` line count               | 1161 lines (over 1150 budget)                       | 1148 lines ✅                        |
+| `core/index.ts` imports from `features/` | 3 direct `./features/dataIntegrity/` imports        | Routed through `./integrity.js` ✅   |
+| Demo `@eregister/open-grid-core` import  | `RealtimeDashboard.tsx` imported from core directly | Uses `@eregister/open-grid-react` ✅ |
 
 ### New guards added (Plan 131/134)
 

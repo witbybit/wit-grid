@@ -1,4 +1,4 @@
-import { compileStyleRules, type GroupPathItem } from '@open-grid/core/experimental';
+import { compileStyleRules, type GroupPathItem } from '@eregister/open-grid-core/experimental';
 
 type GroupPath = GroupPathItem[];
 

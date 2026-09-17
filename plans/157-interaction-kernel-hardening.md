@@ -1,6 +1,6 @@
 # Plan 157: Interaction Kernel Hardening
 
-> **Executor instructions**: Follow this plan as a demolition-and-replacement architecture program, not as feature polish. The target is one authoritative interaction kernel in `@open-grid/core` that owns focus, navigation, selection, range, editing, clipboard routing, and accessibility derivation. Do not preserve parallel legacy interaction paths for compatibility convenience. Open Grid is in alpha; prefer clean replacement over compatibility clutter.
+> **Executor instructions**: Follow this plan as a demolition-and-replacement architecture program, not as feature polish. The target is one authoritative interaction kernel in `@eregister/open-grid-core` that owns focus, navigation, selection, range, editing, clipboard routing, and accessibility derivation. Do not preserve parallel legacy interaction paths for compatibility convenience. Open Grid is in alpha; prefer clean replacement over compatibility clutter.
 >
 > **Drift check (run first)**: `git diff --stat 3824a049..HEAD -- packages/core/src/api packages/core/src/engine packages/core/src/models packages/core/src/features packages/core/src/renderer packages/core/src/navigation.ts packages/react/src/GridView.tsx packages/react/src/hooks.tsx packages/react/src/gridPortalHosts.tsx packages/react/src/GridPortal.tsx`
 > If any in-scope seam changed since this plan was written, compare the "Current state" section against the live code before proceeding. Any mismatch in interaction identity, renderer ownership, or adapter responsibilities is a STOP condition until reconciled.
@@ -125,14 +125,14 @@ The following excerpts describe the live interaction architecture this plan repl
 
 ## Commands you will need
 
-| Purpose                   | Command                                                                                                                                                                                                                              | Expected on success |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| Core build                | `corepack pnpm --filter @open-grid/core build`                                                                                                                                                                                       | exit 0              |
-| React build               | `corepack pnpm --filter @open-grid/react build`                                                                                                                                                                                      | exit 0              |
-| Core tests                | `corepack pnpm --filter @open-grid/core test`                                                                                                                                                                                        | all pass            |
-| React tests               | `corepack pnpm --filter @open-grid/react test`                                                                                                                                                                                       | all pass            |
-| Architecture guards       | `corepack pnpm --filter @open-grid/core exec vitest run src/engine/architectureGuards.test.ts`                                                                                                                                       | all pass            |
-| Focused interaction tests | `corepack pnpm --filter @open-grid/core exec vitest run src/models/SelectionModel.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts src/features/ClipboardController.test.ts` | all pass            |
+| Purpose                   | Command                                                                                                                                                                                                                                        | Expected on success |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Core build                | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                                                                                       | exit 0              |
+| React build               | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                                                                                      | exit 0              |
+| Core tests                | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                                                                                        | all pass            |
+| React tests               | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                                                                                       | all pass            |
+| Architecture guards       | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts`                                                                                                                                       | all pass            |
+| Focused interaction tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/models/SelectionModel.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts src/features/ClipboardController.test.ts` | all pass            |
 
 ## Scope
 
@@ -349,11 +349,11 @@ Reasoning:
 
 ## Done criteria
 
-- [x] `corepack pnpm --filter @open-grid/core build` exits 0
-- [x] `corepack pnpm --filter @open-grid/react build` exits 0
-- [x] `corepack pnpm --filter @open-grid/core test` exits 0
-- [x] `corepack pnpm --filter @open-grid/react test` exits 0
-- [x] `corepack pnpm --filter @open-grid/core exec vitest run src/engine/architectureGuards.test.ts` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-core build` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-react build` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-core test` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-react test` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts` exits 0
 - [x] Core interaction state no longer uses field-only identity for focus/edit/range
 - [x] `packages/core/src/navigation.ts` is either deleted or reduced to a non-semantic shim that is then removed before plan closure
 - [x] `packages/react/src/GridView.tsx` no longer owns semantic keyboard/pointer interaction orchestration

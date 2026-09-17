@@ -129,15 +129,15 @@ right: this.engine.viewport.pinRightColumns,
 
 ## Commands you will need
 
-| Purpose                       | Command                                                                                                                              | Expected on success |
-| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| Purpose                       | Command                                                                                                                                        | Expected on success |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
 | Core build                    | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                       | exit 0              |
 | Core tests                    | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                        | all core tests pass |
 | Focused store/row-model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/rowModel.test.ts src/serverRowModel.test.ts`           | exit 0              |
 | Focused architecture tests    | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0              |
 | React build                   | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                      | exit 0              |
 | React tests                   | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                       | exit 0              |
-| Demo build                    | `corepack pnpm --filter demo-app build`                                                                                              | exit 0              |
+| Demo build                    | `corepack pnpm --filter demo-app build`                                                                                                        | exit 0              |
 
 Run package builds sequentially. `demo-app build` should run only after core and
 React package builds complete.

@@ -1,6 +1,13 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Gauge, Play } from 'lucide-react';
-import { Grid, type ColumnDef, type DomCellRenderer, type ImperativeCellHandle, type CellRendererProps, type GridReadyEvent } from '@eregister/open-grid-react';
+import {
+	Grid,
+	type ColumnDef,
+	type DomCellRenderer,
+	type ImperativeCellHandle,
+	type CellRendererProps,
+	type GridReadyEvent,
+} from '@eregister/open-grid-react';
 
 type RendererMode = 'text' | 'dom' | 'imperativeReact' | 'deferredReact';
 

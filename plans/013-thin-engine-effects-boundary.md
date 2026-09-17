@@ -176,14 +176,14 @@ const internalApi = getStoreFromApi(api);
 
 ## Commands you will need
 
-| Purpose         | Command                                             | Expected on success                             |
-| --------------- | --------------------------------------------------- | ----------------------------------------------- |
-| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`      | exit 0                                          |
-| Core tests      | `corepack pnpm --filter @eregister/open-grid-core test`       | 40 files passed, 467+ tests passed, no failures |
-| React build     | `corepack pnpm --filter @eregister/open-grid-react build`     | exit 0                                          |
-| React tests     | `corepack pnpm --filter @eregister/open-grid-react test`      | 4 files passed, 101+ tests passed, no failures  |
-| Demo build      | `corepack pnpm --filter demo-app build`             | exit 0; chunk-size warning is acceptable        |
-| Full repo check | `corepack pnpm run build && corepack pnpm run test` | exit 0                                          |
+| Purpose         | Command                                                   | Expected on success                             |
+| --------------- | --------------------------------------------------------- | ----------------------------------------------- |
+| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0                                          |
+| Core tests      | `corepack pnpm --filter @eregister/open-grid-core test`   | 40 files passed, 467+ tests passed, no failures |
+| React build     | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                                          |
+| React tests     | `corepack pnpm --filter @eregister/open-grid-react test`  | 4 files passed, 101+ tests passed, no failures  |
+| Demo build      | `corepack pnpm --filter demo-app build`                   | exit 0; chunk-size warning is acceptable        |
+| Full repo check | `corepack pnpm run build && corepack pnpm run test`       | exit 0                                          |
 
 Run package builds sequentially before `demo-app build`. Parallel demo builds
 can race workspace package `dist` output and produce a false module-resolution

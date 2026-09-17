@@ -164,15 +164,15 @@ const controller = new ServerRowModelController<TRowData>(store, options);
 
 ## Commands you will need
 
-| Purpose                       | Command                                                                                                                                                          | Expected on success  |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Purpose                       | Command                                                                                                                                                                    | Expected on success  |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | Core build                    | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                   | exit 0               |
 | Core full tests               | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                    | all core tests pass  |
 | Focused row-model tests       | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/serverRowModel.test.ts src/store.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
 | Focused runtime/effects tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                              | exit 0               |
 | React build                   | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                  | exit 0               |
 | React tests                   | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                   | all React tests pass |
-| Demo build                    | `corepack pnpm --filter demo-app build`                                                                                                                          | exit 0               |
+| Demo build                    | `corepack pnpm --filter demo-app build`                                                                                                                                    | exit 0               |
 
 Run builds/tests sequentially. Do not run `@eregister/open-grid-react` or `demo-app`
 commands in parallel with a core build; those packages resolve core artifacts.

@@ -494,14 +494,14 @@ The pure layout tests are the most important. AG Grid-level reliability comes fr
 
 ## Commands you will need
 
-| Purpose     | Command                                               | Expected on success |
-| ----------- | ----------------------------------------------------- | ------------------- |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`         | exit 0              |
-| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`        | exit 0              |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`        | exit 0              |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build`       | exit 0              |
-| Demo build  | `corepack pnpm --filter demo-app build`               | exit 0              |
-| Formatting  | `corepack pnpm exec prettier --check <touched files>` | exit 0              |
+| Purpose     | Command                                                   | Expected on success |
+| ----------- | --------------------------------------------------------- | ------------------- |
+| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0              |
+| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0              |
+| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0              |
+| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0              |
+| Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0              |
+| Formatting  | `corepack pnpm exec prettier --check <touched files>`     | exit 0              |
 
 ## Scope
 

@@ -20,7 +20,7 @@ const diagnostics = ts
 const signature = createHash('sha256').update(diagnostics.join('\n')).digest('hex');
 
 // Characterization baseline for legacy tests. Source diagnostics are never hidden:
-// `@open-grid/core typecheck` first runs `tsc --noEmit` against the production project.
+// `@eregister/open-grid-core typecheck` first runs `tsc --noEmit` against the production project.
 const baseline = { count: 444, signature: 'd66dd57d325aa4df2e0a4b5a191da451daa1d055a9bc4137c4bb16bf7eb616a7' };
 
 if (process.argv.includes('--report')) {

@@ -3,13 +3,12 @@
 		"target": "ES2022",
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		"baseUrl": ".",
 		"paths": {
-			"@eregister/open-grid-core": ["packages/core/src/index.ts"],
-			"@eregister/open-grid-core/experimental": ["packages/core/src/experimental.ts"],
-			"@eregister/open-grid-core/internal": ["packages/core/src/internal.ts"],
-			"@eregister/open-grid-react": ["packages/react/src/index.ts"],
-			"@eregister/open-grid-react/experimental": ["packages/react/src/experimental.ts"]
+			"@eregister/open-grid-core": ["./packages/core/src/index.ts"],
+			"@eregister/open-grid-core/experimental": ["./packages/core/src/experimental.ts"],
+			"@eregister/open-grid-core/internal": ["./packages/core/src/internal.ts"],
+			"@eregister/open-grid-react": ["./packages/react/src/index.ts"],
+			"@eregister/open-grid-react/experimental": ["./packages/react/src/experimental.ts"]
 		},
 		"strict": true,
 		"esModuleInterop": true,

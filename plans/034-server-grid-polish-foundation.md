@@ -74,14 +74,14 @@ legibility in the demo.
 
 ## Commands you will need
 
-| Purpose            | Command                                                                             | Expected on success |
-| ------------------ | ----------------------------------------------------------------------------------- | ------------------- |
+| Purpose            | Command                                                                                       | Expected on success |
+| ------------------ | --------------------------------------------------------------------------------------------- | ------------------- |
 | Build core         | `corepack pnpm --filter @eregister/open-grid-core build`                                      | exit 0              |
 | Core tests         | `corepack pnpm --filter @eregister/open-grid-core test`                                       | exit 0, all pass    |
 | Server model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts` | exit 0              |
 | Build react        | `corepack pnpm --filter @eregister/open-grid-react build`                                     | exit 0              |
 | React tests        | `corepack pnpm --filter @eregister/open-grid-react test`                                      | exit 0, all pass    |
-| Demo build         | `corepack pnpm --filter demo-app build`                                             | exit 0              |
+| Demo build         | `corepack pnpm --filter demo-app build`                                                       | exit 0              |
 
 ## Scope
 

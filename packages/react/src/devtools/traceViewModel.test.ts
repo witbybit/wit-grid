@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { GridCausalTraceSnapshot } from '@open-grid/core/experimental';
+import type { GridCausalTraceSnapshot } from '@eregister/open-grid-core/experimental';
 import { describe, expect, it } from 'vitest';
 import { buildFrameDistribution, filterTraceEvents, groupTimeline, SLOW_FRAME_THRESHOLD_MS, tracePrivacyLabel } from './traceViewModel.js';
 

@@ -213,11 +213,11 @@ Relevant repo conventions and evidence files:
 | Purpose                         | Command                                                                                                                                                                                                                                                                                                                                                                                                                    | Expected on success              |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------- | -------------------- | ---------------- | ----------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
 | Drift check                     | `git diff --stat 6f594575..HEAD -- packages/core/src/infiniteRowModel.ts packages/core/src/serverPageRowModel.ts packages/core/src/serverRowModel.test.ts packages/core/src/serverRowModel.adversarial.test.ts packages/core/src/createGrid.ts packages/core/src/store.ts packages/core/src/rowModel.ts packages/core/src/api packages/core/src/engine packages/react/src/Grid.tsx demo docs/architecture plans/README.md` | exit 0; inspect output for drift |
-| Core focused tests              | `corepack pnpm --filter @open-grid/core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/renderEngine.test.ts src/renderer/serverRuntimePerformance.test.ts`                                                                                                                                                                                                                 | all pass                         |
-| Core full tests                 | `corepack pnpm --filter @open-grid/core test`                                                                                                                                                                                                                                                                                                                                                                              | exit 0; all tests pass           |
-| React tests                     | `corepack pnpm --filter @open-grid/react test`                                                                                                                                                                                                                                                                                                                                                                             | exit 0; all tests pass           |
+| Core focused tests              | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/renderEngine.test.ts src/renderer/serverRuntimePerformance.test.ts`                                                                                                                                                                                                       | all pass                         |
+| Core full tests                 | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                                                                                                                                                                                                                                                                    | exit 0; all tests pass           |
+| React tests                     | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                                                                                                                                                                                                                                                                   | exit 0; all tests pass           |
 | Workspace tests                 | `corepack pnpm run test`                                                                                                                                                                                                                                                                                                                                                                                                   | exit 0; all tests pass           |
-| Architecture guards             | `corepack pnpm --filter @open-grid/core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts`                                                                                                                                                                                                                                                                                                        | all pass                         |
+| Architecture guards             | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts`                                                                                                                                                                                                                                                                                              | all pass                         |
 | Adversarial suite               | `corepack pnpm run test:adversarial`                                                                                                                                                                                                                                                                                                                                                                                       | exit 0; all tests pass           |
 | Build                           | `corepack pnpm run build`                                                                                                                                                                                                                                                                                                                                                                                                  | exit 0                           |
 | Repo search for removed symbols | `rg -n "ServerPageRowModelController                                                                                                                                                                                                                                                                                                                                                                                       | serverPage                       | goToServerPage | getCurrentServerPage | serverPageLoaded | serverPageChanged | pageNumber" packages/core/src packages/react/src demo docs -g '!**/node_modules/**'` | no matches outside explicit migration notes, if any |
@@ -258,7 +258,7 @@ Relevant repo conventions and evidence files:
 
 - Stay on the current branch unless the operator asks otherwise.
 - Commit by logical phase, not by file dump.
-- Before each commit, run at least `corepack pnpm --filter @open-grid/core test` and ensure it is green.
+- Before each commit, run at least `corepack pnpm --filter @eregister/open-grid-core test` and ensure it is green.
 - Do not push or open a PR unless the operator instructs it.
 
 ## Steps
@@ -279,7 +279,7 @@ Use the existing focused suites to prove the failures and pin the expected core 
     - rapid scrolling not requiring incidental renders to repaint committed rows
 - If a renderer-specific reproduction is clearer, add a narrowly focused assertion in `packages/core/src/renderer/renderEngine.test.ts`.
 
-**Verify**: `corepack pnpm --filter @open-grid/core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/renderEngine.test.ts` -> all pass
+**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/renderEngine.test.ts` -> all pass
 
 ### Step 2: Finish the infinite block model so no represented row can go blank
 
@@ -297,7 +297,7 @@ Required outcomes:
 
 Do not move sort/filter logic into demos; the datasource request snapshot and publication path belong in core.
 
-**Verify**: `corepack pnpm --filter @open-grid/core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/serverRuntimePerformance.test.ts` -> all pass
+**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/renderer/serverRuntimePerformance.test.ts` -> all pass
 
 ### Step 3: Introduce one authoritative async publication path
 
@@ -321,7 +321,7 @@ Requirements:
 
 If a new shared helper is needed, keep it generic enough for infinite and SSRM, but do not collapse the two row models into one giant controller with branching.
 
-**Verify**: `corepack pnpm --filter @open-grid/core test` -> exit 0; all tests pass
+**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0; all tests pass
 
 ### Step 4: Demolish the page-based server row model
 
@@ -371,7 +371,7 @@ Minimum behavior to ship before closing the plan:
 
 Public API must converge on `rowModelType: 'server'` plus SSRM-focused datasource and refresh APIs. Do not leave deprecated page overloads behind.
 
-**Verify**: `corepack pnpm --filter @open-grid/core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/rowModel.capabilities.test.ts src/query/queryModel.test.ts src/store.test.ts` -> all pass
+**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/rowModel.capabilities.test.ts src/query/queryModel.test.ts src/store.test.ts` -> all pass
 
 ### Step 6: Update adapters, docs, demos, and plan index after the core replacement is stable
 
@@ -411,16 +411,16 @@ Keep demo changes minimal and downstream of the core fix.
     - server-page API/type removal
 - Reuse structural patterns from the existing row-model and adversarial suites rather than inventing a new test harness.
 - Verification:
-    - `corepack pnpm --filter @open-grid/core test` -> all pass
-    - `corepack pnpm --filter @open-grid/react test` -> all pass
+    - `corepack pnpm --filter @eregister/open-grid-core test` -> all pass
+    - `corepack pnpm --filter @eregister/open-grid-react test` -> all pass
     - `corepack pnpm run test` -> all pass
 
 ## Done criteria
 
 All must hold:
 
-- [x] `corepack pnpm --filter @open-grid/core test` exits 0
-- [x] `corepack pnpm --filter @open-grid/react test` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-core test` exits 0
+- [x] `corepack pnpm --filter @eregister/open-grid-react test` exits 0
 - [x] `corepack pnpm run build` exits 0
 - [x] Infinite scrolling no longer produces unexplained blank or skipped in-range rows under the focused adversarial tests
 - [x] Infinite sorting and filtering are verified in core tests, not demo-only behavior

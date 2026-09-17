@@ -284,8 +284,8 @@ Key rules:
 
 ## Commands you will need
 
-| Purpose            | Command                                                                                                                                                                   | Expected |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Purpose            | Command                                                                                                                                                                             | Expected |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | Focused fill tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts`                                                                                            | exit 0   |
 | Data/model tests   | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/rowModel.test.ts src/store.test.ts src/calculations/dagEngine.test.ts`                  | exit 0   |
 | Architecture tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0   |
@@ -293,7 +293,7 @@ Key rules:
 | Core tests         | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                             | exit 0   |
 | React build        | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                           | exit 0   |
 | React tests        | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                            | exit 0   |
-| Demo build         | `corepack pnpm --filter demo-app build`                                                                                                                                   | exit 0   |
+| Demo build         | `corepack pnpm --filter demo-app build`                                                                                                                                             | exit 0   |
 
 Run core build before React build when building separately. Running them in parallel can race because React resolves `@eregister/open-grid-core/dist`.
 

@@ -162,13 +162,13 @@
 			"authority": "authoritative root verification"
 		},
 		"full": {
-			"command": "corepack pnpm --filter @open-grid/core exec vitest run",
+			"command": "corepack pnpm --filter @eregister/open-grid-core exec vitest run",
 			"status": "PASS: 121/121 files, 1982/1982 tests",
 			"detail": "The existing 100k-row/10k-scroll test has a test-only 15s timeout to accommodate parallel contention; workload, assertions, and budgets are unchanged.",
 			"authority": "authoritative root verification"
 		},
 		"react": {
-			"command": "corepack pnpm --filter @open-grid/react test",
+			"command": "corepack pnpm --filter @eregister/open-grid-react test",
 			"status": "PASS: 10/10 files, 124/124 tests",
 			"authority": "authoritative root verification"
 		},

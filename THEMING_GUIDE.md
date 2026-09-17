@@ -31,7 +31,7 @@ Set a built-in theme name declaratively via `initialState`. This is resolved onc
 />
 ```
 
-Framework-agnostic (`@open-grid/core`) equivalent:
+Framework-agnostic (`@eregister/open-grid-core`) equivalent:
 
 ```typescript
 import { createClientGrid } from '@eregister/open-grid-core';
@@ -72,7 +72,7 @@ const unsubscribe = manager.onThemeChange((theme) => {
 
 Get `api` from `onGridReady` (React) or the return value of `createClientGrid`/`createInfiniteGrid`/`createServerPageGrid` (core), then call the theme methods directly on it:
 
-```typescript
+````typescript
 import { createTheme, ThemeManager } from '@eregister/open-grid-core';
 
 ### 3. Composing a custom theme
@@ -80,7 +80,7 @@ import { createTheme, ThemeManager } from '@eregister/open-grid-core';
 `ThemeTokens` is a plain flat object — a themed variant of a built-in theme is just a spread, no helper function required:
 
 ```typescript
-import { getBuiltInTheme, type ThemeTokens } from '@open-grid/core';
+import { getBuiltInTheme, type ThemeTokens } from '@eregister/open-grid-core';
 
 export const acmeTheme: ThemeTokens = {
 	...getBuiltInTheme('light'),
@@ -90,7 +90,7 @@ export const acmeTheme: ThemeTokens = {
 	headerBg: '#0f0f1e',
 	headerText: '#b0b0b0',
 };
-```
+````
 
 Apply it in one of two ways:
 
@@ -359,7 +359,7 @@ api.mergeTheme({
 
 ### 2. Dynamic Theme Switching
 
-```typescript
+````typescript
 import { useCallback, useEffect, useState } from 'react';
 import { createClientGrid } from '@eregister/open-grid-core';
 
@@ -380,7 +380,7 @@ function DynamicThemeExample() {
 		</div>
 	);
 }
-```
+````
 
 ### 3. System preference sync
 
@@ -442,9 +442,9 @@ console.log(cssText);
 // }
 ```
 
-## Integration with the low-level host (`@open-grid/core` internal)
+## Integration with the low-level host (`@eregister/open-grid-core` internal)
 
-If you're building a custom framework adapter directly on `mountGridHost` (rather than using `<Grid>` from `@open-grid/react`), the same theme methods are also available directly on the returned host object:
+If you're building a custom framework adapter directly on `mountGridHost` (rather than using `<Grid>` from `@eregister/open-grid-react`), the same theme methods are also available directly on the returned host object:
 
 ```typescript
 import { mountGridHost } from '@eregister/open-grid-core/internal';

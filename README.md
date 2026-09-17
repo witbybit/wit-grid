@@ -1049,7 +1049,7 @@ The same `TValue` parameter is available on `CellRendererProps<TRowData, TValue>
 For new columns, prefer the explicit `renderer` object. It tells the engine what kind of renderer you are using and which scroll behavior it is allowed to use.
 
 ```tsx
-import { Grid, type CellRendererProps, type ColumnDef } from '@open-grid/react';
+import { Grid, type CellRendererProps, type ColumnDef } from '@eregister/open-grid-react';
 
 interface TradeRow {
 	id: string;
@@ -1299,7 +1299,7 @@ For very hot cells, a renderer can expose an imperative `update(params)` handle 
 
 ```tsx
 import React from 'react';
-import type { CellRendererProps, ImperativeCellHandle } from '@open-grid/react';
+import type { CellRendererProps, ImperativeCellHandle } from '@eregister/open-grid-react';
 
 const FastPriceRenderer = React.forwardRef<ImperativeCellHandle<TradeRow>, CellRendererProps<TradeRow, number>>((props, ref) => {
 	const spanRef = React.useRef<HTMLSpanElement>(null);

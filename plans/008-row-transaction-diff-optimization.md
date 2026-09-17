@@ -43,8 +43,8 @@ const allKeys = new Set([...Object.keys(prevRow as object), ...Object.keys(row a
 
 ## Commands you will need
 
-| Purpose         | Command                                                                                | Expected on success          |
-| --------------- | -------------------------------------------------------------------------------------- | ---------------------------- |
+| Purpose         | Command                                                                                          | Expected on success          |
+| --------------- | ------------------------------------------------------------------------------------------------ | ---------------------------- |
 | Row store tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/RowDataStore.test.ts` | exit 0, all tests pass       |
 | Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts`       | exit 0, all tests pass       |
 | Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                         | exit 0, no TypeScript errors |

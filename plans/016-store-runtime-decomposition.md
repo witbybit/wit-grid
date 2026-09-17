@@ -173,15 +173,15 @@ internalApi.registerPlugin(plugin);
 
 ## Commands you will need
 
-| Purpose                      | Command                                                                                                                                                       | Expected on success  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| Purpose                      | Command                                                                                                                                                                 | Expected on success  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | Core build                   | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                | exit 0               |
 | Core full tests              | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                 | all core tests pass  |
 | Focused core runtime tests   | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/contextMenu.test.ts src/boundary.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
 | Focused effect/runtime tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                           | exit 0               |
 | React build                  | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                               | exit 0               |
 | React tests                  | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                | all React tests pass |
-| Demo build                   | `corepack pnpm --filter demo-app build`                                                                                                                       | exit 0               |
+| Demo build                   | `corepack pnpm --filter demo-app build`                                                                                                                                 | exit 0               |
 
 Run package builds sequentially. Run the demo build only after core and React
 build/test commands pass.

@@ -88,8 +88,8 @@ Delete stale assertions whose only purpose was to mention a removed adapter. Pre
 Run:
 
 ```powershell
-corepack pnpm --filter @open-grid/core exec vitest run src/rowModel.capabilities.test.ts src/serverRowModel.test.ts src/engine/architectureGuards.test.ts
-corepack pnpm --filter @open-grid/core exec vitest run
+corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.capabilities.test.ts src/serverRowModel.test.ts src/engine/architectureGuards.test.ts
+corepack pnpm --filter @eregister/open-grid-core exec vitest run
 corepack pnpm run build:packages
 corepack pnpm run bench
 corepack pnpm run bench:long-session

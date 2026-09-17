@@ -41,8 +41,8 @@ if (groupDefs.length > 0) {
 
 ## Commands you will need
 
-| Purpose         | Command                                                                          | Expected on success          |
-| --------------- | -------------------------------------------------------------------------------- | ---------------------------- |
+| Purpose         | Command                                                                                    | Expected on success          |
+| --------------- | ------------------------------------------------------------------------------------------ | ---------------------------- |
 | Row model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts`    | exit 0, all tests pass       |
 | Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts` | exit 0, all tests pass       |
 | Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                   | exit 0, no TypeScript errors |

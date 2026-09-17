@@ -403,14 +403,14 @@ corepack pnpm --filter @eregister/open-grid-react test
 
 ## Commands
 
-| Purpose     | Command                                         | Expected |
-| ----------- | ----------------------------------------------- | -------- |
+| Purpose     | Command                                                   | Expected |
+| ----------- | --------------------------------------------------------- | -------- |
 | Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0   |
 | Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0   |
 | React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0   |
 | React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0   |
-| Demo build  | `corepack pnpm --filter demo-app build`         | exit 0   |
-| Type check  | `corepack pnpm exec tsc --noEmit`               | exit 0   |
+| Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0   |
+| Type check  | `corepack pnpm exec tsc --noEmit`                         | exit 0   |
 
 ## Scope
 

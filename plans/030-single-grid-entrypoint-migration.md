@@ -52,12 +52,12 @@ The codebase already shows the shape we want in the hooks: the lifecycle split i
 
 ## Commands you will need
 
-| Purpose     | Command                                         | Expected on success    |
-| ----------- | ----------------------------------------------- | ---------------------- |
+| Purpose     | Command                                                   | Expected on success    |
+| ----------- | --------------------------------------------------------- | ---------------------- |
 | React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                 |
 | React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0, all tests pass |
 | Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0, all tests pass |
-| Demo build  | `corepack pnpm --filter demo-app build`         | exit 0                 |
+| Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0                 |
 
 ## Scope
 

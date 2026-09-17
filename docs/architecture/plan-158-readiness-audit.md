@@ -30,19 +30,19 @@ Primary evidence was taken from:
 
 Latest committed core verification before the server-page demolition commit:
 
-- `corepack pnpm --filter @open-grid/core exec tsc --noEmit`
-- `corepack pnpm --filter @open-grid/core test`
+- `corepack pnpm --filter @eregister/open-grid-core exec tsc --noEmit`
+- `corepack pnpm --filter @eregister/open-grid-core test`
 - Result: `111` test files passed, `1900` tests passed
 
 Focused Plan 158 verification also passed:
 
-- `corepack pnpm --filter @open-grid/core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/serverSideRowModel.test.ts src/query/queryModel.test.ts src/rowModel.capabilities.test.ts src/features/dataIntegrity/GridDataIntegrityManager.test.ts src/store.test.ts src/renderer/renderEngine.test.ts src/boundary.test.ts src/engine/architectureGuards.test.ts`
+- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/serverRowModel.adversarial.test.ts src/serverSideRowModel.test.ts src/query/queryModel.test.ts src/rowModel.capabilities.test.ts src/features/dataIntegrity/GridDataIntegrityManager.test.ts src/store.test.ts src/renderer/renderEngine.test.ts src/boundary.test.ts src/engine/architectureGuards.test.ts`
 - Result: `10` test files passed, `637` tests passed
 
 ## Remaining completion evidence
 
 Plan 158 should only be marked complete after the broader downstream gates pass:
 
-- `corepack pnpm --filter @open-grid/react test`
+- `corepack pnpm --filter @eregister/open-grid-react test`
 - `corepack pnpm run build`
 - `plans/README.md` Plan 158 status row updated

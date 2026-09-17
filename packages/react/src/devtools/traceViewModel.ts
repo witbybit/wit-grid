@@ -20,6 +20,13 @@ export interface FrameDistribution {
 	unknownMetrics: number;
 }
 
+type ExplanationRowField = 'lastChange' | 'commit' | 'invalidation' | 'frame';
+
+export interface ExplanationRow {
+	readonly field: ExplanationRowField;
+	readonly evidence: GridCellExplanation[ExplanationRowField];
+}
+
 export const SLOW_FRAME_THRESHOLD_MS = 16.7;
 
 const searchableText = (entry: GridCausalTraceEnvelope): string => JSON.stringify(entry.event).toLocaleLowerCase();
@@ -82,7 +89,7 @@ export function buildFrameDistribution(snapshot: GridCausalTraceSnapshot): Frame
 	};
 }
 
-export function explanationRows(explanation: GridCellExplanation | null) {
+export function explanationRows(explanation: GridCellExplanation | null): readonly ExplanationRow[] {
 	if (!explanation) return [];
 	return (['lastChange', 'commit', 'invalidation', 'frame'] as const).map((field) => ({ field, evidence: explanation[field] }));
 }

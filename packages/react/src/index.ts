@@ -169,4 +169,16 @@ export type {
 	GridTransactionStreamHandle,
 	GridTransactionStreamState,
 } from '@eregister/open-grid-core';
-export { duplicateValueRule, missingRequiredRule, required, email, min, max, number, date, oneOf, regex, customCellRule } from '@eregister/open-grid-core';
+export {
+	duplicateValueRule,
+	missingRequiredRule,
+	required,
+	email,
+	min,
+	max,
+	number,
+	date,
+	oneOf,
+	regex,
+	customCellRule,
+} from '@eregister/open-grid-core';

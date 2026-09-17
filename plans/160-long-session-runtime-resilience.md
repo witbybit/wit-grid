@@ -60,14 +60,14 @@ Implement and enforce these invariants:
 
 ## Commands you will need
 
-| Purpose             | Command                                                                                                               | Expected on success                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Core verification   | `corepack pnpm run verify:core`                                                                                       | exit 0                                                                       |
-| Performance budgets | `corepack pnpm run bench`                                                                                             | all existing and new deterministic budget tests pass                         |
-| Long-session suite  | `corepack pnpm run bench:long-session`                                                                                | all long-session resource and backlog invariants pass                        |
-| React focused tests | `corepack pnpm --filter @open-grid/react exec vitest run src/gridPortalStore.adversarial.test.tsx src/index.test.tsx` | exit 0; use the actual extension of the adversarial test if it remains `.ts` |
-| Build               | `corepack pnpm run build`                                                                                             | exit 0                                                                       |
-| Format              | `corepack pnpm run format:check`                                                                                      | exit 0                                                                       |
+| Purpose             | Command                                                                                                                         | Expected on success                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Core verification   | `corepack pnpm run verify:core`                                                                                                 | exit 0                                                                       |
+| Performance budgets | `corepack pnpm run bench`                                                                                                       | all existing and new deterministic budget tests pass                         |
+| Long-session suite  | `corepack pnpm run bench:long-session`                                                                                          | all long-session resource and backlog invariants pass                        |
+| React focused tests | `corepack pnpm --filter @eregister/open-grid-react exec vitest run src/gridPortalStore.adversarial.test.tsx src/index.test.tsx` | exit 0; use the actual extension of the adversarial test if it remains `.ts` |
+| Build               | `corepack pnpm run build`                                                                                                       | exit 0                                                                       |
+| Format              | `corepack pnpm run format:check`                                                                                                | exit 0                                                                       |
 
 Do not run package installation unless a required existing workspace dependency is missing. This plan should not require a new runtime dependency.
 
@@ -160,7 +160,7 @@ Required behavior:
 
 Tests must cover zero/one capacity policy, wraparound ordering, dropped counts, reset after wraparound, and at least 100,000 recorded frames with retained storage equal to capacity.
 
-**Verify**: `corepack pnpm --filter @open-grid/core exec vitest run src/diagnostics/GridInstrumentation.test.ts` passes, and the architecture guard still proves renderer production files do not import the recording implementation.
+**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/diagnostics/GridInstrumentation.test.ts` passes, and the architecture guard still proves renderer production files do not import the recording implementation.
 
 ## Phase 3: Build the deterministic long-session harness
 
@@ -177,7 +177,7 @@ Do not use `setTimeout`, real network calls, `performance.now()` thresholds, ran
 Add root script:
 
 ```json
-"bench:long-session": "pnpm --filter @open-grid/core exec vitest run src/perf/longSessionResilience.test.ts && pnpm --filter @open-grid/react exec vitest run src/gridPortalStore.adversarial.test.ts src/index.test.tsx"
+"bench:long-session": "pnpm --filter @eregister/open-grid-core exec vitest run src/perf/longSessionResilience.test.ts && pnpm --filter @eregister/open-grid-react exec vitest run src/gridPortalStore.adversarial.test.ts src/index.test.tsx"
 ```
 
 If the full React `index.test.tsx` makes this command unreasonably broad, create a focused `longSessionResilience.test.tsx` in React and run that instead.

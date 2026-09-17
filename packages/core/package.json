@@ -1,6 +1,6 @@
 {
 	"name": "@eregister/open-grid-core",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"description": "Framework-agnostic high-performance spreadsheet and grid engine core",
 	"type": "module",
 	"main": "./dist/index.js",

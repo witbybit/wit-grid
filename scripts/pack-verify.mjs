@@ -80,7 +80,7 @@ function main() {
 
 		const coreTarball = packPackage(path.join(ROOT, 'packages', 'core'), tarballDir, npmEnv);
 		const reactTarball = packPackage(path.join(ROOT, 'packages', 'react'), tarballDir, npmEnv);
-		assertTarballContents(coreTarball, '@open-grid/core', [
+		assertTarballContents(coreTarball, '@eregister/open-grid-core', [
 			'README.md',
 			'dist/index.js',
 			'dist/index.d.ts',
@@ -89,7 +89,7 @@ function main() {
 			'dist/internal.js',
 			'dist/internal.d.ts',
 		]);
-		assertTarballContents(reactTarball, '@open-grid/react', [
+		assertTarballContents(reactTarball, '@eregister/open-grid-react', [
 			'dist/index.js',
 			'dist/index.d.ts',
 			'dist/experimental.js',

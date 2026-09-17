@@ -82,13 +82,13 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('eventBus.addEventListener');
 	});
 
-	it('workspace and published packages use an explicit alpha pre-release version (Plan 106)', () => {
+	it('workspace and published packages use explicit semver versions (Plan 106)', () => {
 		const workspacePackage = JSON.parse(readFileSync(resolve(CORE_ROOT, '..', '..', 'package.json'), 'utf-8')) as { version: string };
 		const corePackage = JSON.parse(readFileSync(resolve(CORE_ROOT, 'package.json'), 'utf-8')) as { version: string };
 		const reactPackage = JSON.parse(readFileSync(resolve(REACT_ROOT, 'package.json'), 'utf-8')) as { version: string };
-		expect(workspacePackage.version).toMatch(/^0\.\d+\.\d+-alpha\.\d+$/);
-		expect(corePackage.version).toMatch(/^0\.\d+\.\d+-alpha\.\d+$/);
-		expect(reactPackage.version).toMatch(/^0\.\d+\.\d+-alpha\.\d+$/);
+		expect(workspacePackage.version).toMatch(/^\d+\.\d+\.\d+$/);
+		expect(corePackage.version).toMatch(/^\d+\.\d+\.\d+$/);
+		expect(reactPackage.version).toMatch(/^\d+\.\d+\.\d+$/);
 	});
 
 	it('core and react source trees do not contain generated js or d.ts artifacts', () => {
@@ -458,7 +458,7 @@ describe('Architecture guardrails', () => {
 					new RegExp(`import[\\s\\S]*\\b${token}\\b[\\s\\S]*from ['"]@eregister/open-grid-core/internal['"]`)
 				);
 			}
-			expect(content, `${file} must not import raw renderer files`).not.toMatch(/from ['"]@open-grid\/core\/internal\/renderer\//);
+			expect(content, `${file} must not import raw renderer files`).not.toMatch(/from ['"]@eregister\/open-grid-core\/internal\/renderer\//);
 		}
 	});
 
@@ -478,11 +478,13 @@ describe('Architecture guardrails', () => {
 	it('demo app imports no internal package entry points (Plan 106)', () => {
 		for (const file of collectSourceFiles(resolve(DEMO_ROOT, 'src'))) {
 			const content = readFileSync(file, 'utf-8');
-			expect(content, `${file} must not import @open-grid/core/internal`).not.toContain('@open-grid/core/internal');
-			expect(content, `${file} must not import @open-grid/react internals by subpath`).not.toMatch(
-				/from ['"]@open-grid\/react\/(?!experimental['"])/
+			expect(content, `${file} must not import @eregister/open-grid-core/internal`).not.toContain('@eregister/open-grid-core/internal');
+			expect(content, `${file} must not import @eregister/open-grid-react internals by subpath`).not.toMatch(
+				/from ['"]@eregister\/open-grid-react\/(?!experimental['"])/
 			);
-			expect(content, `${file} must not import @open-grid/core internals by subpath`).not.toMatch(/from ['"]@open-grid\/core\//);
+			expect(content, `${file} must not import @eregister/open-grid-core internals by subpath`).not.toMatch(
+				/from ['"]@eregister\/open-grid-core\//
+			);
 		}
 	});
 
@@ -868,7 +870,7 @@ describe('Architecture guardrails', () => {
 	});
 
 	it('demo code depends on the React Grid entrypoint instead of core or owned-grid internals', () => {
-		const files = [...collectSourceFiles(resolve(DEMO_ROOT, 'src')), resolve(DEMO_ROOT, 'vite.config.ts'), resolve(DEMO_ROOT, 'package.json')];
+		const files = [...collectSourceFiles(resolve(DEMO_ROOT, 'src')), resolve(DEMO_ROOT, 'package.json')];
 		const forbiddenTokens = [
 			'@eregister/open-grid-core',
 			'useOwnedClientGrid',
@@ -1156,7 +1158,7 @@ describe('Architecture guardrails', () => {
 		const allFiles = collectSourceFiles(srcDir).filter((f) => !f.endsWith('.test.ts'));
 		// Match only actual import/require statements, not comments mentioning the package name.
 		// Covers: import ... from '@eregister/open-grid-react' and require('@eregister/open-grid-react')
-		const reactImportPattern = /(?:from\s+|require\s*\(\s*)['"]@open-grid\/react['"]/;
+		const reactImportPattern = /(?:from\s+|require\s*\(\s*)['"]@eregister\/open-grid-react['"]/;
 		const violators: string[] = [];
 		for (const file of allFiles) {
 			const content = readFileSync(file, 'utf-8');

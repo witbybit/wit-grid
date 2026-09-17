@@ -96,8 +96,8 @@ Verify: API report, `pack:verify`, core/react builds, and tarball contents.
 
 ## Commands
 
-- `corepack pnpm --filter @open-grid/core exec tsc --noEmit`
-- `corepack pnpm --filter @open-grid/core test`
+- `corepack pnpm --filter @eregister/open-grid-core exec tsc --noEmit`
+- `corepack pnpm --filter @eregister/open-grid-core test`
 - `corepack pnpm run test:architecture`
 - `corepack pnpm run test:adversarial`
 - `corepack pnpm run bench`
@@ -131,4 +131,4 @@ Every command must exit 0. Use fake schedulers/deferred promises for concurrency
 
 ## Maintenance notes
 
-The permanent renderer contract is: scroll work is proportional to visible rows × visible columns, with no whole-model walk or global DOM query. Future row models must pass the shared composition matrix. Keep `@open-grid/core/internal` adapter-only.
+The permanent renderer contract is: scroll work is proportional to visible rows × visible columns, with no whole-model walk or global DOM query. Future row models must pass the shared composition matrix. Keep `@eregister/open-grid-core/internal` adapter-only.

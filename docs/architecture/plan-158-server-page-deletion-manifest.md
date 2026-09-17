@@ -42,8 +42,8 @@ Allowed remaining hits are historical migration notes in `docs/architecture/*` o
 
 The core demolition/replacement slice was committed only after:
 
-- `corepack pnpm --filter @open-grid/core exec tsc --noEmit`
-- `corepack pnpm --filter @open-grid/core test`
+- `corepack pnpm --filter @eregister/open-grid-core exec tsc --noEmit`
+- `corepack pnpm --filter @eregister/open-grid-core test`
 - Result: `111` test files passed, `1900` tests passed
 
 Plan 158 is complete only after React tests, root build, and the plan index update also pass.

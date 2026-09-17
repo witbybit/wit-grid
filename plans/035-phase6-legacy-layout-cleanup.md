@@ -47,12 +47,12 @@ header bands). Three narrow legacy shortcuts survived into the working tree:
 
 ## Commands
 
-| Purpose     | Command                                         | Expected |
-| ----------- | ----------------------------------------------- | -------- |
+| Purpose     | Command                                                   | Expected |
+| ----------- | --------------------------------------------------------- | -------- |
 | Build core  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0   |
 | Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0   |
 | React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0   |
-| Demo build  | `corepack pnpm --filter demo-app build`         | exit 0   |
+| Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0   |
 
 ## Steps
 

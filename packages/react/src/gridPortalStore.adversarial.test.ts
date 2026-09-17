@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ColumnDef, VisualRow } from '@open-grid/core';
+import type { ColumnDef, VisualRow } from '@eregister/open-grid-core';
 import { createPortalStore } from './gridPortalStore.js';
 
 interface TestRow {

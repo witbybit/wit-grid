@@ -1,14 +1,14 @@
-# @open-grid/core
+# @eregister/open-grid-core
 
 Framework-agnostic grid core for the Open Grid alpha. The application API is
-published from `@open-grid/core`.
+published from `@eregister/open-grid-core`.
 
 ## Factories
 
 Use one factory per grid instance:
 
 ```ts
-import { createClientGrid, createInfiniteGrid, createServerSideGrid } from '@open-grid/core';
+import { createClientGrid, createInfiniteGrid, createServerSideGrid } from '@eregister/open-grid-core';
 
 const client = createClientGrid({
 	columns: [{ field: 'name', header: 'Name' }],
@@ -54,16 +54,16 @@ or its datasource/query changes.
 
 ## Entrypoint stability
 
-- `@open-grid/core` is the supported alpha application surface. It remains
+- `@eregister/open-grid-core` is the supported alpha application surface. It remains
   pre-release and may change between alpha versions.
-- `@open-grid/core/experimental` contains incubating APIs with no compatibility
+- `@eregister/open-grid-core/experimental` contains incubating APIs with no compatibility
   promise.
-- `@open-grid/core/internal` is an adapter-only host contract used by framework
+- `@eregister/open-grid-core/internal` is an adapter-only host contract used by framework
   bindings. It deliberately does not expose stores, engines, row models, or
   renderer implementation classes, and application code should not depend on
   it.
 
 The checked `api-contract.md` records the emitted declaration surface for all
-three entries. Run `pnpm --filter @open-grid/core run api:check` after changing
+three entries. Run `pnpm --filter @eregister/open-grid-core run api:check` after changing
 an exported type, and explicitly regenerate/review the contract when that
 change is intentional.

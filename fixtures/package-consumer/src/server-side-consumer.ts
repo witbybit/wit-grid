@@ -1,4 +1,4 @@
-import { createServerSideGrid, type ColumnDef, type ServerSideDatasource } from '@open-grid/core';
+import { createServerSideGrid, type ColumnDef, type ServerSideDatasource } from '@eregister/open-grid-core';
 
 interface Row {
 	id: string;

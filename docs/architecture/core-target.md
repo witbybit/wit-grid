@@ -269,8 +269,8 @@ A physical identity is a transient DOM slot assignment that may change on every 
 
 ## 7. Package boundary
 
-| Package            | Role                                                             | Allowed consumers            |
-| ------------------ | ---------------------------------------------------------------- | ---------------------------- |
+| Package                      | Role                                                             | Allowed consumers            |
+| ---------------------------- | ---------------------------------------------------------------- | ---------------------------- |
 | `@eregister/open-grid-core`  | Engine, state, row pipeline, physical renderer, host integration | framework adapters, demo app |
 | `@eregister/open-grid-react` | React adapter (component, hooks, portals)                        | React applications           |
 

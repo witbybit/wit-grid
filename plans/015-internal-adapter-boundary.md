@@ -164,15 +164,15 @@ it('exports renderer classes', () => {
 
 ## Commands you will need
 
-| Purpose                 | Command                                                                                        | Expected on success  |
-| ----------------------- | ---------------------------------------------------------------------------------------------- | -------------------- |
+| Purpose                 | Command                                                                                                  | Expected on success  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
 | Core build              | `corepack pnpm --filter @eregister/open-grid-core build`                                                 | exit 0               |
 | React build             | `corepack pnpm --filter @eregister/open-grid-react build`                                                | exit 0               |
 | Core boundary tests     | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts`                  | exit 0               |
 | Core architecture tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts` | exit 0               |
 | Core full tests         | `corepack pnpm --filter @eregister/open-grid-core test`                                                  | all core tests pass  |
 | React full tests        | `corepack pnpm --filter @eregister/open-grid-react test`                                                 | all React tests pass |
-| Demo build              | `corepack pnpm --filter demo-app build`                                                        | exit 0               |
+| Demo build              | `corepack pnpm --filter demo-app build`                                                                  | exit 0               |
 
 Run package builds sequentially. Run the demo build only after core and React
 builds pass.

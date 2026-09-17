@@ -3,16 +3,15 @@
 	"compilerOptions": {
 		"outDir": "./dist",
 		"rootDir": "./src",
-		"baseUrl": "../..",
 		"paths": {
-			"@eregister/open-grid-core": ["packages/core/dist/index.d.ts"],
-			"@eregister/open-grid-core/experimental": ["packages/core/dist/experimental.d.ts"],
-			"@eregister/open-grid-core/internal": ["packages/core/dist/internal.d.ts"]
+			"@eregister/open-grid-core": ["../../packages/core/dist/index.d.ts"],
+			"@eregister/open-grid-core/experimental": ["../../packages/core/dist/experimental.d.ts"],
+			"@eregister/open-grid-core/internal": ["../../packages/core/dist/internal.d.ts"]
 		},
 		"jsx": "react-jsx",
 		"sourceMap": false,
 		"declarationMap": false
 	},
-	"include": ["src/**/*"],
+	"include": ["src/**/*", "css.d.ts"],
 	"exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "dist", "node_modules"]
 }

@@ -27,13 +27,13 @@ Replay turns a trace into a reproducible bug artifact: load a redacted trace, st
 
 ## Commands
 
-| Gate        | Command                                                                                          | Expected |
-| ----------- | ------------------------------------------------------------------------------------------------ | -------- |
-| Replay      | `corepack pnpm --filter @open-grid/core exec vitest run src/diagnostics/GridTraceReplay.test.ts` | exit 0   |
-| Adversarial | `corepack pnpm run test:adversarial`                                                             | exit 0   |
-| Core        | `corepack pnpm run verify:core`                                                                  | exit 0   |
-| React       | `corepack pnpm --filter @open-grid/react test`                                                   | exit 0   |
-| Build       | `corepack pnpm run build`                                                                        | exit 0   |
+| Gate        | Command                                                                                                    | Expected |
+| ----------- | ---------------------------------------------------------------------------------------------------------- | -------- |
+| Replay      | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/diagnostics/GridTraceReplay.test.ts` | exit 0   |
+| Adversarial | `corepack pnpm run test:adversarial`                                                                       | exit 0   |
+| Core        | `corepack pnpm run verify:core`                                                                            | exit 0   |
+| React       | `corepack pnpm --filter @eregister/open-grid-react test`                                                   | exit 0   |
+| Build       | `corepack pnpm run build`                                                                                  | exit 0   |
 
 ## Scope
 

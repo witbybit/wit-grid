@@ -124,7 +124,7 @@ function createInitialState<TRowData>(
 
 function warnInitialOnlyGridProp(propName: string): void {
 	console.warn(
-		`[open-grid/react] Prop "${propName}" is initial-only on <Grid /> after mount. ` +
+		`[@eregister/open-grid-react] Prop "${propName}" is initial-only on <Grid /> after mount. ` +
 			'Changing it does not reconfigure the existing grid instance. Remount the grid if you need the new value to take effect.'
 	);
 }

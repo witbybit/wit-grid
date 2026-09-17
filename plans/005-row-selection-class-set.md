@@ -38,8 +38,8 @@ if (state.selectedRowIds.length > 0 && state.selectedRowIds.includes(node.id)) {
 
 ## Commands you will need
 
-| Purpose        | Command                                                                                          | Expected on success          |
-| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------- |
+| Purpose        | Command                                                                                                    | Expected on success          |
+| -------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Core test file | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/runtimePerformance.test.ts` | exit 0, all tests pass       |
 | Core tests     | `corepack pnpm --filter @eregister/open-grid-core test`                                                    | exit 0, all tests pass       |
 | Core build     | `corepack pnpm --filter @eregister/open-grid-core build`                                                   | exit 0, no TypeScript errors |

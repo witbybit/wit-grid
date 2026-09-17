@@ -84,19 +84,19 @@ Repository-wide production search at the planned commit shows:
 
 ## Commands you will need
 
-| Purpose           | Command                                                                                                            | Expected on success                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Focused row model | `corepack pnpm --filter @open-grid/core exec vitest run src/rowModel.test.ts src/engine/GridChangeApplier.test.ts` | exit 0                                                                   |
-| Architecture      | `corepack pnpm run test:architecture`                                                                              | exit 0, or only the recorded Plan 164 replay-scheduler baseline mismatch |
-| Adversarial       | `corepack pnpm run test:adversarial`                                                                               | exit 0                                                                   |
-| Core test         | `corepack pnpm --filter @open-grid/core test`                                                                      | exit 0, except no accepted baseline weakening                            |
-| Build             | `corepack pnpm run build:packages`                                                                                 | exit 0                                                                   |
-| API               | `corepack pnpm run api:check`                                                                                      | exit 0, no contract drift                                                |
-| Performance       | `corepack pnpm run bench`                                                                                          | exit 0                                                                   |
-| Long session      | `corepack pnpm run bench:long-session`                                                                             | exit 0                                                                   |
-| Package           | `corepack pnpm run pack:verify`                                                                                    | exit 0                                                                   |
-| Formatting        | `corepack pnpm exec prettier --check packages/core/src/rowModel.ts packages/core/src/engine/GridDomainMutation.ts` | exit 0                                                                   |
-| Diff hygiene      | `git diff --check`                                                                                                 | no output, exit 0                                                        |
+| Purpose           | Command                                                                                                                      | Expected on success                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Focused row model | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/engine/GridChangeApplier.test.ts` | exit 0                                                                   |
+| Architecture      | `corepack pnpm run test:architecture`                                                                                        | exit 0, or only the recorded Plan 164 replay-scheduler baseline mismatch |
+| Adversarial       | `corepack pnpm run test:adversarial`                                                                                         | exit 0                                                                   |
+| Core test         | `corepack pnpm --filter @eregister/open-grid-core test`                                                                      | exit 0, except no accepted baseline weakening                            |
+| Build             | `corepack pnpm run build:packages`                                                                                           | exit 0                                                                   |
+| API               | `corepack pnpm run api:check`                                                                                                | exit 0, no contract drift                                                |
+| Performance       | `corepack pnpm run bench`                                                                                                    | exit 0                                                                   |
+| Long session      | `corepack pnpm run bench:long-session`                                                                                       | exit 0                                                                   |
+| Package           | `corepack pnpm run pack:verify`                                                                                              | exit 0                                                                   |
+| Formatting        | `corepack pnpm exec prettier --check packages/core/src/rowModel.ts packages/core/src/engine/GridDomainMutation.ts`           | exit 0                                                                   |
+| Diff hygiene      | `git diff --check`                                                                                                           | no output, exit 0                                                        |
 
 ## Scope
 

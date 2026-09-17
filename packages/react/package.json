@@ -1,6 +1,6 @@
 {
 	"name": "@eregister/open-grid-react",
-	"version": "1.4.0",
+	"version": "1.4.1",
 	"description": "React bindings for the headless high-performance spreadsheet and grid engine core",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -34,7 +34,7 @@
 		"test": "vitest run"
 	},
 	"dependencies": {
-		"@eregister/open-grid-core": "*"
+		"@eregister/open-grid-core": "workspace:*"
 	},
 	"peerDependencies": {
 		"react": "^18.0.0 || ^19.0.0",

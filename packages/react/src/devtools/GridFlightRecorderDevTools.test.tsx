@@ -6,7 +6,7 @@ import type { GridCausalTraceSnapshot } from '@eregister/open-grid-core/experime
 
 let currentSnapshot: GridCausalTraceSnapshot;
 const { start, clear, stop, getSnapshot } = vi.hoisted(() => ({ start: vi.fn(), clear: vi.fn(), stop: vi.fn(), getSnapshot: vi.fn() }));
-vi.mock('@open-grid/core/experimental', async () => {
+vi.mock('@eregister/open-grid-core/experimental', async () => {
 	const actual = await vi.importActual<typeof import('@eregister/open-grid-core/experimental')>('@eregister/open-grid-core/experimental');
 	return {
 		...actual,

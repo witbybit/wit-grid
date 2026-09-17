@@ -46,8 +46,8 @@ const values = descendantLeafNodes.map((n) => context.getValue(n, field)).filter
 
 ## Commands you will need
 
-| Purpose         | Command                                                                                         | Expected on success          |
-| --------------- | ----------------------------------------------------------------------------------------------- | ---------------------------- |
+| Purpose         | Command                                                                                                   | Expected on success          |
+| --------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | Aggregate tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` | exit 0, all tests pass       |
 | Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts`                | exit 0, all tests pass       |
 | Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                                  | exit 0, no TypeScript errors |

@@ -194,10 +194,10 @@ If the event typing becomes awkward, prefer a small helper method per event over
 
 | Purpose      | Command                                                                                                               | Expected |
 | ------------ | --------------------------------------------------------------------------------------------------------------------- | -------- |
-| Core build   | `corepack pnpm --filter @eregister/open-grid-core build`                                                                        | exit 0   |
-| Core tests   | `corepack pnpm --filter @eregister/open-grid-core test`                                                                         | exit 0   |
-| React build  | `corepack pnpm --filter @eregister/open-grid-react build`                                                                       | exit 0   |
-| React tests  | `corepack pnpm --filter @eregister/open-grid-react test`                                                                        | exit 0   |
+| Core build   | `corepack pnpm --filter @eregister/open-grid-core build`                                                              | exit 0   |
+| Core tests   | `corepack pnpm --filter @eregister/open-grid-core test`                                                               | exit 0   |
+| React build  | `corepack pnpm --filter @eregister/open-grid-react build`                                                             | exit 0   |
+| React tests  | `corepack pnpm --filter @eregister/open-grid-react test`                                                              | exit 0   |
 | Demo build   | `corepack pnpm --filter demo-app build`                                                                               | exit 0   |
 | Format check | `corepack pnpm exec prettier --check packages/core/src packages/react/src plans/011-feature-boundary-architecture.md` | exit 0   |
 

@@ -121,9 +121,9 @@ Run:
 
 ```powershell
 rg -n "GridEngineRenderBridge|renderBridge" packages/core/src --glob '!*.test.ts'
-corepack pnpm --filter @open-grid/core exec vitest run src/store.test.ts src/engine/GridChangeApplier.test.ts src/engine/architectureGuards.test.ts
-corepack pnpm --filter @open-grid/core exec vitest run
-corepack pnpm --filter @open-grid/react test
+corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/engine/GridChangeApplier.test.ts src/engine/architectureGuards.test.ts
+corepack pnpm --filter @eregister/open-grid-core exec vitest run
+corepack pnpm --filter @eregister/open-grid-react test
 corepack pnpm run build:packages
 corepack pnpm run bench
 corepack pnpm run bench:long-session

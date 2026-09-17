@@ -26,12 +26,12 @@ The commit kernel is only truly authoritative if derived state, domain version b
 
 ## Commands you will need
 
-| Purpose           | Command                                       | Expected on success |
-| ----------------- | --------------------------------------------- | ------------------- |
-| Architecture gate | `corepack pnpm run test:architecture`         | exit 0              |
+| Purpose           | Command                                                 | Expected on success |
+| ----------------- | ------------------------------------------------------- | ------------------- |
+| Architecture gate | `corepack pnpm run test:architecture`                   | exit 0              |
 | Core tests        | `corepack pnpm --filter @eregister/open-grid-core test` | exit 0              |
-| Workspace tests   | `corepack pnpm run test`                      | exit 0              |
-| Build/typecheck   | `corepack pnpm run build`                     | exit 0              |
+| Workspace tests   | `corepack pnpm run test`                                | exit 0              |
+| Build/typecheck   | `corepack pnpm run build`                               | exit 0              |
 
 ## Scope
 
