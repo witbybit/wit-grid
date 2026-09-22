@@ -5,9 +5,10 @@
 	"description": "Headless high-performance spreadsheet and grid engine",
 	"packageManager": "pnpm@10.33.0",
 	"scripts": {
-		"build": "pnpm run build:packages && pnpm run build:demo",
+		"build": "pnpm run build:packages && pnpm run build:demo && pnpm run build:site",
 		"build:packages": "pnpm --filter @eregister/wit-grid-core run build && pnpm --filter @eregister/wit-grid-react run build",
 		"build:demo": "pnpm --filter \"demo-app\" run build",
+		"build:site": "pnpm --filter \"wit-grid-site\" run build",
 		"test": "pnpm --filter @eregister/wit-grid-core run test && pnpm --filter @eregister/wit-grid-react run test",
 		"test:architecture": "pnpm --filter @eregister/wit-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts && pnpm --filter @eregister/wit-grid-react exec vitest run src/boundary.test.tsx",
 		"test:adversarial": "pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts && pnpm --filter @eregister/wit-grid-react exec vitest run src/gridPortalStore.adversarial.test.ts",
@@ -19,6 +20,7 @@
 		"pack:verify": "node ./scripts/pack-verify.mjs",
 		"verify:core": "pnpm run typecheck:core && pnpm run format:check && pnpm run lint:core && pnpm --filter @eregister/wit-grid-core run test && pnpm run test:architecture && pnpm run test:adversarial && pnpm run api:check && pnpm run pack:verify",
 		"dev:demo": "pnpm --filter \"demo-app\" run dev",
+		"dev:site": "pnpm --filter \"wit-grid-site\" run dev",
 		"format": "prettier --write .",
 		"format:check": "prettier --check ."
 	},
