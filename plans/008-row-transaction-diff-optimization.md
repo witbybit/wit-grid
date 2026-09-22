@@ -45,9 +45,9 @@ const allKeys = new Set([...Object.keys(prevRow as object), ...Object.keys(row a
 
 | Purpose         | Command                                                                                          | Expected on success          |
 | --------------- | ------------------------------------------------------------------------------------------------ | ---------------------------- |
-| Row store tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/RowDataStore.test.ts` | exit 0, all tests pass       |
-| Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts`       | exit 0, all tests pass       |
-| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                         | exit 0, no TypeScript errors |
+| Row store tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/RowDataStore.test.ts` | exit 0, all tests pass       |
+| Core perf tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts`       | exit 0, all tests pass       |
+| Core build      | `corepack pnpm --filter @eregister/wit-grid-core build`                                         | exit 0, no TypeScript errors |
 
 ## Scope
 
@@ -77,7 +77,7 @@ Extend `RowDataStore.test.ts` so any diff refactor is pinned down:
 
 Cover both `updateRows` and `applyTransaction({ update })` if practical.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/RowDataStore.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/RowDataStore.test.ts` -> exit 0.
 
 ### Step 2: Replace Set-of-keys diff with a shared two-pass helper
 
@@ -90,13 +90,13 @@ In `RowDataStore.ts`, add a private helper function that:
 
 Use this helper in both `updateRows` and `applyTransaction`.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/RowDataStore.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/RowDataStore.test.ts` -> exit 0.
 
 ### Step 3: Add a wide-row regression check
 
 Add a performance-oriented test in `performance.test.ts` or `RowDataStore.test.ts` that updates many wide rows where each changed row mutates one field. Assert exactly the expected changed nodes and one changed field per changed row.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts src/rows/RowDataStore.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts src/rows/RowDataStore.test.ts` -> exit 0.
 
 ## Test plan
 
@@ -109,8 +109,8 @@ Add a performance-oriented test in `performance.test.ts` or `RowDataStore.test.t
 - [ ] The duplicated `new Set([...Object.keys(...), ...Object.keys(...)])` patterns are removed from `RowDataStore.ts`.
 - [ ] Changed field/value reporting is unchanged for existing consumers.
 - [ ] Wide-row update regression coverage exists.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 
 ## STOP conditions
 

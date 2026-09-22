@@ -664,12 +664,12 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		() => {};
 	public listViews = (): Promise<readonly GridViewDefinition[]> => Promise.resolve([]);
 	public saveView = (_name: string, _options?: SaveViewOptions): Promise<GridViewDefinition> =>
-		Promise.reject(new Error('[open-grid] No workspace adapter configured'));
+		Promise.reject(new Error('[wit-grid] No workspace adapter configured'));
 	public updateView = (_id: string, _state?: PersistedGridState): Promise<void> => Promise.resolve();
 	public applyView = (_id: string): Promise<void> => Promise.resolve();
 	public deleteView = (_id: string): Promise<void> => Promise.resolve();
 	public duplicateView = (_id: string, _name: string): Promise<GridViewDefinition> =>
-		Promise.reject(new Error('[open-grid] No workspace adapter configured'));
+		Promise.reject(new Error('[wit-grid] No workspace adapter configured'));
 	public renameView = (_id: string, _name: string): Promise<void> => Promise.resolve();
 	public setDefaultView = (_id: string | null): Promise<void> => Promise.resolve();
 

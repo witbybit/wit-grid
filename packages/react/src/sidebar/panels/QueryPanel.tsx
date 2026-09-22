@@ -2,7 +2,7 @@ import React, { useCallback, useId, useRef, useState } from 'react';
 import type { GridApi, GridQueryModel, GridQueryGroup, GridQueryCondition, GridQueryNode } from '../../types.js';
 import { createEmptyQueryModel, getQueryOperatorsForType } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';
-import type { ThemeTokens } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 

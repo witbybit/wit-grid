@@ -1,12 +1,12 @@
-# Plan 150: Make Open Grid Easy to Integrate Into Real Business Workflows
+# Plan 150: Make Wit Grid Easy to Integrate Into Real Business Workflows
 
 ## Mission
 
-Build the import/export and interoperability foundation that lets product teams move data in and out of Open Grid confidently, with enough fidelity and control for real applications rather than demo-only flows.
+Build the import/export and interoperability foundation that lets product teams move data in and out of Wit Grid confidently, with enough fidelity and control for real applications rather than demo-only flows.
 
 ## Why now
 
-A grid does not become the default choice if it is hard to connect to the rest of a business workflow. Users need reliable export, import-adjacent write behavior, formatting fidelity, and integration hooks that make Open Grid practical in apps with spreadsheets, reporting, and data exchange requirements.
+A grid does not become the default choice if it is hard to connect to the rest of a business workflow. Users need reliable export, import-adjacent write behavior, formatting fidelity, and integration hooks that make Wit Grid practical in apps with spreadsheets, reporting, and data exchange requirements.
 
 ## Focus areas
 

@@ -40,7 +40,7 @@ export interface RuntimeFaultReporterOptions<TRowData = unknown> {
 }
 
 function defaultRuntimeFaultLogger(fault: RuntimeFault): void {
-	console.error(`[OpenGrid runtime fault] ${fault.source}:${fault.operation} - ${fault.message}`, fault.error);
+	console.error(`[WitGrid runtime fault] ${fault.source}:${fault.operation} - ${fault.message}`, fault.error);
 }
 
 function toFaultMessage(error: unknown): string {

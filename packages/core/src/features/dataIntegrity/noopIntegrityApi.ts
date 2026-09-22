@@ -8,7 +8,7 @@ import type {
 } from './integrityTypes.js';
 
 export function makeNoopIntegrityApi<TRowData>(): GridIntegrityApi<TRowData> {
-	const _warn = (method: string) => console.warn(`[OpenGrid] api.integrity.${method}() called but dataIntegrity is not configured on this grid.`);
+	const _warn = (method: string) => console.warn(`[WitGrid] api.integrity.${method}() called but dataIntegrity is not configured on this grid.`);
 	const _noopSummary = (): GridIntegritySummary => ({
 		status: 'clean',
 		totalIssues: 0,
@@ -119,7 +119,7 @@ export function makeNoopIntegrityApi<TRowData>(): GridIntegrityApi<TRowData> {
 		},
 		createStream: () => {
 			_warn('createStream');
-			throw new Error('[OpenGrid] dataIntegrity is not configured on this grid.');
+			throw new Error('[WitGrid] dataIntegrity is not configured on this grid.');
 		},
 		getStreamState: () => {
 			_warn('getStreamState');

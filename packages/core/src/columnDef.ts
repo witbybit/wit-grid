@@ -580,13 +580,13 @@ export function validateColumns<TRowData>(columns: ColumnDef<TRowData>[]): void 
 		const id = column.field;
 
 		if (!id) {
-			throw new Error('Open Grid: every column must have a non-empty field.');
+			throw new Error('Wit Grid: every column must have a non-empty field.');
 		}
 
 		seen.add(id);
 
 		if (column.width != null && (!Number.isFinite(column.width) || column.width <= 0)) {
-			throw new Error(`Open Grid: invalid width for column "${id}". Width must be a positive finite number, got ${column.width}.`);
+			throw new Error(`Wit Grid: invalid width for column "${id}". Width must be a positive finite number, got ${column.width}.`);
 		}
 	}
 }

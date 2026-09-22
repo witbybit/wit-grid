@@ -118,8 +118,8 @@ The store should reconcile mount descriptors, not reproduce core renderer state.
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Tests must cover stale portal updates after rebind, one-cell edit notifications, blur/Enter/API commit parity, validation failure, async completion, cancellation, and exactly-once edit events.

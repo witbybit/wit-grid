@@ -1,12 +1,12 @@
 import React, { useState, useCallback } from 'react';
-import { BUILT_IN_THEMES, type BuiltInThemeName, type ThemeTokens } from '@eregister/open-grid-react';
+import { BUILT_IN_THEMES, type BuiltInThemeName, type ThemeTokens } from '@eregister/wit-grid-react';
 
 interface CSSThemeStudioProps {
 	onThemeSelect?: (themeName: BuiltInThemeName, theme: ThemeTokens) => void;
 }
 
 /**
- * CSS Theme Studio - Interactive showcase for Open Grid themes
+ * CSS Theme Studio - Interactive showcase for Wit Grid themes
  *
  * Demonstrates:
  * - All built-in themes (light, dark, high-contrast, branded, minimal)
@@ -43,7 +43,7 @@ export const CSSThemeStudio: React.FC<CSSThemeStudioProps> = ({ onThemeSelect })
 		<div className='theme-studio'>
 			<div className='theme-studio-header'>
 				<h2>CSS Theme Studio</h2>
-				<p>Advanced theming system for Open Grid. Switch themes, inspect tokens, and customize colors.</p>
+				<p>Advanced theming system for Wit Grid. Switch themes, inspect tokens, and customize colors.</p>
 			</div>
 
 			{/* Theme Grid */}
@@ -142,7 +142,7 @@ export const CSSThemeStudio: React.FC<CSSThemeStudioProps> = ({ onThemeSelect })
 						<div className='export-section'>
 							<h4>Export Theme Configuration</h4>
 							<CopyableCode
-								code={`import { ThemeManager, createTheme } from '@eregister/open-grid-react';
+								code={`import { ThemeManager, createTheme } from '@eregister/wit-grid-react';
 
 // Use a built-in theme as-is
 api.switchTheme('${selectedTheme}');

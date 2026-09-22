@@ -17,7 +17,7 @@
 
 ## Why this matters
 
-Open Grid has strong correctness and performance boundaries, but repeated decomposition plans have also produced many controllers, coordinators, bridges, ports, registries, and protocol types. A broad “simplify everything” refactor would be dangerous because some of those abstractions isolate frameworks, untrusted input, lifecycle faults, or alternative row models. This plan makes ownership and execution paths explicit, measures conceptual complexity, and chooses exactly one deletion-oriented vertical slice whose benefit and safety can be proven before production code changes.
+Wit Grid has strong correctness and performance boundaries, but repeated decomposition plans have also produced many controllers, coordinators, bridges, ports, registries, and protocol types. A broad “simplify everything” refactor would be dangerous because some of those abstractions isolate frameworks, untrusted input, lifecycle faults, or alternative row models. This plan makes ownership and execution paths explicit, measures conceptual complexity, and chooses exactly one deletion-oriented vertical slice whose benefit and safety can be proven before production code changes.
 
 The target is not small files. The target is fewer facts with multiple owners, fewer semantic handoffs, fewer forwarding-only layers, and fewer concepts required to predict behavior—without weakening public behavior, performance budgets, diagnostic evidence, or optional-feature isolation.
 

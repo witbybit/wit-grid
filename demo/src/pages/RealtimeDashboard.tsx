@@ -9,7 +9,7 @@ import {
 	type StyleRule,
 	type GridIntegrityIssue,
 	type GridTransactionStreamHandle,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 import { Activity, BarChart3, Code2, RefreshCw, TrendingUp, Zap, ShieldCheck } from 'lucide-react';
 import { createDashboardColumns, createDashboardRows } from './demoGridConfigs';
 import type { DashboardStockRow } from '../components/FastRenderers';

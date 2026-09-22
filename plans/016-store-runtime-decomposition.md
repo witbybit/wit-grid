@@ -7,7 +7,7 @@
 > `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat 6b3ecc5..HEAD -- packages/core/src/store.ts packages/core/src/api/GridApi.ts packages/core/src/navigation.ts packages/core/src/contextMenu.ts packages/core/src/gridPlugins.ts packages/core/src/createGrid.ts packages/core/src/engine packages/core/src/boundary.test.ts packages/core/src/engine/architectureGuards.test.ts packages/core/src/store.test.ts packages/core/src/contextMenu.test.ts packages/react/src/OpenGrid.tsx packages/react/src/GridPortal.tsx`
+> `git diff --stat 6b3ecc5..HEAD -- packages/core/src/store.ts packages/core/src/api/GridApi.ts packages/core/src/navigation.ts packages/core/src/contextMenu.ts packages/core/src/gridPlugins.ts packages/core/src/createGrid.ts packages/core/src/engine packages/core/src/boundary.test.ts packages/core/src/engine/architectureGuards.test.ts packages/core/src/store.test.ts packages/core/src/contextMenu.test.ts packages/react/src/WitGrid.tsx packages/react/src/GridPortal.tsx`
 >
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
@@ -168,19 +168,19 @@ internalApi.registerPlugin(plugin);
       concrete cross-object reach-through. Follow the style introduced in
       `packages/core/src/features/DataMutationController.ts` and
       `packages/core/src/engine/GridStateReactionController.ts`.
-    - Plan 015 already narrowed `@eregister/open-grid-core/internal` to an adapter-facing
+    - Plan 015 already narrowed `@eregister/wit-grid-core/internal` to an adapter-facing
       host contract. This plan should preserve that sealed adapter boundary.
 
 ## Commands you will need
 
 | Purpose                      | Command                                                                                                                                                                 | Expected on success  |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Core build                   | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                | exit 0               |
-| Core full tests              | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                 | all core tests pass  |
-| Focused core runtime tests   | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/contextMenu.test.ts src/boundary.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
-| Focused effect/runtime tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                           | exit 0               |
-| React build                  | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                               | exit 0               |
-| React tests                  | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                | all React tests pass |
+| Core build                   | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                                                | exit 0               |
+| Core full tests              | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                 | all core tests pass  |
+| Focused core runtime tests   | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/contextMenu.test.ts src/boundary.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
+| Focused effect/runtime tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                           | exit 0               |
+| React build                  | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                                               | exit 0               |
+| React tests                  | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                                                | all React tests pass |
 | Demo build                   | `corepack pnpm --filter demo-app build`                                                                                                                                 | exit 0               |
 
 Run package builds sequentially. Run the demo build only after core and React
@@ -214,12 +214,12 @@ build/test commands pass.
 
 - No renderer decomposition of `renderEngine.ts`, `rowRenderer.ts`,
   `renderWindow.ts`, or renderer slot classes.
-- No public `@eregister/open-grid-core` application API redesign.
+- No public `@eregister/wit-grid-core` application API redesign.
 - No new grid features.
 - No formula language changes.
 - No persistence feature expansion beyond moving existing no-op/default wiring
   behind a cleaner facade.
-- Do not widen `@eregister/open-grid-core/internal` again. Plan 015's sealed adapter
+- Do not widen `@eregister/wit-grid-core/internal` again. Plan 015's sealed adapter
   surface must survive this refactor.
 
 ## Git workflow
@@ -245,8 +245,8 @@ assumes:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Split `InternalGridApi` into audience-specific runtime contracts
 
@@ -279,8 +279,8 @@ Requirements:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts` -> exit 0.
 
 ### Step 3: Extract plugin runtime ownership out of the mixed store surface
 
@@ -303,8 +303,8 @@ shrinking what plugin code can see.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/contextMenu.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/contextMenu.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 4: Remove `GridStore` downcasts from plugins
 
@@ -334,8 +334,8 @@ coupling.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/contextMenu.test.ts src/store.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/contextMenu.test.ts src/store.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 5: Thin `GridStore` into coherent public/internal facades
 
@@ -364,8 +364,8 @@ A good result looks like:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts` -> exit 0.
 
 ### Step 6: Strengthen guardrails around store/runtime boundaries
 
@@ -388,16 +388,16 @@ result of moving plugin or host responsibilities.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/boundary.test.ts --reporter=verbose` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts src/boundary.test.ts --reporter=verbose` -> exit 0.
 
 ### Step 7: Run full sequential verification
 
 Run these commands in order:
 
-1. `corepack pnpm --filter @eregister/open-grid-core build`
-2. `corepack pnpm --filter @eregister/open-grid-react build`
-3. `corepack pnpm --filter @eregister/open-grid-core test`
-4. `corepack pnpm --filter @eregister/open-grid-react test`
+1. `corepack pnpm --filter @eregister/wit-grid-core build`
+2. `corepack pnpm --filter @eregister/wit-grid-react build`
+3. `corepack pnpm --filter @eregister/wit-grid-core test`
+4. `corepack pnpm --filter @eregister/wit-grid-react test`
 5. `corepack pnpm --filter demo-app build`
 
 Expected: all exit 0.
@@ -436,13 +436,13 @@ All must hold:
       internal nexus for unrelated runtime responsibilities.
 - [ ] `store.ts` is below `850` lines, or `plans/README.md` explicitly records
       the intermediate guard and why.
-- [ ] `@eregister/open-grid-core/internal` remains sealed; this plan must not widen the
+- [ ] `@eregister/wit-grid-core/internal` remains sealed; this plan must not widen the
       adapter-facing internal entrypoint.
 - [ ] Architecture guards enforce the new store/plugin/runtime boundaries.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `plans/README.md` status for Plan 016 is updated.
 
@@ -459,7 +459,7 @@ Stop and report back if:
   navigation or context-menu semantics rather than just runtime wiring.
 - Hitting the `store.ts < 850` target would require unrelated renderer work or
   arbitrary file shuffling with no real ownership improvement.
-- Any step appears to require reopening the sealed `@eregister/open-grid-core/internal`
+- Any step appears to require reopening the sealed `@eregister/wit-grid-core/internal`
   barrel from Plan 015.
 
 ## Maintenance notes

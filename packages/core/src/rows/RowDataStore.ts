@@ -78,11 +78,11 @@ export class RowDataStore<T> {
 		// Validate before mutating any state so a bad input is a no-op.
 		const ids = rows.map((row, index) => {
 			if (row == null) {
-				throw new Error(`Open Grid: row at index ${index} is null or undefined.`);
+				throw new Error(`Wit Grid: row at index ${index} is null or undefined.`);
 			}
 			const id = this.getRowId(row);
 			if (typeof id !== 'string' || id.length === 0) {
-				throw new Error(`Open Grid: getRowId() returned an invalid id for row at index ${index}.`);
+				throw new Error(`Wit Grid: getRowId() returned an invalid id for row at index ${index}.`);
 			}
 			return id;
 		});

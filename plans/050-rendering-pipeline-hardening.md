@@ -103,7 +103,7 @@ Implementation note (2026-06-14): Phase 3 landed for the known failure classes. 
     - portal reconciliation: a horizontal-scroll new-column bind marks the cell dirty; post-scroll reconcile uses the real value.
     - z-banding: assert the pinned lane's effective z-band > focused/editor (computed-style or rule presence).
     - right-lane anchor: header right-lane origin == body/overlay right-lane origin (guard test).
-- Full suite: `corepack pnpm --filter @eregister/open-grid-core test` + `--filter @eregister/open-grid-react test`.
+- Full suite: `corepack pnpm --filter @eregister/wit-grid-core test` + `--filter @eregister/wit-grid-react test`.
 - **Hot-path guard**: `runtimePerformance.test.ts` + `serverRuntimePerformance.test.ts` must stay green (no new scroll-frame writes/reads).
 - Builds: core + react + demo.
 - **Browser caveat**: this host can't run the live grid (preview tab hidden → RAF paused; Control_Chrome is macOS-only). The fixes are asserted via jsdom + characterization tests; the user verifies the visuals (pin alignment/overlap, PageUp, custom-cell scroll) in a foreground browser.

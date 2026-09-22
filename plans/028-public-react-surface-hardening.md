@@ -6,7 +6,7 @@
 > API shape. When done, update the status row for this plan in `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat 1015f23..HEAD -- packages/react/src/OpenGrid.tsx packages/react/src/GridPortal.tsx packages/react/src/useGrid.ts packages/react/src/index.ts packages/react/src/index.test.tsx demo/src/components/GridShared.tsx demo/src/pages`
+> `git diff --stat 1015f23..HEAD -- packages/react/src/WitGrid.tsx packages/react/src/GridPortal.tsx packages/react/src/useGrid.ts packages/react/src/index.ts packages/react/src/index.test.tsx demo/src/components/GridShared.tsx demo/src/pages`
 > If any in-scope file has changed since this plan was written, compare the
 > "Current state" section against the live code before proceeding.
 
@@ -26,10 +26,10 @@ too many ownership modes through one overloaded convenience component. That is
 fine for a prototype; it is not the strongest public contract to freeze before
 the API becomes established.
 
-Right now `OpenGrid` handles inline client ownership, external `api` ownership,
+Right now `WitGrid` handles inline client ownership, external `api` ownership,
 and provider fallback all in one branchy entrypoint. At the same time,
 `useClientGrid` and `useServerGrid` hide lifecycle rules behind initial-only
-runtime warnings, and the demo app still mixes the old `OpenGrid` path with the
+runtime warnings, and the demo app still mixes the old `WitGrid` path with the
 more compositional `GridProvider` pattern. If we go live with that shape as the
 primary story, we will be teaching people the least explicit version of the API
 first.
@@ -47,30 +47,30 @@ cleaner contract with a better center of gravity:
 
 ## Current state
 
-- `packages/react/src/index.ts:1-8` exports `OpenGrid`, `GridProvider`,
+- `packages/react/src/index.ts:1-8` exports `WitGrid`, `GridProvider`,
   `useClientGrid`, `useServerGrid`, portal helpers, and pagination, but no
   explicit `ClientGrid`, `ServerGrid`, or public `GridView` component.
-- `packages/react/src/OpenGrid.tsx:39-107` gives one component three ownership
+- `packages/react/src/WitGrid.tsx:39-107` gives one component three ownership
   modes: inline client data, external `api`, and `GridProvider` fallback.
 - `packages/react/src/useGrid.ts:20-91` and `102-173` accept flat option bags,
   but some fields are actually initial-only and are guarded only by console
   warnings after mount.
-- `packages/react/src/OpenGrid.tsx:16` and
+- `packages/react/src/WitGrid.tsx:16` and
   `packages/react/src/GridPortal.tsx:25` still reach into
-  `@eregister/open-grid-core/internal` for mount and renderer-capability plumbing. That is
+  `@eregister/wit-grid-core/internal` for mount and renderer-capability plumbing. That is
   a narrow dependency today, but it should be concentrated into one tiny React
   bridge module rather than spread across the public surface.
 - `demo/src/components/GridShared.tsx:429-498` already has a local `GridView`
-  wrapper that composes `OpenGrid`; that is the right migration template to
+  wrapper that composes `WitGrid`; that is the right migration template to
   promote into the public API.
-- Representative demo pages still import `OpenGrid` directly:
+- Representative demo pages still import `WitGrid` directly:
   `demo/src/pages/RowMultiSelectDemo.tsx:12,283`,
   `demo/src/pages/SidebarPanelsDemo.tsx:2,208`,
   `demo/src/pages/RealtimeGroupingDemo.tsx:2,373`,
   `demo/src/pages/NestedTablesGrouping.tsx:2,289,552,564,575`, and similar
   showcase pages.
 - `packages/react/src/index.test.tsx:1453-1507` already characterizes the old
-  inline `OpenGrid` behavior and the "missing ownership mode" throw. That test
+  inline `WitGrid` behavior and the "missing ownership mode" throw. That test
   file is the right place to evolve the surface assertions rather than layering
   a second, parallel characterization suite.
 
@@ -78,17 +78,17 @@ cleaner contract with a better center of gravity:
 
 | Purpose     | Command                                                   | Expected on success |
 | ----------- | --------------------------------------------------------- | ------------------- |
-| Build core  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0              |
-| Build react | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0              |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0              |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0              |
+| Build core  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0              |
+| Build react | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0              |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0              |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0              |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0              |
 
 ## Scope
 
 **In scope**:
 
-- `packages/react/src/OpenGrid.tsx`
+- `packages/react/src/WitGrid.tsx`
 - `packages/react/src/GridPortal.tsx`
 - `packages/react/src/useGrid.ts`
 - `packages/react/src/index.ts`
@@ -99,7 +99,7 @@ cleaner contract with a better center of gravity:
 - `demo/src/pages/SidebarPanelsDemo.tsx`
 - `demo/src/pages/RealtimeGroupingDemo.tsx`
 - `demo/src/pages/NestedTablesGrouping.tsx`
-- other demo pages only if they still import `OpenGrid` after the main migration
+- other demo pages only if they still import `WitGrid` after the main migration
 
 **Out of scope**:
 
@@ -119,19 +119,19 @@ people to use:
 - `GridView` for render-only composition against an existing `api` or
   `GridProvider`,
 - keep `GridProvider` as the context bridge,
-- keep `OpenGrid` only as compatibility sugar around the new primitives.
+- keep `WitGrid` only as compatibility sugar around the new primitives.
 
 At the same time, create one small React-owned host bridge module that is the
-only place in `packages/react/src` allowed to import `@eregister/open-grid-core/internal`
-for mount/imperative-renderer wiring. `OpenGrid`, `GridPortal`, and the new
+only place in `packages/react/src` allowed to import `@eregister/wit-grid-core/internal`
+for mount/imperative-renderer wiring. `WitGrid`, `GridPortal`, and the new
 entrypoints should consume that bridge rather than importing core internals
 directly.
 
 Export the new public primitives from `packages/react/src/index.ts`, and mark
-`OpenGrid` as compatibility-only in the package docs/comments if you keep it
+`WitGrid` as compatibility-only in the package docs/comments if you keep it
 around.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react build` -> exit 0.
 
 ### Step 2: Make lifecycle mutability explicit in the React types
 
@@ -153,7 +153,7 @@ Add or update focused tests in `packages/react/src/index.test.tsx` to prove the
 new entrypoints mount correctly, the compatibility wrapper still works, and the
 initial-only fields remain stable after mount.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react test` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react test` -> exit 0.
 
 ### Step 3: Migrate the demo app to the recommended surface as part of the same pass
 
@@ -161,9 +161,9 @@ Use the demo as the acceptance path for the new public API, not as a passive
 consumer of the old one.
 
 Update `demo/src/components/GridShared.tsx` so its shared grid wrapper renders
-the public `GridView` instead of `OpenGrid`.
+the public `GridView` instead of `WitGrid`.
 
-Then convert the showcase pages that still import `OpenGrid` to the explicit
+Then convert the showcase pages that still import `WitGrid` to the explicit
 public primitives:
 
 - pages that already own an `api` should use `GridProvider` + `GridView`,
@@ -171,7 +171,7 @@ public primitives:
 - server-backed examples should use `ServerGrid`,
 - keep `GridProvider` only where nested/shared composition really needs it.
 
-Prefer removing `OpenGrid` imports from the demo entirely by the end of this
+Prefer removing `WitGrid` imports from the demo entirely by the end of this
 step. If a page truly cannot be expressed cleanly without the compatibility
 wrapper, stop and report which API gap remains instead of leaving the page
 half-migrated.
@@ -183,11 +183,11 @@ half-migrated.
 Add guardrail coverage that codifies the new intended surface:
 
 - the package barrel should expose the explicit primitives first,
-- `OpenGrid` should be tested as a compatibility path, not the recommended
+- `WitGrid` should be tested as a compatibility path, not the recommended
   contract,
-- the new public entrypoints should not reach into `@eregister/open-grid-core/internal`
+- the new public entrypoints should not reach into `@eregister/wit-grid-core/internal`
   directly outside the single host bridge module,
-- the demo should not import `OpenGrid` once the migration is complete.
+- the demo should not import `WitGrid` once the migration is complete.
 
 If necessary, add a small demo-side import guard or grep-style test so this
 does not regress silently when new pages are added later.
@@ -196,10 +196,10 @@ Update `plans/README.md` to mark this plan done and to document the new
 recommended public surface.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core build`
-`corepack pnpm --filter @eregister/open-grid-react build`
-`corepack pnpm --filter @eregister/open-grid-core test`
-`corepack pnpm --filter @eregister/open-grid-react test`
+`corepack pnpm --filter @eregister/wit-grid-core build`
+`corepack pnpm --filter @eregister/wit-grid-react build`
+`corepack pnpm --filter @eregister/wit-grid-core test`
+`corepack pnpm --filter @eregister/wit-grid-react test`
 `corepack pnpm --filter demo-app build`
 -> all exit 0.
 
@@ -208,21 +208,21 @@ recommended public surface.
 - Expand `packages/react/src/index.test.tsx` with explicit surface assertions for
   `ClientGrid`, `ServerGrid`, `GridView`, `GridProvider`, and the compatibility
   wrapper.
-- Keep the old `OpenGrid` characterization only as far as needed to prove the
+- Keep the old `WitGrid` characterization only as far as needed to prove the
   wrapper still forwards correctly.
 - Add a demo import guard or package test that fails if the recommended demo
-  files drift back to `OpenGrid` or `@eregister/open-grid-core/internal` imports.
+  files drift back to `WitGrid` or `@eregister/wit-grid-core/internal` imports.
 
 ## Done criteria
 
 - [ ] `packages/react/src/index.ts` exports explicit recommended entrypoints.
 - [ ] The React package has a single host-bridge module for core-internal
       mounting and renderer-capability plumbing.
-- [ ] `OpenGrid` is compatibility-only and no longer the primary surface in the
+- [ ] `WitGrid` is compatibility-only and no longer the primary surface in the
       demo.
 - [ ] `useClientGrid` / `useServerGrid` no longer teach initial-only behavior
       through runtime warnings as the normal path.
-- [ ] Demo pages consume the new public API instead of `OpenGrid`.
+- [ ] Demo pages consume the new public API instead of `WitGrid`.
 - [ ] Focused react tests, core tests, and the demo build pass.
 - [ ] `plans/README.md` status row updated.
 
@@ -236,7 +236,7 @@ Stop and report back if:
   the old overloaded modes,
 - the lifecycle split would break existing public behavior in a way that would
   require a wider migration plan, or
-- the demo migration uncovers a dependency on `OpenGrid` that is better solved
+- the demo migration uncovers a dependency on `WitGrid` that is better solved
   by a different public component than the one proposed here.
 
 ## Maintenance notes

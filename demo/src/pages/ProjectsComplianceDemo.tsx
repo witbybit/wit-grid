@@ -7,7 +7,7 @@ import {
 	type GridReadyEvent,
 	GridInitialState,
 	StyleRule,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 import {
 	Building2,
 	ChevronRight,

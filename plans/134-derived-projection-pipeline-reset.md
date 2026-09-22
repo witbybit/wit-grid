@@ -29,7 +29,7 @@ The commit kernel is only truly authoritative if derived state, domain version b
 | Purpose           | Command                                                 | Expected on success |
 | ----------------- | ------------------------------------------------------- | ------------------- |
 | Architecture gate | `corepack pnpm run test:architecture`                   | exit 0              |
-| Core tests        | `corepack pnpm --filter @eregister/open-grid-core test` | exit 0              |
+| Core tests        | `corepack pnpm --filter @eregister/wit-grid-core test` | exit 0              |
 | Workspace tests   | `corepack pnpm run test`                                | exit 0              |
 | Build/typecheck   | `corepack pnpm run build`                               | exit 0              |
 
@@ -69,13 +69,13 @@ This should replace inference-by-key-observation as the primary authority.
 
 Reduce `GridStateReactionController` from owner to helper or delete it outright if the new pipeline fully absorbs its responsibilities. Derived state updates like selection bounds and visible ranges should be explicitly recomputed by the projection pipeline, not opportunistically by `updated key` inspection.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
 
 ### Step 3: Collapse render invalidation into projection outputs
 
 Make render invalidation an explicit output of the projection pipeline rather than an additional authority listening to state/events and deciding what to invalidate after the fact. `RenderInvalidationCoordinator` may remain as a renderer-facing shell if needed, but it must not be the business-logic owner of change interpretation.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts` -> all pass
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts` -> all pass
 
 ### Step 4: Shrink or delete the direct-write allowlist entries
 

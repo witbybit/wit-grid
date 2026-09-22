@@ -7,7 +7,7 @@
  *  3. HeavyAnalyticsCell  — standard React renderer (memo), shown as contrast
  */
 import React, { forwardRef, memo, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
-import type { DomCellRenderer, ImperativeCellHandle, CellRendererProps } from '@eregister/open-grid-react';
+import type { DomCellRenderer, ImperativeCellHandle, CellRendererProps } from '@eregister/wit-grid-react';
 
 export interface DashboardStockRow {
 	id: string;

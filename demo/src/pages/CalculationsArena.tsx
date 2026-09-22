@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Grid, GridEventName, type GridApi, type GridReadyEvent, type StyleRule } from '@eregister/open-grid-react';
+import { Grid, GridEventName, type GridApi, type GridReadyEvent, type StyleRule } from '@eregister/wit-grid-react';
 import { Activity, BadgePercent, ShieldAlert } from 'lucide-react';
 import { createPerformanceColumns, generatePerformanceRows } from './demoGridConfigs';
 import type { PerformanceRow } from '../components/GridShared';

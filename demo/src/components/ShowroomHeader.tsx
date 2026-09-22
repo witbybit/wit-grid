@@ -11,7 +11,7 @@ export default function ShowroomHeader() {
 					</span>
 					<div>
 						<h1 className='text-2xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent flex items-center gap-2'>
-							Open Grid Showcase
+							Wit Grid Showcase
 						</h1>
 						<p className='text-xs text-slate-400 mt-1 max-w-2xl font-medium'>
 							Explore our ultra high-performance coordinate-isolated row-store. Prove strict $O(1)$ calculations, inspect real-time

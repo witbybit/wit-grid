@@ -208,11 +208,11 @@ export class StateManager<TRowData = unknown> {
 	): () => void {
 		const uniqueKeys = Array.from(new Set(keys));
 		if (uniqueKeys.length === 0) {
-			throw new Error('[open-grid] subscribeToSelector requires at least one key');
+			throw new Error('[wit-grid] subscribeToSelector requires at least one key');
 		}
 		if (uniqueKeys.length > StateManager.MAX_SELECTOR_FANOUT) {
 			throw new Error(
-				`[open-grid] subscribeToSelector fan-out ${String(uniqueKeys.length)} exceeds limit ${String(StateManager.MAX_SELECTOR_FANOUT)}`
+				`[wit-grid] subscribeToSelector fan-out ${String(uniqueKeys.length)} exceeds limit ${String(StateManager.MAX_SELECTOR_FANOUT)}`
 			);
 		}
 

@@ -4,7 +4,7 @@
 
 Build a data quality system on top of existing validation, column metadata, and row access.
 
-This feature should prove Open Grid can help users trust their data.
+This feature should prove Wit Grid can help users trust their data.
 
 It should answer:
 
@@ -428,5 +428,5 @@ Plan 127 is complete when:
 Final report must say:
 
 ```text
-Plan 127 complete. Open Grid now has a Data Quality layer that aggregates validation and quality rules into reports, sidebar UI, diagnostics, and cell decorations without replacing validation or polluting row models, renderers, mutation, or invalidation.
+Plan 127 complete. Wit Grid now has a Data Quality layer that aggregates validation and quality rules into reports, sidebar UI, diagnostics, and cell decorations without replacing validation or polluting row models, renderers, mutation, or invalidation.
 ```

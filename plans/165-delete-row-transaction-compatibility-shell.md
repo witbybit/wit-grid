@@ -86,10 +86,10 @@ Repository-wide production search at the planned commit shows:
 
 | Purpose           | Command                                                                                                                      | Expected on success                                                      |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Focused row model | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/engine/GridChangeApplier.test.ts` | exit 0                                                                   |
+| Focused row model | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/engine/GridChangeApplier.test.ts` | exit 0                                                                   |
 | Architecture      | `corepack pnpm run test:architecture`                                                                                        | exit 0, or only the recorded Plan 164 replay-scheduler baseline mismatch |
 | Adversarial       | `corepack pnpm run test:adversarial`                                                                                         | exit 0                                                                   |
-| Core test         | `corepack pnpm --filter @eregister/open-grid-core test`                                                                      | exit 0, except no accepted baseline weakening                            |
+| Core test         | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                      | exit 0, except no accepted baseline weakening                            |
 | Build             | `corepack pnpm run build:packages`                                                                                           | exit 0                                                                   |
 | API               | `corepack pnpm run api:check`                                                                                                | exit 0, no contract drift                                                |
 | Performance       | `corepack pnpm run bench`                                                                                                    | exit 0                                                                   |

@@ -77,7 +77,7 @@ export default function ShowroomTitleBanner({
 						{activePage === 'dashboard' && 'Executive Portfolio & SVG Market Analytics Streamer'}
 						{activePage === 'gantt' && 'Quantitative Gantt Scheduling & Task Optimizer Arena'}
 						{activePage === 'nested' && 'Nested and Group Grid Arena'}
-						{activePage === 'native' && 'Native Cell Types — Built into @eregister/open-grid-react'}
+						{activePage === 'native' && 'Native Cell Types — Built into @eregister/wit-grid-react'}
 						{activePage === 'wide' && 'Wide Grid — Column Virtualization Showcase'}
 						{activePage === 'colgroups' && 'Multi-Level Column Header Groups'}
 						{activePage === 'floatingfilters' && 'Floating Filters — Inline Filter Row with Custom Renderers'}

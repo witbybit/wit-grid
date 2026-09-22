@@ -137,8 +137,8 @@ export interface FloatingFilterRendererProps {
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Toggle `showFloatingFilters` → filter row appears below headers. Type in text input → rows filter in real time. Set filter badge shows active value count. Date filter input sets date range. Custom `floatingFilterRenderer` receives correct props.

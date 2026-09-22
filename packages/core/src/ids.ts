@@ -51,11 +51,11 @@ export function validateRowIds(ids: string[], context = 'setRows'): void {
 
 	for (const id of ids) {
 		if (!id) {
-			throw new Error(`Open Grid [${context}]: getRowId returned an empty string. Every row must have a non-empty ID.`);
+			throw new Error(`Wit Grid [${context}]: getRowId returned an empty string. Every row must have a non-empty ID.`);
 		}
 
 		if (seen.has(id)) {
-			throw new Error(`Open Grid [${context}]: duplicate row ID "${id}". Each row must have a unique ID.`);
+			throw new Error(`Wit Grid [${context}]: duplicate row ID "${id}". Each row must have a unique ID.`);
 		}
 
 		seen.add(id);

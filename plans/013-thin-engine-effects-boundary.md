@@ -164,11 +164,11 @@ private handleStateChanges = (prevState: GridState<TRowData>, updatedKeys: strin
 ```
 
 - `packages/react/src/chart/GridChartOverlay.tsx` still crosses into
-  `@eregister/open-grid-core/internal`:
+  `@eregister/wit-grid-core/internal`:
 
 ```ts
 // packages/react/src/chart/GridChartOverlay.tsx:5
-import { getStoreFromApi } from '@eregister/open-grid-core/internal';
+import { getStoreFromApi } from '@eregister/wit-grid-core/internal';
 
 // packages/react/src/chart/GridChartOverlay.tsx:90
 const internalApi = getStoreFromApi(api);
@@ -178,10 +178,10 @@ const internalApi = getStoreFromApi(api);
 
 | Purpose         | Command                                                   | Expected on success                             |
 | --------------- | --------------------------------------------------------- | ----------------------------------------------- |
-| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0                                          |
-| Core tests      | `corepack pnpm --filter @eregister/open-grid-core test`   | 40 files passed, 467+ tests passed, no failures |
-| React build     | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                                          |
-| React tests     | `corepack pnpm --filter @eregister/open-grid-react test`  | 4 files passed, 101+ tests passed, no failures  |
+| Core build      | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0                                          |
+| Core tests      | `corepack pnpm --filter @eregister/wit-grid-core test`   | 40 files passed, 467+ tests passed, no failures |
+| React build     | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0                                          |
+| React tests     | `corepack pnpm --filter @eregister/wit-grid-react test`  | 4 files passed, 101+ tests passed, no failures  |
 | Demo build      | `corepack pnpm --filter demo-app build`                   | exit 0; chunk-size warning is acceptable        |
 | Full repo check | `corepack pnpm run build && corepack pnpm run test`       | exit 0                                          |
 
@@ -233,11 +233,11 @@ report. This plan assumes Plan 012 is green.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass except the
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass except the
   known skipped architecture guard.
-- `corepack pnpm --filter @eregister/open-grid-react build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-react test` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-react build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-react test` -> exit 0.
 - `corepack pnpm --filter demo-app build` -> exit 0.
 
 ### Step 2: Make `GridChange` reasons typed, not free-form strings
@@ -274,7 +274,7 @@ do not leave a broad `string` escape hatch. Update `GridInvalidation.reason`
 inputs only where type compatibility requires it. Avoid a broad repo-wide
 rename if a local typed alias is enough.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 3: Narrow `GridFeatureContext` to an effect port
 
@@ -298,7 +298,7 @@ function.
 Do not keep both `changeApplier` and raw primitives on the context. The point
 is to make bypassing the effect boundary harder than using it.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 4: Finish migrating feature controllers to the effect boundary
 
@@ -335,8 +335,8 @@ primitives.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass.
 
 ### Step 5: Extract subscription batching from `GridEngine`
 
@@ -378,9 +378,9 @@ suite.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core test -- src/store.test.ts` -> related
+- `corepack pnpm --filter @eregister/wit-grid-core test -- src/store.test.ts` -> related
   store batching tests pass.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass.
 
 ### Step 6: Extract the state-change reaction bridge from `GridEngine`
 
@@ -407,8 +407,8 @@ Keep behavior equivalent. This is an extraction, not a rewrite.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core test -- src/engine` -> engine tests pass.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core test -- src/engine` -> engine tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass.
 
 ### Step 7: Move remaining non-kernel feature mutations out of `GridEngine`
 
@@ -440,8 +440,8 @@ the architecture guard allowlist with a comment explaining why.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass.
 
 ### Step 8: Close the remaining React internal-api chart seam
 
@@ -455,15 +455,15 @@ API methods already available:
 
 If the chart needs a read-only method that does not exist publicly, add a
 minimal public or adapter-level read method rather than importing
-`@eregister/open-grid-core/internal` from React.
+`@eregister/wit-grid-core/internal` from React.
 
 Add or extend an architecture guard so no React source file imports
-`@eregister/open-grid-core/internal`, unless there is an explicitly documented exception.
+`@eregister/wit-grid-core/internal`, unless there is an explicitly documented exception.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-react build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-react test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-react build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-react test` -> all tests pass.
 
 ### Step 9: Make the architecture guardrails active
 
@@ -474,7 +474,7 @@ Update `architectureGuards.test.ts` so:
   weaker duplicate if the stronger guard remains active,
 - `GridFeatureContext.ts` no longer contains raw side-effect fields,
 - feature controllers do not use raw `ctx` effect primitives,
-- React source does not import `@eregister/open-grid-core/internal`,
+- React source does not import `@eregister/wit-grid-core/internal`,
 - `GridChange.reason` is not typed as `string`.
 
 Also add a guard for source size if useful:
@@ -487,17 +487,17 @@ allowlist is explicit and narrow.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> all guard tests pass, zero skipped tests in that file.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> all tests pass.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> all guard tests pass, zero skipped tests in that file.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> all tests pass.
 
 ### Step 10: Run full sequential verification
 
 Run all commands in this order:
 
-1. `corepack pnpm --filter @eregister/open-grid-core build`
-2. `corepack pnpm --filter @eregister/open-grid-react build`
-3. `corepack pnpm --filter @eregister/open-grid-core test`
-4. `corepack pnpm --filter @eregister/open-grid-react test`
+1. `corepack pnpm --filter @eregister/wit-grid-core build`
+2. `corepack pnpm --filter @eregister/wit-grid-react build`
+3. `corepack pnpm --filter @eregister/wit-grid-core test`
+4. `corepack pnpm --filter @eregister/wit-grid-react test`
 5. `corepack pnpm --filter demo-app build`
 6. `corepack pnpm run build`
 7. `corepack pnpm run test`
@@ -515,7 +515,7 @@ Expected: all exit 0. The demo chunk-size warning is acceptable.
   selection so each confirms the emitted `GridChange` outcome indirectly:
   resulting state, emitted event, invalidation, and render request.
 - Add a React architecture guard or unit test that prevents
-  `@eregister/open-grid-core/internal` imports from React source.
+  `@eregister/wit-grid-core/internal` imports from React source.
 
 ## Done criteria
 
@@ -529,11 +529,11 @@ All must be true:
 - [ ] Feature controllers do not call raw context side-effect primitives.
 - [ ] Subscription batching logic is extracted from `GridEngine.ts`.
 - [ ] State-change reaction logic is extracted from `GridEngine.ts`.
-- [ ] React source does not import `@eregister/open-grid-core/internal`.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
+- [ ] React source does not import `@eregister/wit-grid-core/internal`.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `corepack pnpm run build` exits 0.
 - [ ] `corepack pnpm run test` exits 0.

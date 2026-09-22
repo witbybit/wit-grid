@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveColumnTypes } from './resolveColumnTypes.js';
 import { CheckboxCellRenderer, DateCellRenderer, BUILTIN_COLUMN_TYPES } from './renderers/CellTypes.js';
-import type { ColumnDef } from '@eregister/open-grid-core';
+import type { ColumnDef } from '@eregister/wit-grid-core';
 
 interface Row {
 	id: string;

@@ -2,7 +2,7 @@
 
 > **Executor instructions**: This is an architectural umbrella plan, not a single small patch. Execute it in phases. Do not skip characterization tests. Do not add more grouping/sticky/header features on top of the current ad hoc layout offsets before completing Phase 1.
 >
-> **Drift check (run first)**: `git diff --stat 78e8122..HEAD -- packages/core/src/renderer packages/core/src/rows packages/core/src/rowModel.ts packages/core/src/store.ts packages/react/src/GridPortal.tsx packages/react/src/OpenGrid.tsx packages/react/src/sidebar`
+> **Drift check (run first)**: `git diff --stat 78e8122..HEAD -- packages/core/src/renderer packages/core/src/rows packages/core/src/rowModel.ts packages/core/src/store.ts packages/react/src/GridPortal.tsx packages/react/src/WitGrid.tsx packages/react/src/sidebar`
 >
 > If any in-scope file changed since this plan was written, compare the current code against the architecture targets below before proceeding. If the current code already implements a phase, mark that phase done in this file and continue with the next phase.
 
@@ -18,7 +18,7 @@
 
 ## Vision
 
-Open Grid should support advanced enterprise-grid behavior with the same kind of predictability users expect from AG Grid:
+Wit Grid should support advanced enterprise-grid behavior with the same kind of predictability users expect from AG Grid:
 
 - Row grouping and nested grouping behave consistently while sorting, filtering, expanding, collapsing, virtualizing, and selecting.
 - Sticky group rows never jitter, freeze, overlap headers, fight row virtualization, or lose pinned-column alignment.
@@ -265,8 +265,8 @@ Required coverage:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 Expected result: exit 0.
@@ -298,10 +298,10 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -333,9 +333,9 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderWindow.test.ts src/renderer/renderEngine.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderWindow.test.ts src/renderer/renderEngine.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -374,9 +374,9 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/stages/groupStage.test.ts src/rows/stages/flattenStage.test.ts src/rowModel.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/stages/groupStage.test.ts src/rows/stages/flattenStage.test.ts src/rowModel.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ### Phase 4: Header band architecture
@@ -401,9 +401,9 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/headerPopover.test.ts src/renderer/renderEngine.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/headerPopover.test.ts src/renderer/renderEngine.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -451,8 +451,8 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -496,10 +496,10 @@ The pure layout tests are the most important. AG Grid-level reliability comes fr
 
 | Purpose     | Command                                                   | Expected on success |
 | ----------- | --------------------------------------------------------- | ------------------- |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0              |
-| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0              |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0              |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0              |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0              |
+| Core build  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0              |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0              |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0              |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0              |
 | Formatting  | `corepack pnpm exec prettier --check <touched files>`     | exit 0              |
 
@@ -514,7 +514,7 @@ In scope:
 - `packages/core/src/columnDef.ts`
 - `packages/core/src/models/ColumnModel.ts`
 - `packages/react/src/GridPortal.tsx`
-- `packages/react/src/OpenGrid.tsx`
+- `packages/react/src/WitGrid.tsx`
 - Demo pages that exercise grouping/sticky grouping/column grouping
 
 Out of scope until later:

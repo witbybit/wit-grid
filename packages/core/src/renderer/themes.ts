@@ -1,5 +1,5 @@
 /**
- * Open Grid Theme System
+ * Wit Grid Theme System
  *
  * Complete CSS variable architecture for light/dark modes and custom themes.
  * Supports runtime theme switching via ThemeManager and custom theme injection.

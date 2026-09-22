@@ -43,9 +43,9 @@ if (groupDefs.length > 0) {
 
 | Purpose         | Command                                                                                    | Expected on success          |
 | --------------- | ------------------------------------------------------------------------------------------ | ---------------------------- |
-| Row model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts`    | exit 0, all tests pass       |
-| Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts` | exit 0, all tests pass       |
-| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                   | exit 0, no TypeScript errors |
+| Row model tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts`    | exit 0, all tests pass       |
+| Core perf tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts` | exit 0, all tests pass       |
+| Core build      | `corepack pnpm --filter @eregister/wit-grid-core build`                                   | exit 0, no TypeScript errors |
 
 ## Scope
 
@@ -74,19 +74,19 @@ Requirements:
 - It returns the original `nodes` array when there are no active filters, or a filtered `RowNode[]` when filters exist.
 - It does not allocate `{ node, sourceIndex }` wrappers.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Use the node-only filter path in grouped pipeline branches
 
 In `RowPipeline.run`, replace grouped branch wrapper creation and unwrapping with the new node-only filter helper. Keep the flat sorted branch using `applyClientSortAndFilter(...).map((w) => w.node)` because it needs sorting and stable source-index tie breaks.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts` -> exit 0.
 
 ### Step 3: Add grouped filter regression coverage
 
 Add or extend a test to verify grouped filtering still excludes nonmatching rows, includes matching rows in the correct group, and keeps group labels/counts correct.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/performance.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/performance.test.ts` -> exit 0.
 
 ## Test plan
 
@@ -99,8 +99,8 @@ Add or extend a test to verify grouped filtering still excludes nonmatching rows
 - [ ] Grouped filter paths no longer create wrapper objects only to unwrap them.
 - [ ] Flat sort/filter behavior is unchanged.
 - [ ] Grouped filtering tests pass and cover group count/label behavior.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 
 ## STOP conditions
 

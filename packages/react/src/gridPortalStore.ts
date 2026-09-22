@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import type { ColumnDef, VisualRow, CellRendererPhase } from '@eregister/open-grid-core';
+import type { ColumnDef, VisualRow, CellRendererPhase } from '@eregister/wit-grid-core';
 import type {
 	PortalData,
 	RowPortalData,

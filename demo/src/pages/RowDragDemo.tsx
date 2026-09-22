@@ -11,8 +11,8 @@
  *   - Live event log for all rowDrag* events
  */
 import React, { useState, useCallback, useRef } from 'react';
-import { Grid, GridEventName } from '@eregister/open-grid-react';
-import type { ColumnDef, GridApi, GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, GridEventName } from '@eregister/wit-grid-react';
+import type { ColumnDef, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 import { GripVertical, Shuffle, RotateCcw, List, ArrowUpDown } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────

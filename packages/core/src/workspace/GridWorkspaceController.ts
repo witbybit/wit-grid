@@ -114,7 +114,7 @@ export function createWorkspaceController(adapter: GridWorkspaceAdapter): GridWo
 
 		async duplicateView(id, name) {
 			const source = state.views.find((v) => v.id === id);
-			if (!source) throw new Error(`[open-grid] workspace: view "${id}" not found`);
+			if (!source) throw new Error(`[wit-grid] workspace: view "${id}" not found`);
 			const now = Date.now();
 			const view: GridViewDefinition = { ...source, id: generateId(), name, createdAt: now, updatedAt: now, version: 1 };
 			await adapter.saveView(view);

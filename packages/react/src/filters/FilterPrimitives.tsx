@@ -3,8 +3,8 @@
  * All components are theme-aware via ThemeTokens.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import type { ThemeTokens } from '@eregister/open-grid-core';
-import type { FilterSelectOption } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
+import type { FilterSelectOption } from '@eregister/wit-grid-core';
 
 // ── FilterSearchInput ─────────────────────────────────────────────────────────
 

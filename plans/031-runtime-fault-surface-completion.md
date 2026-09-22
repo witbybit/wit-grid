@@ -27,8 +27,8 @@ test, subscribe to, and reason about.
 
 ## Verification
 
-- `corepack pnpm --filter @eregister/open-grid-core build`
-- `corepack pnpm --filter @eregister/open-grid-core test`
-- `corepack pnpm --filter @eregister/open-grid-react build`
-- `corepack pnpm --filter @eregister/open-grid-react test`
+- `corepack pnpm --filter @eregister/wit-grid-core build`
+- `corepack pnpm --filter @eregister/wit-grid-core test`
+- `corepack pnpm --filter @eregister/wit-grid-react build`
+- `corepack pnpm --filter @eregister/wit-grid-react test`
 - `corepack pnpm --filter demo-app build`

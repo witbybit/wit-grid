@@ -586,12 +586,12 @@ Add `SelectFilterCondition` handling in `prepareCondition()` and `matchPreparedF
 
 ## Export surface
 
-All public types exported from `@eregister/open-grid-core`:
+All public types exported from `@eregister/wit-grid-core`:
 
 - `FilterSelectOption`, `FilterFetchParams`, `FilterFetchResult`, `FilterPageParams`, `FilterPageResult`
 - `CustomFilterRendererParams`, `ColumnFilterDef`, `ColumnFilterType`, `SelectFilterCondition`
 
-All public components and factories exported from `@eregister/open-grid-react`:
+All public components and factories exported from `@eregister/wit-grid-react`:
 
 - `ColumnFilterRenderer`
 - (No need to export individual filter sub-components — they're composed internally)
@@ -768,7 +768,7 @@ filterDef: {
 
 1. Add guard: `filter component files must not import renderer files`.
 2. Add guard: `SelectFilterCondition is exported from index.ts`.
-3. Export all public types from `@eregister/open-grid-react`: `ColumnFilterDef`, `FilterSelectOption`, `FilterFetchParams`, etc.
+3. Export all public types from `@eregister/wit-grid-react`: `ColumnFilterDef`, `FilterSelectOption`, `FilterFetchParams`, etc.
 4. Update `plans/README.md`.
 
 ---

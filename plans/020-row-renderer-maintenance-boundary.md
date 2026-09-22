@@ -67,11 +67,11 @@ Run focused renderer tests plus full core/React/demo verification.
 
 ## Verification
 
-1. `corepack pnpm --filter @eregister/open-grid-core build`
-2. `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
-3. `corepack pnpm --filter @eregister/open-grid-core test`
-4. `corepack pnpm --filter @eregister/open-grid-react build`
-5. `corepack pnpm --filter @eregister/open-grid-react test`
+1. `corepack pnpm --filter @eregister/wit-grid-core build`
+2. `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
+3. `corepack pnpm --filter @eregister/wit-grid-core test`
+4. `corepack pnpm --filter @eregister/wit-grid-react build`
+5. `corepack pnpm --filter @eregister/wit-grid-react test`
 6. `corepack pnpm --filter demo-app build`
 
 ## Done criteria

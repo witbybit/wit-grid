@@ -14,8 +14,8 @@
  *   - Status cell          — traffic-light dot + label
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import { Grid } from '@eregister/open-grid-react';
-import type { ColumnDef, GridReadyEvent, GridApi, CellRendererProps } from '@eregister/open-grid-react';
+import { Grid } from '@eregister/wit-grid-react';
+import type { ColumnDef, GridReadyEvent, GridApi, CellRendererProps } from '@eregister/wit-grid-react';
 
 // ─── Data model ──────────────────────────────────────────────────────────────
 

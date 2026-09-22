@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Grid, type GridApi, type GridCellPointer, type GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, type GridApi, type GridCellPointer, type GridReadyEvent } from '@eregister/wit-grid-react';
 import { CheckCircle2, Compass, Cpu, Layout, Maximize2 } from 'lucide-react';
 import { generatePerformanceRows, layoutColumnsFull } from './demoGridConfigs';
 import type { PerformanceRow } from '../components/GridShared';

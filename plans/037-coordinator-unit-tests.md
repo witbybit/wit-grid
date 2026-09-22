@@ -36,5 +36,5 @@ portal/focus routing) silently breaks rendering for all grid users.
 
 - [ ] `rowRendererRuntime.test.ts` added with ≥ 6 tests.
 - [ ] `renderPaintCoordinator.test.ts` added with ≥ 4 tests.
-- [ ] All tests pass (`corepack pnpm --filter @eregister/open-grid-core test`).
+- [ ] All tests pass (`corepack pnpm --filter @eregister/wit-grid-core test`).
 - [ ] `plans/README.md` updated.

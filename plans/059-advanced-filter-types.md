@@ -184,8 +184,8 @@ describe('schema migration', () => {
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Set filter with 3 checked values shows only matching rows. Date `inRange` filter correctly excludes boundary rows. Compound AND filter requires both conditions. Schema version is 2. V1 state migrates cleanly to V2.

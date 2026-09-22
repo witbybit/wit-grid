@@ -61,7 +61,7 @@ The contract is only meaningful if we exercise different failure modes:
 - Custom-renderer-heavy scroll
 - Server-backed scroll with loading churn
 
-Executable evidence for these scenarios lives primarily in [serverRuntimePerformance.test.ts](C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/serverRuntimePerformance.test.ts), with complementary reveal and prewarm regressions in [renderEngine.test.ts](C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/renderEngine.test.ts).
+Executable evidence for these scenarios lives primarily in [serverRuntimePerformance.test.ts](C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/serverRuntimePerformance.test.ts), with complementary reveal and prewarm regressions in [renderEngine.test.ts](C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/renderEngine.test.ts).
 
 ## Human review rubric
 

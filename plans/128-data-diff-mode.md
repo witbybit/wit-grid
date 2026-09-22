@@ -4,7 +4,7 @@
 
 Build a risk-averse Data Diff Mode that compares two datasets and exposes differences as read-only metadata/decorations.
 
-This feature should prove Open Grid can review data changes safely.
+This feature should prove Wit Grid can review data changes safely.
 
 It should support:
 
@@ -376,5 +376,5 @@ Plan 128 is complete when:
 Final report must say:
 
 ```text
-Plan 128 complete. Open Grid now has risk-averse inline Data Diff Mode that compares datasets, reports added/removed/changed rows and cells, displays decorations through Insight Layers, and avoids polluting row models, renderers, columns, mutation, invalidation, or history.
+Plan 128 complete. Wit Grid now has risk-averse inline Data Diff Mode that compares datasets, reports added/removed/changed rows and cells, displays decorations through Insight Layers, and avoids polluting row models, renderers, columns, mutation, invalidation, or history.
 ```

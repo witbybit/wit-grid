@@ -5,7 +5,7 @@
 Create one cohesive demo that proves the full data integrity story:
 
 ```text
-Open Grid is not only fast.
+Wit Grid is not only fast.
 It helps users trust, review, validate, and safely update data.
 ```
 
@@ -341,7 +341,7 @@ This is the most important part.
 ### This proves
 
 ```text
-Open Grid is not just rendering data.
+Wit Grid is not just rendering data.
 It protects data integrity.
 It makes changes explainable.
 It makes unsafe overwrites visible.
@@ -421,5 +421,5 @@ The demo is complete when:
 Use this description in the demo app:
 
 ```text
-Data Integrity Lab demonstrates how Open Grid can validate, review, compare, stream, and safely reconcile data changes without compromising the core engine. Quality issues, diffs, live updates, and conflicts are implemented as insight layers that sit on top of the existing commit, invalidation, render, and diagnostics systems.
+Data Integrity Lab demonstrates how Wit Grid can validate, review, compare, stream, and safely reconcile data changes without compromising the core engine. Quality issues, diffs, live updates, and conflicts are implemented as insight layers that sit on top of the existing commit, invalidation, render, and diagnostics systems.
 ```

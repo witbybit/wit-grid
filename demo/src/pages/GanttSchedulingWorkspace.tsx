@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Grid, GridEventName, type GridApi, type GridReadyEvent, type StyleRule } from '@eregister/open-grid-react';
+import { Grid, GridEventName, type GridApi, type GridReadyEvent, type StyleRule } from '@eregister/wit-grid-react';
 import { CheckSquare, Clock, Layers, RefreshCw, Sparkles, TrendingUp, Users, Zap } from 'lucide-react';
 import { createGanttColumns, createGanttRows, type GanttRow } from './demoGridConfigs';
 

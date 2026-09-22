@@ -27,7 +27,7 @@ Replace split logical-commit coordination with one authoritative `GridCommitKern
 - row-order publication now routes through `GridEngine.setRowOrder(...)` instead of `RowDragController` mutating the row model and dispatching events directly
 - persisted state restore now batches replayed API operations and clears history on success so hydration does not create synthetic undo entries
 - `GridCommitKernel` and `GridCommit` are first-class exports in the kernel module, with compatibility aliases preserved while engine/context types migrate onto commit terminology
-- focused kernel/editing/clipboard/fill suites and the full `@eregister/open-grid-core` test suite are green after the convergence pass
+- focused kernel/editing/clipboard/fill suites and the full `@eregister/wit-grid-core` test suite are green after the convergence pass
 
 ## Problem
 

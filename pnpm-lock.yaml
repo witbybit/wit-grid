@@ -32,7 +32,7 @@ importers:
 
   demo:
     dependencies:
-      '@eregister/open-grid-react':
+      '@eregister/wit-grid-react':
         specifier: workspace:*
         version: link:../packages/react
       lucide-react:
@@ -71,7 +71,7 @@ importers:
 
   packages/react:
     dependencies:
-      '@eregister/open-grid-core':
+      '@eregister/wit-grid-core':
         specifier: workspace:*
         version: link:../core
     devDependencies:

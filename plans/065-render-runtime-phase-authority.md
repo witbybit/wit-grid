@@ -108,8 +108,8 @@ Every scheduled scroll, paint, portal, and post-scroll callback captures the rel
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add tests proving legal transitions, stale epoch rejection, portal flush eligibility, and teardown from every live phase.

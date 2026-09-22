@@ -1,6 +1,6 @@
 import React from 'react';
-import { Grid } from '@eregister/open-grid-react';
-import type { ColumnDef, CellRendererProps, GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid } from '@eregister/wit-grid-react';
+import type { ColumnDef, CellRendererProps, GridReadyEvent } from '@eregister/wit-grid-react';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 

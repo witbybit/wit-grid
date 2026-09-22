@@ -48,9 +48,9 @@ const values = descendantLeafNodes.map((n) => context.getValue(n, field)).filter
 
 | Purpose         | Command                                                                                                   | Expected on success          |
 | --------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Aggregate tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` | exit 0, all tests pass       |
-| Core perf tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts`                | exit 0, all tests pass       |
-| Core build      | `corepack pnpm --filter @eregister/open-grid-core build`                                                  | exit 0, no TypeScript errors |
+| Aggregate tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` | exit 0, all tests pass       |
+| Core perf tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts`                | exit 0, all tests pass       |
+| Core build      | `corepack pnpm --filter @eregister/wit-grid-core build`                                                  | exit 0, no TypeScript errors |
 
 ## Scope
 
@@ -72,7 +72,7 @@ const values = descendantLeafNodes.map((n) => context.getValue(n, field)).filter
 
 Add tests in `aggregateStage.test.ts` that cover multiple aggregate fields, nested parent aggregates, and custom aggregation callbacks receiving the full `RowNode[]` leaf list in source order.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` -> exit 0.
 
 ### Step 2: Introduce streaming accumulators for built-ins
 
@@ -80,27 +80,27 @@ Refactor `aggregateNodeRecursively` so built-in `sum`, `avg`, `min`, `max`, and 
 
 Do not change how `undefined` is produced when no numeric values exist for `sum`/`avg`/`min`/`max`.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows/stages/aggregateStage.test.ts` -> exit 0.
 
 ### Step 3: Add a large grouped aggregation regression check
 
 Add a deterministic test that builds a large grouped tree and verifies aggregate correctness. If adding a timing budget, keep it loose enough for CI variance and local Windows runs.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts src/rows/stages/aggregateStage.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts src/rows/stages/aggregateStage.test.ts` -> exit 0.
 
 ## Test plan
 
 - Existing aggregate tests must continue to pass.
 - New tests must cover built-in and custom aggregation paths.
-- Run `corepack pnpm --filter @eregister/open-grid-core test` before completion.
+- Run `corepack pnpm --filter @eregister/wit-grid-core test` before completion.
 
 ## Done criteria
 
 - [ ] Built-in aggregations no longer allocate a numeric `values` array per field per group.
 - [ ] Custom aggregation functions still receive descendant `RowNode[]`.
 - [ ] Nested group aggregate behavior is unchanged.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 
 ## STOP conditions
 

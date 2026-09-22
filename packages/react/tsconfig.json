@@ -4,9 +4,9 @@
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"paths": {
-			"@eregister/open-grid-core": ["../../packages/core/dist/index.d.ts"],
-			"@eregister/open-grid-core/experimental": ["../../packages/core/dist/experimental.d.ts"],
-			"@eregister/open-grid-core/internal": ["../../packages/core/dist/internal.d.ts"]
+			"@eregister/wit-grid-core": ["../../packages/core/dist/index.d.ts"],
+			"@eregister/wit-grid-core/experimental": ["../../packages/core/dist/experimental.d.ts"],
+			"@eregister/wit-grid-core/internal": ["../../packages/core/dist/internal.d.ts"]
 		},
 		"jsx": "react-jsx",
 		"sourceMap": false,

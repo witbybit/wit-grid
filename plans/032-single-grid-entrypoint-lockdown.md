@@ -40,7 +40,7 @@ The relevant files, each with its role:
 - `packages/react/src/index.ts:1-12` still exports `GridView`, `GridProvider`,
   `useOwnedClientGrid`, and `useOwnedServerGrid` alongside `Grid`.
 - `packages/react/src/Grid.tsx:1-157` owns the grid lifecycle, but it still
-  reaches into `@eregister/open-grid-core` directly and renders `GridProvider` +
+  reaches into `@eregister/wit-grid-core` directly and renders `GridProvider` +
   `GridView`, so the adapter surface is not yet collapsed to one explicit
   public entrypoint.
 - `packages/react/src/ownedGrid.ts:1-58` still exposes the owned-grid helper
@@ -49,7 +49,7 @@ The relevant files, each with its role:
   contains architecture fence tests for the React adapter, which is the right
   place to extend the public-surface guardrails.
 - `demo/src/hooks/useOwnedGrid.ts:1` currently re-exports the owned-grid helper
-  names from `@eregister/open-grid-react`, preserving the old pattern in the demo
+  names from `@eregister/wit-grid-react`, preserving the old pattern in the demo
   namespace.
 - `demo/src/hooks/useShowroomStores.ts:27,158,285-854` centralizes all showroom
   grid instances behind the owned-grid helpers.
@@ -74,10 +74,10 @@ alive.
 
 | Purpose     | Command                                                   | Expected on success    |
 | ----------- | --------------------------------------------------------- | ---------------------- |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                 |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0, all tests pass |
-| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0                 |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0, all tests pass |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0                 |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0, all tests pass |
+| Core build  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0                 |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0, all tests pass |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0                 |
 
 ## Scope
@@ -119,7 +119,7 @@ refactor. There should be no public `useOwnedClientGrid` or
 `useOwnedServerGrid` export, and no public path that invites the demo to build
 its own ownership wrapper.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react build` -> exit 0.
 
 ### Step 2: Add guard rails that fail fast on surface drift
 
@@ -132,14 +132,14 @@ assertions that:
 
 - `packages/react/src/index.ts` does not re-export the removed helpers,
 - `packages/react/src/ownedGrid.ts` is not reachable as a public surface,
-- `demo/src` does not import `@eregister/open-grid-core`,
+- `demo/src` does not import `@eregister/wit-grid-core`,
 - `demo/src` does not import or re-export `useOwnedGrid`,
 - `demo/src` does not depend on `useShowroomStores`.
 
 Use the existing architecture guard style in that test file as the precedent.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react test` and
-`corepack pnpm --filter @eregister/open-grid-core test` -> both exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react test` and
+`corepack pnpm --filter @eregister/wit-grid-core test` -> both exit 0.
 
 ### Step 3: Remove the showroom ownership layer and migrate the demo to `Grid`
 
@@ -172,10 +172,10 @@ showroom store or owned-grid helper pattern as a normal path.
 
 Finish by running the full verification sequence:
 
-`corepack pnpm --filter @eregister/open-grid-react build`
-`corepack pnpm --filter @eregister/open-grid-react test`
-`corepack pnpm --filter @eregister/open-grid-core build`
-`corepack pnpm --filter @eregister/open-grid-core test`
+`corepack pnpm --filter @eregister/wit-grid-react build`
+`corepack pnpm --filter @eregister/wit-grid-react test`
+`corepack pnpm --filter @eregister/wit-grid-core build`
+`corepack pnpm --filter @eregister/wit-grid-core test`
 `corepack pnpm --filter demo-app build`
 
 All must pass.
@@ -202,13 +202,13 @@ Machine-checkable. All must hold:
       in the public surface.
 - [ ] `demo/src/hooks/useOwnedGrid.ts` and `demo/src/hooks/useShowroomStores.ts`
       are gone.
-- [ ] `demo/src` no longer imports `@eregister/open-grid-core`.
+- [ ] `demo/src` no longer imports `@eregister/wit-grid-core`.
 - [ ] `demo/src` pages render through `Grid` with page-local ownership, not a
       shared showroom store layer.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `plans/README.md` is updated to reflect this plan and its dependency
       ordering.

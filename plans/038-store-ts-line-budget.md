@@ -65,7 +65,7 @@ budget assertion from `< 875` to `< 855` (keeps a 5-line margin above 850).
 ### Step 3: Verify
 
 ```
-corepack pnpm --filter @eregister/open-grid-core test
+corepack pnpm --filter @eregister/wit-grid-core test
 ```
 
 → exit 0.

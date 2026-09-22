@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { GridEventName, type GridApi } from '@eregister/open-grid-core';
-import type { GridCausalTraceSnapshot } from '@eregister/open-grid-core/experimental';
+import { GridEventName, type GridApi } from '@eregister/wit-grid-core';
+import type { GridCausalTraceSnapshot } from '@eregister/wit-grid-core/experimental';
 
 let currentSnapshot: GridCausalTraceSnapshot;
 const { start, clear, stop, getSnapshot } = vi.hoisted(() => ({ start: vi.fn(), clear: vi.fn(), stop: vi.fn(), getSnapshot: vi.fn() }));
-vi.mock('@eregister/open-grid-core/experimental', async () => {
-	const actual = await vi.importActual<typeof import('@eregister/open-grid-core/experimental')>('@eregister/open-grid-core/experimental');
+vi.mock('@eregister/wit-grid-core/experimental', async () => {
+	const actual = await vi.importActual<typeof import('@eregister/wit-grid-core/experimental')>('@eregister/wit-grid-core/experimental');
 	return {
 		...actual,
 		startFlightRecorder: start,
@@ -139,7 +139,7 @@ describe('GridFlightRecorderDevTools', () => {
 				<GridFlightRecorderDevTools api={second} />
 			</>
 		);
-		const panels = screen.getAllByLabelText('Open Grid Flight Recorder');
+		const panels = screen.getAllByLabelText('Wit Grid Flight Recorder');
 		expect(panels[0].style.getPropertyValue('--fr-bg')).toBe('#07101d');
 		second._setTheme(theme('#ffffff'));
 		await waitFor(() => expect(panels[1].style.getPropertyValue('--fr-bg')).toBe('#ffffff'));
@@ -170,10 +170,10 @@ describe('GridFlightRecorderDevTools', () => {
 		second._setTheme(theme('#ffffff'));
 		getSnapshot.mockImplementation((target) => (target === second ? trace(2) : trace(1)));
 		const view = render(<GridFlightRecorderDevTools api={first} />);
-		expect(screen.getByLabelText('Open Grid Flight Recorder').style.getPropertyValue('--fr-bg')).toBe('#07101d');
+		expect(screen.getByLabelText('Wit Grid Flight Recorder').style.getPropertyValue('--fr-bg')).toBe('#07101d');
 		view.rerender(<GridFlightRecorderDevTools api={second} />);
-		await waitFor(() => expect(screen.getByLabelText('Open Grid Flight Recorder').style.getPropertyValue('--fr-bg')).toBe('#ffffff'));
-		expect(screen.getByLabelText('Open Grid Flight Recorder').querySelector('.og-fr__summary strong')?.textContent).toBe('2');
+		await waitFor(() => expect(screen.getByLabelText('Wit Grid Flight Recorder').style.getPropertyValue('--fr-bg')).toBe('#ffffff'));
+		expect(screen.getByLabelText('Wit Grid Flight Recorder').querySelector('.og-fr__summary strong')?.textContent).toBe('2');
 	});
 
 	it('clamps NaN and over-maximum recorder capacities', () => {

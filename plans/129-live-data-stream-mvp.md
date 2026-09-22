@@ -4,7 +4,7 @@
 
 Build a minimal, safe live data stream orchestrator.
 
-This plan should prove Open Grid can ingest frequent updates without bypassing the core architecture.
+This plan should prove Wit Grid can ingest frequent updates without bypassing the core architecture.
 
 Live Stream MVP should support:
 
@@ -433,5 +433,5 @@ Plan 129 is complete when:
 Final report must say:
 
 ```text
-Plan 129 complete. Open Grid now has a risk-averse Live Data Stream MVP that batches and coalesces updates through existing commit APIs, protects dirty local cells, exposes live flash decorations through Insight Layers, and reports diagnostics without polluting row models, renderers, history, invalidation, or datasource logic.
+Plan 129 complete. Wit Grid now has a risk-averse Live Data Stream MVP that batches and coalesces updates through existing commit APIs, protects dirty local cells, exposes live flash decorations through Insight Layers, and reports diagnostics without polluting row models, renderers, history, invalidation, or datasource logic.
 ```

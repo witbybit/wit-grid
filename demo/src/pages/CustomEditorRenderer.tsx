@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Grid, GridEventName, type GridApi, type GridReadyEvent, type GridStateSnapshot } from '@eregister/open-grid-react';
+import { Grid, GridEventName, type GridApi, type GridReadyEvent, type GridStateSnapshot } from '@eregister/wit-grid-react';
 import { AlertTriangle, BarChart3, Gauge, Play, ShieldCheck, Star } from 'lucide-react';
 import { createCustomColumns, generateCustomShowcaseRows } from './demoGridConfigs';
 import type { CustomShowcaseRow } from '../components/GridShared';

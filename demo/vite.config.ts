@@ -7,23 +7,23 @@ export default defineConfig({
 	resolve: {
 		alias: [
 			{
-				find: '@eregister/open-grid-core/experimental',
+				find: '@eregister/wit-grid-core/experimental',
 				replacement: resolve(__dirname, '../packages/core/src/experimental.ts'),
 			},
 			{
-				find: '@eregister/open-grid-core/internal',
+				find: '@eregister/wit-grid-core/internal',
 				replacement: resolve(__dirname, '../packages/core/src/internal.ts'),
 			},
 			{
-				find: '@eregister/open-grid-core',
+				find: '@eregister/wit-grid-core',
 				replacement: resolve(__dirname, '../packages/core/src/index.ts'),
 			},
 			{
-				find: '@eregister/open-grid-react/experimental',
+				find: '@eregister/wit-grid-react/experimental',
 				replacement: resolve(__dirname, '../packages/react/src/experimental.ts'),
 			},
 			{
-				find: '@eregister/open-grid-react',
+				find: '@eregister/wit-grid-react',
 				replacement: resolve(__dirname, '../packages/react/src/index.ts'),
 			},
 		],

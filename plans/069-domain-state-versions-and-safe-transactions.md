@@ -101,8 +101,8 @@ Internal renderer and controller subscriptions should prefer domain versions or 
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Tests must prove exception-safe transaction cleanup, one notification per outer transaction, stable domain version semantics, and immutable public snapshots.

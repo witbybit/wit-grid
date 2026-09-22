@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Grid } from '@eregister/open-grid-react';
-import type { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid } from '@eregister/wit-grid-react';
+import type { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -368,7 +368,7 @@ function RealtimeGroupingDemoInner({ api, onGridReady }: { api: GridApi<SalesRow
 					rowModelType='client'
 					columns={COLUMNS}
 					rows={ROWS}
-					persistence='open-grid-sales-demo'
+					persistence='wit-grid-sales-demo'
 					initialState={{
 						groupBy: ['region', 'category'],
 						groupRowHeight: 44,

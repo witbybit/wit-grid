@@ -27,7 +27,7 @@ This is the first checked-in inventory for the Plan 103 convergence pass. It rec
 
 ## Current allowlist
 
-The source-of-truth allowlist lives in [packages/core/src/engine/gridDirectWriteAllowlist.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/engine/gridDirectWriteAllowlist.ts:1).
+The source-of-truth allowlist lives in [packages/core/src/engine/gridDirectWriteAllowlist.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/engine/gridDirectWriteAllowlist.ts:1).
 
 ## Remaining hot spots to convert next
 

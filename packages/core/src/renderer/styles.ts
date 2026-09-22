@@ -1,7 +1,7 @@
 import { DARK_THEME, themeToCSSVariables } from './themes.js';
 
 /**
- * Structural and Visual CSS Styles for Open Grid.
+ * Structural and Visual CSS Styles for Wit Grid.
  *
  * Theme variables are injected by ThemeManager at runtime.
  * Default (dark theme) is defined here for quick load before ThemeManager.mount().

@@ -806,7 +806,7 @@ function ToggleRow({
 
 // ── Shared mini-style helpers ─────────────────────────────────────────────────
 
-import type { ThemeTokens } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
 function makeIconBtnStyle(color: string): React.CSSProperties {
 	return {
 		width: 24,

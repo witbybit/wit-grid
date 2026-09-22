@@ -23,7 +23,7 @@ export function registerGridRuntimeComposition<TRowData>(api: GridApi<TRowData>,
 export function resolveGridRuntimeComposition<TRowData>(api: GridApi<TRowData>): GridRuntimeComposition<TRowData> {
 	const runtime = apiRuntimeMap.get(api as GridApi<unknown>);
 	if (!runtime) {
-		throw new Error('Invalid GridApi. This API was not created by Open Grid.');
+		throw new Error('Invalid GridApi. This API was not created by Wit Grid.');
 	}
 	return runtime as GridRuntimeComposition<TRowData>;
 }

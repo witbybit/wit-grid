@@ -65,4 +65,4 @@ That means the architecture is more correct than it is fast. Before advanced fea
 - no row-write executor uses `full` invalidation as the default answer for non-full writes
 - row-range and group invalidations trigger observable renderer work
 - focused invalidation and write-path regression suites pass
-- full `@eregister/open-grid-core` test suite passes
+- full `@eregister/wit-grid-core` test suite passes

@@ -1,4 +1,4 @@
-import { Grid, type ColumnDef } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface Row {
 	id: string;

@@ -88,8 +88,8 @@ Temporarily retain it as a compatibility re-export file, then delete it once all
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add package-export and forbidden-import tests. Generated declaration output must contain no accidental internal renderer or model exports.

@@ -1,4 +1,4 @@
-# Open Grid Critical Convergence Program — Plans 103–112
+# Wit Grid Critical Convergence Program — Plans 103–112
 
 ## Why Plan 103 changed
 

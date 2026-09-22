@@ -1,15 +1,15 @@
 # 🚀 High-Performance Data Grid & Spreadsheet Engine
 
-Open Grid is a lightweight, framework-agnostic grid engine for high-performance virtualized spreadsheets and data grids. Built to handle massive datasets with complex layouts, Open Grid maintains an out-of-render state loop in a centralized engine while exposing granular micro-subscriptions. This allows React, Vue, or vanilla JS wrappers to paint individual cells and rows with surgical precision, entirely bypassing the framework rendering bottleneck.
+Wit Grid is a lightweight, framework-agnostic grid engine for high-performance virtualized spreadsheets and data grids. Built to handle massive datasets with complex layouts, Wit Grid maintains an out-of-render state loop in a centralized engine while exposing granular micro-subscriptions. This allows React, Vue, or vanilla JS wrappers to paint individual cells and rows with surgical precision, entirely bypassing the framework rendering bottleneck.
 
 ---
 
 ## Alpha Status
 
-Open Grid is currently published as a pre-release alpha surface (`0.1.0-alpha.x`), not a stable `1.x` contract.
+Wit Grid is currently published as a pre-release alpha surface (`0.1.0-alpha.x`), not a stable `1.x` contract.
 
-- Use `@eregister/open-grid-react` for the supported React entrypoint and `@eregister/open-grid-core` for the supported headless entrypoint.
-- Incubating helpers live under `@eregister/open-grid-core/experimental` and `@eregister/open-grid-react/experimental`.
+- Use `@eregister/wit-grid-react` for the supported React entrypoint and `@eregister/wit-grid-core` for the supported headless entrypoint.
+- Incubating helpers live under `@eregister/wit-grid-core/experimental` and `@eregister/wit-grid-react/experimental`.
 - Anything under an `experimental` entry may change or be removed between alpha releases without compatibility guarantees.
 
 ---
@@ -22,7 +22,7 @@ The normative architecture constitution is at [docs/architecture/core-target.md]
 
 ## ⚡ Technical Architecture Overview
 
-To bypass virtual DOM performance bottlenecks and eliminate layout thrashing during rapid scrolling, Open Grid decouples raw record arrays from visual presentation using a dynamic **Row Node Tree** and a discriminated union **VisualRow** pipeline:
+To bypass virtual DOM performance bottlenecks and eliminate layout thrashing during rapid scrolling, Wit Grid decouples raw record arrays from visual presentation using a dynamic **Row Node Tree** and a discriminated union **VisualRow** pipeline:
 
 ```mermaid
 graph TD
@@ -43,7 +43,7 @@ graph TD
     A --> G[Scoped Formula Solver]
 
     A --> H[Framework Adapters]
-    H --> I["@eregister/open-grid-react bindings"]
+    H --> I["@eregister/wit-grid-react bindings"]
 
     I --> J[Isolated Cell-Level Subscribers]
     J --> K[Targeted Cell Paint]
@@ -62,7 +62,7 @@ graph TD
 
 ## 🔥 Key Developer Features
 
-Open Grid comes equipped with an extensive suite of built-in features designed for advanced spreadsheet and data dashboard development:
+Wit Grid comes equipped with an extensive suite of built-in features designed for advanced spreadsheet and data dashboard development:
 
 - **High-Performance Virtualization**: Virtualizes both rows and columns dynamically, yielding standard 60 FPS performance even for massive datasets with 100,000+ rows and 1,000+ columns.
 - **Sticky Lanes (Pinning)**: Floating stickiness for left/right columns and top/bottom rows with floating headers and scroll boundaries.
@@ -80,19 +80,19 @@ Open Grid comes equipped with an extensive suite of built-in features designed f
 
 ### 1. Installation
 
-Install Open Grid packages in your monorepo or project.
+Install Wit Grid packages in your monorepo or project.
 
 ```bash
-pnpm install @eregister/open-grid-core @eregister/open-grid-react
+pnpm install @eregister/wit-grid-core @eregister/wit-grid-react
 ```
 
 ### 2. Basic Setup Example
 
-The simplest way to use Open Grid is the single public `<Grid>` component. Pick `mode="client"` or `mode="server"` explicitly, and use `onGridReady` when you need the `GridApi` handle outside the grid tree.
+The simplest way to use Wit Grid is the single public `<Grid>` component. Pick `mode="client"` or `mode="server"` explicitly, and use `onGridReady` when you need the `GridApi` handle outside the grid tree.
 
 ```tsx
 import React, { useMemo } from 'react';
-import { Grid, type ColumnDef } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface BookRow {
 	id: string;
@@ -148,7 +148,7 @@ Use `onGridReady` when a parent component needs the `GridApi` handle, and `useGr
 
 ```tsx
 import { useState } from 'react';
-import { Grid, type GridApi } from '@eregister/open-grid-react';
+import { Grid, type GridApi } from '@eregister/wit-grid-react';
 
 function Toolbar({ api }: { api: GridApi<BookRow> | null }) {
 	return (
@@ -183,7 +183,7 @@ To enable row grouping, pass the `groupBy` fields inside the `initialState` conf
 
 ```tsx
 import React, { useMemo, useCallback } from 'react';
-import { Grid, type ColumnDef, type VisualRow, type GridApi } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type VisualRow, type GridApi } from '@eregister/wit-grid-react';
 
 interface EmployeeRow {
 	id: string;
@@ -257,7 +257,7 @@ To configure tree data, specify the `getParentId` function inside `initialState`
 
 ```tsx
 import React, { useMemo } from 'react';
-import { Grid, type ColumnDef, type CellRendererProps } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type CellRendererProps } from '@eregister/wit-grid-react';
 
 interface FileNode {
 	id: string;
@@ -309,7 +309,7 @@ Enable master-detail by setting `masterDetailEnabled: true` in your options, and
 
 ```tsx
 import React, { useMemo, useCallback } from 'react';
-import { Grid, type ColumnDef, type VisualRow, type GridApi, type CellRendererProps } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type VisualRow, type GridApi, type CellRendererProps } from '@eregister/wit-grid-react';
 
 interface OrderRow {
 	id: string;
@@ -408,7 +408,7 @@ To bind a header popover, register your custom header filter component in `heade
 
 ```tsx
 import React, { useState } from 'react';
-import { useGridApi, type GridApi, type ColumnDef } from '@eregister/open-grid-react';
+import { useGridApi, type GridApi, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface CustomFilterProps {
 	colField: string;
@@ -470,7 +470,7 @@ export const StatusHeaderFilter = ({ colField, api, close }: CustomFilterProps) 
 
 ### 5. Built-in Cell Types & Column Type Registry
 
-`@eregister/open-grid-react` ships six ready-to-use cell types — checkbox, date, number, multi-select, dropdown, and tags. Attach them to a column with `type: 'name'` and the grid resolves the renderer and editor automatically, with no component imports needed in your column definitions.
+`@eregister/wit-grid-react` ships six ready-to-use cell types — checkbox, date, number, multi-select, dropdown, and tags. Attach them to a column with `type: 'name'` and the grid resolves the renderer and editor automatically, with no component imports needed in your column definitions.
 
 #### Built-in types (no configuration required)
 
@@ -501,7 +501,7 @@ import {
 	type ColumnDef,
 	type ColumnTypeDefinition,
 	type DropdownOption,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 
 const STATUS_OPTIONS: DropdownOption[] = [
 	{ value: 'Active', color: 'emerald' },
@@ -555,7 +555,7 @@ Column-level `renderer` / `cellEditor` always override a type — so you can use
 When you own the grid via `<Grid>`, pass `styleRules` directly:
 
 ```tsx
-import { Grid, type ColumnDef, type StyleRule } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type StyleRule } from '@eregister/wit-grid-react';
 
 const styleRules = useMemo<StyleRule<OrderRow>[]>(
 	() => [
@@ -600,7 +600,7 @@ All matching rules contribute their class strings (space-joined), so rules are c
 When a component needs to apply rules from inside the grid tree, use `useGridApi` + `useStyleRules`:
 
 ```tsx
-import { Grid, useGridApi, useStyleRules, type ColumnDef, type StyleRule } from '@eregister/open-grid-react';
+import { Grid, useGridApi, useStyleRules, type ColumnDef, type StyleRule } from '@eregister/wit-grid-react';
 
 function DashboardRules() {
 	const api = useGridApi<StockRow>();
@@ -653,12 +653,12 @@ function DashboardGrid({ rows, columns }: { rows: StockRow[]; columns: ColumnDef
 
 ### 7. Pagination
 
-Open Grid ships a built-in `GridPagination` component and a `useClientGridPagination` hook for slice-level paging. The grid instance itself is now owned by `<Grid>` and surfaced through `onGridReady` / `useGridApi`.
+Wit Grid ships a built-in `GridPagination` component and a `useClientGridPagination` hook for slice-level paging. The grid instance itself is now owned by `<Grid>` and surfaced through `onGridReady` / `useGridApi`.
 
 #### Client-side pagination
 
 ```tsx
-import { Grid, GridPagination, useClientGridPagination, type ColumnDef } from '@eregister/open-grid-react';
+import { Grid, GridPagination, useClientGridPagination, type ColumnDef } from '@eregister/wit-grid-react';
 
 export function PaginatedGrid({ allRows, columns }: { allRows: MyRow[]; columns: ColumnDef<MyRow>[] }) {
 	const { pageRows, page, pageCount, setPage, totalRows, pageSize } = useClientGridPagination(allRows, {
@@ -681,7 +681,7 @@ export function PaginatedGrid({ allRows, columns }: { allRows: MyRow[]; columns:
 For server grids you manage the page state yourself — just drive your datasource and pass page metadata to `<GridPagination>`:
 
 ```tsx
-import { Grid, GridPagination, type ColumnDef } from '@eregister/open-grid-react';
+import { Grid, GridPagination, type ColumnDef } from '@eregister/wit-grid-react';
 
 const PAGE_SIZE = 100;
 
@@ -917,7 +917,7 @@ api.batch(() => {
 Style rows, cells, and header cells declaratively using an array of rule objects. The grid compiles them internally — no separate compiler call needed:
 
 ```tsx
-import { Grid, type ColumnDef, type StyleRule } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type StyleRule } from '@eregister/wit-grid-react';
 
 const styleRules = useMemo<StyleRule<ProductRow>[]>(
 	() => [
@@ -972,7 +972,7 @@ unsub();
 
 ## 🎨 Creating Custom Cell Renderers & Editors
 
-Open Grid allows you to build highly customized visual presentation slots and complex editing dropdowns by creating React components.
+Wit Grid allows you to build highly customized visual presentation slots and complex editing dropdowns by creating React components.
 
 ### 1. Custom Cell Renderer (Interactive Star Ratings)
 
@@ -980,7 +980,7 @@ Renderers are used for stunning presentation of passive values or simple interac
 
 ```tsx
 import React from 'react';
-import type { CellRendererProps } from '@eregister/open-grid-react';
+import type { CellRendererProps } from '@eregister/wit-grid-react';
 
 export const StarRatingRenderer = ({ value, rowId, colField, api }: CellRendererProps<ProductRow>) => {
 	const rating = Number(value) || 0;
@@ -1018,7 +1018,7 @@ Editors handle active inline cell editing. Use the second type parameter `TValue
 
 ```tsx
 import React from 'react';
-import type { CellEditorProps } from '@eregister/open-grid-react';
+import type { CellEditorProps } from '@eregister/wit-grid-react';
 
 // CellEditorProps<RowType, ValueType> — value is now typed as string, no cast needed
 export const StatusDropdownEditor = ({ value, onCommit, onCancel }: CellEditorProps<ProductRow, string>) => {
@@ -1049,7 +1049,7 @@ The same `TValue` parameter is available on `CellRendererProps<TRowData, TValue>
 For new columns, prefer the explicit `renderer` object. It tells the engine what kind of renderer you are using and which scroll behavior it is allowed to use.
 
 ```tsx
-import { Grid, type CellRendererProps, type ColumnDef } from '@eregister/open-grid-react';
+import { Grid, type CellRendererProps, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface TradeRow {
 	id: string;
@@ -1091,7 +1091,7 @@ const columns: ColumnDef<TradeRow>[] = [
 
 #### How cell rendering works
 
-Open Grid separates "what this cell should mean" from "where this cell's DOM currently lives":
+Wit Grid separates "what this cell should mean" from "where this cell's DOM currently lives":
 
 1. The grid resolves a row and column into a cell controller keyed by `rowId + columnInstanceId`.
 2. The controller decides the semantic presentation for the current phase: primitive text, frozen portal, live renderer, text impostor, or HTML snapshot.
@@ -1127,7 +1127,7 @@ The older `cellRenderer` examples in this README are kept for compatibility with
 | `'text-impostor'` | Shows a cheap text/chip stand-in during scroll via `textImpostor.render`.                                                                                                                       | Expensive badges/chips where a faithful text stand-in is acceptable.             |
 | `'html-snapshot'` | Replays a captured inert HTML snapshot during scroll. Missing or stale snapshots use shell/pending behavior unless explicitly configured otherwise.                                             | Expensive static React renderers with stable markup.                             |
 
-If you omit `scrollPresentation` on a custom renderer, Open Grid treats it as `'freeze'`. If a column has no renderer, it uses the primitive path.
+If you omit `scrollPresentation` on a custom renderer, Wit Grid treats it as `'freeze'`. If a column has no renderer, it uses the primitive path.
 
 #### Column capability reference
 
@@ -1169,7 +1169,7 @@ Use `rendererOptions.liveReact` on `<Grid>` to tune live renderer work. These ar
 />
 ```
 
-`rowOverscan` and `columnOverscan` extend the live-cell planning window beyond the visible viewport. Visible live cells are prioritized first, and the live budget controls how much live renderer work can be admitted in a frame. `maxMountsPerFrame` limits fresh renderer mounts, while `maxUpdatesPerFrame` limits updates to renderers that already exist. Set `allowEmergencyShell: false` when truthfulness is more important than avoiding jank; in live mode, Open Grid will prefer real renderer work over showing raw or stale text.
+`rowOverscan` and `columnOverscan` extend the live-cell planning window beyond the visible viewport. Visible live cells are prioritized first, and the live budget controls how much live renderer work can be admitted in a frame. `maxMountsPerFrame` limits fresh renderer mounts, while `maxUpdatesPerFrame` limits updates to renderers that already exist. Set `allowEmergencyShell: false` when truthfulness is more important than avoiding jank; in live mode, Wit Grid will prefer real renderer work over showing raw or stale text.
 
 Overscan only applies to cells using `scrollPresentation: 'live'`. It does not force every offscreen cell to mount; it extends the candidate window, then the per-frame budgets decide how much of that work actually runs. The practical effect is that nearby live cells can already be warm by the time they enter view.
 
@@ -1299,7 +1299,7 @@ For very hot cells, a renderer can expose an imperative `update(params)` handle 
 
 ```tsx
 import React from 'react';
-import type { CellRendererProps, ImperativeCellHandle } from '@eregister/open-grid-react';
+import type { CellRendererProps, ImperativeCellHandle } from '@eregister/wit-grid-react';
 
 const FastPriceRenderer = React.forwardRef<ImperativeCellHandle<TradeRow>, CellRendererProps<TradeRow, number>>((props, ref) => {
 	const spanRef = React.useRef<HTMLSpanElement>(null);
@@ -1401,10 +1401,10 @@ const PriceEditor = ({ value, rowId, colField, api, onCommit, onCancel }: CellEd
 
 ### Implementing a server datasource
 
-The `GridDatasource` interface has a single `getRows` method. Open Grid calls it as the user scrolls into un-loaded blocks, passing the row range and the current sort/filter models.
+The `GridDatasource` interface has a single `getRows` method. Wit Grid calls it as the user scrolls into un-loaded blocks, passing the row range and the current sort/filter models.
 
 ```tsx
-import { Grid, GridPagination, type GridDatasource, type SortModel, type FilterModel } from '@eregister/open-grid-react';
+import { Grid, GridPagination, type GridDatasource, type SortModel, type FilterModel } from '@eregister/wit-grid-react';
 
 interface LogRow {
 	id: string;
@@ -1457,7 +1457,7 @@ export function ServerLogGrid() {
 		[page]
 	);
 
-	const columns = React.useMemo<import('@eregister/open-grid-react').ColumnDef<LogRow>[]>(
+	const columns = React.useMemo<import('@eregister/wit-grid-react').ColumnDef<LogRow>[]>(
 		() => [
 			{ field: 'timestamp', header: 'Time', width: 180 },
 			{ field: 'service', header: 'Service', width: 140 },
@@ -1522,10 +1522,10 @@ Use `useGridApi()` inside any component rendered beneath `<Grid>` to access the 
 
 ### Selection-based bulk actions
 
-Open Grid's selection model tracks focused cell and range bounds. Read `state.selection` to derive which rows are selected:
+Wit Grid's selection model tracks focused cell and range bounds. Read `state.selection` to derive which rows are selected:
 
 ```tsx
-import { Grid, useGridApi, useGridSelector } from '@eregister/open-grid-react';
+import { Grid, useGridApi, useGridSelector } from '@eregister/wit-grid-react';
 
 function GridToolbar<TRowData extends { id: string }>() {
 	const api = useGridApi<TRowData>();
@@ -1601,7 +1601,7 @@ const applyBulkPriceIncrease = (selectedRowIds: string[]) => {
 
 ### Keyboard navigation
 
-Open Grid ships full keyboard navigation out of the box when `enableNavigation` is `true` (the default):
+Wit Grid ships full keyboard navigation out of the box when `enableNavigation` is `true` (the default):
 
 | Key                     | Action                             |
 | :---------------------- | :--------------------------------- |
@@ -1677,7 +1677,7 @@ The grid respects `prefers-reduced-motion` through CSS. If your custom renderers
 
 ## 📊 Spreadsheet Formulas & Calculations
 
-Open Grid supports scoped spreadsheet formulas as an optional engine behavior. You can pass formula expressions starting with `=` as cell values, and the engine automatically recalculates computed values when source cells are edited.
+Wit Grid supports scoped spreadsheet formulas as an optional engine behavior. You can pass formula expressions starting with `=` as cell values, and the engine automatically recalculates computed values when source cells are edited.
 
 ### Writing Formulas
 
@@ -1702,7 +1702,7 @@ Whenever `S-1001:A` or `S-1001:B` changes, the calculated output for `C` and `F`
 
 ### 1. Running Unit Tests
 
-Open Grid uses Vitest for core correctness tests around formulas, virtualization geometry, and row model sorting and grouping pipelines.
+Wit Grid uses Vitest for core correctness tests around formulas, virtualization geometry, and row model sorting and grouping pipelines.
 
 ```bash
 pnpm run test
@@ -1736,7 +1736,7 @@ Open your browser to `http://localhost:5173` to explore the **Calculations Arena
 
 ## 📄 License
 
-Open Grid is proprietary software — all rights reserved. No license is granted to use, copy, modify,
+Wit Grid is proprietary software — all rights reserved. No license is granted to use, copy, modify,
 or distribute this software except by separate written agreement with Wit By Bit. Availability of this
 source is at the sole discretion of Wit By Bit and may be restricted, or made subject to a paid
 commercial license, at any time. See [LICENSE](LICENSE) for the full terms.

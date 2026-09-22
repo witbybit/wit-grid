@@ -1,7 +1,7 @@
 import React from 'react';
 import { useGridKeySelector } from '../hooks.js';
 import type { GridApi } from '../types.js';
-import { summarizeAnalysisState } from '@eregister/open-grid-core';
+import { summarizeAnalysisState } from '@eregister/wit-grid-core';
 import { ColumnsPanel } from './panels/ColumnsPanel.js';
 import { FiltersPanel } from './panels/FiltersPanel.js';
 import { SortPanel } from './panels/SortPanel.js';

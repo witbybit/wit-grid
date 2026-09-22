@@ -5,8 +5,8 @@
  * Used by FiltersPanel, header menu bridge, and floating filter bridge.
  */
 import React from 'react';
-import type { ThemeTokens } from '@eregister/open-grid-core';
-import type { ColumnFilterDef, CustomFilterRendererParams } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
+import type { ColumnFilterDef, CustomFilterRendererParams } from '@eregister/wit-grid-core';
 import { AsyncSelectFilter, InfiniteSelectFilter, StaticSelectFilter } from './SelectFilterComponents.js';
 
 interface ColumnFilterRendererProps {

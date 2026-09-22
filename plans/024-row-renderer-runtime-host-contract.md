@@ -47,11 +47,11 @@ budget.
 
 | Purpose     | Command                                                                                                                                    | Expected on success |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| Build       | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                   | exit 0              |
-| Focused     | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` | exit 0              |
-| Core test   | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                    | exit 0              |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                  | exit 0              |
-| React test  | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                   | exit 0              |
+| Build       | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                   | exit 0              |
+| Focused     | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` | exit 0              |
+| Core test   | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                    | exit 0              |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                  | exit 0              |
+| React test  | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                   | exit 0              |
 | Demo build  | `corepack pnpm --filter demo-app build`                                                                                                    | exit 0              |
 
 ## Scope
@@ -77,7 +77,7 @@ budget.
 Ensure the runtime helper reads the existing `programmaticScrollCell` property
 instead of expecting a non-existent getter on `RowRenderer`.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Reduce binder churn around programmatic scroll checks
 
@@ -85,7 +85,7 @@ Update `rowCellBinder.ts` so the programmatic-scroll pointer is read once per
 bind path and reused, instead of calling the getter repeatedly.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
+`corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
 -> exit 0.
 
 ### Step 3: Keep the architecture guard aligned with the runtime factory
@@ -101,7 +101,7 @@ Check `rowRenderer.ts` remains under the intermediate size guard and that the
 runtime helper owns the adapter code.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core test`
+`corepack pnpm --filter @eregister/wit-grid-core test`
 -> exit 0 and `rowRenderer.ts` stays below the 800-line guard.
 
 ## Test plan
@@ -118,11 +118,11 @@ runtime helper owns the adapter code.
 - [x] `rowCellBinder.ts` reuses the programmatic scroll pointer within the bind
       path.
 - [x] `architectureGuards.test.ts` matches the new runtime factory call sites.
-- [x] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [x] `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` exits 0.
-- [x] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [x] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [x] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
+- [x] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [x] `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` exits 0.
+- [x] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [x] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [x] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
 - [x] `corepack pnpm --filter demo-app build` exits 0.
 - [x] `rowRenderer.ts` remains below the 800-line intermediate budget.
 

@@ -1,6 +1,6 @@
 # Plan 157: Interaction Kernel Hardening
 
-> **Executor instructions**: Follow this plan as a demolition-and-replacement architecture program, not as feature polish. The target is one authoritative interaction kernel in `@eregister/open-grid-core` that owns focus, navigation, selection, range, editing, clipboard routing, and accessibility derivation. Do not preserve parallel legacy interaction paths for compatibility convenience. Open Grid is in alpha; prefer clean replacement over compatibility clutter.
+> **Executor instructions**: Follow this plan as a demolition-and-replacement architecture program, not as feature polish. The target is one authoritative interaction kernel in `@eregister/wit-grid-core` that owns focus, navigation, selection, range, editing, clipboard routing, and accessibility derivation. Do not preserve parallel legacy interaction paths for compatibility convenience. Wit Grid is in alpha; prefer clean replacement over compatibility clutter.
 >
 > **Drift check (run first)**: `git diff --stat 3824a049..HEAD -- packages/core/src/api packages/core/src/engine packages/core/src/models packages/core/src/features packages/core/src/renderer packages/core/src/navigation.ts packages/react/src/GridView.tsx packages/react/src/hooks.tsx packages/react/src/gridPortalHosts.tsx packages/react/src/GridPortal.tsx`
 > If any in-scope seam changed since this plan was written, compare the "Current state" section against the live code before proceeding. Any mismatch in interaction identity, renderer ownership, or adapter responsibilities is a STOP condition until reconciled.
@@ -58,66 +58,66 @@ No compatibility hub preserving deprecated field-based identity internally.
 
 The following excerpts describe the live interaction architecture this plan replaces.
 
-- [packages/core/src/api/GridApi.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/api/GridApi.ts) defines public interaction state and still uses field-based cell identity:
+- [packages/core/src/api/GridApi.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/api/GridApi.ts) defines public interaction state and still uses field-based cell identity:
     - `GridCellPointer { rowId, colField }` at lines 82-85
     - `ActiveEditState extends GridCellPointer` at lines 87-89
     - `GridSelectionState` with `focus`, `anchor`, `range`, and `bounds` at lines 192-198
 
-- [packages/core/src/models/SelectionModel.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/models/SelectionModel.ts) owns cell selection/range state mechanics, but range bounds still convert through row id + field:
+- [packages/core/src/models/SelectionModel.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/models/SelectionModel.ts) owns cell selection/range state mechanics, but range bounds still convert through row id + field:
     - `calculateRangeBounds(...)` maps `range.start.colField` / `range.end.colField` to displayed column indexes at lines 70-90
     - invalidated cells are keyed as `${rowId}:${colField}` at lines 183-188
 
-- [packages/core/src/models/EditModel.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/models/EditModel.ts) is only a shallow pointer holder:
+- [packages/core/src/models/EditModel.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/models/EditModel.ts) is only a shallow pointer holder:
     - `private activeEdit: GridCellPointer | null = null` at lines 3-4
     - there is no `draftValue`, `originalValue`, `startedBy`, `version`, or lifecycle state machine
 
-- [packages/core/src/navigation.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/navigation.ts) is the current keyboard/pointer navigation owner:
+- [packages/core/src/navigation.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/navigation.ts) is the current keyboard/pointer navigation owner:
     - pointer and keyboard commands are driven directly through `GridPluginRuntime`
     - focus/edit/range movement is all field-based, via `GridCellPointer`
     - `PageUp` / `PageDown` currently use a fixed `const page = 10` heuristic at lines 182-188
     - printable-character editing, deletion, clipboard routing, selection drag, and edit movement all live here
 
-- [packages/core/src/engine/GridEngine.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/engine/GridEngine.ts) already provides a strong central commit seam:
+- [packages/core/src/engine/GridEngine.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/engine/GridEngine.ts) already provides a strong central commit seam:
     - `applySelectionRange(...)` performs core-owned selection/focus commit and invalidation at lines 1288-1348
     - row-selection commands route through `RowSelectionFeatureController` at lines 1260-1285
     - clipboard API calls route through `ClipboardController` at lines 945-952
 
-- [packages/core/src/engine/GridProjectionPipeline.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/engine/GridProjectionPipeline.ts) currently normalizes selection/editing validity after row-model changes:
+- [packages/core/src/engine/GridProjectionPipeline.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/engine/GridProjectionPipeline.ts) currently normalizes selection/editing validity after row-model changes:
     - `normalizeSelectionState(...)` clears or collapses selection when pointers go invalid at lines 216-243
     - `normalizeActiveEdit(...)` nulls editing when row or column disappears at lines 245-253
     - this normalization still uses row id + field, not row id + column instance id
 
-- [packages/core/src/features/EditingFeatureController.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/features/EditingFeatureController.ts) already routes committed writes through core authority:
+- [packages/core/src/features/EditingFeatureController.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/features/EditingFeatureController.ts) already routes committed writes through core authority:
     - `startEdit(...)` / `stopEdit(...)` own edit-start / edit-stop invalidations and events at lines 63-98
     - `commitEdit(...)` validates and commits through `ctx.applyChange(...)` at lines 100-185
     - but committed edit identity is still `rowId + colField`, and the controller does not own draft/original state
 
-- [packages/core/src/features/RowSelectionFeatureController.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/features/RowSelectionFeatureController.ts) is already relatively solid:
+- [packages/core/src/features/RowSelectionFeatureController.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/features/RowSelectionFeatureController.ts) is already relatively solid:
     - row-selection gestures are core-owned and row-model-scope-aware at lines 13-153
     - this should be folded into the final kernel rather than reimplemented in the adapter
 
-- [packages/core/src/features/ClipboardController.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/features/ClipboardController.ts) currently derives copy/paste from selection bounds + displayed columns:
+- [packages/core/src/features/ClipboardController.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/features/ClipboardController.ts) currently derives copy/paste from selection bounds + displayed columns:
     - copy/paste start from `selection.focus` and `selection.bounds` at lines 38-77
     - paste iterates visible rows + displayed columns using field-based column access at lines 89-119
     - this is structurally good, but it still depends on field/index identity rather than instance identity
 
-- [packages/react/src/GridView.tsx](/C:/Users/rishi/witbybit/open-grid/packages/react/src/GridView.tsx) currently owns too much interaction assembly:
+- [packages/react/src/GridView.tsx](/C:/Users/rishi/witbybit/wit-grid/packages/react/src/GridView.tsx) currently owns too much interaction assembly:
     - global `keydown` / `mouseup` / `mousedown` activity tracking is wired in the adapter at lines 246-294
     - the adapter resolves `.og-cell` DOM targets to logical pointers at lines 296-303
     - the adapter manually focuses cells and forwards mouse/click/double-click/contextmenu behavior to the navigation plugin at lines 305-430
     - this is the clearest sign that interaction orchestration is not yet core-owned enough
 
-- [packages/core/src/renderer/selectionPaintManager.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/selectionPaintManager.ts) still owns row-selection click behavior inside a renderer-facing class:
+- [packages/core/src/renderer/selectionPaintManager.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/selectionPaintManager.ts) still owns row-selection click behavior inside a renderer-facing class:
     - delegated viewport click handling for checkbox and row clicks lives at lines 46-121
     - this class mixes row-class paint concerns with semantic row-selection interaction
     - this is a clean demolition target for Plan 157
 
-- [packages/core/src/renderer/rowCellBindingLanes.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/rowCellBindingLanes.ts) shows the renderer is already column-instance-aware:
+- [packages/core/src/renderer/rowCellBindingLanes.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/rowCellBindingLanes.ts) shows the renderer is already column-instance-aware:
     - row slots and cell slots are reconciled by `ColumnInstanceId`
     - current focus recovery still derives a focused instance id from `focusedCell.colField` by searching displayed columns at lines 479-481
     - this is a temporary bridge that Plan 157 should remove
 
-- [packages/core/src/renderer/cellSlot.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/cellSlot.ts), [packages/core/src/renderer/rowSlot.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/rowSlot.ts), and [packages/core/src/renderer/viewportRenderer.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/renderer/viewportRenderer.ts) already provide the physical identity and ARIA paint foundation:
+- [packages/core/src/renderer/cellSlot.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/cellSlot.ts), [packages/core/src/renderer/rowSlot.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/rowSlot.ts), and [packages/core/src/renderer/viewportRenderer.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/renderer/viewportRenderer.ts) already provide the physical identity and ARIA paint foundation:
     - cell slots own stable `columnInstanceId`, `cellInstanceId`, `aria-colindex`, and `aria-selected`
     - row slots own `aria-rowindex`
     - viewport root owns `role="grid"`, `aria-rowcount`, and `aria-colcount`
@@ -127,12 +127,12 @@ The following excerpts describe the live interaction architecture this plan repl
 
 | Purpose                   | Command                                                                                                                                                                                                                                        | Expected on success |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| Core build                | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                                                                                       | exit 0              |
-| React build               | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                                                                                      | exit 0              |
-| Core tests                | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                                                                                        | all pass            |
-| React tests               | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                                                                                       | all pass            |
-| Architecture guards       | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts`                                                                                                                                       | all pass            |
-| Focused interaction tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/models/SelectionModel.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts src/features/ClipboardController.test.ts` | all pass            |
+| Core build                | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                                                                                                                       | exit 0              |
+| React build               | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                                                                                                                      | exit 0              |
+| Core tests                | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                                                                                        | all pass            |
+| React tests               | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                                                                                                                       | all pass            |
+| Architecture guards       | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts`                                                                                                                                       | all pass            |
+| Focused interaction tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/models/SelectionModel.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts src/features/ClipboardController.test.ts` | all pass            |
 
 ## Scope
 
@@ -349,11 +349,11 @@ Reasoning:
 
 ## Done criteria
 
-- [x] `corepack pnpm --filter @eregister/open-grid-core build` exits 0
-- [x] `corepack pnpm --filter @eregister/open-grid-react build` exits 0
-- [x] `corepack pnpm --filter @eregister/open-grid-core test` exits 0
-- [x] `corepack pnpm --filter @eregister/open-grid-react test` exits 0
-- [x] `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts` exits 0
+- [x] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0
+- [x] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0
+- [x] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0
+- [x] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0
+- [x] `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts` exits 0
 - [x] Core interaction state no longer uses field-only identity for focus/edit/range
 - [x] `packages/core/src/navigation.ts` is either deleted or reduced to a non-semantic shim that is then removed before plan closure
 - [x] `packages/react/src/GridView.tsx` no longer owns semantic keyboard/pointer interaction orchestration

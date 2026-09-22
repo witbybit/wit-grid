@@ -14,8 +14,8 @@ import type {
 	DateFilterOperator,
 } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';
-import type { ThemeTokens, CustomFilterRendererParams, GridDistinctValueSummary } from '@eregister/open-grid-core';
-import { resolveColumnFilterDef } from '@eregister/open-grid-core';
+import type { ThemeTokens, CustomFilterRendererParams, GridDistinctValueSummary } from '@eregister/wit-grid-core';
+import { resolveColumnFilterDef } from '@eregister/wit-grid-core';
 import { ColumnFilterRenderer } from '../../filters/ColumnFilterRenderer.js';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────

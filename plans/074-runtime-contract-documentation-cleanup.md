@@ -81,8 +81,8 @@ While cleaning comments, delete only compatibility branches proven unreachable b
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 A repository search should find no completed migration-phase comments in runtime source, and the architecture note must match the final ownership model.

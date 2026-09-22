@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { createGridTraceReplay, type GridReplayScheduler, type GridTraceReplay } from '@eregister/open-grid-core/experimental';
+import { createGridTraceReplay, type GridReplayScheduler, type GridTraceReplay } from '@eregister/wit-grid-core/experimental';
 import './gridTraceReplayControls.css';
 
 export interface GridTraceReplayControlsProps {

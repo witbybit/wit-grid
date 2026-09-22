@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { GridEventName, type GridApi } from '@eregister/open-grid-react';
+import { GridEventName, type GridApi } from '@eregister/wit-grid-react';
 import { TableProperties, Terminal } from 'lucide-react';
 
 export const StateInspector = React.memo(({ api }: { api: GridApi<any> }) => {

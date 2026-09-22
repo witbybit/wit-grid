@@ -1,5 +1,5 @@
-import { type GridHostWithAdapter } from '@eregister/open-grid-core/internal';
-import { Grid, type ColumnDef } from '@eregister/open-grid-react';
+import { type GridHostWithAdapter } from '@eregister/wit-grid-core/internal';
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface Row {
 	id: string;

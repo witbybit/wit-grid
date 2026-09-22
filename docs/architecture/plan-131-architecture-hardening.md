@@ -1,4 +1,4 @@
-# Plan 131 — Open Grid Final Architecture Hardening
+# Plan 131 — Wit Grid Final Architecture Hardening
 
 > **Status**: In progress. Plans 122-130 implemented the Data Integrity pipeline core.
 > Plans 131+ lock in the remaining non-negotiables.

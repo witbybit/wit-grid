@@ -110,9 +110,9 @@ Inner wrapper + height/clip WAAPI on enter/exit; displaced rows `move` in lockst
 ## Verification
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/layoutTransitionController.test.ts src/renderer/rowSlotPool.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/layoutTransitionController.test.ts src/renderer/rowSlotPool.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 

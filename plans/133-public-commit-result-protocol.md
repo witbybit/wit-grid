@@ -30,7 +30,7 @@ Advanced grid features cannot rely on void mutation APIs once validation, capabi
 | Purpose           | Command                                                 | Expected on success |
 | ----------------- | ------------------------------------------------------- | ------------------- |
 | Architecture gate | `corepack pnpm run test:architecture`                   | exit 0              |
-| Core tests        | `corepack pnpm --filter @eregister/open-grid-core test` | exit 0              |
+| Core tests        | `corepack pnpm --filter @eregister/wit-grid-core test` | exit 0              |
 | Workspace tests   | `corepack pnpm run test`                                | exit 0              |
 | Build/typecheck   | `corepack pnpm run build`                               | exit 0              |
 
@@ -78,13 +78,13 @@ Replace or rename the advanced mutation APIs so the serious path is result-aware
 
 Because the operator explicitly requested no deprecated compatibility layer, remove the old void contract rather than keeping both surfaces around.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
 
 ### Step 3: Route all feature callers to the public result protocol
 
 Update integrity, editing, fill, clipboard, streaming, and other feature callers to consume the result protocol directly. Delete local wrappers that convert kernel outcomes into feature-specific pseudo-results when they are no longer needed.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts` -> all pass
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts` -> all pass
 
 ### Step 4: Make failure handling explicit at call sites
 

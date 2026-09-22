@@ -49,9 +49,9 @@ header bands). Three narrow legacy shortcuts survived into the working tree:
 
 | Purpose     | Command                                                   | Expected |
 | ----------- | --------------------------------------------------------- | -------- |
-| Build core  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0   |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0   |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0   |
+| Build core  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0   |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0   |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0   |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0   |
 
 ## Steps
@@ -82,7 +82,7 @@ Add `getLayoutPlan: () => this.viewportRenderer.getLayoutPlan()` to the
 `FillDragController` constructor options (lines 234-241), matching the pattern
 used for the column-interaction controller directly above it.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` → exit 0.
 
 ### Step 2: Fix `GridEngine.ts` — remove `setAggDefs` cast
 
@@ -102,7 +102,7 @@ public setAggDefs(defs: import('../rows/stages/aggregateStage.js').AggregationDe
     this.groupingFeature.setAggDefs(defs);
 ```
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` → exit 0.
 
 ### Step 3: Fix `contextMenu.ts` — remove `item.id as any`
 
@@ -131,9 +131,9 @@ before the `includes` call.
 **Final verify**:
 
 ```
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
 corepack pnpm --filter demo-app build
 ```
 

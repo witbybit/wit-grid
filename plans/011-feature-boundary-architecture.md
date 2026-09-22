@@ -2,7 +2,7 @@
 
 > **Executor instructions**: Execute in phases, in order. This is an architecture hardening plan, not a feature plan. Keep behavior unchanged unless a phase explicitly says otherwise. Add characterization tests before moving code. Do not make broad rewrites outside the in-scope files.
 >
-> **Drift check (run first)**: `git diff --stat 53fe61f..HEAD -- packages/core/src/store.ts packages/core/src/createGrid.ts packages/core/src/engine packages/core/src/models packages/core/src/renderer packages/core/src/gridHost.ts packages/core/src/internal.ts packages/react/src/OpenGrid.tsx packages/react/src/GridPortal.tsx packages/react/src/chart`
+> **Drift check (run first)**: `git diff --stat 53fe61f..HEAD -- packages/core/src/store.ts packages/core/src/createGrid.ts packages/core/src/engine packages/core/src/models packages/core/src/renderer packages/core/src/gridHost.ts packages/core/src/internal.ts packages/react/src/WitGrid.tsx packages/react/src/GridPortal.tsx packages/react/src/chart`
 >
 > If any in-scope file changed since this plan was written, compare the "Current state" excerpts against the live code before proceeding. If they do not match, stop and refresh this plan before editing.
 
@@ -30,7 +30,7 @@ The current implementation has good building blocks, but ownership is still too 
 - `packages/core/src/store.ts` is 1600+ lines. It exports public types, state slices, validation helpers, `GridApi`, `InternalGridApi`, and the `GridStore` implementation from one file.
 - `packages/core/src/engine/GridEngine.ts` is 1000+ lines. It owns column mutations, sorting, filtering, grouping, editing, row selection, subscriptions, formula invalidation, derived state, invalidation, event dispatch, and render requests.
 - `packages/core/src/createGrid.ts` manually mirrors every public API method into a frozen facade.
-- `packages/react/src/OpenGrid.tsx` and `packages/react/src/GridPortal.tsx` import `@eregister/open-grid-core/internal` for routine adapter work.
+- `packages/react/src/WitGrid.tsx` and `packages/react/src/GridPortal.tsx` import `@eregister/wit-grid-core/internal` for routine adapter work.
 
 Evidence:
 
@@ -121,17 +121,17 @@ export function createApiFacade<TRowData>(
 React adapter code still relies on internal core types and store access:
 
 ```ts
-// packages/react/src/OpenGrid.tsx:16
-import { InternalColumnDef, GridHost, mountGridHost, getStoreFromApi } from '@eregister/open-grid-core/internal';
+// packages/react/src/WitGrid.tsx:16
+import { InternalColumnDef, GridHost, mountGridHost, getStoreFromApi } from '@eregister/wit-grid-core/internal';
 
-// packages/react/src/OpenGrid.tsx:380
+// packages/react/src/WitGrid.tsx:380
 const visualRow = Number.isFinite(rowIndex) ? getStoreFromApi(api).getVisualRow(rowIndex) : null;
 
-// packages/react/src/OpenGrid.tsx:390
+// packages/react/src/WitGrid.tsx:390
 const access = getStoreFromApi(api).getCellAccess(pointer.rowId, pointer.colField);
 
 // packages/react/src/GridPortal.tsx:24
-import type { InternalColumnDef, InternalGridApi } from '@eregister/open-grid-core/internal';
+import type { InternalColumnDef, InternalGridApi } from '@eregister/wit-grid-core/internal';
 
 // packages/react/src/GridPortal.tsx:132
 const iCol = col as InternalColumnDef | undefined;
@@ -186,7 +186,7 @@ export interface GridChange<TRowData = unknown> {
 If the event typing becomes awkward, prefer a small helper method per event over weakening the whole contract to `any`.
 
 3. **Framework adapters use a stable host adapter contract**
-    - Keep `@eregister/open-grid-core/internal` for renderer mounting, but stop requiring React to recover `GridStore` for common interactions.
+    - Keep `@eregister/wit-grid-core/internal` for renderer mounting, but stop requiring React to recover `GridStore` for common interactions.
     - Add adapter-facing methods to `GridHost` or a new `GridAdapterHandle`, not to the public `GridApi`.
     - Examples: `getCellPointerFromElement`, `getCellAccessFromElement`, `getGroupVisibleDescendantRowIds`, `isImperativeRendererColumn`.
 
@@ -194,10 +194,10 @@ If the event typing becomes awkward, prefer a small helper method per event over
 
 | Purpose      | Command                                                                                                               | Expected |
 | ------------ | --------------------------------------------------------------------------------------------------------------------- | -------- |
-| Core build   | `corepack pnpm --filter @eregister/open-grid-core build`                                                              | exit 0   |
-| Core tests   | `corepack pnpm --filter @eregister/open-grid-core test`                                                               | exit 0   |
-| React build  | `corepack pnpm --filter @eregister/open-grid-react build`                                                             | exit 0   |
-| React tests  | `corepack pnpm --filter @eregister/open-grid-react test`                                                              | exit 0   |
+| Core build   | `corepack pnpm --filter @eregister/wit-grid-core build`                                                              | exit 0   |
+| Core tests   | `corepack pnpm --filter @eregister/wit-grid-core test`                                                               | exit 0   |
+| React build  | `corepack pnpm --filter @eregister/wit-grid-react build`                                                             | exit 0   |
+| React tests  | `corepack pnpm --filter @eregister/wit-grid-react test`                                                              | exit 0   |
 | Demo build   | `corepack pnpm --filter demo-app build`                                                                               | exit 0   |
 | Format check | `corepack pnpm exec prettier --check packages/core/src packages/react/src plans/011-feature-boundary-architecture.md` | exit 0   |
 
@@ -217,7 +217,7 @@ In scope:
 - `packages/core/src/boundary.test.ts`
 - `packages/core/src/store.test.ts`
 - `packages/core/src/engine/*.test.ts` (create if needed)
-- `packages/react/src/OpenGrid.tsx`
+- `packages/react/src/WitGrid.tsx`
 - `packages/react/src/GridPortal.tsx`
 - `packages/react/src/chart/GridChartOverlay.tsx`
 - `packages/react/src/index.test.tsx`
@@ -262,8 +262,8 @@ Required test coverage:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 Expected: exit 0. Tests may initially exercise the current implementation, not the future one.
@@ -300,8 +300,8 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts
-corepack pnpm --filter @eregister/open-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/GridChangeApplier.test.ts
+corepack pnpm --filter @eregister/wit-grid-core build
 ```
 
 Expected: exit 0.
@@ -354,8 +354,8 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/boundary.test.ts src/engine/GridChangeApplier.test.ts
-corepack pnpm --filter @eregister/open-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/boundary.test.ts src/engine/GridChangeApplier.test.ts
+corepack pnpm --filter @eregister/wit-grid-core build
 ```
 
 Expected: exit 0.
@@ -394,8 +394,8 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/rows/stages/groupStage.test.ts src/rows/stages/flattenStage.test.ts src/renderer/layoutPlan.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/rows/stages/groupStage.test.ts src/rows/stages/flattenStage.test.ts src/renderer/layoutPlan.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
 ```
 
 Expected: exit 0.
@@ -429,15 +429,15 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/models/SelectionModel.test.ts
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/models/SelectionModel.test.ts
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 Expected: exit 0.
 
 ### Phase 5: Introduce an adapter-facing host contract
 
-React currently reaches into `@eregister/open-grid-core/internal` for common tasks. Replace common store reach-throughs with a stable host/adapter handle.
+React currently reaches into `@eregister/wit-grid-core/internal` for common tasks. Replace common store reach-throughs with a stable host/adapter handle.
 
 Add to `packages/core/src/gridHost.ts` or a new adjacent module:
 
@@ -454,26 +454,26 @@ Then expose the handle from `mountGridHost` return value or through a clearly na
 
 Migrate:
 
-- `packages/react/src/OpenGrid.tsx` cell click pointer/access resolution.
+- `packages/react/src/WitGrid.tsx` cell click pointer/access resolution.
 - `packages/react/src/GridPortal.tsx` group descendant lookup.
 - `packages/react/src/GridPortal.tsx` imperative renderer capability checks.
 - `packages/react/src/chart/GridChartOverlay.tsx` store access if it only needs read-only row/cell state that can be represented by the adapter/public API.
 
-Do not remove `@eregister/open-grid-core/internal` entirely in this phase; React may still need `mountGridHost`, `GridHost`, and internal column type imports until the host contract is complete.
+Do not remove `@eregister/wit-grid-core/internal` entirely in this phase; React may still need `mountGridHost`, `GridHost`, and internal column type imports until the host contract is complete.
 
 Done criteria:
 
-- `OpenGrid.tsx` no longer calls `getStoreFromApi(api)`.
+- `WitGrid.tsx` no longer calls `getStoreFromApi(api)`.
 - `GridPortal.tsx` no longer casts the public api to `InternalGridApi`.
-- Any remaining `@eregister/open-grid-core/internal` imports in React are limited to renderer mounting or documented adapter-only types.
+- Any remaining `@eregister/wit-grid-core/internal` imports in React are limited to renderer mounting or documented adapter-only types.
 - Boundary tests assert public `GridApi` still has no hidden store/engine methods.
 
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
-corepack pnpm --filter @eregister/open-grid-react build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
+corepack pnpm --filter @eregister/wit-grid-react build
 ```
 
 Expected: exit 0.
@@ -518,10 +518,10 @@ Done criteria:
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 Expected: exit 0.
@@ -534,7 +534,7 @@ Required guardrails:
 
 - A test that fails if `packages/core/src/engine/GridEngine.ts` grows above 800 lines.
 - A test that fails if `packages/core/src/store.ts` grows above 900 lines after Phase 6.
-- A boundary test that lists the allowed `@eregister/open-grid-core/internal` imports from React and fails on new `getStoreFromApi` usage outside approved files.
+- A boundary test that lists the allowed `@eregister/wit-grid-core/internal` imports from React and fails on new `getStoreFromApi` usage outside approved files.
 - A test or lint-like script that forbids new direct `stateManager.setState` calls in feature-adjacent files except inside feature controllers, `StateManager`, and a short allowlist.
 
 Do not add a new lint dependency. Implement these as Vitest tests using Node `fs` reads if needed.
@@ -542,8 +542,8 @@ Do not add a new lint dependency. Implement these as Vitest tests using Node `fs
 Verification:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -575,7 +575,7 @@ All must hold:
 - [ ] Column, grouping, editing, and row-selection mutations are owned by feature controllers.
 - [ ] `GridEngine.ts` is below 800 lines.
 - [ ] `store.ts` is below 900 lines.
-- [ ] `OpenGrid.tsx` no longer calls `getStoreFromApi(api)`.
+- [ ] `WitGrid.tsx` no longer calls `getStoreFromApi(api)`.
 - [ ] `GridPortal.tsx` no longer casts public `api` to `InternalGridApi`.
 - [ ] Public `GridApi` remains frozen and does not expose store/engine/renderer internals.
 - [ ] Core build/test, React build/test, and demo build exit 0.

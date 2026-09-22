@@ -1,12 +1,12 @@
 /**
  * Native Cell Types Showcase
  *
- * All renderers/editors are imported directly from @eregister/open-grid-react —
+ * All renderers/editors are imported directly from @eregister/wit-grid-react —
  * they ship inside the package, not here in the demo.
  */
 import React, { useMemo, useState } from 'react';
-import { Grid, multiSelectColumnType, dropdownColumnType, numberColumnType } from '@eregister/open-grid-react';
-import type { ColumnDef, ColumnTypeDefinition, DropdownOption, GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, multiSelectColumnType, dropdownColumnType, numberColumnType } from '@eregister/wit-grid-react';
+import type { ColumnDef, ColumnTypeDefinition, DropdownOption, GridReadyEvent } from '@eregister/wit-grid-react';
 import { CheckSquare, Tag, Calendar, List, Hash, Film, Sparkles, Code2, ChevronRight, Box } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -317,7 +317,7 @@ const CELL_TYPES = [
 	},
 ];
 
-const SNIPPET = `// Import directly from @eregister/open-grid-react — no extra packages needed
+const SNIPPET = `// Import directly from @eregister/wit-grid-react — no extra packages needed
 import {
   CheckboxCellRenderer,
   createMultiSelectCellRenderer,
@@ -328,7 +328,7 @@ import {
   createDropdownCellEditor,
   createNumberCellRenderer,
   createNumberCellEditor,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 
 // Create instances ONCE at module level (stable identity)
 const TricksRenderer = createMultiSelectCellRenderer(TRICKS);
@@ -375,7 +375,7 @@ function NativeCellTypesDemoInner({ rows, onGridReady }: { rows: SkaterRow[]; on
 						<span className='w-2 h-2 rounded-full bg-purple-500 animate-pulse shrink-0' />
 						<span className='text-[10px] text-slate-400 font-extrabold uppercase tracking-wider flex items-center gap-1.5'>
 							<Box className='w-4 h-4 text-purple-400' />
-							Native Cell Types from <span className='text-purple-300 font-mono'>@eregister/open-grid-react</span>
+							Native Cell Types from <span className='text-purple-300 font-mono'>@eregister/wit-grid-react</span>
 							<span className='text-slate-600 font-normal'>— double-click any cell to edit</span>
 						</span>
 					</div>

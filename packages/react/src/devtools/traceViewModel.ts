@@ -1,4 +1,4 @@
-import type { GridCausalEvent, GridCausalTraceEnvelope, GridCausalTraceSnapshot, GridCellExplanation } from '@eregister/open-grid-core/experimental';
+import type { GridCausalEvent, GridCausalTraceEnvelope, GridCausalTraceSnapshot, GridCellExplanation } from '@eregister/wit-grid-core/experimental';
 
 export type TraceWorkspace = 'why' | 'timeline' | 'performance' | 'faults';
 export type TraceFilter = 'all' | GridCausalEvent['type'];

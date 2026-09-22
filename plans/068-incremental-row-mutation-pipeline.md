@@ -112,8 +112,8 @@ Reuse existing visual-row objects or records when identity and structural role a
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add benchmarks proving a non-dependent cell update allocates no new visual-row array, rebuilds no row lookup maps, and performs work independent of total row count.

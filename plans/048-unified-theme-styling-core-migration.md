@@ -46,29 +46,29 @@ That split creates exactly the long-term risks you called out:
 
 ### Deprecated styling still crosses the full stack
 
-- Public API still exposes `setStyleSlots` and `GridTransaction.styleSlots` in [packages/core/src/api/GridApi.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\api\GridApi.ts).
-- Core still stores and propagates `styleSlots` through [packages/core/src/store.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\store.ts), [packages/core/src/engine/GridEngine.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\engine\GridEngine.ts), [packages/core/src/features/GridStateFeatureController.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\features\GridStateFeatureController.ts), and [packages/core/src/state/GridState.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\state\GridState.ts).
-- Render hot paths still branch on style hooks in [packages/core/src/renderer/rowRenderer.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\rowRenderer.ts), [packages/core/src/renderer/rowCellBinder.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\rowCellBinder.ts), [packages/core/src/renderer/headerRenderer.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\headerRenderer.ts), [packages/core/src/renderer/renderScrollCoordinator.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\renderScrollCoordinator.ts), and [packages/core/src/renderer/renderPaintCoordinator.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\renderPaintCoordinator.ts).
+- Public API still exposes `setStyleSlots` and `GridTransaction.styleSlots` in [packages/core/src/api/GridApi.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\api\GridApi.ts).
+- Core still stores and propagates `styleSlots` through [packages/core/src/store.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\store.ts), [packages/core/src/engine/GridEngine.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\engine\GridEngine.ts), [packages/core/src/features/GridStateFeatureController.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\features\GridStateFeatureController.ts), and [packages/core/src/state/GridState.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\state\GridState.ts).
+- Render hot paths still branch on style hooks in [packages/core/src/renderer/rowRenderer.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\rowRenderer.ts), [packages/core/src/renderer/rowCellBinder.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\rowCellBinder.ts), [packages/core/src/renderer/headerRenderer.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\headerRenderer.ts), [packages/core/src/renderer/renderScrollCoordinator.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\renderScrollCoordinator.ts), and [packages/core/src/renderer/renderPaintCoordinator.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\renderPaintCoordinator.ts).
 
 ### React still reintroduces the old model
 
-- [packages/react/src/Grid.tsx](C:\Users\rishi\witbybit\open-grid\packages\react\src\Grid.tsx) compiles `styleRules` back into `styleSlots`.
-- [packages/react/src/styleRules.ts](C:\Users\rishi\witbybit\open-grid\packages\react\src\styleRules.ts) is effectively a legacy compatibility bridge instead of a first-class styling API.
+- [packages/react/src/Grid.tsx](C:\Users\rishi\witbybit\wit-grid\packages\react\src\Grid.tsx) compiles `styleRules` back into `styleSlots`.
+- [packages/react/src/styleRules.ts](C:\Users\rishi\witbybit\wit-grid\packages\react\src\styleRules.ts) is effectively a legacy compatibility bridge instead of a first-class styling API.
 - React tests currently validate the old translation path instead of the desired end state.
 
 ### Demo pages still teach the deprecated surface
 
-- [demo/src/pages/CalculationsArena.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\CalculationsArena.tsx)
-- [demo/src/pages/GanttSchedulingWorkspace.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\GanttSchedulingWorkspace.tsx)
-- [demo/src/pages/RealtimeDashboard.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\RealtimeDashboard.tsx)
-- [demo/src/pages/NestedTablesGrouping.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\NestedTablesGrouping.tsx)
+- [demo/src/pages/CalculationsArena.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\CalculationsArena.tsx)
+- [demo/src/pages/GanttSchedulingWorkspace.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\GanttSchedulingWorkspace.tsx)
+- [demo/src/pages/RealtimeDashboard.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\RealtimeDashboard.tsx)
+- [demo/src/pages/NestedTablesGrouping.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\NestedTablesGrouping.tsx)
 
 ### The theme system is already the strongest foundation
 
-- Built-in tokens, theme metadata, and CSS variable generation already live in [packages/core/src/renderer/themes.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\themes.ts).
-- Theme application is already scoped and grid-owned in [packages/core/src/renderer/viewportRenderer.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\viewportRenderer.ts).
-- Theme persistence is already in the right place in [packages/core/src/persistence/statePersistence.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\persistence\statePersistence.ts).
-- Sidebar theme controls already exist and should become the canonical UX in [packages/react/src/sidebar/panels/ThemesPanel.tsx](C:\Users\rishi\witbybit\open-grid\packages\react\src\sidebar\panels\ThemesPanel.tsx).
+- Built-in tokens, theme metadata, and CSS variable generation already live in [packages/core/src/renderer/themes.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\themes.ts).
+- Theme application is already scoped and grid-owned in [packages/core/src/renderer/viewportRenderer.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\viewportRenderer.ts).
+- Theme persistence is already in the right place in [packages/core/src/persistence/statePersistence.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\persistence\statePersistence.ts).
+- Sidebar theme controls already exist and should become the canonical UX in [packages/react/src/sidebar/panels/ThemesPanel.tsx](C:\Users\rishi\witbybit\wit-grid\packages\react\src\sidebar\panels\ThemesPanel.tsx).
 
 ## Architecture decision
 
@@ -224,12 +224,12 @@ Replace every renderer consumer of `styleSlots` with the new semantic styling ru
 
 Targets:
 
-- [packages/core/src/renderer/rowRenderer.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\rowRenderer.ts)
-- [packages/core/src/renderer/rowCellBinder.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\rowCellBinder.ts)
-- [packages/core/src/renderer/headerRenderer.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\headerRenderer.ts)
-- [packages/core/src/renderer/selectionPaintManager.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\selectionPaintManager.ts)
-- [packages/core/src/renderer/renderScrollCoordinator.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\renderScrollCoordinator.ts)
-- [packages/core/src/renderer/renderPaintCoordinator.ts](C:\Users\rishi\witbybit\open-grid\packages\core\src\renderer\renderPaintCoordinator.ts)
+- [packages/core/src/renderer/rowRenderer.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\rowRenderer.ts)
+- [packages/core/src/renderer/rowCellBinder.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\rowCellBinder.ts)
+- [packages/core/src/renderer/headerRenderer.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\headerRenderer.ts)
+- [packages/core/src/renderer/selectionPaintManager.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\selectionPaintManager.ts)
+- [packages/core/src/renderer/renderScrollCoordinator.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\renderScrollCoordinator.ts)
+- [packages/core/src/renderer/renderPaintCoordinator.ts](C:\Users\rishi\witbybit\wit-grid\packages\core\src\renderer\renderPaintCoordinator.ts)
 
 Requirements:
 
@@ -277,11 +277,11 @@ React must stop translating into the removed model and instead speak the new sty
 
 Targets:
 
-- [packages/react/src/Grid.tsx](C:\Users\rishi\witbybit\open-grid\packages\react\src\Grid.tsx)
-- [packages/react/src/styleRules.ts](C:\Users\rishi\witbybit\open-grid\packages\react\src\styleRules.ts)
-- [packages/react/src/styleRules.test.ts](C:\Users\rishi\witbybit\open-grid\packages\react\src\styleRules.test.ts)
-- [packages/react/src/index.ts](C:\Users\rishi\witbybit\open-grid\packages\react\src\index.ts)
-- [packages/react/src/types.ts](C:\Users\rishi\witbybit\open-grid\packages\react\src\types.ts)
+- [packages/react/src/Grid.tsx](C:\Users\rishi\witbybit\wit-grid\packages\react\src\Grid.tsx)
+- [packages/react/src/styleRules.ts](C:\Users\rishi\witbybit\wit-grid\packages\react\src\styleRules.ts)
+- [packages/react/src/styleRules.test.ts](C:\Users\rishi\witbybit\wit-grid\packages\react\src\styleRules.test.ts)
+- [packages/react/src/index.ts](C:\Users\rishi\witbybit\wit-grid\packages\react\src\index.ts)
+- [packages/react/src/types.ts](C:\Users\rishi\witbybit\wit-grid\packages\react\src\types.ts)
 
 Decision rule:
 
@@ -300,8 +300,8 @@ Theme controls should feel like a core feature, not a side panel add-on.
 
 Targets:
 
-- [packages/react/src/sidebar/GridSidebar.tsx](C:\Users\rishi\witbybit\open-grid\packages\react\src\sidebar\GridSidebar.tsx)
-- [packages/react/src/sidebar/panels/ThemesPanel.tsx](C:\Users\rishi\witbybit\open-grid\packages\react\src\sidebar\panels\ThemesPanel.tsx)
+- [packages/react/src/sidebar/GridSidebar.tsx](C:\Users\rishi\witbybit\wit-grid\packages\react\src\sidebar\GridSidebar.tsx)
+- [packages/react/src/sidebar/panels/ThemesPanel.tsx](C:\Users\rishi\witbybit\wit-grid\packages\react\src\sidebar\panels\ThemesPanel.tsx)
 - demo pages that should expose built-in theme toggles or showcase theme-aware styling
 
 Requirements:
@@ -323,14 +323,14 @@ Every demo that currently teaches `styleSlots` or the old React bridge must be u
 
 Priority targets:
 
-- [demo/src/pages/NestedTablesGrouping.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\NestedTablesGrouping.tsx)
-- [demo/src/pages/CalculationsArena.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\CalculationsArena.tsx)
-- [demo/src/pages/GanttSchedulingWorkspace.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\GanttSchedulingWorkspace.tsx)
-- [demo/src/pages/RealtimeDashboard.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\RealtimeDashboard.tsx)
+- [demo/src/pages/NestedTablesGrouping.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\NestedTablesGrouping.tsx)
+- [demo/src/pages/CalculationsArena.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\CalculationsArena.tsx)
+- [demo/src/pages/GanttSchedulingWorkspace.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\GanttSchedulingWorkspace.tsx)
+- [demo/src/pages/RealtimeDashboard.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\RealtimeDashboard.tsx)
 
 Reference exemplar:
 
-- [demo/src/pages/HeadlessSkinsPlayground.tsx](C:\Users\rishi\witbybit\open-grid\demo\src\pages\HeadlessSkinsPlayground.tsx) already reflects the intended theme-first direction.
+- [demo/src/pages/HeadlessSkinsPlayground.tsx](C:\Users\rishi\witbybit\wit-grid\demo\src\pages\HeadlessSkinsPlayground.tsx) already reflects the intended theme-first direction.
 
 Requirements:
 
@@ -431,10 +431,10 @@ The migration is complete when all of the following are true:
 Run at minimum:
 
 ```bash
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-react build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-react build
 corepack pnpm --filter demo-app build
 corepack pnpm run test
 corepack pnpm run build

@@ -22,6 +22,6 @@ pnpm pack:verify
 
 ## Notes
 
-- `pnpm build` is intentionally sequenced: `@eregister/open-grid-core` must build before `@eregister/open-grid-react` because the React package compiles against the core `dist` entrypoints.
+- `pnpm build` is intentionally sequenced: `@eregister/wit-grid-core` must build before `@eregister/wit-grid-react` because the React package compiles against the core `dist` entrypoints.
 - `pnpm bench` runs the committed instrumentation-budget evidence in `packages/core/src/perf/instrumentedBudgets.test.ts`.
 - `pnpm pack:verify` packs both published packages, installs them into `fixtures/package-consumer`, and compiles the fixture as an external consumer.
