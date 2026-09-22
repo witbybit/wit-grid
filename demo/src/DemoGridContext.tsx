@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import type { GridApi, GridReadyEvent } from '@eregister/open-grid-react';
+import type { GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 import type { GridPageType } from './components/GridShared';
 
 type DemoGridContextValue = {

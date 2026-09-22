@@ -1,5 +1,5 @@
 import React from 'react';
-import type { GridApi } from '@eregister/open-grid-react';
+import type { GridApi } from '@eregister/wit-grid-react';
 import { StateInspector, LiveEventLogPanel } from './RightSidebar';
 import { ViewportPanel, SortFilterPanel, ColumnOrderPanel, AccessibilityPanel, KeyboardShortcutsPanel } from './ShowroomControls';
 import { GridPageType } from './GridShared';

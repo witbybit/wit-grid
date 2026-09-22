@@ -159,22 +159,22 @@ const controller = new ServerRowModelController<TRowData>(store, options);
       `packages/core/src/plugins/GridPluginRegistry.ts`.
     - `packages/core/src/engine/architectureGuards.test.ts` is the right place
       for structural guardrails.
-    - Plan 015 already sealed `@eregister/open-grid-core/internal`, and Plan 016 split
+    - Plan 015 already sealed `@eregister/wit-grid-core/internal`, and Plan 016 split
       plugin runtime away from `GridStore`. This plan must keep both intact.
 
 ## Commands you will need
 
 | Purpose                       | Command                                                                                                                                                                    | Expected on success  |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| Core build                    | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                   | exit 0               |
-| Core full tests               | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                    | all core tests pass  |
-| Focused row-model tests       | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/serverRowModel.test.ts src/store.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
-| Focused runtime/effects tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                              | exit 0               |
-| React build                   | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                  | exit 0               |
-| React tests                   | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                   | all React tests pass |
+| Core build                    | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                                                   | exit 0               |
+| Core full tests               | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                    | all core tests pass  |
+| Focused row-model tests       | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/serverRowModel.test.ts src/store.test.ts src/engine/architectureGuards.test.ts` | exit 0               |
+| Focused runtime/effects tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts`                              | exit 0               |
+| React build                   | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                                                  | exit 0               |
+| React tests                   | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                                                   | all React tests pass |
 | Demo build                    | `corepack pnpm --filter demo-app build`                                                                                                                                    | exit 0               |
 
-Run builds/tests sequentially. Do not run `@eregister/open-grid-react` or `demo-app`
+Run builds/tests sequentially. Do not run `@eregister/wit-grid-react` or `demo-app`
 commands in parallel with a core build; those packages resolve core artifacts.
 
 ## Scope
@@ -201,7 +201,7 @@ commands in parallel with a core build; those packages resolve core artifacts.
   server-loading semantics beyond internal wiring.
 - No new retry/backoff/error-surface design for server fetch failures; if that
   becomes necessary, stop and spin it into the next plan.
-- Do not reopen the sealed `@eregister/open-grid-core/internal` boundary from Plan 015.
+- Do not reopen the sealed `@eregister/wit-grid-core/internal` boundary from Plan 015.
 
 ## Git workflow
 
@@ -225,8 +225,8 @@ Before editing, verify the current baseline assumed by this plan:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/store.test.ts --reporter=verbose` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts src/store.test.ts --reporter=verbose` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Define explicit row-model runtime contracts
 
@@ -254,7 +254,7 @@ Requirements:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 3: Migrate `ClientRowModelController` off `GridStore`
 
@@ -281,8 +281,8 @@ Keep the current observable behavior:
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/store.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/store.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 4: Migrate `ServerRowModelController` off `GridStore`
 
@@ -305,8 +305,8 @@ reach-through.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts src/store.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/serverRowModel.test.ts src/store.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 5: Move row-model composition into the factory/store boundary
 
@@ -329,8 +329,8 @@ contains unrelated methods.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/rowModel.test.ts src/serverRowModel.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/rowModel.test.ts src/serverRowModel.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 6: Add guardrails for the row-model boundary
 
@@ -352,16 +352,16 @@ goal rather than arbitrary churn.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
 
 ### Step 7: Run full sequential verification
 
 Run these commands in order:
 
-1. `corepack pnpm --filter @eregister/open-grid-core build`
-2. `corepack pnpm --filter @eregister/open-grid-react build`
-3. `corepack pnpm --filter @eregister/open-grid-core test`
-4. `corepack pnpm --filter @eregister/open-grid-react test`
+1. `corepack pnpm --filter @eregister/wit-grid-core build`
+2. `corepack pnpm --filter @eregister/wit-grid-react build`
+3. `corepack pnpm --filter @eregister/wit-grid-core test`
+4. `corepack pnpm --filter @eregister/wit-grid-react test`
 5. `corepack pnpm --filter demo-app build`
 
 Expected: all exit 0.
@@ -395,10 +395,10 @@ All must hold:
       models with the whole store object.
 - [ ] Row-model behavior for grouping, detail expansion, transactions, and
       server block loading remains covered by passing tests.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `plans/README.md` status for Plan 017 is updated.
 
@@ -413,7 +413,7 @@ Stop and report back if:
 - Preserving current server-loading behavior requires designing a new public
   error/status API rather than just narrowing internal wiring.
 - The work appears to require touching `packages/core/src/renderer/**`.
-- Any step appears to require reopening the sealed `@eregister/open-grid-core/internal`
+- Any step appears to require reopening the sealed `@eregister/wit-grid-core/internal`
   barrel from Plan 015.
 
 ## Maintenance notes

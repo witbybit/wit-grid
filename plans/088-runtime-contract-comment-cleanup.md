@@ -98,8 +98,8 @@ Add a source check preventing roadmap chronology from returning to production fi
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Verify production source contains no roadmap chronology, architecture documents describe the final contracts, and the source guard permits legitimate plan and migration documentation.

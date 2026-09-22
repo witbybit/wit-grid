@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { Grid, GridEventName, type GridApi, type GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, GridEventName, type GridApi, type GridReadyEvent } from '@eregister/wit-grid-react';
 
 interface Product {
 	id: string;

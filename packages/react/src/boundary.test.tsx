@@ -72,7 +72,7 @@ describe('React public boundary', () => {
 			'ValueFormat',
 		];
 		for (const name of removed) {
-			expect((publicApi as Record<string, unknown>)[name], `${name} must not be exported from @eregister/open-grid-react`).toBeUndefined();
+			expect((publicApi as Record<string, unknown>)[name], `${name} must not be exported from @eregister/wit-grid-react`).toBeUndefined();
 		}
 	});
 

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { Layout } from 'lucide-react';
-import type { FilterModel, GridApi, GridReadyEvent } from '@eregister/open-grid-react';
+import type { FilterModel, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 import { DemoGridApiScope } from './DemoGridContext';
 import ShowroomHeader from './components/ShowroomHeader';
 import ShowroomLeftSidebar from './components/ShowroomLeftSidebar';
@@ -150,7 +150,7 @@ export default function App() {
 				if (newValue === 'Done') activeApi.setCellValue(rowId, 'progress', 100);
 				else if (newValue === 'Pending') activeApi.setCellValue(rowId, 'progress', 0);
 			}
-			performance.mark('open-grid-demo-cell-change');
+			performance.mark('wit-grid-demo-cell-change');
 		},
 		[activeApi, activePage]
 	);
@@ -168,8 +168,8 @@ export default function App() {
 			});
 		});
 		activeApi.applyTransaction({ update: updates });
-		performance.measure('open-grid-demo-bulk-calculation', { start, end: performance.now() });
-		performance.mark('open-grid-demo-grid-action');
+		performance.measure('wit-grid-demo-bulk-calculation', { start, end: performance.now() });
+		performance.mark('wit-grid-demo-grid-action');
 	}, [activeApi]);
 
 	const applySpreadsheetRangeAction = useCallback(
@@ -208,7 +208,7 @@ export default function App() {
 					return next;
 				})
 			);
-			performance.mark('open-grid-demo-range-action');
+			performance.mark('wit-grid-demo-range-action');
 		},
 		[activeApi]
 	);

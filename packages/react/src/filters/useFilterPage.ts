@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FilterPageParams, FilterPageResult, FilterSelectOption } from '@eregister/open-grid-core';
+import type { FilterPageParams, FilterPageResult, FilterSelectOption } from '@eregister/wit-grid-core';
 
 export interface UseFilterPageOptions<TValue> {
 	fetchPage: (params: FilterPageParams, signal: AbortSignal) => Promise<FilterPageResult<TValue>>;

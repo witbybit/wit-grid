@@ -54,9 +54,9 @@ The codebase already shows the shape we want in the hooks: the lifecycle split i
 
 | Purpose     | Command                                                   | Expected on success    |
 | ----------- | --------------------------------------------------------- | ---------------------- |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                 |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0, all tests pass |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0, all tests pass |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0                 |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0, all tests pass |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0, all tests pass |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0                 |
 
 ## Scope
@@ -93,7 +93,7 @@ type GridProps<TRowData> = ({ mode: 'client' } & ClientGridProps<TRowData>) | ({
 
 The component should own the grid lifecycle internally and render the existing `GridView` implementation underneath. Keep the implementation explicit and readable; do not infer mode from prop presence.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react build` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react build` → exit 0.
 
 ### Step 2: Remove the extra public grid components
 
@@ -101,11 +101,11 @@ Update `packages/react/src/index.ts` so the public barrel exports `Grid` as the 
 
 Tighten `packages/core/src/engine/architectureGuards.test.ts` so it enforces the new surface and no longer treats `GridView`/`ClientGrid`/`ServerGrid` as public API.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` → exit 0.
 
 ### Step 3: Migrate the demo in one pass
 
-Update the demo shell in `demo/src/components/GridShared.tsx` to render the new `Grid` component, not the old public grid variants. Then update the pages that import `GridView` from `@eregister/open-grid-react` to import and use `Grid` instead, keeping any existing hook-owned wrapper logic only where it is genuinely needed for local orchestration.
+Update the demo shell in `demo/src/components/GridShared.tsx` to render the new `Grid` component, not the old public grid variants. Then update the pages that import `GridView` from `@eregister/wit-grid-react` to import and use `Grid` instead, keeping any existing hook-owned wrapper logic only where it is genuinely needed for local orchestration.
 
 Target the representative pages and then sweep the rest of `demo/src/pages` for any direct package-level grid component imports.
 
@@ -117,7 +117,7 @@ Update `packages/react/src/index.test.tsx` so the smoke coverage exercises the s
 
 Add a guard test that the package barrel exposes only the single grid component as the public instance.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-react test` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-react test` → exit 0.
 
 ### Step 5: Remove dead code and stale references
 
@@ -136,7 +136,7 @@ Do not leave compatibility aliases behind in the package barrel. The public Reac
     - any remaining `useGrid` hook coverage that is still relevant
 - Update `packages/core/src/engine/architectureGuards.test.ts` so the React adapter boundary now treats `Grid` as the single public grid instance.
 - Use the existing React test file as the structural pattern for render/hook smoke coverage.
-- Verification sequence: `@eregister/open-grid-react build`, `@eregister/open-grid-react test`, `@eregister/open-grid-core test`, `demo-app build`.
+- Verification sequence: `@eregister/wit-grid-react build`, `@eregister/wit-grid-react test`, `@eregister/wit-grid-core test`, `demo-app build`.
 
 ## Done criteria
 
@@ -146,9 +146,9 @@ Machine-checkable. All must hold:
 - [ ] `packages/react/src/ClientGrid.tsx` and `packages/react/src/ServerGrid.tsx` are deleted or no longer reachable from the public barrel.
 - [ ] `Grid` uses an explicit discriminated union for client/server ownership.
 - [ ] Demo pages render through `Grid` rather than the retired public grid components.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `plans/README.md` is updated to reflect this plan and its dependency ordering.
 

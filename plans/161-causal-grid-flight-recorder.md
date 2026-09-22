@@ -16,7 +16,7 @@
 
 ## Why this matters
 
-Open Grid assigns mutation change IDs, publishes precise cell changes, records bounded frame telemetry, and retains structured faults. These facts are disconnected, so users cannot answer “why did this cell change?” or correlate an expensive frame with its cause. Build one opt-in, bounded, redaction-safe causal recorder for the DevTools and replay plans. It observes existing paths; it must not become another event bus, history stack, mutation protocol, or scheduler.
+Wit Grid assigns mutation change IDs, publishes precise cell changes, records bounded frame telemetry, and retains structured faults. These facts are disconnected, so users cannot answer “why did this cell change?” or correlate an expensive frame with its cause. Build one opt-in, bounded, redaction-safe causal recorder for the DevTools and replay plans. It observes existing paths; it must not become another event bus, history stack, mutation protocol, or scheduler.
 
 ## Current state
 
@@ -33,7 +33,7 @@ Match `RecordingGridInstrumentation` fixed-capacity behavior and immutable snaps
 
 | Gate         | Command                                                                                                                                                                                        | Expected |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Focused      | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/diagnostics/GridFlightRecorder.test.ts src/engine/GridChangeApplier.test.ts src/diagnostics/GridInstrumentation.test.ts` | exit 0   |
+| Focused      | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/diagnostics/GridFlightRecorder.test.ts src/engine/GridChangeApplier.test.ts src/diagnostics/GridInstrumentation.test.ts` | exit 0   |
 | Budgets      | `corepack pnpm run bench`                                                                                                                                                                      | exit 0   |
 | Long session | `corepack pnpm run bench:long-session`                                                                                                                                                         | exit 0   |
 | Architecture | `corepack pnpm run test:architecture`                                                                                                                                                          | exit 0   |

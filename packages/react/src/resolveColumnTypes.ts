@@ -1,4 +1,4 @@
-import type { ColumnDef } from '@eregister/open-grid-core';
+import type { ColumnDef } from '@eregister/wit-grid-core';
 import { BUILTIN_COLUMN_TYPES, type ColumnTypeDefinition } from './renderers/CellTypes.js';
 
 export function resolveColumnTypes<TRowData>(

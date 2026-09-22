@@ -47,6 +47,6 @@ That works, but it still makes the API feel like a negotiation. AG Grid-level st
 
 ## Verification
 
-- `pnpm --filter @eregister/open-grid-react build`
-- `pnpm --filter @eregister/open-grid-react test`
+- `pnpm --filter @eregister/wit-grid-react build`
+- `pnpm --filter @eregister/wit-grid-react test`
 - `pnpm --filter demo-app build`

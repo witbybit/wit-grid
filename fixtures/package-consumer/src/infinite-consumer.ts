@@ -1,4 +1,4 @@
-import { createInfiniteGrid, type ColumnDef, type InfiniteDatasource } from '@eregister/open-grid-core';
+import { createInfiniteGrid, type ColumnDef, type InfiniteDatasource } from '@eregister/wit-grid-core';
 
 interface Row {
 	id: string;

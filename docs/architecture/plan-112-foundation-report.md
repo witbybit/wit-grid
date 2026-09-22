@@ -16,7 +16,7 @@ What is enforced now:
 
 - stable package entrypoints do not export `GridStore`
 - stable package entrypoints do not export mutable `GridState` or `InternalGridState`
-- adapter-facing `@eregister/open-grid-core/internal` exports only `mountGridHost` and `hasImperativeRendererCapability`
+- adapter-facing `@eregister/wit-grid-core/internal` exports only `mountGridHost` and `hasImperativeRendererCapability`
 - the internal API bridge stores a narrow runtime handle, not a concrete `GridStore`
 - public consumers receive `GridApi`, `GridStateSnapshot`, and `PersistedGridState`, not mutable runtime state
 
@@ -64,7 +64,7 @@ flowchart TD
 
 ## Public API and Package Entry Points
 
-### `@eregister/open-grid-core`
+### `@eregister/wit-grid-core`
 
 Stable runtime exports are intentionally narrow and include:
 
@@ -83,11 +83,11 @@ Explicitly not exported from the stable entry:
 - `InternalGridState`
 - renderer classes and runtime bridge helpers
 
-### `@eregister/open-grid-core/experimental`
+### `@eregister/wit-grid-core/experimental`
 
 Experimental runtime exports remain quarantined under the explicit experimental entry.
 
-### `@eregister/open-grid-core/internal`
+### `@eregister/wit-grid-core/internal`
 
 Adapter-only runtime exports:
 
@@ -96,7 +96,7 @@ Adapter-only runtime exports:
 
 No bridge escape hatches, raw store, engine, or renderer classes are exported.
 
-### `@eregister/open-grid-react`
+### `@eregister/wit-grid-react`
 
 Stable runtime exports remain focused on:
 
@@ -104,11 +104,11 @@ Stable runtime exports remain focused on:
 - stable hooks: `useGridApi`, `useGridSelector`, `useGridKeySelector`
 - selected built-in editors/renderers and theme helpers
 
-Portal and formula/filter bridge helpers remain in `@eregister/open-grid-react/experimental`.
+Portal and formula/filter bridge helpers remain in `@eregister/wit-grid-react/experimental`.
 
 ## Alpha Feature Matrix
 
-The alpha feature matrix is the `alphaFeatureMatrix` set in [feature-registry.json](C:/Users/rishi/witbybit/open-grid/docs/architecture/feature-registry.json).
+The alpha feature matrix is the `alphaFeatureMatrix` set in [feature-registry.json](C:/Users/rishi/witbybit/wit-grid/docs/architecture/feature-registry.json).
 
 Foundation/reference features retained for alpha:
 
@@ -139,13 +139,13 @@ Foundation/reference features retained for alpha:
 
 Baseline references:
 
-- [baseline.json](C:/Users/rishi/witbybit/open-grid/docs/architecture/baseline.json)
-- [benchmark-scenarios.json](C:/Users/rishi/witbybit/open-grid/docs/architecture/benchmark-scenarios.json)
-- [plan-111-scheduler-simplification-report.md](C:/Users/rishi/witbybit/open-grid/docs/architecture/plan-111-scheduler-simplification-report.md)
+- [baseline.json](C:/Users/rishi/witbybit/wit-grid/docs/architecture/baseline.json)
+- [benchmark-scenarios.json](C:/Users/rishi/witbybit/wit-grid/docs/architecture/benchmark-scenarios.json)
+- [plan-111-scheduler-simplification-report.md](C:/Users/rishi/witbybit/wit-grid/docs/architecture/plan-111-scheduler-simplification-report.md)
 
 Milestone verification run:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts`
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts`
 - result: passed
 
 Interpretation:
@@ -157,8 +157,8 @@ Interpretation:
 
 Milestone verification run:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts src/lifecycle.adversarial.test.ts`
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts`
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts src/lifecycle.adversarial.test.ts`
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts`
 
 Result:
 
@@ -185,15 +185,15 @@ Real app verification:
 The following command set was re-run for the Plan 112 milestone:
 
 ```text
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts src/gridHost.test.ts src/gridHost.adversarial.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/boundary.test.ts src/engine/architectureGuards.test.ts src/gridHost.test.ts src/gridHost.adversarial.test.ts
 corepack pnpm run test:architecture
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/performance.test.ts src/lifecycle.adversarial.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-react test
-corepack pnpm --filter @eregister/open-grid-react build
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/performance.test.ts src/lifecycle.adversarial.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-react test
+corepack pnpm --filter @eregister/wit-grid-react build
 node .\scripts\pack-verify.mjs
 corepack pnpm --filter demo-app build
 ```
@@ -201,7 +201,7 @@ corepack pnpm --filter demo-app build
 Observed environment note:
 
 - the root `test:adversarial` script hit a Corepack permission/usage limitation in this session, so the equivalent package-level adversarial suites were run directly instead
-- the React adversarial file is included by the full `@eregister/open-grid-react` package test run, which passed
+- the React adversarial file is included by the full `@eregister/wit-grid-react` package test run, which passed
 
 ## Deleted-Path Inventory
 
@@ -228,7 +228,7 @@ The following capabilities remain intentionally non-foundation:
 - `chart-overlay` — incubating
 - `spreadsheet-fill-range` — deferred
 
-These limitations are tracked in [feature-registry.json](C:/Users/rishi/witbybit/open-grid/docs/architecture/feature-registry.json) and are not part of the stable alpha promise.
+These limitations are tracked in [feature-registry.json](C:/Users/rishi/witbybit/wit-grid/docs/architecture/feature-registry.json) and are not part of the stable alpha promise.
 
 ## Post-Foundation Roadmap
 

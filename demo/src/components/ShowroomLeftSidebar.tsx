@@ -251,7 +251,7 @@ export default function ShowroomLeftSidebar({ activePage, leftSidebarCollapsed, 
 					<div className='flex items-center justify-between w-full p-2 rounded-lg bg-slate-950/40 border border-slate-900/80'>
 						<div className='flex items-center gap-1.5 text-[10px] text-slate-400 font-bold'>
 							<Sparkles className='w-3 h-3 text-purple-400' />
-							Open Grid
+							Wit Grid
 						</div>
 						<span className='font-mono text-[9px] text-slate-500 font-semibold'>v{APP_VERSION}</span>
 					</div>

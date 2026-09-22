@@ -1,4 +1,4 @@
-# Open Grid Renderer and Topology Stability Program — Plans 118–119
+# Wit Grid Renderer and Topology Stability Program — Plans 118–119
 
 ## Purpose
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Grid, type ColumnDef, type CellRendererProps, type GridApi, type GridReadyEvent, type VisualRow } from '@eregister/open-grid-react';
+import { Grid, type ColumnDef, type CellRendererProps, type GridApi, type GridReadyEvent, type VisualRow } from '@eregister/wit-grid-react';
 import {
 	Layers,
 	FolderTree,
@@ -74,7 +74,7 @@ const groupRows: EmployeeRow[] = [
 ];
 
 const treeRows: FileNodeRow[] = [
-	{ id: 'root', name: 'open-grid-monorepo', type: 'folder' },
+	{ id: 'root', name: 'wit-grid-monorepo', type: 'folder' },
 	{ id: 'packages', name: 'packages', type: 'folder', parentId: 'root' },
 	{ id: 'core', name: 'core', type: 'folder', parentId: 'packages' },
 	{ id: 'core-src', name: 'src', type: 'folder', parentId: 'core' },

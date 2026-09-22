@@ -96,8 +96,8 @@ Tests must assert the phase from inside the real paint callback, not only test `
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add tests proving the runtime phase is `paint-frame` inside actual paint execution, returns to `idle` after success and failure, increments `frameEpoch`, and never flushes portals as if idle during paint.

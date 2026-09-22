@@ -1,4 +1,4 @@
-import { createClientGrid, type ColumnDef } from '@eregister/open-grid-core';
+import { createClientGrid, type ColumnDef } from '@eregister/wit-grid-core';
 
 interface Row {
 	id: string;

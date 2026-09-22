@@ -1,5 +1,5 @@
-import { type GridStyleRule } from '@eregister/open-grid-core';
-import { compileStyleRules } from '@eregister/open-grid-core/experimental';
+import { type GridStyleRule } from '@eregister/wit-grid-core';
+import { compileStyleRules } from '@eregister/wit-grid-core/experimental';
 import { describe, expect, it } from 'vitest';
 
 interface Row {

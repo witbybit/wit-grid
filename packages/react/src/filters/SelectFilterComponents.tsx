@@ -5,14 +5,14 @@
  * They share FilterPrimitives and the useFilterFetch / useFilterPage hooks.
  */
 import React, { useMemo } from 'react';
-import type { ThemeTokens } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
 import type {
 	ColumnFilterDef,
 	CustomFilterRendererParams,
 	FilterSelectOption,
 	FilterSurface,
 	SelectFilterCondition,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 import { FilterOptionList, FilterSearchInput, FilterSelectAll, FilterStatusBar, LoadMoreButton, optionKey } from './FilterPrimitives.js';
 import { useFilterFetch } from './useFilterFetch.js';
 import { useFilterPage } from './useFilterPage.js';

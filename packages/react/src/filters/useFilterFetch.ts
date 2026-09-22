@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FilterFetchParams, FilterFetchResult, FilterSelectOption } from '@eregister/open-grid-core';
+import type { FilterFetchParams, FilterFetchResult, FilterSelectOption } from '@eregister/wit-grid-core';
 
 export interface UseFilterFetchOptions<TValue> {
 	fetchOptions: (params: FilterFetchParams, signal: AbortSignal) => Promise<FilterFetchResult<TValue>>;

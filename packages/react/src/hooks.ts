@@ -1,4 +1,4 @@
-import { GridApi, GridStateSnapshot } from '@eregister/open-grid-core';
+import { GridApi, GridStateSnapshot } from '@eregister/wit-grid-core';
 import { useCallback, useContext, useRef, useSyncExternalStore } from 'react';
 import { GridApiContext } from './gridContext.js';
 

@@ -13,7 +13,7 @@ It must not become a second mutation system.
 It should prove:
 
 ```text
-Open Grid can safely deal with changing data while users edit/review data.
+Wit Grid can safely deal with changing data while users edit/review data.
 ```
 
 ---
@@ -427,5 +427,5 @@ Plan 130 is complete when:
 Final report must say:
 
 ```text
-Plan 130 complete. Open Grid now has an explicit Conflict Resolution Layer for live/server/local data changes. Conflicts are metadata and decorations until resolved, resolution flows through existing commit, validation, history, invalidation, and render systems, and the feature strengthens data integrity without polluting core architecture.
+Plan 130 complete. Wit Grid now has an explicit Conflict Resolution Layer for live/server/local data changes. Conflicts are metadata and decorations until resolved, resolution flows through existing commit, validation, history, invalidation, and render systems, and the feature strengthens data integrity without polluting core architecture.
 ```

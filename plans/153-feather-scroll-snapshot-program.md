@@ -6,7 +6,7 @@
 
 ## Mission
 
-Make Open Grid feel like feather-light paper under trackpad scroll:
+Make Wit Grid feel like feather-light paper under trackpad scroll:
 
 - 60 FPS-class glide in the dominant path
 - no blank cells
@@ -80,7 +80,7 @@ All gates passed against the reconciled implementation:
 
 **Status: DONE.** The optional hybrid-surface spike remains intentionally unstarted: no deterministic DOM evidence met its trigger condition.
 
-Open Grid already has:
+Wit Grid already has:
 
 - stable slot ownership
 - topology-aware row/cell reuse
@@ -350,7 +350,7 @@ This program is complete when:
 - rich fidelity upgrades are budgeted and deterministic
 - the grid subjectively feels lighter and calmer in demo and adversarial scenarios
 - the known classes of blanking, stale wake-up, and decoration loss are closed by tests
-- Open Grid has a defensible perceptual advantage story, not just a benchmark story
+- Wit Grid has a defensible perceptual advantage story, not just a benchmark story
 
 ## STOP conditions
 

@@ -188,9 +188,9 @@ Group rows and loading skeletons that have no `rowId` continue to use `globalVer
 **Verification:**
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ---
@@ -219,10 +219,10 @@ The value is: once the interfaces are separate, Phase 5 (persistence API) can di
 **Verification:**
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ---
@@ -264,9 +264,9 @@ export class CellRenderer<TRowData> {
 **Verification:**
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ---
@@ -306,8 +306,8 @@ Error surface: `activeEdit` gains an optional `validationError: string | null` f
 **Verification:**
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ---
@@ -320,7 +320,7 @@ Add `getColumnState()`, `applyColumnState()`, `getGridState()`, and `applyGridSt
 
 - `packages/core/src/store.ts` — `ColumnState`, `SerializableGridState` interfaces
 - `packages/core/src/engine/GridEngine.ts` — implement `getColumnState`, `applyColumnState`, `getGridState`, `applyGridState`
-- `packages/react/src/OpenGrid.tsx` / public API surface — expose through `GridApi`
+- `packages/react/src/WitGrid.tsx` / public API surface — expose through `GridApi`
 - `packages/core/src/models/ColumnModel.ts` — `applyColumnState` needs to update column order (reorder displayed columns array)
 
 **`ColumnState` interface:**
@@ -366,8 +366,8 @@ export interface SerializableGridState {
 **Verification:**
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ---
@@ -405,10 +405,10 @@ corepack pnpm --filter @eregister/open-grid-react test
 
 | Purpose     | Command                                                   | Expected |
 | ----------- | --------------------------------------------------------- | -------- |
-| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0   |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0   |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0   |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0   |
+| Core build  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0   |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0   |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0   |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0   |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0   |
 | Type check  | `corepack pnpm exec tsc --noEmit`                         | exit 0   |
 
@@ -426,7 +426,7 @@ In scope:
 - `packages/core/src/renderer/scrollRenderContext.ts`
 - `packages/core/src/columnDef.ts`
 - `packages/react/src/GridPortal.tsx`
-- `packages/react/src/OpenGrid.tsx`
+- `packages/react/src/WitGrid.tsx`
 
 Out of scope for this plan:
 

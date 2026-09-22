@@ -23,13 +23,13 @@ export function normalizeRendererCapabilities(cap: CellRendererCapabilities | un
 	const mode = cap?.scrollPresentation ?? 'freeze';
 
 	if (mode !== 'live' && cap?.live) {
-		throw new Error("Open Grid: capabilities.live is only valid with scrollPresentation:'live'.");
+		throw new Error("Wit Grid: capabilities.live is only valid with scrollPresentation:'live'.");
 	}
 	if (mode !== 'text-impostor' && cap?.textImpostor) {
-		throw new Error("Open Grid: capabilities.textImpostor is only valid with scrollPresentation:'text-impostor'.");
+		throw new Error("Wit Grid: capabilities.textImpostor is only valid with scrollPresentation:'text-impostor'.");
 	}
 	if (mode !== 'html-snapshot' && cap?.htmlSnapshot) {
-		throw new Error("Open Grid: capabilities.htmlSnapshot is only valid with scrollPresentation:'html-snapshot'.");
+		throw new Error("Wit Grid: capabilities.htmlSnapshot is only valid with scrollPresentation:'html-snapshot'.");
 	}
 
 	return { ...cap, scrollPresentation: mode };

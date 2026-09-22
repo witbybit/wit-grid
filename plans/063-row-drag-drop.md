@@ -214,8 +214,8 @@ it('rowDrag=false hides handle for that column', ...);
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build
 ```
 
 Dragging a row reorders it in managed mode. Drop indicator appears at correct position. Auto-scroll activates near viewport edges. `rowOrderChanged` event fires with correct new order. Escape key cancels drag and restores original order.

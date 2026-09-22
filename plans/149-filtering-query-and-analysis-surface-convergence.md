@@ -6,7 +6,7 @@ Make filtering feel complete and unified by connecting column filters, floating 
 
 ## Why now
 
-Filtering is one of the first deal-breaker features users evaluate. Open Grid already has a strong internal row pipeline, but the analysis surface still needs to feel deliberate rather than accumulated. This plan turns filtering from a collection of widgets into a workflow teams can trust for real datasets.
+Filtering is one of the first deal-breaker features users evaluate. Wit Grid already has a strong internal row pipeline, but the analysis surface still needs to feel deliberate rather than accumulated. This plan turns filtering from a collection of widgets into a workflow teams can trust for real datasets.
 
 ## Focus areas
 

@@ -62,17 +62,17 @@ type SerializedGridStateParseResult = SerializedGridStateParseSuccess | Persiste
  */
 export function validateSchemaVersion(state: { v?: unknown } | null | undefined): string | null {
 	if (!state || typeof state !== 'object') {
-		return '[open-grid] persisted grid state must be an object.';
+		return '[wit-grid] persisted grid state must be an object.';
 	}
 	if (state.v === undefined) {
-		return '[open-grid] persisted grid state is missing required schema version `v`.';
+		return '[wit-grid] persisted grid state is missing required schema version `v`.';
 	}
 	if (!Number.isInteger(state.v)) {
-		return `[open-grid] persisted grid state has invalid schema version \`v=${String(state.v)}\`.`;
+		return `[wit-grid] persisted grid state has invalid schema version \`v=${String(state.v)}\`.`;
 	}
 	if (state.v === GRID_STATE_SCHEMA_VERSION) return null;
 	return (
-		`[open-grid] persisted grid state schema version mismatch ` +
+		`[wit-grid] persisted grid state schema version mismatch ` +
 		`(blob v=${state.v}, expected v=${GRID_STATE_SCHEMA_VERSION}). ` +
 		`State was not applied. Clear the persisted state or provide a migration function.`
 	);
@@ -92,7 +92,7 @@ function isFiniteNumberRecord(value: unknown): value is Record<string, number> {
 
 function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult {
 	if (!isRecord(raw)) {
-		return { ok: false, error: '[open-grid] persisted grid state payload `state` must be an object.' };
+		return { ok: false, error: '[wit-grid] persisted grid state payload `state` must be an object.' };
 	}
 
 	const allowedKeys = new Set([
@@ -110,18 +110,18 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 	]);
 	for (const key of Object.keys(raw)) {
 		if (!allowedKeys.has(key)) {
-			return { ok: false, error: `[open-grid] persisted grid state contains unsupported field \`${key}\`.` };
+			return { ok: false, error: `[wit-grid] persisted grid state contains unsupported field \`${key}\`.` };
 		}
 	}
 
 	if (raw.columnWidths !== undefined && !isFiniteNumberRecord(raw.columnWidths)) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.columnWidths` must be a record of positive finite numbers.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.columnWidths` must be a record of positive finite numbers.' };
 	}
 	if (raw.columnOrder !== undefined && (!Array.isArray(raw.columnOrder) || !raw.columnOrder.every((entry) => typeof entry === 'string'))) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.columnOrder` must be a string array.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.columnOrder` must be a string array.' };
 	}
 	if (raw.columnVisibility !== undefined && !isBooleanRecord(raw.columnVisibility)) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.columnVisibility` must be a boolean record.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.columnVisibility` must be a boolean record.' };
 	}
 	if (
 		raw.sortModel !== undefined &&
@@ -129,25 +129,25 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		(!Array.isArray(raw.sortModel) ||
 			!raw.sortModel.every((sort) => isRecord(sort) && typeof sort.colId === 'string' && (sort.sort === 'asc' || sort.sort === 'desc')))
 	) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.sortModel` must be null or a valid sort-model array.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.sortModel` must be null or a valid sort-model array.' };
 	}
 	if (raw.filterModel !== undefined && raw.filterModel !== null && !isRecord(raw.filterModel)) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.filterModel` must be null or an object.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.filterModel` must be null or an object.' };
 	}
 	if (raw.queryModel !== undefined && raw.queryModel !== null && !isRecord(raw.queryModel)) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.queryModel` must be null or an object.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.queryModel` must be null or an object.' };
 	}
 	if (raw.themeName !== undefined && typeof raw.themeName !== 'string') {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.themeName` must be a string.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.themeName` must be a string.' };
 	}
 	if (raw.groupBy !== undefined && (!Array.isArray(raw.groupBy) || !raw.groupBy.every((entry) => typeof entry === 'string'))) {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.groupBy` must be a string array.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.groupBy` must be a string array.' };
 	}
 	if (raw.showGroupFooter !== undefined && typeof raw.showGroupFooter !== 'boolean') {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.showGroupFooter` must be a boolean.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.showGroupFooter` must be a boolean.' };
 	}
 	if (raw.enableStickyGroupRows !== undefined && typeof raw.enableStickyGroupRows !== 'boolean') {
-		return { ok: false, error: '[open-grid] persisted grid state field `state.enableStickyGroupRows` must be a boolean.' };
+		return { ok: false, error: '[wit-grid] persisted grid state field `state.enableStickyGroupRows` must be a boolean.' };
 	}
 	if (
 		raw.pinnedColumns !== undefined &&
@@ -161,7 +161,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 	) {
 		return {
 			ok: false,
-			error: '[open-grid] persisted grid state field `state.pinnedColumns` must contain non-negative integer `left` and `right` counts.',
+			error: '[wit-grid] persisted grid state field `state.pinnedColumns` must contain non-negative integer `left` and `right` counts.',
 		};
 	}
 
@@ -186,14 +186,14 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 
 function parsePersistedGridState(raw: unknown): PersistedGridStateParseResult {
 	if (!isRecord(raw)) {
-		return { ok: false, error: '[open-grid] persisted grid state must be an object.' };
+		return { ok: false, error: '[wit-grid] persisted grid state must be an object.' };
 	}
 	const versionError = validateSchemaVersion(raw);
 	if (versionError !== null) {
 		return { ok: false, error: versionError };
 	}
 	if (!('state' in raw)) {
-		return { ok: false, error: '[open-grid] persisted grid state is missing required `state` payload.' };
+		return { ok: false, error: '[wit-grid] persisted grid state is missing required `state` payload.' };
 	}
 	const parsedState = parseSerializedGridState(raw.state);
 	if (!parsedState.ok) {

@@ -8,7 +8,7 @@ import {
 	type CellRendererPhase,
 	type ImperativeCellHandle,
 	isDomCellRenderer,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { useGridApi } from './hooks.js';
 import { GridAdapterContext } from './gridContext.js';

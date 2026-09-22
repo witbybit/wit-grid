@@ -91,8 +91,8 @@ Destroying the engine invalidates all bindings before host callbacks or portal w
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add lifecycle tests for binding ownership, stale generation rejection, sequential remounts, headless fallback, destroy ordering, and duplicate active-host faults.

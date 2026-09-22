@@ -34,7 +34,7 @@ Plan 117 is implemented.
 
 Delivered:
 
-- runtime composition is now built in private [packages/core/src/internal/createGridRuntimeComposition.ts](/C:/Users/rishi/witbybit/open-grid/packages/core/src/internal/createGridRuntimeComposition.ts)
+- runtime composition is now built in private [packages/core/src/internal/createGridRuntimeComposition.ts](/C:/Users/rishi/witbybit/wit-grid/packages/core/src/internal/createGridRuntimeComposition.ts)
 - the public package no longer exports `createApiFacade`
 - the internal bridge now models explicit composition roles with `GridRuntimeComposition` and `GridHostComposition`
 - host wiring resolves the narrow host composition handle instead of a broader runtime bundle name
@@ -101,9 +101,9 @@ Delivered:
 
 Verification completed:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/boundary.test.ts src/gridHost.test.ts src/gridHost.adversarial.test.ts src/engine/architectureGuards.test.ts`
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/persistence/statePersistence.test.ts src/store.test.ts`
-- `corepack pnpm --filter @eregister/open-grid-core build`
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/boundary.test.ts src/gridHost.test.ts src/gridHost.adversarial.test.ts src/engine/architectureGuards.test.ts`
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/persistence/statePersistence.test.ts src/store.test.ts`
+- `corepack pnpm --filter @eregister/wit-grid-core build`
 
 ## Completion gate
 

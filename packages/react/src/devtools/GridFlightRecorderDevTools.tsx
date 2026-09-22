@@ -9,7 +9,7 @@ import {
 	type CSSProperties,
 	type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
-import { GridEventName, type GridApi, type ThemeTokens } from '@eregister/open-grid-core';
+import { GridEventName, type GridApi, type ThemeTokens } from '@eregister/wit-grid-core';
 import {
 	clearFlightRecorder,
 	explainFlightRecorderCell,
@@ -19,7 +19,7 @@ import {
 	type GridCausalTraceEnvelope,
 	type GridCausalTraceSnapshot,
 	type GridCellExplanation,
-} from '@eregister/open-grid-core/experimental';
+} from '@eregister/wit-grid-core/experimental';
 import {
 	buildFrameDistribution,
 	explanationRows,
@@ -237,7 +237,7 @@ export function GridFlightRecorderDevTools<TRowData>({
 		const url = URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' }));
 		const anchor = document.createElement('a');
 		anchor.href = url;
-		anchor.download = `open-grid-trace-${snapshot.sessionId ?? 'empty'}.json`;
+		anchor.download = `wit-grid-trace-${snapshot.sessionId ?? 'empty'}.json`;
 		anchor.click();
 		URL.revokeObjectURL(url);
 	};
@@ -274,7 +274,7 @@ export function GridFlightRecorderDevTools<TRowData>({
 		pointerCleanupRef.current = up;
 	};
 	return (
-		<section ref={panelRef} className={`og-fr og-fr--${dock}`} style={shellStyle} aria-label='Open Grid Flight Recorder'>
+		<section ref={panelRef} className={`og-fr og-fr--${dock}`} style={shellStyle} aria-label='Wit Grid Flight Recorder'>
 			<div
 				className='og-fr__resize'
 				role='separator'

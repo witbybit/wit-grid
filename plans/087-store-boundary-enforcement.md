@@ -83,8 +83,8 @@ Remove exports that are internal-only and no longer required for compatibility.
 ## Verification gate
 
 ```text
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Add an architecture test proving internal files import owning modules directly, no new domain cycles exist, and public entrypoints continue exporting the intended compatibility surface.

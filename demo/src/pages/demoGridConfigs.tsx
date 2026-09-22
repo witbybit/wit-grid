@@ -7,7 +7,7 @@ import {
 	type GridApi,
 	type InfiniteDatasource,
 	type SortModel,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 import {
 	GanttStatusBadgeRenderer,
 	GanttStatusDropdownEditor,

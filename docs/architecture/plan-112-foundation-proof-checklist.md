@@ -4,7 +4,7 @@ Date: 2026-06-19
 
 Status: complete.
 
-The canonical Plan 112 closeout now lives in [plan-112-foundation-report.md](C:/Users/rishi/witbybit/open-grid/docs/architecture/plan-112-foundation-report.md).
+The canonical Plan 112 closeout now lives in [plan-112-foundation-report.md](C:/Users/rishi/witbybit/wit-grid/docs/architecture/plan-112-foundation-report.md).
 
 Checklist summary:
 

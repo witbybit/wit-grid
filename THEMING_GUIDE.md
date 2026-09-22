@@ -1,10 +1,10 @@
-# Open Grid CSS Theming System
+# Wit Grid CSS Theming System
 
-Complete guide to the advanced theming system in Open Grid. Build advanced CSS styling/theming natively with support for light/dark modes, custom themes, and runtime switching.
+Complete guide to the advanced theming system in Wit Grid. Build advanced CSS styling/theming natively with support for light/dark modes, custom themes, and runtime switching.
 
 ## Overview
 
-Open Grid provides a **modern, shadcn-style theming system** with:
+Wit Grid provides a **modern, shadcn-style theming system** with:
 
 - ✅ Built-in light & dark themes
 - ✅ High-contrast accessibility themes
@@ -31,10 +31,10 @@ Set a built-in theme name declaratively via `initialState`. This is resolved onc
 />
 ```
 
-Framework-agnostic (`@eregister/open-grid-core`) equivalent:
+Framework-agnostic (`@eregister/wit-grid-core`) equivalent:
 
 ```typescript
-import { createClientGrid } from '@eregister/open-grid-core';
+import { createClientGrid } from '@eregister/wit-grid-core';
 
 const api = createClientGrid(config);
 
@@ -50,7 +50,7 @@ const themeManager = host.setTheme?.toString(); // Access via host methods
 ### 2. Using ThemeManager Directly
 
 ```typescript
-import { ThemeManager, DARK_THEME } from '@eregister/open-grid-core';
+import { ThemeManager, DARK_THEME } from '@eregister/wit-grid-core';
 
 const manager = new ThemeManager(DARK_THEME);
 manager.mount(); // Inject theme into document
@@ -73,14 +73,14 @@ const unsubscribe = manager.onThemeChange((theme) => {
 Get `api` from `onGridReady` (React) or the return value of `createClientGrid`/`createInfiniteGrid`/`createServerPageGrid` (core), then call the theme methods directly on it:
 
 ````typescript
-import { createTheme, ThemeManager } from '@eregister/open-grid-core';
+import { createTheme, ThemeManager } from '@eregister/wit-grid-core';
 
 ### 3. Composing a custom theme
 
 `ThemeTokens` is a plain flat object — a themed variant of a built-in theme is just a spread, no helper function required:
 
 ```typescript
-import { getBuiltInTheme, type ThemeTokens } from '@eregister/open-grid-core';
+import { getBuiltInTheme, type ThemeTokens } from '@eregister/wit-grid-core';
 
 export const acmeTheme: ThemeTokens = {
 	...getBuiltInTheme('light'),
@@ -127,7 +127,7 @@ Or declare the initial tweaks up front, alongside a base theme name — both are
 `ThemeManager.detectSystemPreference()` is a standalone static helper (no grid instance needed) — use it to pick the right built-in theme name up front:
 
 ```typescript
-import { ThemeManager } from '@eregister/open-grid-core';
+import { ThemeManager } from '@eregister/wit-grid-core';
 
 const prefersDark = ThemeManager.detectSystemPreference();
 
@@ -152,7 +152,7 @@ useEffect(() => {
 High-contrast, professional dark theme optimized for extended viewing and reduced eye strain.
 
 ```typescript
-import { DARK_THEME } from '@eregister/open-grid-core';
+import { DARK_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### Light
@@ -160,7 +160,7 @@ import { DARK_THEME } from '@eregister/open-grid-core';
 Clean, bright professional theme for daytime use.
 
 ```typescript
-import { LIGHT_THEME } from '@eregister/open-grid-core';
+import { LIGHT_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### High-Contrast Light (`light-hc`)
@@ -168,7 +168,7 @@ import { LIGHT_THEME } from '@eregister/open-grid-core';
 Enhanced light theme with stronger contrasts for better accessibility.
 
 ```typescript
-import { HIGH_CONTRAST_LIGHT_THEME } from '@eregister/open-grid-core';
+import { HIGH_CONTRAST_LIGHT_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### High-Contrast Dark (`dark-hc`)
@@ -176,7 +176,7 @@ import { HIGH_CONTRAST_LIGHT_THEME } from '@eregister/open-grid-core';
 Enhanced dark theme with stronger contrasts for better accessibility.
 
 ```typescript
-import { HIGH_CONTRAST_DARK_THEME } from '@eregister/open-grid-core';
+import { HIGH_CONTRAST_DARK_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### Cool Blue (`cool-blue`)
@@ -184,7 +184,7 @@ import { HIGH_CONTRAST_DARK_THEME } from '@eregister/open-grid-core';
 Modern tech aesthetic with cool blue accent tones.
 
 ```typescript
-import { COOL_BLUE_THEME } from '@eregister/open-grid-core';
+import { COOL_BLUE_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### Warm Orange (`warm-orange`)
@@ -192,7 +192,7 @@ import { COOL_BLUE_THEME } from '@eregister/open-grid-core';
 Energetic, warm aesthetic with orange accent tones.
 
 ```typescript
-import { WARM_ORANGE_THEME } from '@eregister/open-grid-core';
+import { WARM_ORANGE_THEME } from '@eregister/wit-grid-core';
 ```
 
 ### Minimal Monochrome (`minimal-monochrome`)
@@ -200,7 +200,7 @@ import { WARM_ORANGE_THEME } from '@eregister/open-grid-core';
 Ultra-clean, minimalist monochrome theme.
 
 ```typescript
-import { MINIMAL_MONOCHROME_THEME } from '@eregister/open-grid-core';
+import { MINIMAL_MONOCHROME_THEME } from '@eregister/wit-grid-core';
 ```
 
 All built-in themes are also reachable by name via `getBuiltInTheme(name)` and `BUILT_IN_THEMES[name]`, which is generally more convenient than importing each theme constant individually.
@@ -344,7 +344,7 @@ const BUILT_IN_THEMES: Record<BuiltInThemeName, ThemeTokens>;
 Modify specific tokens while keeping the rest, at any point after the grid is created:
 
 ```typescript
-import { ThemeManager, DARK_THEME } from '@eregister/open-grid-core';
+import { ThemeManager, DARK_THEME } from '@eregister/wit-grid-core';
 
 const manager = new ThemeManager(DARK_THEME);
 manager.mount();
@@ -361,7 +361,7 @@ api.mergeTheme({
 
 ````typescript
 import { useCallback, useEffect, useState } from 'react';
-import { createClientGrid } from '@eregister/open-grid-core';
+import { createClientGrid } from '@eregister/wit-grid-core';
 
 ```tsx
 function DynamicThemeExample() {
@@ -385,7 +385,7 @@ function DynamicThemeExample() {
 ### 3. System preference sync
 
 ```typescript
-import { ThemeManager } from '@eregister/open-grid-core';
+import { ThemeManager } from '@eregister/wit-grid-core';
 
 // Pick the initial theme from the OS preference, before the grid ever mounts
 const initialThemeName = ThemeManager.detectSystemPreference() ? 'dark' : 'light';
@@ -396,7 +396,7 @@ const initialThemeName = ThemeManager.detectSystemPreference() ? 'dark' : 'light
 ### 4. Custom theme from brand guidelines
 
 ```typescript
-import { createTheme, ThemeManager } from '@eregister/open-grid-core';
+import { createTheme, ThemeManager } from '@eregister/wit-grid-core';
 
 	// Brand primary
 	focusRing: '#6366f1', // Indigo
@@ -428,7 +428,7 @@ api.setTheme(brandTheme);
 ### 5. Exporting theme configuration
 
 ```typescript
-import { themeToCSSVariables } from '@eregister/open-grid-core';
+import { themeToCSSVariables } from '@eregister/wit-grid-core';
 
 const theme = { ...getBuiltInTheme('dark'), focusRing: '#00d4ff' };
 const cssText = themeToCSSVariables(theme);
@@ -442,12 +442,12 @@ console.log(cssText);
 // }
 ```
 
-## Integration with the low-level host (`@eregister/open-grid-core` internal)
+## Integration with the low-level host (`@eregister/wit-grid-core` internal)
 
-If you're building a custom framework adapter directly on `mountGridHost` (rather than using `<Grid>` from `@eregister/open-grid-react`), the same theme methods are also available directly on the returned host object:
+If you're building a custom framework adapter directly on `mountGridHost` (rather than using `<Grid>` from `@eregister/wit-grid-react`), the same theme methods are also available directly on the returned host object:
 
 ```typescript
-import { mountGridHost } from '@eregister/open-grid-core/internal';
+import { mountGridHost } from '@eregister/wit-grid-core/internal';
 
 const host = mountGridHost(api, container);
 
@@ -485,7 +485,7 @@ Or via stylesheets:
 
 ## CSS Theme Studio Demo
 
-Open Grid includes an interactive CSS Theme Studio component to:
+Wit Grid includes an interactive CSS Theme Studio component to:
 
 - Preview all built-in themes
 - Inspect theme tokens live
@@ -565,7 +565,7 @@ See the CSS Theme Studio demo component (`demo/src/components/CSSThemeStudio.tsx
 
 ## Accessibility
 
-Open Grid includes two high-contrast themes specifically designed for accessibility:
+Wit Grid includes two high-contrast themes specifically designed for accessibility:
 
 - **Light HC** (`light-hc`): Enhanced light theme with WCAG AA+ contrasts
 - **Dark HC** (`dark-hc`): Enhanced dark theme with WCAG AA+ contrasts

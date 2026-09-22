@@ -1,14 +1,14 @@
-# Open Grid Foundation Convergence Program — Plans 089–103
+# Wit Grid Foundation Convergence Program — Plans 089–103
 
 ## Purpose
 
-This program converts the successful Open Grid POC into a coherent pre-release foundation. It is not a feature roadmap. It defines the destination, cuts scope, captures evidence before demolition, closes known correctness defects, converges ownership, and proves the resulting system before an internal foundation milestone.
+This program converts the successful Wit Grid POC into a coherent pre-release foundation. It is not a feature roadmap. It defines the destination, cuts scope, captures evidence before demolition, closes known correctness defects, converges ownership, and proves the resulting system before an internal foundation milestone.
 
 ## Required execution order
 
 ### Stage A — Define the destination and reduce scope
 
-1. **Plan 089 — Open Grid Core Architecture Target**
+1. **Plan 089 — Wit Grid Core Architecture Target**
 2. **Plan 090 — Feature Surface Triage and Quarantine**
 3. **Plan 091 — Performance Baseline Laboratory and Regression Harness**
 

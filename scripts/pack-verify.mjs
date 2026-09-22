@@ -62,7 +62,7 @@ function copyWorkspacePackage(sourceSegments, destinationSegments) {
 
 function main() {
 	mkdirSync(TMP_BASE, { recursive: true });
-	const tmpRoot = mkdtempSync(path.join(TMP_BASE, 'open-grid-pack-verify-'));
+	const tmpRoot = mkdtempSync(path.join(TMP_BASE, 'wit-grid-pack-verify-'));
 	const tarballDir = path.join(tmpRoot, 'tarballs');
 	const fixtureTemplateDir = path.join(ROOT, 'fixtures', 'package-consumer');
 	const fixtureDir = path.join(tmpRoot, 'package-consumer');
@@ -80,7 +80,7 @@ function main() {
 
 		const coreTarball = packPackage(path.join(ROOT, 'packages', 'core'), tarballDir, npmEnv);
 		const reactTarball = packPackage(path.join(ROOT, 'packages', 'react'), tarballDir, npmEnv);
-		assertTarballContents(coreTarball, '@eregister/open-grid-core', [
+		assertTarballContents(coreTarball, '@eregister/wit-grid-core', [
 			'README.md',
 			'dist/index.js',
 			'dist/index.d.ts',
@@ -89,7 +89,7 @@ function main() {
 			'dist/internal.js',
 			'dist/internal.d.ts',
 		]);
-		assertTarballContents(reactTarball, '@eregister/open-grid-react', [
+		assertTarballContents(reactTarball, '@eregister/wit-grid-react', [
 			'dist/index.js',
 			'dist/index.d.ts',
 			'dist/experimental.js',

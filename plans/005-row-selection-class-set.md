@@ -40,9 +40,9 @@ if (state.selectedRowIds.length > 0 && state.selectedRowIds.includes(node.id)) {
 
 | Purpose        | Command                                                                                                    | Expected on success          |
 | -------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Core test file | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/runtimePerformance.test.ts` | exit 0, all tests pass       |
-| Core tests     | `corepack pnpm --filter @eregister/open-grid-core test`                                                    | exit 0, all tests pass       |
-| Core build     | `corepack pnpm --filter @eregister/open-grid-core build`                                                   | exit 0, no TypeScript errors |
+| Core test file | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/runtimePerformance.test.ts` | exit 0, all tests pass       |
+| Core tests     | `corepack pnpm --filter @eregister/wit-grid-core test`                                                    | exit 0, all tests pass       |
+| Core build     | `corepack pnpm --filter @eregister/wit-grid-core build`                                                   | exit 0, no TypeScript errors |
 
 ## Scope
 
@@ -73,27 +73,27 @@ if (this._selectedRowIdSet?.has(node.id)) {
 
 Do not create a new `Set` inside `updateRowClassNameSlot`; the frame-level cache is already populated in `recycleViewport`.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Add a regression test
 
 In `packages/core/src/renderer/runtimePerformance.test.ts`, add a test near the other runtime performance tests that creates many selected row IDs, paints/recycles the viewport, and confirms a selected visible row still receives `og-row-node-selected`. If the test can safely observe membership without broad global spies, also assert the paint path does not call `selectedRowIds.includes`.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/runtimePerformance.test.ts` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/runtimePerformance.test.ts` -> exit 0.
 
 ## Test plan
 
 - Add one regression test in `packages/core/src/renderer/runtimePerformance.test.ts`.
 - Cover both behavior and performance shape: selected rows still get `og-row-node-selected`, and row paint avoids array membership scans.
-- Run `corepack pnpm --filter @eregister/open-grid-core test`.
+- Run `corepack pnpm --filter @eregister/wit-grid-core test`.
 
 ## Done criteria
 
 - [ ] `rowRenderer.ts` uses `_selectedRowIdSet?.has(node.id)` for `og-row-node-selected`.
 - [ ] No new `Set` allocation is added inside `updateRowClassNameSlot`.
 - [ ] The new runtime performance regression test passes.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
 
 ## STOP conditions
 

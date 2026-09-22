@@ -27,7 +27,7 @@ import {
 	type GridViewDefinition,
 	type GridWorkspaceState,
 	type PersistedGridState,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 
 // ── Row type ──────────────────────────────────────────────────────────────────
 

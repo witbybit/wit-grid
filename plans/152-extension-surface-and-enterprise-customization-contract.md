@@ -6,7 +6,7 @@ Define the extension and customization contract that lets teams build custom edi
 
 ## Why now
 
-Desirability is not just feature count. Teams choose a grid they can bend safely to their product. If the only way to customize advanced behavior is to reach into internals, the grid stays impressive but not adoptable. This plan turns Open Grid into a platform without turning it into a dependency hazard.
+Desirability is not just feature count. Teams choose a grid they can bend safely to their product. If the only way to customize advanced behavior is to reach into internals, the grid stays impressive but not adoptable. This plan turns Wit Grid into a platform without turning it into a dependency hazard.
 
 ## Focus areas
 
@@ -34,4 +34,4 @@ Desirability is not just feature count. Teams choose a grid they can bend safely
 - advanced customization scenarios are possible through explicit supported contracts
 - no new extension feature requires public exposure of mutable runtime internals
 - package-consumer tests or examples prove the extension seams are sufficient
-- Open Grid becomes easier to tailor deeply while staying maintainable
+- Wit Grid becomes easier to tailor deeply while staying maintainable

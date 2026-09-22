@@ -153,7 +153,7 @@ Add/extend pure layout-plan tests (`renderer/layoutPlan.test.ts`) and viewport D
 - Every `.og-layer-*` element present, their top/height/width.
 - Header pin layer widths == plan pin widths.
 - Sort animation still fires (mock WAAPI/`Animation`).
-  Verify: `corepack pnpm --filter @eregister/open-grid-core test` exit 0.
+  Verify: `corepack pnpm --filter @eregister/wit-grid-core test` exit 0.
 
 ### Phase 1: Four-edge chrome + layer registry (no behavior change)
 
@@ -205,10 +205,10 @@ Add/extend pure layout-plan tests (`renderer/layoutPlan.test.ts`) and viewport D
 
 | Purpose     | Command                                                   | Success |
 | ----------- | --------------------------------------------------------- | ------- |
-| Core tests  | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0  |
-| Core build  | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0  |
-| React tests | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0  |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0  |
+| Core tests  | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0  |
+| Core build  | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0  |
+| React tests | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0  |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0  |
 | Demo build  | `corepack pnpm --filter demo-app build`                   | exit 0  |
 
 ## Scope

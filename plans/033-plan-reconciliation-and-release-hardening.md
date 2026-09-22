@@ -65,10 +65,10 @@ Repo conventions to follow:
 
 | Purpose          | Command                                                   | Expected on success                |
 | ---------------- | --------------------------------------------------------- | ---------------------------------- |
-| Core build       | `corepack pnpm --filter @eregister/open-grid-core build`  | exit 0                             |
-| Core tests       | `corepack pnpm --filter @eregister/open-grid-core test`   | exit 0, all tests pass             |
-| React build      | `corepack pnpm --filter @eregister/open-grid-react build` | exit 0                             |
-| React tests      | `corepack pnpm --filter @eregister/open-grid-react test`  | exit 0, all tests pass             |
+| Core build       | `corepack pnpm --filter @eregister/wit-grid-core build`  | exit 0                             |
+| Core tests       | `corepack pnpm --filter @eregister/wit-grid-core test`   | exit 0, all tests pass             |
+| React build      | `corepack pnpm --filter @eregister/wit-grid-react build` | exit 0                             |
+| React tests      | `corepack pnpm --filter @eregister/wit-grid-react test`  | exit 0, all tests pass             |
 | Demo build       | `corepack pnpm --filter demo-app build`                   | exit 0                             |
 | Dirty tree check | `git status --short`                                      | only expected local changes remain |
 
@@ -120,10 +120,10 @@ reconciliation plan through.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0
-- `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
-- `corepack pnpm --filter @eregister/open-grid-react build` -> exit 0
-- `corepack pnpm --filter @eregister/open-grid-react test` -> exit 0
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
+- `corepack pnpm --filter @eregister/wit-grid-react build` -> exit 0
+- `corepack pnpm --filter @eregister/wit-grid-react test` -> exit 0
 - `corepack pnpm --filter demo-app build` -> exit 0
 
 ### Step 3: Reconcile `plans/README.md` from evidence
@@ -153,10 +153,10 @@ used for each status change so the next pass does not need to rediscover it.
 
 Machine-checkable. All must hold:
 
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0
 - [ ] `corepack pnpm --filter demo-app build` exits 0
 - [ ] `plans/README.md` no longer shows stale `TODO` statuses for `001` and `032`
 - [ ] `plans/README.md` records an explicit disposition for `028`

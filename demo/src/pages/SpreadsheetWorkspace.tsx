@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Grid, GridEventName, type GridApi, type GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, GridEventName, type GridApi, type GridReadyEvent } from '@eregister/wit-grid-react';
 import { BookOpen, Calculator, RefreshCw, Sigma, Sparkles, TrendingUp } from 'lucide-react';
 import { type SpreadsheetRow } from '../components/GridShared';
 import { createSpreadsheetColumns, createSpreadsheetRows } from './demoGridConfigs';

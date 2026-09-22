@@ -4,7 +4,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { cleanup } from '@testing-library/react';
 afterEach(cleanup);
 import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react';
-import { createClientGrid, type ClientGridOptions, type ColumnDef } from '@eregister/open-grid-core';
+import { createClientGrid, type ClientGridOptions, type ColumnDef } from '@eregister/wit-grid-core';
 import * as ReactPackage from './index.js';
 import { GridProvider } from './gridContext.js';
 import { GridView } from './GridView.js';

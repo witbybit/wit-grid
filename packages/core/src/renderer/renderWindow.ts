@@ -289,7 +289,7 @@ export function applyRenderWindowRuntimeLimits(window: RenderWindow, limits?: Re
 		if (!clampWarned && (typeof (globalThis as any).process === 'undefined' || (globalThis as any).process?.env?.NODE_ENV !== 'production')) {
 			clampWarned = true;
 			console.warn(
-				`[OpenGrid] Render limits exceeded. Clamped rendering window: rows=${getRowIndices(next).length}/${getRowIndices(window).length}, cells=${getRowIndices(next).length * getColIndices(next).length}/${getRowIndices(window).length * getColIndices(window).length}.`
+				`[WitGrid] Render limits exceeded. Clamped rendering window: rows=${getRowIndices(next).length}/${getRowIndices(window).length}, cells=${getRowIndices(next).length * getColIndices(next).length}/${getRowIndices(window).length * getColIndices(window).length}.`
 			);
 		}
 		if (onClamp) {

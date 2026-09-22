@@ -204,7 +204,7 @@ export function createGridRuntimeComposition<TRowData>({
 			workspaceController?.onStateChange(listener) ?? (() => {}),
 		listViews: (): Promise<readonly GridViewDefinition[]> => Promise.resolve(workspaceController?.getState().views ?? []),
 		saveView: async (name: string, options?: SaveViewOptions): Promise<GridViewDefinition> => {
-			if (!workspaceController) throw new Error('[open-grid] No workspace adapter configured');
+			if (!workspaceController) throw new Error('[wit-grid] No workspace adapter configured');
 			const view = await workspaceController.saveView(name, runtime.getGridState(), options);
 			runtime.dispatchEvent(GridEventName.viewSaved, { view });
 			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
@@ -218,7 +218,7 @@ export function createGridRuntimeComposition<TRowData>({
 		applyView: async (id: string): Promise<void> => {
 			if (!workspaceController) return;
 			const view = await workspaceController.getView(id);
-			if (!view) throw new Error(`[open-grid] workspace: view "${id}" not found`);
+			if (!view) throw new Error(`[wit-grid] workspace: view "${id}" not found`);
 			if (persistenceController) {
 				persistenceController.suspendAutoSave(() => runtime.applyGridState(view.state));
 			} else {
@@ -235,7 +235,7 @@ export function createGridRuntimeComposition<TRowData>({
 			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
 		},
 		duplicateView: async (id: string, name: string): Promise<GridViewDefinition> => {
-			if (!workspaceController) throw new Error('[open-grid] No workspace adapter configured');
+			if (!workspaceController) throw new Error('[wit-grid] No workspace adapter configured');
 			const view = await workspaceController.duplicateView(id, name);
 			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
 			return view;

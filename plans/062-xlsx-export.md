@@ -14,7 +14,7 @@
 ## Package addition
 
 ```
-pnpm -F @eregister/open-grid-core add exceljs
+pnpm -F @eregister/wit-grid-core add exceljs
 ```
 
 `exceljs` is ~600KB minified. It is a peer/optional dep — only loaded when `exportXlsx()` is called (dynamic import).
@@ -213,8 +213,8 @@ it('includes group rows when includeGroupRows=true', ...);
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build
 pnpm -F demo-app build
 ```
 

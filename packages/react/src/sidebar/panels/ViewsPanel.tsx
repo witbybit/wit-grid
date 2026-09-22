@@ -90,7 +90,7 @@ function makeIconBtnStyle(color: string, hoverBg?: string): React.CSSProperties 
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-import type { ThemeTokens } from '@eregister/open-grid-core';
+import type { ThemeTokens } from '@eregister/wit-grid-core';
 
 function SectionHeader({ label, theme }: { label: string; theme: ThemeTokens }) {
 	return (

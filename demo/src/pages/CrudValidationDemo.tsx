@@ -5,7 +5,7 @@
  *   - Sidebar "Submission Log" panel showing errors or success payload as JSON
  */
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
-import { Grid } from '@eregister/open-grid-react';
+import { Grid } from '@eregister/wit-grid-react';
 import type {
 	ColumnDef,
 	GridApi,
@@ -15,7 +15,7 @@ import type {
 	SidebarPanelDef,
 	GridCellIntegrityRule,
 	GridRowIntegrityRule,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 import { ShieldCheck, Send, RefreshCw, AlertTriangle, CheckCircle2, Loader2, Plus, FileJson, Scan, Navigation2 } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────

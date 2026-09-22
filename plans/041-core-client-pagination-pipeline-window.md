@@ -110,9 +110,9 @@ Guard test: client slicing happens in the pipeline only (no slice in renderer/ge
 ## Verification
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rows
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rows
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 

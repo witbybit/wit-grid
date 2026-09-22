@@ -1,5 +1,5 @@
 import { memo, useSyncExternalStore } from 'react';
-import { GridApi, VisualRow } from '@eregister/open-grid-core';
+import { GridApi, VisualRow } from '@eregister/wit-grid-core';
 import { createPortal } from 'react-dom';
 import { GridProvider } from './gridContext.js';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';

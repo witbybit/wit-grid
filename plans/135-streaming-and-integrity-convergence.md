@@ -29,7 +29,7 @@ Two live-stream engines with nearly identical batching, flashing, and patch-appl
 | Purpose           | Command                                                 | Expected on success |
 | ----------------- | ------------------------------------------------------- | ------------------- |
 | Architecture gate | `corepack pnpm run test:architecture`                   | exit 0              |
-| Core tests        | `corepack pnpm --filter @eregister/open-grid-core test` | exit 0              |
+| Core tests        | `corepack pnpm --filter @eregister/wit-grid-core test` | exit 0              |
 | Workspace tests   | `corepack pnpm run test`                                | exit 0              |
 | Build/typecheck   | `corepack pnpm run build`                               | exit 0              |
 
@@ -69,7 +69,7 @@ Migrate stream creation, diagnostics, flashing, dirty-cell handling, and row pat
 
 Remove the losing implementation, its tests, its re-export barrel, and any transitional wrappers. Update package exports to expose only the canonical streaming surface.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
 
 ### Step 4: Unify stream decorations and diagnostics
 

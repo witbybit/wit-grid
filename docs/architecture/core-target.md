@@ -1,4 +1,4 @@
-# Open Grid Core Architecture Target
+# Wit Grid Core Architecture Target
 
 > **Status**: Normative — plans 089–103 converge toward this document.
 > This document is the architecture constitution. A future plan may not contradict it
@@ -271,13 +271,13 @@ A physical identity is a transient DOM slot assignment that may change on every 
 
 | Package                      | Role                                                             | Allowed consumers            |
 | ---------------------------- | ---------------------------------------------------------------- | ---------------------------- |
-| `@eregister/open-grid-core`  | Engine, state, row pipeline, physical renderer, host integration | framework adapters, demo app |
-| `@eregister/open-grid-react` | React adapter (component, hooks, portals)                        | React applications           |
+| `@eregister/wit-grid-core`  | Engine, state, row pipeline, physical renderer, host integration | framework adapters, demo app |
+| `@eregister/wit-grid-react` | React adapter (component, hooks, portals)                        | React applications           |
 
 Rules:
 
-- `@eregister/open-grid-core` must not import from `@eregister/open-grid-react` or any other framework package.
-- `@eregister/open-grid-react` imports from `@eregister/open-grid-core` only through the exported public API (`src/index.ts`), never through deep internal paths.
+- `@eregister/wit-grid-core` must not import from `@eregister/wit-grid-react` or any other framework package.
+- `@eregister/wit-grid-react` imports from `@eregister/wit-grid-core` only through the exported public API (`src/index.ts`), never through deep internal paths.
 - No other inter-package imports are permitted until a new package is chartered with an explicit dependency budget.
 
 ---

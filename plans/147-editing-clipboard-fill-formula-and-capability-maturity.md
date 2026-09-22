@@ -6,7 +6,7 @@ Raise the mutation UX from “several strong subsystems” to one spreadsheet-gr
 
 ## Why now
 
-This is daily-driver value. Users feel it immediately. It is also where grids often become inconsistent: one write path for edit commits, another for paste, a third for fill, and a fourth for advanced editors. Open Grid already converged the core pipeline a lot; this plan turns that architectural win into product-level maturity.
+This is daily-driver value. Users feel it immediately. It is also where grids often become inconsistent: one write path for edit commits, another for paste, a third for fill, and a fourth for advanced editors. Wit Grid already converged the core pipeline a lot; this plan turns that architectural win into product-level maturity.
 
 ## Focus areas
 

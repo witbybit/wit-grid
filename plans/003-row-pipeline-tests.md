@@ -127,7 +127,7 @@ function makeContext(cols: { field: string }[] = [{ field: 'category' }, { field
 9. **Custom `keyCreator` in GroupDef is used** — `keyCreator: ({ value }) => String(value).toUpperCase()` maps keys to uppercase.
 10. **Custom `comparator` in GroupDef changes ordering** — `comparator: (a, b) => String(b).localeCompare(String(a))` reverses alphabetical order.
 
-**Verification:** `pnpm -F @eregister/open-grid-core test -- groupStage` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-core test -- groupStage` — all pass.
 
 ---
 
@@ -163,7 +163,7 @@ const getParentId = (row: Row) => row.parentId ?? null;
 7. **Diamond/cycle guard** — if row A has parentId pointing to row B but row B is not in the input, A becomes a root.
 8. **`children` array order matches input order for siblings**.
 
-**Verification:** `pnpm -F @eregister/open-grid-core test -- treeStage` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-core test -- treeStage` — all pass.
 
 ---
 
@@ -189,7 +189,7 @@ import type { SortModel } from '../../rowModel.js';
 5. **Sort is applied recursively to children** — siblings within a group are also sorted.
 6. **Multi-column sort** — primary ascending, secondary descending.
 
-**Verification:** `pnpm -F @eregister/open-grid-core test -- sortTreeStage` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-core test -- sortTreeStage` — all pass.
 
 ---
 
@@ -220,7 +220,7 @@ import type { AggregationDef } from './aggregateStage.js';
 8. **Nested groups propagate aggregates up** — two-level grouping: inner group sums first, outer group sums inner sums.
 9. **Custom function that throws is caught** — `aggregateValues[field]` is `undefined`, no exception propagates.
 
-**Verification:** `pnpm -F @eregister/open-grid-core test -- aggregateStage` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-core test -- aggregateStage` — all pass.
 
 ---
 
@@ -260,14 +260,14 @@ const defaultConfig: FlattenConfig<any> = {
 11. **`kind` field on output rows is correct**: data rows are `'data'`, group rows are `'group'`, detail rows are `'detail'`.
 12. **Output row `depth` matches the `RowTreeNode` depth**.
 
-**Verification:** `pnpm -F @eregister/open-grid-core test -- flattenStage` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-core test -- flattenStage` — all pass.
 
 ---
 
 ### Step 6 — Run full test suite
 
 ```bash
-pnpm -F @eregister/open-grid-core test
+pnpm -F @eregister/wit-grid-core test
 ```
 
 All existing tests must continue to pass. No existing test file may be modified.
@@ -291,7 +291,7 @@ All existing tests must continue to pass. No existing test file may be modified.
 ## Done criteria
 
 ```bash
-pnpm -F @eregister/open-grid-core test
+pnpm -F @eregister/wit-grid-core test
 # Expected output: all existing tests pass + new tests pass
 # New test count: ≥ 43 new test cases across the 5 files
 # Zero test failures, zero skipped tests
@@ -300,11 +300,11 @@ pnpm -F @eregister/open-grid-core test
 Individual file checks:
 
 ```bash
-pnpm -F @eregister/open-grid-core test -- groupStage     # ≥ 10 cases
-pnpm -F @eregister/open-grid-core test -- treeStage      # ≥ 8 cases
-pnpm -F @eregister/open-grid-core test -- sortTreeStage  # ≥ 6 cases
-pnpm -F @eregister/open-grid-core test -- aggregateStage # ≥ 9 cases
-pnpm -F @eregister/open-grid-core test -- flattenStage   # ≥ 12 cases
+pnpm -F @eregister/wit-grid-core test -- groupStage     # ≥ 10 cases
+pnpm -F @eregister/wit-grid-core test -- treeStage      # ≥ 8 cases
+pnpm -F @eregister/wit-grid-core test -- sortTreeStage  # ≥ 6 cases
+pnpm -F @eregister/wit-grid-core test -- aggregateStage # ≥ 9 cases
+pnpm -F @eregister/wit-grid-core test -- flattenStage   # ≥ 12 cases
 ```
 
 ---

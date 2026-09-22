@@ -1,4 +1,4 @@
-import { BUILT_IN_THEME_METADATA, getBuiltInTheme } from '@eregister/open-grid-core';
+import { BUILT_IN_THEME_METADATA, getBuiltInTheme } from '@eregister/wit-grid-core';
 import React from 'react';
 import type { GridApi } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';

@@ -51,16 +51,16 @@ The scheduler and instrumentation simplifications landed with measured verificat
 The following suites were used as the Plan 111 evidence set:
 
 ```powershell
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts src/renderer/runtimePerformance.test.ts src/renderer/serverRuntimePerformance.test.ts src/renderer/frameCoordinator.test.ts src/renderer/gridScheduler.test.ts
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/diagnostics/GridInstrumentation.test.ts src/engine/architectureGuards.test.ts
-corepack pnpm --filter @eregister/open-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts src/renderer/runtimePerformance.test.ts src/renderer/serverRuntimePerformance.test.ts src/renderer/frameCoordinator.test.ts src/renderer/gridScheduler.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/diagnostics/GridInstrumentation.test.ts src/engine/architectureGuards.test.ts
+corepack pnpm --filter @eregister/wit-grid-core build
 ```
 
 Observed results on 2026-06-18:
 
 - `instrumentedBudgets`, `runtimePerformance`, `serverRuntimePerformance`, `frameCoordinator`, and `gridScheduler` all passed: 75 tests green.
 - `GridInstrumentation` and architecture guard suites passed: 175 tests green.
-- `@eregister/open-grid-core` build passed.
+- `@eregister/wit-grid-core` build passed.
 
 ## Baseline Comparison Statement
 

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { BUILT_IN_THEMES, BUILT_IN_THEME_ORDER, BUILT_IN_THEME_METADATA, type BuiltInThemeName, type ThemeTokens } from '@eregister/open-grid-react';
+import { BUILT_IN_THEMES, BUILT_IN_THEME_ORDER, BUILT_IN_THEME_METADATA, type BuiltInThemeName, type ThemeTokens } from '@eregister/wit-grid-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

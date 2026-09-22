@@ -30,7 +30,7 @@ The existing infrastructure is ready:
 4. All editors: ESC → `onCancel`, Enter/Tab → `onCommit`, click-outside → `onCommit` with current value.
 5. Portal positioning: anchored to the cell DOM rect (`getBoundingClientRect()`), flipping to stay within viewport.
 6. Fully theme-aware via `api.getTheme()`.
-7. Exported from `@eregister/open-grid-react` as named exports.
+7. Exported from `@eregister/wit-grid-react` as named exports.
 
 ## Editor API
 
@@ -252,7 +252,7 @@ The React cell renderer passes the cell's DOM node via a ref when invoking the e
 ### Phase 5 — Architecture guard and exports
 
 1. Add guard: `editor files must not import renderer files`.
-2. Verify all types are re-exported from `@eregister/open-grid-react` index.
+2. Verify all types are re-exported from `@eregister/wit-grid-react` index.
 3. Add Storybook-style demo panel in AdvancedFeatures page showing all three editors side by side.
 
 ## Out of scope

@@ -7,7 +7,7 @@ import {
 	type ImperativeCellHandle,
 	type CellRendererProps,
 	type GridReadyEvent,
-} from '@eregister/open-grid-react';
+} from '@eregister/wit-grid-react';
 
 type RendererMode = 'text' | 'dom' | 'imperativeReact' | 'deferredReact';
 

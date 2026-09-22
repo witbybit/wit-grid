@@ -30,7 +30,7 @@ After this plan, every cell-value mutation should go through a single mutation k
 At commit `39c83e3`:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core test
+corepack pnpm --filter @eregister/wit-grid-core test
 ```
 
 fails with:
@@ -46,14 +46,14 @@ expected 15 to be '=[r1:val2]*3'
 Sequential builds are green:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-react build
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-react build
 ```
 
 React tests are green:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 ### Failing tests
@@ -286,16 +286,16 @@ Key rules:
 
 | Purpose            | Command                                                                                                                                                                             | Expected |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
-| Focused fill tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts`                                                                                            | exit 0   |
-| Data/model tests   | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/rowModel.test.ts src/store.test.ts src/calculations/dagEngine.test.ts`                  | exit 0   |
-| Architecture tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0   |
-| Core build         | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                                                            | exit 0   |
-| Core tests         | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                             | exit 0   |
-| React build        | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                                                           | exit 0   |
-| React tests        | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                                                            | exit 0   |
+| Focused fill tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts`                                                                                            | exit 0   |
+| Data/model tests   | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts src/rowModel.test.ts src/store.test.ts src/calculations/dagEngine.test.ts`                  | exit 0   |
+| Architecture tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0   |
+| Core build         | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                                                            | exit 0   |
+| Core tests         | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                             | exit 0   |
+| React build        | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                                                           | exit 0   |
+| React tests        | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                                                            | exit 0   |
 | Demo build         | `corepack pnpm --filter demo-app build`                                                                                                                                             | exit 0   |
 
-Run core build before React build when building separately. Running them in parallel can race because React resolves `@eregister/open-grid-core/dist`.
+Run core build before React build when building separately. Running them in parallel can race because React resolves `@eregister/wit-grid-core/dist`.
 
 ## Scope
 
@@ -340,7 +340,7 @@ Out of scope:
 Run the focused failing test command:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts
 ```
 
 Expected at plan start: exit 1 with the two formula fill failures listed above.
@@ -354,7 +354,7 @@ Then add one more characterization test in `packages/core/src/store.test.ts` tha
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts
 ```
 
 Expected during this phase: the new test should fail if it exposes the same bug. Keep it as a failing characterization until Phase 1 fixes the mutation order.
@@ -381,7 +381,7 @@ Do not simply change the tests to expect computed values. `getCellState().value`
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts src/calculations/dagEngine.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts src/calculations/dagEngine.test.ts
 ```
 
 Expected: exit 0.
@@ -429,8 +429,8 @@ Migration rule:
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts src/rowModel.test.ts
-corepack pnpm --filter @eregister/open-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts src/store.test.ts src/rowModel.test.ts
+corepack pnpm --filter @eregister/wit-grid-core build
 ```
 
 Expected: exit 0.
@@ -450,7 +450,7 @@ Requirements:
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/fillRange.test.ts src/renderer/runtimePerformance.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/fillRange.test.ts src/renderer/runtimePerformance.test.ts
 ```
 
 Expected: exit 0.
@@ -476,7 +476,7 @@ Implementation options:
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/calculations/dagEngine.test.ts src/fillRange.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/calculations/dagEngine.test.ts src/fillRange.test.ts
 ```
 
 Expected: exit 0.
@@ -497,7 +497,7 @@ Do not force pure `GridChangeApplier` usage for low-level render-engine subscrip
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts src/features/ColumnFeatureController.test.ts src/features/GroupingFeatureController.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/GridChangeApplier.test.ts src/engine/gridFeatureEffects.test.ts src/features/ColumnFeatureController.test.ts src/features/GroupingFeatureController.test.ts src/features/EditingFeatureController.test.ts src/features/RowSelectionFeatureController.test.ts
 ```
 
 Expected: exit 0.
@@ -518,7 +518,7 @@ If `GridEngine.ts` cannot be brought below 800 lines without broad unrelated wor
 Verify:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts
+corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts
 ```
 
 Expected: exit 0 with no skipped guard for a criterion claimed as done.
@@ -528,10 +528,10 @@ Expected: exit 0 with no skipped guard for a criterion claimed as done.
 Run:
 
 ```sh
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 
@@ -563,10 +563,10 @@ Existing tests to use as patterns:
 
 All must hold:
 
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `SpreadsheetFillEngine` does not call `engine.data.setCellValue` directly for user-visible writes.
 - [ ] `getCellState().value` preserves formula strings; `getCellValue()` returns computed values.

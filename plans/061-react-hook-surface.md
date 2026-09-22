@@ -216,7 +216,7 @@ it('useRowCount reflects filter reduction', ...);
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 `useGridRef` populated after mount. `useSortModel` updates correctly when `api.setSortModel()` is called. `useRowCount` decreases when filter is applied. Built-in column types resolve correctly.

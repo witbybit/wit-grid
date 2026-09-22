@@ -2,7 +2,7 @@
 
 ## Mission
 
-Create a small, safe overlay foundation that allows Open Grid to expose data-integrity tools without polluting the core row model, renderer, commit kernel, invalidation architecture, or history system.
+Create a small, safe overlay foundation that allows Wit Grid to expose data-integrity tools without polluting the core row model, renderer, commit kernel, invalidation architecture, or history system.
 
 This plan is the foundation for:
 
@@ -415,5 +415,5 @@ Plan 126 is complete when:
 Final report must say:
 
 ```text
-Plan 126 complete. Open Grid now has a safe Insight Layer foundation for data-integrity tools. Insight layers can expose read-only diagnostics and cell/row decorations without owning data, rendering, mutation, invalidation, history, or row models.
+Plan 126 complete. Wit Grid now has a safe Insight Layer foundation for data-integrity tools. Insight layers can expose read-only diagnostics and cell/row decorations without owning data, rendering, mutation, invalidation, history, or row models.
 ```

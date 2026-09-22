@@ -67,7 +67,7 @@ expose it.
 
 ### Verification
 
-- `pnpm -F @eregister/open-grid-core test` — all pass
+- `pnpm -F @eregister/wit-grid-core test` — all pass
 - `pnpm exec tsc --noEmit` — no errors
 
 ---
@@ -118,7 +118,7 @@ which uses an arbitrary anchor element (the chip div) instead.
 
 ### Verification
 
-- `pnpm -F @eregister/open-grid-core test` — all pass
+- `pnpm -F @eregister/wit-grid-core test` — all pass
 - `pnpm exec tsc --noEmit` — no errors
 
 ---
@@ -168,8 +168,8 @@ tightly coupled to `this.*`) or a broader refactor of the stats callers — defe
 
 ### Verification
 
-- `pnpm -F @eregister/open-grid-core test` — 659/659 pass
-- `pnpm -F @eregister/open-grid-react test` — 70/70 pass
+- `pnpm -F @eregister/wit-grid-core test` — 659/659 pass
+- `pnpm -F @eregister/wit-grid-react test` — 70/70 pass
 
 ---
 
@@ -179,6 +179,6 @@ tightly coupled to `this.*`) or a broader refactor of the stats callers — defe
 - [x] Clicking a filter chip label opens the column's filter popover anchored to the chip
 - [x] `rowVersions: Map<string, number>` was already implemented — confirmed in GridEngine + rowCellBinder
 - [x] `rowRenderer.ts` reduced 654 → 612 lines; `pinnedContainerManager.ts` extracted
-- [x] `pnpm -F @eregister/open-grid-core test` — 659/659 pass
-- [x] `pnpm -F @eregister/open-grid-react test` — 70/70 pass
+- [x] `pnpm -F @eregister/wit-grid-core test` — 659/659 pass
+- [x] `pnpm -F @eregister/wit-grid-react test` — 70/70 pass
 - [x] `plans/README.md` updated

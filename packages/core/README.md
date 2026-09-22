@@ -1,14 +1,14 @@
-# @eregister/open-grid-core
+# @eregister/wit-grid-core
 
-Framework-agnostic grid core for the Open Grid alpha. The application API is
-published from `@eregister/open-grid-core`.
+Framework-agnostic grid core for the Wit Grid alpha. The application API is
+published from `@eregister/wit-grid-core`.
 
 ## Factories
 
 Use one factory per grid instance:
 
 ```ts
-import { createClientGrid, createInfiniteGrid, createServerSideGrid } from '@eregister/open-grid-core';
+import { createClientGrid, createInfiniteGrid, createServerSideGrid } from '@eregister/wit-grid-core';
 
 const client = createClientGrid({
 	columns: [{ field: 'name', header: 'Name' }],
@@ -54,16 +54,16 @@ or its datasource/query changes.
 
 ## Entrypoint stability
 
-- `@eregister/open-grid-core` is the supported alpha application surface. It remains
+- `@eregister/wit-grid-core` is the supported alpha application surface. It remains
   pre-release and may change between alpha versions.
-- `@eregister/open-grid-core/experimental` contains incubating APIs with no compatibility
+- `@eregister/wit-grid-core/experimental` contains incubating APIs with no compatibility
   promise.
-- `@eregister/open-grid-core/internal` is an adapter-only host contract used by framework
+- `@eregister/wit-grid-core/internal` is an adapter-only host contract used by framework
   bindings. It deliberately does not expose stores, engines, row models, or
   renderer implementation classes, and application code should not depend on
   it.
 
 The checked `api-contract.md` records the emitted declaration surface for all
-three entries. Run `pnpm --filter @eregister/open-grid-core run api:check` after changing
+three entries. Run `pnpm --filter @eregister/wit-grid-core run api:check` after changing
 an exported type, and explicitly regenerate/review the contract when that
 change is intentional.

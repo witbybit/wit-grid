@@ -17,7 +17,7 @@ export {
 	getBuiltInTheme,
 	isBuiltInThemeName,
 	themeToCSSVariables,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 
 // ─── Built-in cell renderers & editors ───────────────────────────────────────
 export {
@@ -66,8 +66,8 @@ export type {
 	CustomFilterRendererParams,
 	FilterSurface,
 	SelectFilterCondition,
-} from '@eregister/open-grid-core';
-export { resolveColumnFilterDef } from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
+export { resolveColumnFilterDef } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
 export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js';
@@ -122,8 +122,8 @@ export type {
 	GridCapabilityCallback,
 	GridCapabilitiesConfig,
 	CapabilityDiagnostics,
-} from '@eregister/open-grid-core';
-export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
+export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/wit-grid-core';
 
 export type {
 	GridContextMenuOptions,
@@ -134,7 +134,7 @@ export type {
 	AutoSizeColumnOptions,
 	AutoSizeAllColumnsOptions,
 	FloatingFilterRendererParams,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 
 // ── Data Integrity Pipeline types ─────────────────────────────────────────────
 export type {
@@ -168,7 +168,7 @@ export type {
 	ServerIntegrityReport,
 	GridTransactionStreamHandle,
 	GridTransactionStreamState,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 export {
 	duplicateValueRule,
 	missingRequiredRule,
@@ -181,4 +181,4 @@ export {
 	oneOf,
 	regex,
 	customCellRule,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';

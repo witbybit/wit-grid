@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Grid, type GridReadyEvent } from '@eregister/open-grid-react';
+import { Grid, type GridReadyEvent } from '@eregister/wit-grid-react';
 import { Palette } from 'lucide-react';
 import { createSkinsColumns, generatePerformanceRows } from './demoGridConfigs';
 import { ThemeTweaker } from '../components/ThemeTweaker';

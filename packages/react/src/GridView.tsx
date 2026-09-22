@@ -7,7 +7,7 @@ import {
 	type GridEventPayloadMap,
 	registerGridContextMenu,
 	VisualRow,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GridAdapterContext } from './gridContext.js';
 import {
@@ -50,7 +50,7 @@ export interface GridViewProps<TRowData = unknown> {
 
 function warnInitialOnlyGridViewProp(propName: string): void {
 	console.warn(
-		`[@eregister/open-grid-react] Prop "${propName}" is initial-only for the current grid instance. ` +
+		`[@eregister/wit-grid-react] Prop "${propName}" is initial-only for the current grid instance. ` +
 			'Changing it after mount does not reconfigure the existing runtime. Remount or replace the grid api if you need the new value to take effect.'
 	);
 }

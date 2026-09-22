@@ -16,7 +16,7 @@
 
 ## Why this matters
 
-Serious grids survive feature load by waking only the smallest necessary slice of the system. Open Grid already has good cell-level hooks, but broad snapshot subscriptions in `store.ts` still wake on keys like `globalVersion`, `columns`, and `sortModel` for higher-level consumers. That will become a scaling bottleneck once formulas, integrity, collaboration, charts, and devtools all subscribe concurrently.
+Serious grids survive feature load by waking only the smallest necessary slice of the system. Wit Grid already has good cell-level hooks, but broad snapshot subscriptions in `store.ts` still wake on keys like `globalVersion`, `columns`, and `sortModel` for higher-level consumers. That will become a scaling bottleneck once formulas, integrity, collaboration, charts, and devtools all subscribe concurrently.
 
 ## Current state
 
@@ -32,7 +32,7 @@ Serious grids survive feature load by waking only the smallest necessary slice o
 | Purpose           | Command                                                 | Expected on success |
 | ----------------- | ------------------------------------------------------- | ------------------- |
 | Architecture gate | `corepack pnpm run test:architecture`                   | exit 0              |
-| Core tests        | `corepack pnpm --filter @eregister/open-grid-core test` | exit 0              |
+| Core tests        | `corepack pnpm --filter @eregister/wit-grid-core test` | exit 0              |
 | Workspace tests   | `corepack pnpm run test`                                | exit 0              |
 | Build/typecheck   | `corepack pnpm run build`                               | exit 0              |
 
@@ -73,7 +73,7 @@ The new API should let consumers subscribe to a narrow derived projection with a
 
 Replace the current broad `globalVersion` / `columns` / `sortModel` fan-out in `store.ts` with narrow selector-grade subscriptions or domain-version-backed comparators.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
 
 ### Step 3: Add an integrity selector surface
 

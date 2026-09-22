@@ -131,12 +131,12 @@ right: this.engine.viewport.pinRightColumns,
 
 | Purpose                       | Command                                                                                                                                        | Expected on success |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| Core build                    | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                       | exit 0              |
-| Core tests                    | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                        | all core tests pass |
-| Focused store/row-model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/rowModel.test.ts src/serverRowModel.test.ts`           | exit 0              |
-| Focused architecture tests    | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0              |
-| React build                   | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                      | exit 0              |
-| React tests                   | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                       | exit 0              |
+| Core build                    | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                       | exit 0              |
+| Core tests                    | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                        | all core tests pass |
+| Focused store/row-model tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/rowModel.test.ts src/serverRowModel.test.ts`           | exit 0              |
+| Focused architecture tests    | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts src/engine/gridFeatureEffects.test.ts` | exit 0              |
+| React build                   | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                      | exit 0              |
+| React tests                   | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                       | exit 0              |
 | Demo build                    | `corepack pnpm --filter demo-app build`                                                                                                        | exit 0              |
 
 Run package builds sequentially. `demo-app build` should run only after core and
@@ -196,8 +196,8 @@ baseline is not green, stop and finish or refresh Plan 013 before proceeding.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0, no skipped guard tests.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0, no skipped guard tests.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0.
 
 ### Step 2: Define explicit runtime ports
 
@@ -237,7 +237,7 @@ Put the port types in a stable internal location such as
 `packages/core/src/engine/runtimePorts.ts` or `packages/core/src/internal/runtimePorts.ts`.
 Do not scatter one-off local interfaces across many files.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 3: Refactor models off `GridEngine`
 
@@ -261,8 +261,8 @@ add that read to the relevant port instead of passing the whole engine.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/store.test.ts src/engine/gridFeatureEffects.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/store.test.ts src/engine/gridFeatureEffects.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 4: Refactor row models off `store.engine`
 
@@ -288,8 +288,8 @@ must be toward explicit ports.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/rowModel.test.ts src/serverRowModel.test.ts src/store.test.ts` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.test.ts src/serverRowModel.test.ts src/store.test.ts` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 5: Thin `GridStore` into a public facade
 
@@ -320,8 +320,8 @@ composition root.
 
 **Verify**:
 
-- `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
-- `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
+- `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0.
 
 ### Step 6: Add architecture guardrails for port ownership
 
@@ -342,16 +342,16 @@ Add narrow, explicit checks such as:
 Do not add brittle guards that fail on comments or tests. Guard against the
 actual structural regressions.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts --reporter=verbose` -> exit 0.
 
 ### Step 7: Run full sequential verification
 
 Run these commands in order:
 
-1. `corepack pnpm --filter @eregister/open-grid-core build`
-2. `corepack pnpm --filter @eregister/open-grid-react build`
-3. `corepack pnpm --filter @eregister/open-grid-core test`
-4. `corepack pnpm --filter @eregister/open-grid-react test`
+1. `corepack pnpm --filter @eregister/wit-grid-core build`
+2. `corepack pnpm --filter @eregister/wit-grid-react build`
+3. `corepack pnpm --filter @eregister/wit-grid-core test`
+4. `corepack pnpm --filter @eregister/wit-grid-react test`
 5. `corepack pnpm --filter demo-app build`
 
 Expected: all exit 0.
@@ -387,10 +387,10 @@ All must hold:
 - [ ] Stable internal runtime-port interfaces exist in one shared location.
 - [ ] `GridStore` is thinner and no longer acts as a raw subsystem grab-bag.
 - [ ] Architecture guards enforce the model/row-model port boundaries.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-core test` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react build` exits 0.
-- [ ] `corepack pnpm --filter @eregister/open-grid-react test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-core test` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react build` exits 0.
+- [ ] `corepack pnpm --filter @eregister/wit-grid-react test` exits 0.
 - [ ] `corepack pnpm --filter demo-app build` exits 0.
 - [ ] `plans/README.md` status for Plan 014 is updated.
 

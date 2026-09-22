@@ -59,11 +59,11 @@ import type {
 	ServerSideGetRowsRequest,
 	ServerSideGetRowsResult,
 	ServerSideStoreSnapshot,
-} from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
 import type { ColumnTypeDefinition } from './renderers/CellTypes.js';
-export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from '@eregister/open-grid-core';
+export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from '@eregister/wit-grid-core';
 export type { ColumnTypeDefinition } from './renderers/CellTypes.js';
-export type { RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from '@eregister/open-grid-core';
+export type { RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from '@eregister/wit-grid-core';
 export type {
 	GroupDef,
 	AggregationDef,
@@ -77,8 +77,8 @@ export type {
 	GridViewDefinition,
 	GridWorkspaceState,
 	SaveViewOptions,
-} from '@eregister/open-grid-core';
-export { createLocalStorageWorkspaceAdapter } from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
+export { createLocalStorageWorkspaceAdapter } from '@eregister/wit-grid-core';
 
 export type {
 	ColumnDef,
@@ -144,8 +144,8 @@ export type {
 	QueryEvaluationContext,
 	QueryOperatorDefinition,
 	GridDistinctValueSummary,
-} from '@eregister/open-grid-core';
-export { createEmptyQueryModel, isQueryModelActive, countQueryNodes, getQueryOperator, getQueryOperatorsForType } from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
+export { createEmptyQueryModel, isQueryModelActive, countQueryNodes, getQueryOperator, getQueryOperatorsForType } from '@eregister/wit-grid-core';
 
 export type {
 	GridCapabilityAction,
@@ -154,8 +154,8 @@ export type {
 	GridCapabilityCallback,
 	GridCapabilitiesConfig,
 	CapabilityDiagnostics,
-} from '@eregister/open-grid-core';
-export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/open-grid-core';
+} from '@eregister/wit-grid-core';
+export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/wit-grid-core';
 
 /**
  * Fields from GridInitialState that can be configured as top-level props on the public

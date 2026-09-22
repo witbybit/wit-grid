@@ -9,7 +9,7 @@
 
 `api.setStyleSlots()` is powerful but fully imperative — every demo page that uses conditional cell/row coloring wires up multi-line callback functions. The typical pattern (if `value > 0` → green, if `value < 0` → red, if field = X → bold) repeats identically across `RealtimeDashboard`, `CalculationsArena`, `GanttSchedulingWorkspace`, and `NestedTablesGrouping`.
 
-A declarative `styleRules` prop on `<OpenGrid>` / `useClientGrid` lets users describe those rules as data. The runtime compiles them into a single `setStyleSlots` callback — zero new engine code, same performance, dramatically less boilerplate.
+A declarative `styleRules` prop on `<WitGrid>` / `useClientGrid` lets users describe those rules as data. The runtime compiles them into a single `setStyleSlots` callback — zero new engine code, same performance, dramatically less boilerplate.
 
 ---
 
@@ -21,7 +21,7 @@ A declarative `styleRules` prop on `<OpenGrid>` / `useClientGrid` lets users des
 - `packages/react/src/styleRules.test.ts` — new file: unit tests
 - `packages/react/src/types.ts` — add `styleRules` to `ClientGridOptions` and `ServerGridOptions`
 - `packages/react/src/useGrid.ts` — apply `styleRules` when `columns` or `styleRules` change
-- `packages/react/src/OpenGrid.tsx` — thread `styleRules` prop
+- `packages/react/src/WitGrid.tsx` — thread `styleRules` prop
 - `packages/react/src/index.ts` — export `StyleRule` type
 - `demo/src/pages/RealtimeDashboard.tsx` — replace imperative `setStyleSlots` with `styleRules`
 - `demo/src/pages/CalculationsArena.tsx` — replace imperative `setStyleSlots` with `styleRules`
@@ -82,7 +82,7 @@ useEffect(() => {
 ## Repo conventions
 
 - New types in `packages/react/src/` use PascalCase interfaces, camelCase functions.
-- No `@eregister/open-grid-core/internal` imports in new public API files.
+- No `@eregister/wit-grid-core/internal` imports in new public API files.
 - Helper functions are pure and co-located with their type in the same file.
 - Tests use `vitest` `describe`/`it`/`expect` — no mocks needed for pure functions.
 
@@ -95,7 +95,7 @@ useEffect(() => {
 Create `packages/react/src/styleRules.ts`:
 
 ```ts
-import type { ColumnDef, GridStyleSlots, GridRowClassParams, GridCellClassParams } from '@eregister/open-grid-core';
+import type { ColumnDef, GridStyleSlots, GridRowClassParams, GridCellClassParams } from '@eregister/wit-grid-core';
 
 // ─── Rule types ───────────────────────────────────────────────────────────────
 
@@ -151,7 +151,7 @@ export function compileStyleRules<TRowData>(rules: StyleRule<TRowData>[]): GridS
 }
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no TS errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no TS errors.
 
 ---
 
@@ -215,7 +215,7 @@ const makeCellParams = (field: string, value: unknown, overrides = {}) => ({
 11. **Cell-only rules produce no `rowClass` in output**.
 12. **`compileStyleRules` is a pure function — calling it twice with same input produces equivalent output**.
 
-**Verification:** `pnpm -F @eregister/open-grid-react test -- styleRules` — all pass.
+**Verification:** `pnpm -F @eregister/wit-grid-react test -- styleRules` — all pass.
 
 ---
 
@@ -255,7 +255,7 @@ In `packages/react/src/types.ts`:
  }
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -285,36 +285,36 @@ Apply the same pattern to `useServerGrid`.
 
 **Note on referential stability:** `styleRules` is an array and will trigger the effect on every render if defined inline. Document in JSDoc on `StyleRule` (Step 3) that users should memoize the array with `useMemo`. This matches the existing convention for `columns`.
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
-### Step 5 — Thread `styleRules` through `OpenGrid`
+### Step 5 — Thread `styleRules` through `WitGrid`
 
-In `packages/react/src/OpenGrid.tsx`:
+In `packages/react/src/WitGrid.tsx`:
 
-1. Add `styleRules?: StyleRule<TRowData>[]` to `OpenGridProps`.
-2. In `OpenGridManagedClient`, destructure `styleRules` and pass it to `useClientGrid`.
-3. `OpenGridInner` does not need `styleRules` — it only receives `api`.
+1. Add `styleRules?: StyleRule<TRowData>[]` to `WitGridProps`.
+2. In `WitGridManagedClient`, destructure `styleRules` and pass it to `useClientGrid`.
+3. `WitGridInner` does not need `styleRules` — it only receives `api`.
 
 ```diff
- export interface OpenGridProps<TRowData = unknown> {
+ export interface WitGridProps<TRowData = unknown> {
    // ...
    columnTypes?: Record<string, ColumnTypeDefinition<TRowData>>;
 +  styleRules?: StyleRule<TRowData>[];
  }
 
- function OpenGridManagedClient<TRowData>({
+ function WitGridManagedClient<TRowData>({
 -  rows, columns, columnTypes, getRowId, initialState, ...rest
 +  rows, columns, columnTypes, styleRules, getRowId, initialState, ...rest
- }: OpenGridProps<TRowData> & { rows: TRowData[] }) {
+ }: WitGridProps<TRowData> & { rows: TRowData[] }) {
    const api = useClientGrid<TRowData>({
 -    rows, columns: columns ?? [], columnTypes, getRowId, initialState, ...
 +    rows, columns: columns ?? [], columnTypes, styleRules, getRowId, initialState, ...
    });
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -325,7 +325,7 @@ In `packages/react/src/OpenGrid.tsx`:
 +export { compileStyleRules } from './styleRules.js';
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -334,8 +334,8 @@ In `packages/react/src/OpenGrid.tsx`:
 In `demo/src/pages/RealtimeDashboard.tsx`:
 
 1. Remove the `useEffect` block that calls `api.setStyleSlots(...)`.
-2. Import `StyleRule` from `@eregister/open-grid-react`.
-3. Define `styleRules` as a `useMemo`-stabilized array and pass it to `useClientGrid` (or `<OpenGrid>` if in inline mode).
+2. Import `StyleRule` from `@eregister/wit-grid-react`.
+3. Define `styleRules` as a `useMemo`-stabilized array and pass it to `useClientGrid` (or `<WitGrid>` if in inline mode).
 
 **Before (abbreviated):**
 
@@ -357,7 +357,7 @@ useEffect(() => {
 **After:**
 
 ```ts
-import { type StyleRule } from '@eregister/open-grid-react';
+import { type StyleRule } from '@eregister/wit-grid-react';
 // ...
 
 const styleRules = useMemo<StyleRule<DashboardStockRow>[]>(
@@ -428,7 +428,7 @@ Open `demo/src/pages/CalculationsArena.tsx`. Find the `setStyleSlots` call (line
 | `packages/react/src/styleRules.test.ts` | **New file**                              |
 | `packages/react/src/types.ts`           | Add `styleRules` to options types         |
 | `packages/react/src/useGrid.ts`         | Apply `styleRules` in effect              |
-| `packages/react/src/OpenGrid.tsx`       | Thread `styleRules` prop                  |
+| `packages/react/src/WitGrid.tsx`       | Thread `styleRules` prop                  |
 | `packages/react/src/index.ts`           | Export new types + function               |
 | `demo/src/pages/RealtimeDashboard.tsx`  | Replace `setStyleSlots` with `styleRules` |
 | `demo/src/pages/CalculationsArena.tsx`  | Replace `setStyleSlots` with `styleRules` |
@@ -440,15 +440,15 @@ Open `demo/src/pages/CalculationsArena.tsx`. Find the `setStyleSlots` call (line
 ## Done criteria
 
 ```bash
-pnpm -F @eregister/open-grid-react build         # exits 0
-pnpm -F @eregister/open-grid-react test          # all tests pass including new styleRules.test.ts
+pnpm -F @eregister/wit-grid-react build         # exits 0
+pnpm -F @eregister/wit-grid-react test          # all tests pass including new styleRules.test.ts
 pnpm dev:demo                          # RealtimeDashboard and CalculationsArena styling unchanged
 ```
 
 - `styleRules.test.ts` has ≥ 12 test cases.
 - `api.setStyleSlots` is no longer called in `RealtimeDashboard.tsx` or `CalculationsArena.tsx`.
 - Both demo pages pass `styleRules` via `useMemo`.
-- `StyleRule`, `RowStyleRule`, `CellStyleRule`, `compileStyleRules` are all exported from `@eregister/open-grid-react`.
+- `StyleRule`, `RowStyleRule`, `CellStyleRule`, `compileStyleRules` are all exported from `@eregister/wit-grid-react`.
 
 ---
 

@@ -1,4 +1,4 @@
-# Plan 089: Open Grid Core Architecture Target
+# Plan 089: Wit Grid Core Architecture Target
 
 > This is a **convergence plan**, not an additive feature plan. It is complete only when the target owner is authoritative, superseded mechanisms are deleted, architecture guards prevent regression, and behavioral/performance evidence passes. Merely adding the proposed abstraction beside existing paths is a failed implementation.
 

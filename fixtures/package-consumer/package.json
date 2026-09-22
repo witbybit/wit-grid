@@ -1,10 +1,10 @@
 {
-	"name": "open-grid-package-consumer-fixture",
+	"name": "wit-grid-package-consumer-fixture",
 	"private": true,
 	"version": "0.0.0",
 	"type": "module",
 	"dependencies": {
-		"@eregister/open-grid-core": "file:__CORE_TARBALL__",
-		"@eregister/open-grid-react": "file:__REACT_TARBALL__"
+		"@eregister/wit-grid-core": "file:__CORE_TARBALL__",
+		"@eregister/wit-grid-react": "file:__REACT_TARBALL__"
 	}
 }

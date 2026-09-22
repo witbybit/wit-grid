@@ -50,10 +50,10 @@ The grid does not need dishonest fake parity. It does need one explicit integrit
 | Purpose                 | Command                                                                                                                                                                                                                        | Expected on success |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
 | Architecture gate       | `corepack pnpm run test:architecture`                                                                                                                                                                                          | exit 0              |
-| Core tests              | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                                                                                                        | exit 0              |
+| Core tests              | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                                                                        | exit 0              |
 | Workspace tests         | `corepack pnpm run test`                                                                                                                                                                                                       | exit 0              |
 | Build/typecheck         | `corepack pnpm run build`                                                                                                                                                                                                      | exit 0              |
-| Focused integrity tests | `C:\Users\rishi\witbybit\open-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/store.test.ts packages/core/src/rowModel.capabilities.test.ts` | all pass            |
+| Focused integrity tests | `C:\Users\rishi\witbybit\wit-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/store.test.ts packages/core/src/rowModel.capabilities.test.ts` | all pass            |
 
 ## Scope
 
@@ -112,7 +112,7 @@ Refactor the provider setup so integrity no longer depends on three ad hoc provi
 
 It is acceptable to keep multiple implementations internally if the public/runtime contract becomes single, explicit, and testable. It is not acceptable to keep three behaviorally drifting providers with no shared authority model.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core test` -> exit 0
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core test` -> exit 0
 
 ### Step 3: Fail early for unsupported integrity/row-model combinations
 
@@ -125,7 +125,7 @@ Use existing capability/result patterns rather than console warnings or best-eff
 
 If partial semantics are kept for some scopes, make the partiality explicit in diagnostics and API results so consumers cannot confuse them with complete scans.
 
-**Verify**: `C:\Users\rishi\witbybit\open-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/rowModel.capabilities.test.ts` -> all pass
+**Verify**: `C:\Users\rishi\witbybit\wit-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/rowModel.capabilities.test.ts` -> all pass
 
 ### Step 4: Align live-stream row patching and integrity writes with the honest capability contract
 
@@ -147,7 +147,7 @@ Add focused tests for infinite and server-page integrity behavior. At minimum co
 
 The current suite is too client-centered; parity and honest failure behavior must be test-backed.
 
-**Verify**: `C:\Users\rishi\witbybit\open-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/store.test.ts packages/core/src/rowModel.capabilities.test.ts` -> all pass
+**Verify**: `C:\Users\rishi\witbybit\wit-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/dataIntegrity/GridDataIntegrityManager.test.ts packages/core/src/store.test.ts packages/core/src/rowModel.capabilities.test.ts` -> all pass
 
 ### Step 6: Update the normative architecture docs and guards
 

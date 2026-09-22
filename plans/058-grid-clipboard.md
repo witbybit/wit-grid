@@ -149,8 +149,8 @@ export interface PasteOptions {
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build && pnpm -F @eregister/open-grid-react test
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build && pnpm -F @eregister/wit-grid-react test
 ```
 
 Ctrl+C on a selected range copies TSV. Ctrl+V pastes TSV starting at focus cell. `cellsCopied` event fires with correct row/col count. Formatted values (via `valueFormatter`) appear in copied text.

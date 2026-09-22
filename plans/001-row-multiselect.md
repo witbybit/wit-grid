@@ -2,15 +2,15 @@
 
 **Commit:** `3d32692`  
 **Package manager:** pnpm  
-**Build:** `pnpm -F @eregister/open-grid-core build`  
-**Test:** `pnpm -F @eregister/open-grid-core test`  
-**Typecheck:** `pnpm -F @eregister/open-grid-core typecheck` (or `tsc --noEmit` from `packages/core`)
+**Build:** `pnpm -F @eregister/wit-grid-core build`  
+**Test:** `pnpm -F @eregister/wit-grid-core test`  
+**Typecheck:** `pnpm -F @eregister/wit-grid-core typecheck` (or `tsc --noEmit` from `packages/core`)
 
 ---
 
 ## Why it matters
 
-Open Grid currently has only cell-range selection (anchor → focus rectangle). There is no way to select arbitrary rows for bulk operations. Users expect checkboxes and `Ctrl/Cmd+Click` to check rows independently of the cell cursor.
+Wit Grid currently has only cell-range selection (anchor → focus rectangle). There is no way to select arbitrary rows for bulk operations. Users expect checkboxes and `Ctrl/Cmd+Click` to check rows independently of the cell cursor.
 
 ---
 
@@ -74,7 +74,7 @@ Add alongside the other `initialState.xxx || default` entries:
 selectedRowIds: initialState.selectedRowIds ?? [],
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-core typecheck` should pass with no new errors.
+**Verification:** `pnpm -F @eregister/wit-grid-core typecheck` should pass with no new errors.
 
 ---
 
@@ -165,7 +165,7 @@ public clearRowSelection(): void {
 
 **Note on `this.rowModel`:** Look for how `this.rowModel` or equivalent is referenced in `GridEngine.ts` (search for `rowModel` property). The row model should have a `forEach` method or equivalent to iterate all nodes. If the property name differs (e.g., `this.rows`, `this.clientRowModel`), adjust accordingly. The key is to iterate all data RowNodes and collect their `.id` fields. If no clean iteration method exists, use `this.stateManager.getState()` and get row IDs from the viewport rows accessor — look for how `applyTransaction` or `setData` iterates rows and follow that pattern.
 
-**Verification:** `pnpm -F @eregister/open-grid-core typecheck`
+**Verification:** `pnpm -F @eregister/wit-grid-core typecheck`
 
 ---
 
@@ -238,7 +238,7 @@ getCheckedIds: (): string[] => {
 },
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-core typecheck`
+**Verification:** `pnpm -F @eregister/wit-grid-core typecheck`
 
 ---
 
@@ -380,7 +380,7 @@ if (event.ctrlKey || event.metaKey) {
 
 This intercepts the modifier-click before any cell focus logic runs, so the cell cursor stays in place while the row checkbox state toggles.
 
-**Verification:** `pnpm -F @eregister/open-grid-core typecheck`
+**Verification:** `pnpm -F @eregister/wit-grid-core typecheck`
 
 ---
 
@@ -496,7 +496,7 @@ Add a `describe('row multi-select', () => {` block with the following tests:
     expect(store.getState().selectedRowIds).toEqual(['row-1']);
     ```
 
-**Run tests:** `pnpm -F @eregister/open-grid-core test`
+**Run tests:** `pnpm -F @eregister/wit-grid-core test`
 
 ---
 
@@ -506,13 +506,13 @@ All of the following must pass:
 
 ```bash
 # Typecheck
-pnpm -F @eregister/open-grid-core typecheck
+pnpm -F @eregister/wit-grid-core typecheck
 
 # Tests (all existing + new row multi-select tests pass)
-pnpm -F @eregister/open-grid-core test
+pnpm -F @eregister/wit-grid-core test
 
 # Build succeeds
-pnpm -F @eregister/open-grid-core build
+pnpm -F @eregister/wit-grid-core build
 ```
 
 Additionally verify manually:

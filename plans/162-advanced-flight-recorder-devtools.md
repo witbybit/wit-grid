@@ -16,7 +16,7 @@
 
 ## Why this matters
 
-The recorder differentiates Open Grid only when its evidence is understandable. Build a polished, keyboard-accessible inspector for causal stories, frame cost, timeline exploration, and redacted trace export. This supersedes the narrower unfinished Plan 122 rather than creating two DevTools products.
+The recorder differentiates Wit Grid only when its evidence is understandable. Build a polished, keyboard-accessible inspector for causal stories, frame cost, timeline exploration, and redacted trace export. This supersedes the narrower unfinished Plan 122 rather than creating two DevTools products.
 
 ## Current state
 
@@ -30,8 +30,8 @@ The recorder differentiates Open Grid only when its evidence is understandable. 
 
 | Gate         | Command                                                                          | Expected |
 | ------------ | -------------------------------------------------------------------------------- | -------- |
-| Focused      | `corepack pnpm --filter @eregister/open-grid-react exec vitest run src/devtools` | exit 0   |
-| React        | `corepack pnpm --filter @eregister/open-grid-react test`                         | exit 0   |
+| Focused      | `corepack pnpm --filter @eregister/wit-grid-react exec vitest run src/devtools` | exit 0   |
+| React        | `corepack pnpm --filter @eregister/wit-grid-react test`                         | exit 0   |
 | Architecture | `corepack pnpm run test:architecture`                                            | exit 0   |
 | Packages     | `corepack pnpm run build:packages`                                               | exit 0   |
 | Demo         | `corepack pnpm --filter demo-app build`                                          | exit 0   |

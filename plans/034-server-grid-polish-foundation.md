@@ -76,11 +76,11 @@ legibility in the demo.
 
 | Purpose            | Command                                                                                       | Expected on success |
 | ------------------ | --------------------------------------------------------------------------------------------- | ------------------- |
-| Build core         | `corepack pnpm --filter @eregister/open-grid-core build`                                      | exit 0              |
-| Core tests         | `corepack pnpm --filter @eregister/open-grid-core test`                                       | exit 0, all pass    |
-| Server model tests | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts` | exit 0              |
-| Build react        | `corepack pnpm --filter @eregister/open-grid-react build`                                     | exit 0              |
-| React tests        | `corepack pnpm --filter @eregister/open-grid-react test`                                      | exit 0, all pass    |
+| Build core         | `corepack pnpm --filter @eregister/wit-grid-core build`                                      | exit 0              |
+| Core tests         | `corepack pnpm --filter @eregister/wit-grid-core test`                                       | exit 0, all pass    |
+| Server model tests | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/serverRowModel.test.ts` | exit 0              |
+| Build react        | `corepack pnpm --filter @eregister/wit-grid-react build`                                     | exit 0              |
+| React tests        | `corepack pnpm --filter @eregister/wit-grid-react test`                                      | exit 0, all pass    |
 | Demo build         | `corepack pnpm --filter demo-app build`                                                       | exit 0              |
 
 ## Scope
@@ -239,7 +239,7 @@ section. Extend `ServerRowModelOptions` with:
 pagination?: { pageSize: number; initialPage?: number };
 ```
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` → exit 0.
 
 ### Step 2: Implement native pagination in `ServerRowModelController`
 
@@ -287,7 +287,7 @@ public goToPage(page: number): void {
 }
 ```
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/serverRowModel.test.ts` → exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/serverRowModel.test.ts` → exit 0.
 
 ### Step 3: Wire the new port and expose through `GridApi`
 
@@ -316,8 +316,8 @@ model's `goToPage` if in server mode, otherwise no-op.
 **Verify**:
 
 ```
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
 ```
 
 Both → exit 0.
@@ -386,8 +386,8 @@ This step removes all four sources of the infinite loop.
 **Verify**:
 
 ```
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 ```
 
 Both → exit 0.
@@ -440,10 +440,10 @@ pagination architecture change.
 **Final verification**:
 
 ```
-corepack pnpm --filter @eregister/open-grid-core build
-corepack pnpm --filter @eregister/open-grid-core test
-corepack pnpm --filter @eregister/open-grid-react build
-corepack pnpm --filter @eregister/open-grid-react test
+corepack pnpm --filter @eregister/wit-grid-core build
+corepack pnpm --filter @eregister/wit-grid-core test
+corepack pnpm --filter @eregister/wit-grid-react build
+corepack pnpm --filter @eregister/wit-grid-react test
 corepack pnpm --filter demo-app build
 ```
 

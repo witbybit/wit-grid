@@ -152,7 +152,7 @@ export class UnsupportedRowModelOperationError extends Error {
 
 	constructor(opts: { operation: string; rowModelType: string; supportedRowModels: string[] }) {
 		super(
-			`[open-grid] Operation '${opts.operation}' is not supported by the '${opts.rowModelType}' row model. ` +
+			`[wit-grid] Operation '${opts.operation}' is not supported by the '${opts.rowModelType}' row model. ` +
 				`Supported row model(s): ${opts.supportedRowModels.join(', ')}.`
 		);
 		this.name = 'UnsupportedRowModelOperationError';
@@ -1539,7 +1539,7 @@ export class ClientRowModelController<TData = unknown>
 
 	public restoreTransactionSnapshot = (snapshot: RowModelTransactionSnapshot<TData>): void => {
 		if (snapshot.modelType !== 'client') {
-			throw new Error(`Open Grid: cannot restore ${snapshot.modelType} snapshot into client row model.`);
+			throw new Error(`Wit Grid: cannot restore ${snapshot.modelType} snapshot into client row model.`);
 		}
 		const clientSnapshot = snapshot as ClientRowModelTransactionSnapshot<TData>;
 		this.dataStore.restoreTransactionSnapshot(clientSnapshot.snapshot.dataStore);

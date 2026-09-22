@@ -1,4 +1,4 @@
-import type { ColumnDef, GridApi, VisualRow, CellRendererPhase } from '@eregister/open-grid-core';
+import type { ColumnDef, GridApi, VisualRow, CellRendererPhase } from '@eregister/wit-grid-core';
 
 export interface PortalRowNodeLike<TRowData = unknown> {
 	id: string;

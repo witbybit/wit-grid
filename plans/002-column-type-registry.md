@@ -7,7 +7,7 @@
 
 ## Why it matters
 
-Every column that uses a built-in cell type (`DateCellRenderer`, `createNumberCellRenderer`, etc.) currently requires 4–6 lines of manual wiring per column: import the factory, call it at module scope, set `renderer.kind = 'react'`, set `cellEditor`. The factories already exist in `@eregister/open-grid-react` — they just have no registration path.
+Every column that uses a built-in cell type (`DateCellRenderer`, `createNumberCellRenderer`, etc.) currently requires 4–6 lines of manual wiring per column: import the factory, call it at module scope, set `renderer.kind = 'react'`, set `cellEditor`. The factories already exist in `@eregister/wit-grid-react` — they just have no registration path.
 
 A `columnTypes` map lets users write `{ field: 'price', type: 'number' }` and get the renderer, editor, and sort comparator automatically. This is the single highest-DX change possible with almost zero engine work.
 
@@ -20,7 +20,7 @@ A `columnTypes` map lets users write `{ field: 'price', type: 'number' }` and ge
 - `packages/react/src/renderers/CellTypes.tsx` — add `ColumnTypeDefinition` interface and `BUILTIN_COLUMN_TYPES` registry
 - `packages/react/src/types.ts` — add `columnTypes` to `ClientGridOptions` and `ServerGridOptions`
 - `packages/react/src/useGrid.ts` — resolve `columnTypes` when calling `createClientGrid` / `createServerGrid`
-- `packages/react/src/OpenGrid.tsx` — thread `columnTypes` through `OpenGridManagedClient` and `OpenGridInner`
+- `packages/react/src/WitGrid.tsx` — thread `columnTypes` through `WitGridManagedClient` and `WitGridInner`
 - `packages/core/src/columnDef.ts` — add optional `type?: string` field to `ColumnDef`
 - `demo/src/pages/NativeCellTypesDemo.tsx` — rewrite using the new `type` prop
 - `demo/src/pages/RealtimeGroupingDemo.tsx` — update any numeric/boolean columns to use `type`
@@ -84,7 +84,7 @@ const YearsEditor    = createNumberCellEditor({ min: 0, max: 80, step: 1 });
 
 - All new types go in the file where they are primarily used; re-export from `index.ts` as needed.
 - Functions exported from `packages/react` use camelCase; types use PascalCase.
-- No runtime imports from `@eregister/open-grid-core/internal` in public API code.
+- No runtime imports from `@eregister/wit-grid-core/internal` in public API code.
 - Columns resolved in React hooks (`useClientGrid`) — no engine changes required for this feature.
 
 ---
@@ -124,7 +124,7 @@ export const BUILTIN_COLUMN_TYPES: Record<string, ColumnTypeDefinition<any>> = {
 };
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — must succeed with no TS errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — must succeed with no TS errors.
 
 ---
 
@@ -144,7 +144,7 @@ In `packages/core/src/columnDef.ts`, add one line inside `ColumnDef`:
 
 This is purely additive — the core does not interpret `type`; resolution happens in the React layer.
 
-**Verification:** `pnpm -F @eregister/open-grid-core build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-core build` — no errors.
 
 ---
 
@@ -183,7 +183,7 @@ In `packages/react/src/types.ts`, import `ColumnTypeDefinition` and add the fiel
  }
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -192,7 +192,7 @@ In `packages/react/src/types.ts`, import `ColumnTypeDefinition` and add the fiel
 Add a new file `packages/react/src/resolveColumnTypes.ts`:
 
 ```ts
-import type { ColumnDef } from '@eregister/open-grid-core';
+import type { ColumnDef } from '@eregister/wit-grid-core';
 import { BUILTIN_COLUMN_TYPES, type ColumnTypeDefinition } from './renderers/CellTypes.js';
 
 export function resolveColumnTypes<TRowData>(
@@ -216,7 +216,7 @@ export function resolveColumnTypes<TRowData>(
 }
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -253,30 +253,30 @@ Apply the same change pattern to `useServerGrid`.
 
 **Escape hatch:** If `resolveColumnTypes` causes a column to lose an explicitly-set `renderer` (i.e. both `type` and `renderer` are provided), the spread order `{ renderer: typeDef.renderer, ...col }` ensures `col.renderer` wins. Verify this in the test in Step 8.
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
-### Step 6 — Thread `columnTypes` through `OpenGrid`
+### Step 6 — Thread `columnTypes` through `WitGrid`
 
-In `packages/react/src/OpenGrid.tsx`:
+In `packages/react/src/WitGrid.tsx`:
 
-1. Add `columnTypes?: Record<string, ColumnTypeDefinition<TRowData>>` to `OpenGridProps`.
-2. In `OpenGridManagedClient`, destructure `columnTypes` from props and pass it to `useClientGrid`.
-3. In `OpenGridInner`, no change needed — it only takes `api`.
+1. Add `columnTypes?: Record<string, ColumnTypeDefinition<TRowData>>` to `WitGridProps`.
+2. In `WitGridManagedClient`, destructure `columnTypes` from props and pass it to `useClientGrid`.
+3. In `WitGridInner`, no change needed — it only takes `api`.
 
 ```diff
- export interface OpenGridProps<TRowData = unknown> {
+ export interface WitGridProps<TRowData = unknown> {
    rows?: TRowData[];
    columns?: ColumnDef<TRowData>[];
 +  columnTypes?: Record<string, ColumnTypeDefinition<TRowData>>;
    // ...
  }
 
- function OpenGridManagedClient<TRowData>({
+ function WitGridManagedClient<TRowData>({
 -  rows, columns, getRowId, initialState, ...rest
 +  rows, columns, columnTypes, getRowId, initialState, ...rest
- }: OpenGridProps<TRowData> & { rows: TRowData[] }) {
+ }: WitGridProps<TRowData> & { rows: TRowData[] }) {
    const api = useClientGrid<TRowData>({
      rows, columns: columns ?? [],
 +    columnTypes,
@@ -284,7 +284,7 @@ In `packages/react/src/OpenGrid.tsx`:
    });
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -295,7 +295,7 @@ In `packages/react/src/OpenGrid.tsx`:
 +export { BUILTIN_COLUMN_TYPES } from './renderers/CellTypes.js';
 ```
 
-**Verification:** `pnpm -F @eregister/open-grid-react build` — no errors.
+**Verification:** `pnpm -F @eregister/wit-grid-react build` — no errors.
 
 ---
 
@@ -307,7 +307,7 @@ Add a new test file `packages/react/src/resolveColumnTypes.test.ts`:
 import { describe, it, expect } from 'vitest';
 import { resolveColumnTypes } from './resolveColumnTypes.js';
 import { CheckboxCellRenderer, DateCellRenderer } from './renderers/CellTypes.js';
-import type { ColumnDef } from '@eregister/open-grid-core';
+import type { ColumnDef } from '@eregister/wit-grid-core';
 
 interface Row {
 	id: string;
@@ -360,7 +360,7 @@ describe('resolveColumnTypes', () => {
 });
 ```
 
-Run: `pnpm -F @eregister/open-grid-react test` — all pass.
+Run: `pnpm -F @eregister/wit-grid-react test` — all pass.
 
 ---
 
@@ -421,7 +421,7 @@ Open `demo/src/pages/RealtimeGroupingDemo.tsx`. Find columns with numeric or boo
 | `packages/react/src/resolveColumnTypes.test.ts` | **New file**                                       |
 | `packages/react/src/types.ts`                   | Add `columnTypes` to options interfaces            |
 | `packages/react/src/useGrid.ts`                 | Call `resolveColumnTypes` on column sync           |
-| `packages/react/src/OpenGrid.tsx`               | Thread `columnTypes` prop                          |
+| `packages/react/src/WitGrid.tsx`               | Thread `columnTypes` prop                          |
 | `packages/react/src/index.ts`                   | Export new types                                   |
 | `demo/src/pages/NativeCellTypesDemo.tsx`        | Use `type` prop for checkbox/date/number           |
 | `demo/src/pages/RealtimeGroupingDemo.tsx`       | Use `type` prop where applicable                   |
@@ -433,9 +433,9 @@ Open `demo/src/pages/RealtimeGroupingDemo.tsx`. Find columns with numeric or boo
 ## Done criteria
 
 ```bash
-pnpm -F @eregister/open-grid-core build          # exits 0
-pnpm -F @eregister/open-grid-react build         # exits 0
-pnpm -F @eregister/open-grid-react test          # all tests pass including new resolveColumnTypes.test.ts
+pnpm -F @eregister/wit-grid-core build          # exits 0
+pnpm -F @eregister/wit-grid-react build         # exits 0
+pnpm -F @eregister/wit-grid-react test          # all tests pass including new resolveColumnTypes.test.ts
 ```
 
 - `resolveColumnTypes.test.ts` contains ≥ 7 test cases covering: no-type passthrough, each built-in type, column-level override, unknown type, user override of built-in.

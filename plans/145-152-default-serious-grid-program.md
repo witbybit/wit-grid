@@ -2,7 +2,7 @@
 
 ## Objective
 
-Turn Open Grid from a deeply hardened core into the default serious choice for real product teams:
+Turn Wit Grid from a deeply hardened core into the default serious choice for real product teams:
 
 - simple use cases stay easy
 - advanced use cases stay composable
@@ -24,7 +24,7 @@ This program focuses on the features and contracts that make teams stop evaluati
 - editing, clipboard, fill, validation, formulas, and advanced editors behave like one system
 - grouping, tree data, master/detail, and pinned lanes compose without visual or state corruption
 - filtering, query building, and analysis affordances feel complete enough for serious workflows
-- import/export and integration surfaces make Open Grid usable in business applications instead of only demos
+- import/export and integration surfaces make Wit Grid usable in business applications instead of only demos
 - long-session performance stays fast, predictable, and measurable
 - advanced customization happens through explicit extension seams instead of internal reach-through
 

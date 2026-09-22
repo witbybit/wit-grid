@@ -14,8 +14,8 @@
  *   - rowSelectionChanged event →  reactive event log
  */
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Grid, GridEventName } from '@eregister/open-grid-react';
-import type { ColumnDef, GridApi, GridReadyEvent, InfiniteDatasource, RowSelectionScope, ServerSideDatasource } from '@eregister/open-grid-react';
+import { Grid, GridEventName } from '@eregister/wit-grid-react';
+import type { ColumnDef, GridApi, GridReadyEvent, InfiniteDatasource, RowSelectionScope, ServerSideDatasource } from '@eregister/wit-grid-react';
 import { CheckSquare, Trash2, Download, Tag, MousePointerClick, Info } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────

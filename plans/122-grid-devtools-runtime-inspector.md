@@ -41,10 +41,10 @@ Create an internal sidebar panel that lets developers inspect the grid runtime a
 
 ```tsx
 // Boolean shorthand
-<OpenGrid enableDevTools />
+<WitGrid enableDevTools />
 
 // Explicit sidebar config — devtools must be listed explicitly
-<OpenGrid
+<WitGrid
   sidebar={{
     panels: ['columns', 'filters', 'sort', 'themes', 'devtools'],
   }}

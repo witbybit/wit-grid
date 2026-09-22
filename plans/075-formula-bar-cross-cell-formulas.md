@@ -96,7 +96,7 @@ interface FormulaBarProps<TRowData = unknown> {
 - On focus change: reads `api.getFormula(rowId, colField)` if present, else `api.getCellValue(rowId, colField)`.
 - Renders an `<input>` showing the formula/value. Editing the input on Enter/Tab calls `api.startEditing` then immediately `api.commitEdit` with the new value (so the formula commit path fires).
 - Styled via `api.getTheme()` tokens — background, border, text, focus ring.
-- Exported from `@eregister/open-grid-react`.
+- Exported from `@eregister/wit-grid-react`.
 
 ### 7. ColumnDef option (packages/core/src/columnDef.ts)
 
@@ -140,7 +140,7 @@ Add test: `calculations/dagEngine.ts does not import renderer files` — scans `
 
 1. Implement `FormulaBar` component with selection subscription and commit wiring.
 2. Style via theme tokens.
-3. Export from `@eregister/open-grid-react`.
+3. Export from `@eregister/wit-grid-react`.
 4. Add to demo: `AdvancedFeatures` demo page shows formula bar above the grid.
 
 ### Phase 5 — ColumnDef option and architecture guard

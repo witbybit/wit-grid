@@ -185,8 +185,8 @@ Add JSDoc `@breaking` comment to `IGetRowsParams` noting the new fields. Existin
 ## Verification gate
 
 ```
-pnpm -F @eregister/open-grid-core build && pnpm -F @eregister/open-grid-core test
-pnpm -F @eregister/open-grid-react build
+pnpm -F @eregister/wit-grid-core build && pnpm -F @eregister/wit-grid-core test
+pnpm -F @eregister/wit-grid-react build
 ```
 
 Applying a sort model on a server grid fires a new `getRows` call with the updated `sortModel`. Applying a filter fires a new `getRows` call with `filterModel`. Client-side sort and filter do not alter already-loaded server data. Stale callbacks (from abandoned requests) are silently ignored.

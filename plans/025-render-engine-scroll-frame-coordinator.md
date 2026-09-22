@@ -53,11 +53,11 @@ into lower-level render flow.
 
 | Purpose     | Command                                                                                                                                    | Expected on success |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
-| Build       | `corepack pnpm --filter @eregister/open-grid-core build`                                                                                   | exit 0              |
-| Focused     | `corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` | exit 0              |
-| Core test   | `corepack pnpm --filter @eregister/open-grid-core test`                                                                                    | exit 0              |
-| React build | `corepack pnpm --filter @eregister/open-grid-react build`                                                                                  | exit 0              |
-| React test  | `corepack pnpm --filter @eregister/open-grid-react test`                                                                                   | exit 0              |
+| Build       | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                   | exit 0              |
+| Focused     | `corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts` | exit 0              |
+| Core test   | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                    | exit 0              |
+| React build | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                  | exit 0              |
+| React test  | `corepack pnpm --filter @eregister/wit-grid-react test`                                                                                   | exit 0              |
 | Demo build  | `corepack pnpm --filter demo-app build`                                                                                                    | exit 0              |
 
 ## Scope
@@ -85,7 +85,7 @@ decisioning into a dedicated scroll coordinator helper. Keep the helper fed by
 explicit callbacks for row/header/overlay/sticky-group actions instead of
 reaching back into `RenderEngine` internals.
 
-**Verify**: `corepack pnpm --filter @eregister/open-grid-core build` -> exit 0.
+**Verify**: `corepack pnpm --filter @eregister/wit-grid-core build` -> exit 0.
 
 ### Step 2: Keep `RenderEngine` as the composition root for rendering
 
@@ -94,7 +94,7 @@ route scroll-frame work through the new coordinator so `renderEngine.ts`
 retains ownership of setup, not policy.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
+`corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/renderer/renderEngine.test.ts src/engine/architectureGuards.test.ts`
 -> exit 0.
 
 ### Step 3: Preserve cheap same-window behavior and telemetry
@@ -104,7 +104,7 @@ rows, sticky groups, and current window values, and that render stats continue
 to report the same counters as before.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core test`
+`corepack pnpm --filter @eregister/wit-grid-core test`
 -> exit 0.
 
 ### Step 4: Tighten the architecture guard
@@ -113,7 +113,7 @@ Add or update guardrail coverage so `renderEngine.ts` no longer owns the scroll
 orchestration policy directly, while the new coordinator module does.
 
 **Verify**:
-`corepack pnpm --filter @eregister/open-grid-core exec vitest run src/engine/architectureGuards.test.ts`
+`corepack pnpm --filter @eregister/wit-grid-core exec vitest run src/engine/architectureGuards.test.ts`
 -> exit 0.
 
 ## Test plan
