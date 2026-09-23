@@ -1,33 +1,59 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
 	ArrowRight,
 	BookOpen,
-	Braces,
 	Check,
 	ChevronRight,
-	Code2,
-	Gauge,
 	Github,
 	Grid3X3,
 	Layers3,
-	Library,
-	MousePointer2,
 	Search,
-	Sparkles,
-	TerminalSquare,
-	Zap,
 } from 'lucide-react';
 import { apiEntries, docSections, examples, type DocSection } from './content/docs';
 import './styles.css';
 
 const navGroups = Array.from(new Set(docSections.map((section) => section.group)));
+const defaultDoc = docSections[0];
 
 function cx(...values: Array<string | false | null | undefined>) {
 	return values.filter(Boolean).join(' ');
 }
 
-function Hero() {
+function usePathname() {
+	const [pathname, setPathname] = useState(() => window.location.pathname);
+	useEffect(() => {
+		const handlePopState = () => setPathname(window.location.pathname);
+		window.addEventListener('popstate', handlePopState);
+		return () => window.removeEventListener('popstate', handlePopState);
+	}, []);
+	return pathname;
+}
+
+function navigate(path: string) {
+	if (window.location.pathname === path) return;
+	window.history.pushState(null, '', path);
+	window.dispatchEvent(new PopStateEvent('popstate'));
+	window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function AppLink({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
+	return (
+		<a
+			className={className}
+			href={href}
+			onClick={(event) => {
+				if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+				event.preventDefault();
+				navigate(href);
+			}}
+		>
+			{children}
+		</a>
+	);
+}
+
+function Hero({ onPrimary }: { onPrimary: () => void }) {
 	return (
 		<section className="hero" id="overview">
 			<div className="hero-copy">
@@ -37,17 +63,17 @@ function Hero() {
 				</div>
 				<h1>Wit Grid</h1>
 				<p className="hero-lede">
-					A high-performance data grid and spreadsheet engine with serious docs, live examples, and a public API surface developers can trust.
+					Documentation for the Wit Grid React adapter and framework-agnostic core engine.
 				</p>
 				<div className="hero-actions">
-					<a className="button primary" href="#quick-start">
+					<button className="button primary" onClick={onPrimary}>
 						Get started
 						<ArrowRight size={16} />
-					</a>
-					<a className="button secondary" href="#api-reference">
+					</button>
+					<AppLink className="button secondary" href="/api/reference">
 						API reference
 						<BookOpen size={16} />
-					</a>
+					</AppLink>
 				</div>
 			</div>
 			<div className="hero-panel" aria-label="Wit Grid documentation preview">
@@ -85,41 +111,7 @@ function Hero() {
 	);
 }
 
-function ValueCards() {
-	const cards = [
-		{
-			icon: Gauge,
-			title: 'Performance first',
-			text: 'Document renderer budgets, virtualization guarantees, and long-session behavior with evidence.',
-		},
-		{
-			icon: Braces,
-			title: 'Reference quality',
-			text: 'Give every public type, event, prop, and method a clear home with examples and stability labels.',
-		},
-		{
-			icon: Sparkles,
-			title: 'Polished examples',
-			text: 'Turn the internal showcase into focused, copyable patterns that feel as refined as the product.',
-		},
-	];
-	return (
-		<section className="value-grid" aria-label="Site priorities">
-			{cards.map((card) => {
-				const Icon = card.icon;
-				return (
-					<article className="value-card" key={card.title}>
-						<Icon size={22} />
-						<h2>{card.title}</h2>
-						<p>{card.text}</p>
-					</article>
-				);
-			})}
-		</section>
-	);
-}
-
-function DocsNav({ activeId, onSelect }: { activeId: string; onSelect: (id: string) => void }) {
+function DocsNav({ activePath }: { activePath: string }) {
 	return (
 		<aside className="docs-nav" aria-label="Documentation navigation">
 			<div className="nav-title">Documentation</div>
@@ -129,10 +121,10 @@ function DocsNav({ activeId, onSelect }: { activeId: string; onSelect: (id: stri
 					{docSections
 						.filter((section) => section.group === group)
 						.map((section) => (
-							<button className={cx('nav-link', activeId === section.id && 'active')} key={section.id} onClick={() => onSelect(section.id)}>
+							<AppLink className={cx('nav-link', activePath === section.path && 'active')} href={section.path} key={section.id}>
 								<ChevronRight size={14} />
 								{section.title}
-							</button>
+							</AppLink>
 						))}
 				</div>
 			))}
@@ -172,19 +164,16 @@ function DocArticle({ section }: { section: DocSection }) {
 	);
 }
 
-function DocsExplorer() {
-	const [activeId, setActiveId] = useState(docSections[0].id);
-	const activeSection = docSections.find((section) => section.id === activeId) ?? docSections[0];
+function DocsLayout({ section, activePath }: { section: DocSection; activePath: string }) {
 	return (
 		<section className="docs-shell" id="docs">
-			<DocsNav activeId={activeId} onSelect={setActiveId} />
-			<DocArticle section={activeSection} />
+			<DocsNav activePath={activePath} />
+			<DocArticle section={section} />
 			<aside className="toc" aria-label="On this page">
 				<div className="toc-title">On This Page</div>
-				<a href={`#${activeSection.id}`}>{activeSection.title}</a>
-				<a href="#api-reference">API Reference</a>
-				<a href="#examples">Examples</a>
-				<a href="#roadmap">Docs Roadmap</a>
+				<a href={`#${section.id}`}>{section.title}</a>
+				<AppLink href="/api/reference">API Reference</AppLink>
+				<AppLink href="/examples">Examples</AppLink>
 			</aside>
 		</section>
 	);
@@ -235,10 +224,10 @@ function ExamplesSection() {
 				<div>
 					<div className="article-kicker">Examples</div>
 					<h2>Production Patterns</h2>
-					<p>Focused examples should become the bridge between API docs and the full engineering showcase.</p>
+					<p>Common implementation patterns for React applications using Wit Grid.</p>
 				</div>
 				<a className="button secondary" href="/demo/">
-					Showcase app
+					Open demo
 					<Grid3X3 size={16} />
 				</a>
 			</div>
@@ -260,51 +249,25 @@ function ExamplesSection() {
 	);
 }
 
-function Roadmap() {
-	const items = [
-		['Content split', 'Move README and theming guide into proper docs pages with owner-friendly editing paths.'],
-		['Generated reference', 'Extract public declarations into docs JSON for events, GridApi, props, hooks, and types.'],
-		['Live examples', 'Mount runnable examples beside their code and keep the current demo as the advanced showcase.'],
-		['Search and release polish', 'Add indexed search, version badges, canonical URLs, OpenGraph, sitemap, and CI docs builds.'],
-	];
-	return (
-		<section className="roadmap-section" id="roadmap">
-			<div className="section-heading">
-				<div>
-					<div className="article-kicker">Plan</div>
-					<h2>Path To A Library-Grade Site</h2>
-					<p>This first pass creates the product surface. The next passes make it complete, generated, and publishable.</p>
-				</div>
-			</div>
-			<div className="roadmap-list">
-				{items.map(([title, text], index) => (
-					<div className="roadmap-item" key={title}>
-						<div className="roadmap-index">{index + 1}</div>
-						<div>
-							<h3>{title}</h3>
-							<p>{text}</p>
-						</div>
-					</div>
-				))}
-			</div>
-		</section>
-	);
-}
-
-function SiteHeader() {
+function SiteHeader({ activePath }: { activePath: string }) {
 	return (
 		<header className="site-header">
-			<a className="brand" href="#overview" aria-label="Wit Grid home">
+			<AppLink className="brand" href="/" aria-label="Wit Grid home">
 				<span className="brand-mark">
 					<Layers3 size={18} />
 				</span>
 				Wit Grid
-			</a>
+			</AppLink>
 			<nav className="top-nav" aria-label="Primary navigation">
-				<a href="#docs">Docs</a>
-				<a href="#api-reference">API</a>
-				<a href="#examples">Examples</a>
-				<a href="#roadmap">Roadmap</a>
+				<AppLink className={cx(activePath.startsWith('/docs') && 'active')} href="/docs/introduction">
+					Docs
+				</AppLink>
+				<AppLink className={cx(activePath.startsWith('/api') && 'active')} href="/api/reference">
+					API
+				</AppLink>
+				<AppLink className={cx(activePath === '/examples' && 'active')} href="/examples">
+					Examples
+				</AppLink>
 			</nav>
 			<a className="github-link" href="https://github.com" aria-label="GitHub">
 				<Github size={18} />
@@ -313,39 +276,34 @@ function SiteHeader() {
 	);
 }
 
+function HomePage() {
+	return (
+		<>
+			<Hero onPrimary={() => navigate('/docs/quick-start')} />
+			<DocsLayout section={docSections.find((section) => section.id === 'quick-start') ?? defaultDoc} activePath="/docs/quick-start" />
+			<ApiReference />
+			<ExamplesSection />
+		</>
+	);
+}
+
 function App() {
+	const pathname = usePathname();
+	const normalizedPath = pathname === '/docs' ? '/docs/introduction' : pathname;
+	const activeDoc = docSections.find((section) => section.path === normalizedPath);
+	const isApi = normalizedPath === '/api/reference';
+	const isExamples = normalizedPath === '/examples';
+	const isHome = normalizedPath === '/';
+
 	return (
 		<div className="app">
-			<SiteHeader />
+			<SiteHeader activePath={normalizedPath} />
 			<main>
-				<Hero />
-				<ValueCards />
-				<div className="feature-strip" aria-label="Documentation highlights">
-					<div>
-						<Library size={18} />
-						Docs IA
-					</div>
-					<div>
-						<TerminalSquare size={18} />
-						Copyable code
-					</div>
-					<div>
-						<MousePointer2 size={18} />
-						Interactive examples
-					</div>
-					<div>
-						<Code2 size={18} />
-						Generated API ready
-					</div>
-					<div>
-						<Zap size={18} />
-						Performance proof
-					</div>
-				</div>
-				<DocsExplorer />
-				<ApiReference />
-				<ExamplesSection />
-				<Roadmap />
+				{isHome ? <HomePage /> : null}
+				{activeDoc ? <DocsLayout section={activeDoc} activePath={activeDoc.path} /> : null}
+				{isApi ? <ApiReference /> : null}
+				{isExamples ? <ExamplesSection /> : null}
+				{!isHome && !activeDoc && !isApi && !isExamples ? <DocsLayout section={defaultDoc} activePath={defaultDoc.path} /> : null}
 			</main>
 		</div>
 	);

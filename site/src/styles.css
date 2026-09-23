@@ -64,6 +64,10 @@
 		@apply transition-colors hover:text-slate-900;
 	}
 
+	.top-nav a.active {
+		@apply text-slate-950;
+	}
+
 	.github-link {
 		@apply h-9 w-9 justify-center rounded-lg border border-slate-900/10 bg-white/70;
 	}
@@ -115,11 +119,9 @@
 	}
 
 	.hero-panel,
-	.value-card,
 	.docs-shell,
 	.reference-section,
-	.examples-section,
-	.roadmap-section {
+	.examples-section {
 		@apply rounded-lg border border-slate-900/10 bg-white/85 shadow-soft;
 	}
 
@@ -184,48 +186,16 @@
 		@apply mt-[22px] p-[18px];
 	}
 
-	.value-grid {
-		@apply mb-7 grid grid-cols-3 gap-4 max-[980px]:grid-cols-1;
-	}
-
-	.value-card {
-		@apply p-[22px];
-	}
-
-	.value-card svg {
-		@apply text-teal-700;
-	}
-
-	.value-card h2,
 	.section-heading h2,
 	.doc-article h2,
-	.roadmap-item h3,
 	.example-card h3 {
 		@apply my-2 mt-3 tracking-normal text-slate-900;
 	}
 
-	.value-card h2 {
-		@apply text-lg;
-	}
-
-	.value-card p,
 	.section-heading p,
 	.doc-article p,
-	.example-card p,
-	.roadmap-item p {
+	.example-card p {
 		@apply leading-[1.62] text-slate-600;
-	}
-
-	.feature-strip {
-		@apply mb-7 grid grid-cols-5 gap-2.5 max-[980px]:grid-cols-2 max-[560px]:grid-cols-1;
-	}
-
-	.feature-strip div {
-		@apply flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-slate-900/10 bg-white/60 text-[13px] font-bold text-slate-700;
-	}
-
-	.feature-strip svg {
-		@apply text-blue-600;
 	}
 
 	.docs-shell {
@@ -250,7 +220,7 @@
 	}
 
 	.nav-link {
-		@apply flex min-h-[34px] w-full cursor-pointer items-center gap-1.5 rounded-[7px] border-0 bg-transparent px-2 text-left text-[13px] font-bold text-slate-600;
+		@apply flex min-h-[34px] w-full cursor-pointer items-center gap-1.5 rounded-[7px] px-2 text-left text-[13px] font-bold text-slate-600;
 	}
 
 	.nav-link.active {
@@ -287,8 +257,7 @@
 	}
 
 	.reference-section,
-	.examples-section,
-	.roadmap-section {
+	.examples-section {
 		@apply mt-7 p-[30px] max-[560px]:p-[22px];
 	}
 
@@ -341,20 +310,4 @@
 		@apply flex flex-wrap gap-[7px];
 	}
 
-	.roadmap-list {
-		@apply grid gap-3;
-	}
-
-	.roadmap-item {
-		@apply grid grid-cols-[42px_minmax(0,1fr)] gap-3.5 rounded-lg border border-slate-900/10 bg-white p-[18px];
-	}
-
-	.roadmap-index {
-		@apply grid h-[34px] w-[34px] place-items-center rounded-lg bg-slate-900 font-extrabold text-white;
-	}
-
-	.roadmap-item h3,
-	.roadmap-item p {
-		@apply m-0;
-	}
 }

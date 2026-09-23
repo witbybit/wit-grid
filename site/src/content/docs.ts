@@ -1,5 +1,6 @@
 export type DocSection = {
 	id: string;
+	path: string;
 	group: string;
 	title: string;
 	description: string;
@@ -25,17 +26,19 @@ export type ExampleCard = {
 export const docSections: DocSection[] = [
 	{
 		id: 'introduction',
+		path: '/docs/introduction',
 		group: 'Start',
 		title: 'Introduction',
-		description: 'A serious data grid engine for React applications that need speed, control, and long-session resilience.',
+		description: 'What Wit Grid is, which packages it exposes, and where the public surface is stable.',
 		body: [
-			'Wit Grid separates the data engine from framework rendering. The core package owns row models, viewport planning, state, events, and diagnostics; the React package provides ergonomic components and hooks on top.',
-			'The docs site is organized around production workflows: start fast, choose the right row model, wire columns and editing, then go deep on events, API methods, performance, and theming.',
+			'Wit Grid is a lightweight, framework-agnostic grid engine for high-performance virtualized spreadsheets and data grids.',
+			'The core package owns row models, viewport planning, state, events, persistence, diagnostics, and rendering coordination. The React package provides the supported React component and hook surface on top of that engine.',
 		],
-		checklist: ['Framework-agnostic core', 'React adapter', 'Virtualized rows and columns', 'Editing, filtering, grouping, diagnostics'],
+		checklist: ['@eregister/wit-grid-core for headless usage', '@eregister/wit-grid-react for React apps', 'experimental exports may change during alpha'],
 	},
 	{
 		id: 'installation',
+		path: '/docs/installation',
 		group: 'Start',
 		title: 'Installation',
 		description: 'Install the React adapter for application work, or the core package for a custom framework integration.',
@@ -47,28 +50,60 @@ export const docSections: DocSection[] = [
 	},
 	{
 		id: 'quick-start',
+		path: '/docs/quick-start',
 		group: 'Start',
 		title: 'Quick Start',
 		description: 'Render your first grid with explicit client mode and typed columns.',
 		body: [
-			'The quickest path is the single public Grid component. Pass rows, columns, and an explicit mode. Capture the API with onGridReady when page-level controls need to drive the grid.',
+			'The simplest way to use Wit Grid is the single public Grid component. Pick mode="client" or mode="server" explicitly.',
+			'Use onGridReady when a parent component needs the GridApi handle outside the grid tree.',
 		],
-		code: `import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
+		code: `import { useMemo, useState } from 'react';
+import { Grid, type ColumnDef, type GridApi } from '@eregister/wit-grid-react';
 
-type Invoice = { id: string; customer: string; total: number; status: string };
+type BookRow = {
+  id: string;
+  title: string;
+  author: string;
+  price: number;
+};
 
-const columns: ColumnDef<Invoice>[] = [
-  { field: 'customer', headerName: 'Customer' },
-  { field: 'total', headerName: 'Total', type: 'number' },
-  { field: 'status', headerName: 'Status' },
-];
+export function BookInventoryGrid() {
+  const [api, setApi] = useState<GridApi<BookRow> | null>(null);
+  const columns = useMemo<ColumnDef<BookRow>[]>(() => [
+    { field: 'id', header: 'Asset ID', width: 100 },
+    { field: 'title', header: 'Book Title', width: 250 },
+    { field: 'author', header: 'Author', width: 180 },
+    { field: 'price', header: 'Price', width: 120 },
+  ], []);
 
-export function InvoiceGrid({ rows }: { rows: Invoice[] }) {
-  return <Grid mode="client" rows={rows} columns={columns} />;
+  return (
+    <Grid
+      mode="client"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.id}
+      onGridReady={({ api }) => setApi(api)}
+    />
+  );
 }`,
 	},
 	{
+		id: 'architecture',
+		path: '/docs/architecture',
+		group: 'Core Concepts',
+		title: 'Architecture',
+		description: 'How data, row models, viewport planning, rendering, and adapters fit together.',
+		body: [
+			'Wit Grid decouples raw record arrays from visual presentation using row nodes, row pipeline stages, viewport planning, and framework adapters.',
+			'The core engine is responsible for state, row model composition, event publication, rendering coordination, and diagnostics. Framework packages should depend on the public core API and adapter contracts rather than reaching into engine internals.',
+			'The detailed architecture target remains in docs/architecture/core-target.md; this site page is the practical overview for users.',
+		],
+		checklist: ['RowNode tree', 'VisualRow pipeline', 'GridApi facade', 'Viewport recycler', 'Framework adapter boundary'],
+	},
+	{
 		id: 'columns',
+		path: '/docs/columns',
 		group: 'Core Concepts',
 		title: 'Columns',
 		description: 'Columns define field access, headers, renderers, editors, sizing, pinning, filters, and semantic cell types.',
@@ -79,7 +114,20 @@ export function InvoiceGrid({ rows }: { rows: Invoice[] }) {
 		checklist: ['field and headerName', 'value getters', 'cell renderers', 'cell editors', 'pinning and sizing', 'filter definitions'],
 	},
 	{
+		id: 'row-models',
+		path: '/docs/row-models',
+		group: 'Core Concepts',
+		title: 'Row Models',
+		description: 'Choose client rows for local data or server-backed rows for paged and async datasets.',
+		body: [
+			'Client mode is appropriate when the application already has the full row array in memory and wants local sorting, filtering, grouping, editing, and selection.',
+			'Server mode is appropriate when the grid should request ranges as the user scrolls or when filtering and sorting live on the backend.',
+		],
+		checklist: ['Client row model', 'Server-backed row model', 'Range requests', 'Sort and filter forwarding', 'Request identity'],
+	},
+	{
 		id: 'events',
+		path: '/docs/events',
 		group: 'Core Concepts',
 		title: 'Events',
 		description: 'Subscribe to grid lifecycle, editing, selection, viewport, row model, and data mutation events.',
@@ -99,17 +147,19 @@ export function InvoiceGrid({ rows }: { rows: Invoice[] }) {
 	},
 	{
 		id: 'theming',
+		path: '/docs/theming',
 		group: 'Customization',
 		title: 'Theming',
 		description: 'Use built-in themes, CSS variables, or theme tokens to align the grid with your product interface.',
 		body: [
-			'Wit Grid theming should feel like shadcn-quality infrastructure: tasteful defaults, explicit tokens, and easy overrides. The docs should show every token with live previews.',
-			'The existing theming guide becomes this section, split into practical recipes: dark mode, high contrast, compact density, custom palettes, and runtime switching.',
+			'Wit Grid exposes theme tokens and CSS variable output for applications that need product-specific styling.',
+			'Use built-in themes for default light, dark, high-contrast, and product-style palettes. Use custom theme tokens when your app needs precise alignment with an existing design system.',
 		],
 		checklist: ['Theme tokens', 'CSS variables', 'Built-in themes', 'Runtime switching', 'Accessibility contrast guidance'],
 	},
 	{
 		id: 'performance',
+		path: '/docs/performance',
 		group: 'Production',
 		title: 'Performance',
 		description: 'Understand virtualization budgets, renderer lifecycles, long-session stability, and diagnostics.',
@@ -121,6 +171,7 @@ export function InvoiceGrid({ rows }: { rows: Invoice[] }) {
 	},
 	{
 		id: 'api-reference',
+		path: '/api/reference',
 		group: 'Reference',
 		title: 'API Reference',
 		description: 'Public API pages for packages, components, hooks, events, types, and methods.',
