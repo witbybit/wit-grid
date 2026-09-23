@@ -202,6 +202,10 @@
 		@apply grid min-h-[570px] grid-cols-[230px_minmax(0,1fr)_180px] gap-0 overflow-hidden max-[980px]:grid-cols-1;
 	}
 
+	.example-shell {
+		@apply grid min-h-[570px] grid-cols-[230px_minmax(0,1fr)_180px] gap-0 overflow-hidden rounded-lg border border-slate-900/10 bg-white/85 shadow-soft max-[980px]:grid-cols-1;
+	}
+
 	.docs-nav {
 		@apply border-r border-slate-900/10 bg-slate-50 px-4 py-[22px] max-[980px]:border-b max-[980px]:border-r-0;
 	}
@@ -231,8 +235,13 @@
 		@apply p-[38px] max-[560px]:p-[22px];
 	}
 
+	.example-detail {
+		@apply p-[38px] max-[560px]:p-[22px];
+	}
+
 	.doc-article h2,
-	.section-heading h2 {
+	.section-heading h2,
+	.example-detail h2 {
 		@apply text-[34px];
 	}
 
@@ -310,4 +319,64 @@
 		@apply flex flex-wrap gap-[7px];
 	}
 
+	.detail-tags {
+		@apply mb-5;
+	}
+
+	.example-link {
+		@apply mt-4 inline-flex items-center gap-2 text-sm font-bold text-teal-700;
+	}
+
+	.live-preview {
+		@apply overflow-hidden rounded-lg border border-slate-900/10 bg-slate-50;
+	}
+
+	.preview-heading,
+	.code-heading {
+		@apply flex min-h-11 items-center justify-between border-b border-slate-900/10 bg-white px-4 text-xs font-extrabold uppercase tracking-[0.08em] text-slate-500;
+	}
+
+	.code-heading {
+		@apply mt-6 rounded-t-lg border border-b-0 border-slate-900/10;
+	}
+
+	.live-grid-frame {
+		@apply h-[320px] p-4;
+	}
+
+	.live-preview-loading {
+		@apply grid h-[320px] place-items-center text-sm font-semibold text-slate-500;
+	}
+
+	.live-grid-frame .og-grid-container {
+		@apply h-full overflow-hidden rounded-lg border border-slate-900/10 bg-white;
+	}
+
+	.example-notes {
+		@apply mt-5 rounded-lg border border-slate-900/10 bg-white p-4;
+	}
+
+	.example-notes h3 {
+		@apply m-0 text-base font-extrabold text-slate-900;
+	}
+
+	.example-notes ul {
+		@apply mb-0 mt-3 grid gap-2 pl-5 text-sm leading-6 text-slate-600;
+	}
+
+	.status-badge {
+		@apply inline-flex min-h-6 items-center rounded-full px-2.5 text-xs font-extrabold;
+	}
+
+	.status-badge.green {
+		@apply bg-emerald-100 text-emerald-800;
+	}
+
+	.status-badge.amber {
+		@apply bg-amber-100 text-amber-800;
+	}
+
+	.status-badge.slate {
+		@apply bg-slate-100 text-slate-700;
+	}
 }
