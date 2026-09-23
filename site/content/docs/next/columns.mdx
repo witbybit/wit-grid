@@ -1,0 +1,20 @@
+---
+title: Columns
+description: Define fields, headers, sizing, renderers, and column behavior.
+---
+
+Columns describe how row data is projected into the grid.
+
+```tsx
+const columns = [
+	{ field: 'name', header: 'Name', width: 180 },
+	{ field: 'team', header: 'Team', width: 160 },
+	{ field: 'status', header: 'Status', width: 140 },
+];
+```
+
+Use stable `field` values. They are used by state, events, filtering, sorting, and persistence.
+
+## Column Types
+
+Column type helpers are exported from `@eregister/wit-grid-react` for built-in renderer/editor patterns. Use the API reference to confirm the available helpers for the current release line.

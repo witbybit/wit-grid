@@ -1,10 +1,13 @@
 import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { source } from '@/lib/source';
+import { currentDocsVersion } from '@/lib/versions';
 
 export default async function Page({ params }: { params: Promise<{ slug?: string[] }> }) {
 	const { slug } = await params;
+	if (!slug || slug.length === 0) redirect(`/docs/${currentDocsVersion}`);
 	const page = source.getPage(slug);
 	if (!page) notFound();
 

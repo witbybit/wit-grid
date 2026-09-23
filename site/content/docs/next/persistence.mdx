@@ -1,0 +1,12 @@
+---
+title: Persistence
+description: Persist grid state with a storage key or adapter.
+---
+
+Pass a string key to persist grid state in local storage:
+
+```tsx
+<Grid rows={rows} columns={columns} persistence='orders-grid' />
+```
+
+For application-owned storage, pass a `GridPersistenceAdapter`. Workspace views use the workspace adapter APIs exported from the React package.

@@ -1,4 +1,20 @@
 {
 	"title": "Next",
-	"pages": ["index", "quick-start", "examples", "events", "api-reference", "docs-architecture"]
+	"pages": [
+		"index",
+		"installation",
+		"quick-start",
+		"columns",
+		"row-models",
+		"selection",
+		"filtering",
+		"persistence",
+		"theming",
+		"server-side-data",
+		"events",
+		"examples",
+		"migration-notes",
+		"api-reference",
+		"docs-architecture"
+	]
 }

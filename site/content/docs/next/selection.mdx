@@ -1,0 +1,12 @@
+---
+title: Selection
+description: Enable row selection and react to selection changes.
+---
+
+Enable row selection with `rowSelection`.
+
+```tsx
+<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' showStatusBar />
+```
+
+Use `GridEventName.selectionChanged` and `GridEventName.rowSelectionChanged` when the host application needs to react to selection changes.

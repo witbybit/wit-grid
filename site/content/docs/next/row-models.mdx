@@ -1,0 +1,20 @@
+---
+title: Row Models
+description: Choose client, infinite, or server-side row data.
+---
+
+Wit Grid supports three row model modes:
+
+| Mode       | Use When                                                                  |
+| ---------- | ------------------------------------------------------------------------- |
+| `client`   | Rows are already available in memory.                                     |
+| `infinite` | Rows load in block ranges as the user scrolls.                            |
+| `server`   | The datasource owns server-side route, filter, sort, and paging behavior. |
+
+Client mode is the default:
+
+```tsx
+<Grid rows={rows} columns={columns} getRowId={(row) => row.id} />
+```
+
+Use `rowModelType="infinite"` or `rowModelType="server"` when the datasource should load ranges on demand.

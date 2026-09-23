@@ -1,0 +1,12 @@
+---
+title: Filtering
+description: Configure filter UI and listen for filter state changes.
+---
+
+Use `showFilterChipBar` to show active filters and `showFloatingFilters` to show inline filter inputs.
+
+```tsx
+<Grid rows={rows} columns={columns} showFilterChipBar showFloatingFilters />
+```
+
+Filter state changes emit `GridEventName.filterChanged` and quick filter changes emit `GridEventName.quickFilterChanged`.
