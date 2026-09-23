@@ -28,9 +28,7 @@ export default function HomePage() {
 			<section className='mx-auto flex max-w-6xl flex-col gap-8 px-6 py-16 sm:py-24'>
 				<div className='max-w-3xl'>
 					<p className='text-sm font-semibold uppercase tracking-wide text-fd-muted-foreground'>Wit Grid Docs</p>
-					<h1 className='mt-4 text-4xl font-semibold tracking-normal text-fd-foreground sm:text-6xl'>
-						Data grid documentation that stays close to the code.
-					</h1>
+					<h1 className='mt-4 text-4xl font-semibold tracking-normal text-fd-foreground sm:text-6xl'>Data grid documentation.</h1>
 					<p className='mt-6 text-lg leading-8 text-fd-muted-foreground'>
 						Reference pages are generated, examples are file-backed, and versioned content lives next to the docs app.
 					</p>
