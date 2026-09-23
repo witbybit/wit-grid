@@ -3,18 +3,197 @@ title: Columns
 description: Define fields, headers, sizing, renderers, and column behavior.
 ---
 
-Columns describe how row data is projected into the grid.
+Columns describe how row data is read, displayed, edited, filtered, and written back.
+
+```tsx
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
+
+type Person = {
+	id: string;
+	name: string;
+	team: string;
+	score: number;
+};
+
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', width: 180 },
+	{ field: 'team', header: 'Team', width: 160 },
+	{ field: 'score', header: 'Score', type: 'number', width: 120 },
+];
+
+export function PeopleGrid({ rows }: { rows: Person[] }) {
+	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} />;
+}
+```
+
+## Required Shape
+
+Every column needs:
+
+| Field    | Type     | Notes                                                                            |
+| -------- | -------- | -------------------------------------------------------------------------------- |
+| `field`  | `string` | Stable data path and column identity. Dot paths are supported for nested values. |
+| `header` | `string` | Visible column header text.                                                      |
+
+Use stable `field` values. They are used by state, events, filtering, sorting, selection ranges, clipboard, and persistence. Use `colId` only when the public API identity needs to differ from the row data path.
+
+## Sizing And Visibility
 
 ```tsx
 const columns = [
-	{ field: 'name', header: 'Name', width: 180 },
-	{ field: 'team', header: 'Team', width: 160 },
-	{ field: 'status', header: 'Status', width: 140 },
+	{ field: 'name', header: 'Name', width: 220, minWidth: 140, maxWidth: 360 },
+	{ field: 'internalNotes', header: 'Notes', hide: true },
+	{ field: 'status', header: 'Status', pinned: 'left' },
 ];
 ```
 
-Use stable `field` values. They are used by state, events, filtering, sorting, and persistence.
+`width` must be a positive finite number. `minWidth` and `maxWidth` constrain user resizing. `pinned` is an initial setting; use the grid API for runtime pin changes.
+
+## Values
+
+By default, the grid reads `row[field]`. Dot paths read nested data.
+
+```tsx
+const columns = [{ field: 'account.owner.name', header: 'Owner' }];
+```
+
+Use `valueGetter` when display data is derived.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'displayName',
+		header: 'Display name',
+		valueGetter: ({ row }) => `${row.name} (${row.team})`,
+		valueGetterDependencies: ['name', 'team'],
+	},
+];
+```
+
+Use `valueFormatter` when the raw value should stay unchanged, but display/export text should be formatted.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		valueFormatter: ({ value }) => `${Number(value).toFixed(1)} pts`,
+	},
+];
+```
+
+## Writing Values
+
+Use `valueSetter` to control edit commits.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		valueSetter: ({ row, value }) => {
+			const next = Number(value);
+			if (!Number.isFinite(next) || next < 0) return false;
+			row.score = next;
+			return true;
+		},
+	},
+];
+```
+
+Return `false` to reject a commit. Return a promise when validation depends on asynchronous work. Call `abort()` for an immediate rollback.
 
 ## Column Types
 
-Column type helpers are exported from `@eregister/wit-grid-react` for built-in renderer/editor patterns. Use the API reference to confirm the available helpers for the current release line.
+Wit Grid ships built-in type registry entries for:
+
+| Type       | Behavior                    |
+| ---------- | --------------------------- |
+| `checkbox` | Checkbox renderer.          |
+| `date`     | Date renderer and editor.   |
+| `number`   | Number renderer and editor. |
+
+Register custom types with the `columnTypes` grid prop.
+
+```tsx
+import { Grid, numberColumnType, dropdownColumnType } from '@eregister/wit-grid-react';
+
+const columnTypes = {
+	usd: numberColumnType({ prefix: '$', decimals: 2, locale: true }),
+	status: dropdownColumnType([
+		{ value: 'Active', color: 'emerald' },
+		{ value: 'Paused', color: 'amber' },
+	]),
+};
+
+const columns = [
+	{ field: 'revenue', header: 'Revenue', type: 'usd' },
+	{ field: 'status', header: 'Status', type: 'status' },
+];
+
+<Grid rows={rows} columns={columns} columnTypes={columnTypes} />;
+```
+
+Helper exports include `numberColumnType`, `multiSelectColumnType`, and `dropdownColumnType`.
+
+## Renderers And Editors
+
+Use `renderer` to control cell display. Use `cellEditor` to control edit UI.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'team',
+		header: 'Team',
+		renderer: { kind: 'react', component: TeamBadge },
+		cellEditor: TeamEditor,
+	},
+];
+```
+
+Renderer specs support text, DOM, React, and imperative React modes. For high-frequency cells, renderer capabilities control scroll behavior with `primitive`, `live`, `freeze`, `text-impostor`, or `html-snapshot` presentation.
+
+## Filtering And Sorting
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', sortable: true, filterType: 'text' },
+	{ field: 'score', header: 'Score', sortable: true, filterType: 'number' },
+	{ field: 'team', header: 'Team', filterType: 'set' },
+];
+```
+
+Prefer `filterDef` for new filter UI. `filterType` and `filterValues` are still supported and normalized internally.
+
+## Clipboard
+
+Use `onCopy` and `onPaste` when clipboard text should not be the same as the raw cell value.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		onCopy: ({ value }) => String(value ?? ''),
+		onPaste: ({ pastedText }) => Number(pastedText),
+	},
+];
+```
+
+## Capabilities
+
+Column capability callbacks allow per-cell or per-column rules.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		canEdit: ({ row }) => row.team !== 'Locked',
+		canSort: () => true,
+		canExport: () => true,
+	},
+];
+```
+
+Capability callbacks exist for editing, selection, copy, paste, grouping, fill, sort, filter, pin, resize, delete, expand, drag, column movement, and export.

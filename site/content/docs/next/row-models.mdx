@@ -5,16 +5,158 @@ description: Choose client, infinite, or server-side row data.
 
 Wit Grid supports three row model modes:
 
-| Mode       | Use When                                                                  |
-| ---------- | ------------------------------------------------------------------------- |
-| `client`   | Rows are already available in memory.                                     |
-| `infinite` | Rows load in block ranges as the user scrolls.                            |
-| `server`   | The datasource owns server-side route, filter, sort, and paging behavior. |
+| Mode       | Use When                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `client`   | Rows are already available in memory and the grid can own local sort/filter work.              |
+| `infinite` | Rows load in block ranges as the user scrolls. Sort/filter state is sent to the datasource.    |
+| `server`   | The server owns range loading plus server-side route, grouping, sort, filter, and query state. |
 
-Client mode is the default:
+## Client Rows
+
+Client mode is the default. Pass `rows` directly.
 
 ```tsx
 <Grid rows={rows} columns={columns} getRowId={(row) => row.id} />
 ```
 
-Use `rowModelType="infinite"` or `rowModelType="server"` when the datasource should load ranges on demand.
+Use client mode for small to medium datasets, local editing, and application flows where the full row array is already in memory.
+
+## Infinite Rows
+
+Infinite mode loads row blocks by numeric range.
+
+```tsx
+import type { InfiniteDatasource } from '@eregister/wit-grid-react';
+
+type Order = {
+	id: string;
+	customer: string;
+	total: number;
+};
+
+const datasource: InfiniteDatasource<Order> = {
+	async getRows(params, { signal }) {
+		const url = new URL('/api/orders', location.origin);
+		url.searchParams.set('start', String(params.startRow));
+		url.searchParams.set('end', String(params.endRow));
+		url.searchParams.set('sort', JSON.stringify(params.sortModel));
+		url.searchParams.set('filter', JSON.stringify(params.filterModel));
+
+		const response = await fetch(url, { signal });
+		if (!response.ok) throw new Error('Failed to load orders');
+		return response.json();
+	},
+};
+
+<Grid rowModelType='infinite' columns={columns} datasource={datasource} blockSize={100} getRowId={(row) => row.id} />;
+```
+
+The datasource receives:
+
+| Request Field      | Notes                        |
+| ------------------ | ---------------------------- |
+| `startRow`         | Inclusive start index.       |
+| `endRow`           | Exclusive end index.         |
+| `sortModel`        | Current sort state.          |
+| `filterModel`      | Current column filter state. |
+| `quickFilterModel` | Current quick filter state.  |
+| `queryModel`       | Current query model state.   |
+
+Return:
+
+```ts
+type InfiniteGetRowsResult<TRowData> = {
+	rows: TRowData[];
+	totalCount?: number;
+	lastRow?: number;
+	hasMore?: boolean;
+};
+```
+
+Use one of `totalCount`, `lastRow`, or `hasMore` to tell the grid whether more rows exist. The grid validates duplicate ids and inconsistent row counts.
+
+## Server-Side Rows
+
+Server mode uses a richer request shape for stores, routes, grouping metadata, and server-owned query behavior.
+
+```tsx
+import type { ServerSideDatasource } from '@eregister/wit-grid-react';
+
+const datasource: ServerSideDatasource<Order> = {
+	async getRows(request, { signal }) {
+		const response = await fetch('/api/orders/query', {
+			method: 'POST',
+			signal,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(request),
+		});
+
+		if (!response.ok) throw new Error('Failed to load orders');
+		return response.json();
+	},
+};
+
+<Grid rowModelType='server' columns={columns} datasource={datasource} blockSize={100} getRowId={(row) => row.id} />;
+```
+
+The server request contains:
+
+| Request Field         | Notes                                          |
+| --------------------- | ---------------------------------------------- |
+| `startRow` / `endRow` | Requested range. `endRow` is exclusive.        |
+| `route`               | Store route. Empty route means the root store. |
+| `groupKeys`           | Group keys for the current route.              |
+| `rowGroupColumns`     | Group column metadata.                         |
+| `valueColumns`        | Aggregated value column metadata.              |
+| `sortModel`           | Current sort state or `null`.                  |
+| `filterModel`         | Current filter state or `null`.                |
+| `quickFilterModel`    | Current quick filter state or `null`.          |
+| `queryModel`          | Current query model state or `null`.           |
+
+Return:
+
+```ts
+type ServerSideGetRowsResult<TRowData> = {
+	rows: readonly TRowData[];
+	rowCount?: number;
+	lastRow?: number;
+	hasMore?: boolean;
+	aggregateData?: Readonly<Record<string, unknown>>;
+	groupMetadata?: readonly ServerSideGroupMetadata[];
+};
+```
+
+Use `rowCount`, `lastRow`, or `hasMore` to describe the row count state. Server mode also accepts `aggregateData` and `groupMetadata` for grouped stores.
+
+## Refreshing Datasources
+
+Use the API from `onGridReady` to replace or refresh server-owned data.
+
+```tsx
+<Grid
+	rowModelType='server'
+	columns={columns}
+	datasource={datasource}
+	onGridReady={({ api }) => {
+		api.refreshServerSide();
+	}}
+/>
+```
+
+For infinite mode, use `api.setInfiniteDatasource(nextDatasource, blockSize)`. For server mode, use `api.setServerSideDatasource(nextDatasource)`, `api.refreshServerSide()`, or `api.purgeServerSide()`.
+
+## Events
+
+Async row models emit lifecycle events:
+
+| Event                                   | Mode     |
+| --------------------------------------- | -------- |
+| `GridEventName.infiniteBlockLoaded`     | Infinite |
+| `GridEventName.infiniteBlockLoadFailed` | Infinite |
+| `GridEventName.serverSideStateChanged`  | Server   |
+
+See [Events](/docs/next/events) for generated event payloads.
+
+## Selection Scope
+
+Infinite and server-side row models operate on loaded data. Selection scopes such as “all rows” only apply to rows that are loaded or represented by the current model capability.
