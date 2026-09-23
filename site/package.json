@@ -8,7 +8,9 @@
 		"build": "pnpm docs:generate && next build --webpack",
 		"start": "next start --hostname 127.0.0.1 --port 5174",
 		"docs:generate": "node scripts/generate-docs.mjs",
-		"docs:check": "node scripts/generate-docs.mjs --check"
+		"docs:check": "node scripts/generate-docs.mjs --check",
+		"docs:release": "node scripts/release-docs-version.mjs",
+		"docs:release:from-package": "node scripts/release-docs-version.mjs --from-package"
 	},
 	"dependencies": {
 		"@eregister/wit-grid-react": "workspace:*",
@@ -28,6 +30,7 @@
 		"@types/node": "latest",
 		"@types/react": "latest",
 		"@types/react-dom": "latest",
-		"postcss": "^8.4.38"
+		"postcss": "^8.4.38",
+		"ts-morph": "^28.0.0"
 	}
 }

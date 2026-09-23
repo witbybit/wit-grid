@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Project, SyntaxKind } from 'ts-morph';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const siteRoot = path.resolve(__dirname, '..');
@@ -93,40 +94,6 @@ function extractInterface(source, name) {
 	return null;
 }
 
-function parseProps(source, name) {
-	const body = extractInterface(source, name);
-	if (!body) return { name, props: [] };
-
-	const props = [];
-	const lines = body.split('\n');
-	let pendingComment = [];
-
-	for (const line of lines) {
-		const trimmed = line.trim();
-		if (!trimmed) continue;
-		if (trimmed.startsWith('/**')) {
-			pendingComment = [trimmed];
-			continue;
-		}
-		if (pendingComment.length > 0) {
-			pendingComment.push(trimmed);
-			if (!trimmed.endsWith('*/')) continue;
-		}
-
-		const match = trimmed.match(/^([A-Za-z_$][\w$]*)\??:\s*(.+?);?$/);
-		if (!match) continue;
-		props.push({
-			name: match[1],
-			optional: trimmed.includes('?:'),
-			type: normalizeType(match[2]),
-			description: pendingComment.length > 0 ? stripCommentMarkers(pendingComment) : undefined,
-		});
-		pendingComment = [];
-	}
-
-	return { name, props };
-}
-
 function parseEvents() {
 	const sourcePath = 'packages/core/src/api/GridEvents.ts';
 	const source = readRepo(sourcePath);
@@ -173,25 +140,93 @@ function parseEvents() {
 	};
 }
 
+const project = new Project({
+	tsConfigFilePath: path.join(repoRoot, 'tsconfig.json'),
+	skipAddingFilesFromTsConfig: true,
+});
+
+function createSource(relativePath) {
+	return project.addSourceFileAtPath(path.join(repoRoot, relativePath));
+}
+
+function getNodeDocs(node) {
+	const jsDocs = typeof node.getJsDocs === 'function' ? node.getJsDocs() : [];
+	const comment = jsDocs
+		.map((doc) => doc.getCommentText() ?? '')
+		.filter(Boolean)
+		.join('\n')
+		.trim();
+	const deprecated = jsDocs.flatMap((doc) => doc.getTags()).find((tag) => tag.getTagName() === 'deprecated');
+	return {
+		description: comment || undefined,
+		deprecated: deprecated ? deprecated.getCommentText() || true : undefined,
+	};
+}
+
+function parseInterfaceProps(sourceFile, interfaces, name, seen = new Set()) {
+	const node = interfaces.get(name);
+	if (!node || seen.has(name)) return [];
+	seen.add(name);
+
+	const inherited = [];
+	for (const type of node.getExtends()) {
+		const expression = type.getExpression().getText();
+		if (interfaces.has(expression)) {
+			inherited.push(...parseInterfaceProps(sourceFile, interfaces, expression, seen));
+		}
+	}
+
+	const own = node
+		.getMembers()
+		.filter((member) => member.getKind() === SyntaxKind.PropertySignature)
+		.map((member) => {
+			const docs = getNodeDocs(member);
+			return {
+				name: member.getName(),
+				optional: member.hasQuestionToken(),
+				type: normalizeType(member.getTypeNode()?.getText() ?? 'unknown'),
+				...docs,
+			};
+		});
+
+	const byName = new Map();
+	for (const prop of [...inherited, ...own]) byName.set(prop.name, prop);
+	return [...byName.values()];
+}
+
+function parseInterfaceDoc(sourceFile, interfaces, name) {
+	return {
+		name,
+		props: parseInterfaceProps(sourceFile, interfaces, name),
+	};
+}
+
+function parseExports(sourceFile) {
+	const exports = [];
+	for (const statement of sourceFile.getStatements()) {
+		if (statement.getKind() !== SyntaxKind.ExportDeclaration && statement.getKind() !== SyntaxKind.ExportAssignment) continue;
+		exports.push(statement.getText().replace(/;$/, ''));
+	}
+	return exports;
+}
+
 function parseApi() {
-	const gridSource = readRepo('packages/react/src/Grid.tsx');
-	const gridViewSource = readRepo('packages/react/src/GridView.tsx');
-	const indexSource = readRepo('packages/react/src/index.ts');
-	const exports = indexSource
-		.split('\n')
-		.map((line) => line.trim())
-		.filter((line) => line.startsWith('export '))
-		.map((line) => line.replace(/;$/, ''));
+	const gridSource = createSource('packages/react/src/Grid.tsx');
+	const gridViewSource = createSource('packages/react/src/GridView.tsx');
+	const indexSource = createSource('packages/react/src/index.ts');
+	const gridInterfaces = new Map(gridSource.getInterfaces().map((item) => [item.getName(), item]));
+	const gridViewInterfaces = new Map(gridViewSource.getInterfaces().map((item) => [item.getName(), item]));
 
 	return {
 		generatedAt: 'build',
 		source: 'packages/react/src',
-		exports,
+		extraction: 'typescript-ast',
+		exports: parseExports(indexSource),
 		interfaces: [
-			parseProps(gridSource, 'GridClientProps'),
-			parseProps(gridSource, 'GridInfiniteProps'),
-			parseProps(gridSource, 'GridServerSideProps'),
-			parseProps(gridViewSource, 'GridViewProps'),
+			parseInterfaceDoc(gridSource, gridInterfaces, 'GridClientProps'),
+			parseInterfaceDoc(gridSource, gridInterfaces, 'GridInfiniteProps'),
+			parseInterfaceDoc(gridSource, gridInterfaces, 'GridServerSideProps'),
+			parseInterfaceDoc(gridViewSource, gridViewInterfaces, 'GridViewProps'),
 		],
 	};
 }

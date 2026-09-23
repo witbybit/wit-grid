@@ -1,16 +1,17 @@
 {
 	"generatedAt": "build",
 	"source": "packages/react/src",
+	"extraction": "typescript-ast",
 	"exports": [
 		"export { Grid } from './Grid.js'",
 		"export type { GridProps, GridClientProps, GridInfiniteProps, GridServerSideProps, GridPaginationConfig } from './Grid.js'",
-		"export type {",
+		"export type {\n\tRowModelType,\n\tInfiniteDatasource,\n\tServerSideDatasource,\n\tServerSideGetRowsRequest,\n\tServerSideGetRowsResult,\n\tServerSideStoreSnapshot,\n} from './types.js'",
 		"export { useGridApi, useGridSelector, useGridKeySelector } from './hooks.js'",
 		"export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelDef } from './sidebar/GridSidebar.js'",
-		"export {",
-		"export {",
-		"export type {",
-		"export type {",
+		"export {\n\tBUILT_IN_THEMES,\n\tBUILT_IN_THEME_ORDER,\n\tBUILT_IN_THEME_METADATA,\n\tgetBuiltInTheme,\n\tisBuiltInThemeName,\n\tthemeToCSSVariables,\n} from '@eregister/wit-grid-core'",
+		"export {\n\t// Checkbox\n\tCheckboxCellRenderer,\n\t// Multi-select\n\tMultiSelectCellRenderer,\n\tcreateMultiSelectCellRenderer,\n\tcreateMultiSelectCellEditor,\n\t// Date\n\tDateCellRenderer,\n\tDateCellEditor,\n\t// Dropdown / enum badge\n\tcreateDropdownCellRenderer,\n\tcreateDropdownCellEditor,\n\t// Number\n\tcreateNumberCellRenderer,\n\tcreateNumberCellEditor,\n\t// Utilities\n\tparseMultiValue,\n\tTagsCellRenderer,\n\t// Column type registry\n\tBUILTIN_COLUMN_TYPES,\n\t// Column type helpers\n\tnumberColumnType,\n\tmultiSelectColumnType,\n\tdropdownColumnType,\n} from './renderers/CellTypes.js'",
+		"export type {\n\tDropdownOption,\n\tDropdownOptionColor,\n\tNumberCellRendererOptions,\n\tNumberCellEditorOptions,\n\tColumnTypeDefinition,\n} from './renderers/CellTypes.js'",
+		"export type {\n\tColumnFilterDef,\n\tColumnFilterType,\n\tFilterSelectOption,\n\tFilterFetchParams,\n\tFilterFetchResult,\n\tFilterPageParams,\n\tFilterPageResult,\n\tCustomFilterRendererParams,\n\tFilterSurface,\n\tSelectFilterCondition,\n} from '@eregister/wit-grid-core'",
 		"export { resolveColumnFilterDef } from '@eregister/wit-grid-core'",
 		"export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js'",
 		"export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js'",
@@ -18,17 +19,135 @@
 		"export type { GridWorkspaceAdapter, GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './types.js'",
 		"export { createLocalStorageWorkspaceAdapter } from './types.js'",
 		"export type { StyleRule, RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from './types.js'",
-		"export type {",
-		"export type {",
+		"export type {\n\tColumnDef,\n\tCellEditorProps,\n\tCellRendererProps,\n\tFilterModel,\n\tQuickFilterModel,\n\tSortModel,\n\tGridApi,\n\tGridCellClickParams,\n\tGridStateSnapshot,\n\tVisualRow,\n\tDataVisualRow,\n\tGroupVisualRow,\n\tDetailVisualRow,\n\tFooterVisualRow,\n\tLoadingVisualRow,\n\tFailedVisualRow,\n\tPlaceholderVisualRow,\n\tGroupDef,\n\tAggregationDef,\n\tCsvExportOptions,\n\tCellRendererCapabilities,\n\tCellRendererPhase,\n\tDomCellRenderer,\n\tDomCellRendererHandle,\n\tDomCellRendererParams,\n\tDomCellRendererRowRef,\n\tGridRowDataRef,\n\tImperativeCellHandle,\n\tGridReadyEvent,\n\tGridInitialState,\n\tBuiltInThemeName,\n\tThemeTokens,\n\tRowSelectionMode,\n\tRowSelectionOptions,\n\tRowSelectionScope,\n\tSelectRowsOptions,\n\tSelectAllRowsOptions,\n} from './types.js'",
+		"export type {\n\tGridCapabilityAction,\n\tGridCapabilityParams,\n\tGridCapabilityResult,\n\tGridCapabilityCallback,\n\tGridCapabilitiesConfig,\n\tCapabilityDiagnostics,\n} from '@eregister/wit-grid-core'",
 		"export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/wit-grid-core'",
-		"export type {",
-		"export type {",
-		"export {"
+		"export type {\n\tGridContextMenuOptions,\n\tGridContextMenuItem,\n\tGridCellPointer,\n\tHeaderMenuRendererProps,\n\tTooltipParams,\n\tAutoSizeColumnOptions,\n\tAutoSizeAllColumnsOptions,\n\tFloatingFilterRendererParams,\n} from '@eregister/wit-grid-core'",
+		"export type {\n\tGridIntegrityApi,\n\tGridIntegrityIssue,\n\tGridIntegrityIssueSource,\n\tGridIntegrityIssueType,\n\tGridIntegritySeverity,\n\tGridIntegrityIssueFilter,\n\tGridIntegritySummary,\n\tGridIntegrityScope,\n\tGridIntegrityRunOptions,\n\tGridIntegrityRunResult,\n\tGridDataIntegrityConfig,\n\tGridValidationIntegrityOptions,\n\tGridQualityIntegrityOptions,\n\tGridDiffIntegrityOptions,\n\tGridLiveStreamIntegrityOptions,\n\tGridConflictIntegrityOptions,\n\tGridCellIntegrityRule,\n\tGridRowIntegrityRule,\n\tGridIntegrityRuleResult,\n\tGridDataQualityRule,\n\tGridDiffModel,\n\tGridCellDiff,\n\tGridDiffResult,\n\tGridDiffAcceptResult,\n\tGridCellConflict,\n\tResolveConflictOptions,\n\tConflictResolutionResult,\n\tServerIntegrityReport,\n\tGridTransactionStreamHandle,\n\tGridTransactionStreamState,\n} from '@eregister/wit-grid-core'",
+		"export {\n\tduplicateValueRule,\n\tmissingRequiredRule,\n\trequired,\n\temail,\n\tmin,\n\tmax,\n\tnumber,\n\tdate,\n\toneOf,\n\tregex,\n\tcustomCellRule,\n} from '@eregister/wit-grid-core'"
 	],
 	"interfaces": [
 		{
 			"name": "GridClientProps",
 			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
 				{
 					"name": "rowModelType",
 					"optional": true,
@@ -38,12 +157,136 @@
 					"name": "rows",
 					"optional": false,
 					"type": "TRowData[]"
+				},
+				{
+					"name": "getRowHeight",
+					"optional": true,
+					"type": "(row: TRowData) => number | undefined",
+					"description": "Per-row height callback. Return a pixel height for each row, or `undefined` to use `defaultRowHeight`. Overridden by `api.setRowHeight()`. Initial-only."
 				}
 			]
 		},
 		{
 			"name": "GridInfiniteProps",
 			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
 				{
 					"name": "rowModelType",
 					"optional": false,
@@ -64,6 +307,124 @@
 		{
 			"name": "GridServerSideProps",
 			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
 				{
 					"name": "rowModelType",
 					"optional": false,
@@ -147,17 +508,7 @@
 				{
 					"name": "navigationOptions",
 					"optional": true,
-					"type": "{"
-				},
-				{
-					"name": "editTrigger",
-					"optional": true,
-					"type": "'singleClick' | 'doubleClick'"
-				},
-				{
-					"name": "arrowKeyNavigationEdit",
-					"optional": true,
-					"type": "boolean"
+					"type": "{ editTrigger?: 'singleClick' | 'doubleClick'; arrowKeyNavigationEdit?: boolean; }"
 				},
 				{
 					"name": "groupRowRenderer",
