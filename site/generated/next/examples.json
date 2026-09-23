@@ -1,0 +1,27 @@
+{
+	"generatedAt": "build",
+	"source": "site/examples",
+	"examples": [
+		{
+			"id": "basic-grid",
+			"title": "Basic grid",
+			"description": "Client-side rows and columns with a stable row id.",
+			"sourcePath": "site/examples/basic-grid/source.tsx",
+			"source": "'use client';\n\nimport { Grid } from '@eregister/wit-grid-react';\n\nconst rows = [\n\t{ id: 'row-1', name: 'Ada Lovelace', team: 'Compute', status: 'Active' },\n\t{ id: 'row-2', name: 'Grace Hopper', team: 'Compiler', status: 'Active' },\n\t{ id: 'row-3', name: 'Katherine Johnson', team: 'Flight', status: 'Review' },\n\t{ id: 'row-4', name: 'Dorothy Vaughan', team: 'Systems', status: 'Active' },\n];\n\nconst columns = [\n\t{ field: 'name', header: 'Name', width: 180 },\n\t{ field: 'team', header: 'Team', width: 160 },\n\t{ field: 'status', header: 'Status', width: 140 },\n];\n\nexport default function BasicGridExample() {\n\treturn <Grid rows={rows} columns={columns} getRowId={(row) => row.id} showStatusBar />;\n}\n"
+		},
+		{
+			"id": "editable-grid",
+			"title": "Row selection",
+			"description": "Selection state with the core status bar enabled.",
+			"sourcePath": "site/examples/editable-grid/source.tsx",
+			"source": "'use client';\n\nimport { Grid, type ColumnDef } from '@eregister/wit-grid-react';\n\ntype Row = {\n\tid: string;\n\ttask: string;\n\towner: string;\n\tpriority: 'Low' | 'Medium' | 'High';\n};\n\nconst rows: Row[] = [\n\t{ id: 'task-1', task: 'Publish migration notes', owner: 'Mira', priority: 'High' },\n\t{ id: 'task-2', task: 'Audit event payload docs', owner: 'Rey', priority: 'Medium' },\n\t{ id: 'task-3', task: 'Refresh example coverage', owner: 'Nia', priority: 'Low' },\n];\n\nconst columns: ColumnDef<Row>[] = [\n\t{ field: 'task', header: 'Task', width: 240 },\n\t{ field: 'owner', header: 'Owner', width: 150 },\n\t{ field: 'priority', header: 'Priority', width: 140 },\n];\n\nexport default function EditableGridExample() {\n\treturn <Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection=\"multiple\" showStatusBar />;\n}\n"
+		},
+		{
+			"id": "persistence",
+			"title": "Persisted workspace",
+			"description": "Persist grid state to local storage with a key.",
+			"sourcePath": "site/examples/persistence/source.tsx",
+			"source": "'use client';\n\nimport { Grid } from '@eregister/wit-grid-react';\n\nconst rows = Array.from({ length: 24 }, (_, index) => ({\n\tid: `asset-${index + 1}`,\n\tsymbol: `WG-${String(index + 1).padStart(3, '0')}`,\n\tlatency: `${3 + (index % 5)}ms`,\n\tregion: ['iad', 'bom', 'fra', 'sin'][index % 4],\n}));\n\nconst columns = [\n\t{ field: 'symbol', header: 'Symbol', width: 130 },\n\t{ field: 'region', header: 'Region', width: 120 },\n\t{ field: 'latency', header: 'Latency', width: 120 },\n];\n\nexport default function PersistenceExample() {\n\treturn <Grid rows={rows} columns={columns} getRowId={(row) => row.id} persistence=\"wit-grid-docs-persistence\" showStatusBar />;\n}\n"
+		}
+	]
+}

@@ -1,0 +1,16 @@
+---
+title: Docs Architecture
+description: How Wit Grid documentation is versioned, generated, and checked.
+---
+
+## Versioning
+
+`next` tracks the current development line. When a release is cut, copy the `next` docs into a fixed version directory such as `1.5` and commit the generated reference snapshots for that release.
+
+## Truthfulness
+
+Generated pages are produced by `pnpm --filter wit-grid-site docs:generate`. CI should run `pnpm --filter wit-grid-site docs:check` so docs changes fail when source APIs change without updated generated output.
+
+## Authored Content
+
+Guides should explain concepts and workflows. Reference pages should come from source code wherever possible. Examples should live as runnable files, not screenshots or copied snippets.

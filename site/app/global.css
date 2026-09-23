@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+:root {
+	color-scheme: light;
+	--wg-page-background: #ffffff;
+	--wg-page-gradient-start: rgba(247, 248, 250, 0.96);
+	--wg-page-gradient-end: rgba(255, 255, 255, 1);
+	--color-fd-background: #ffffff;
+	--color-fd-foreground: #0f172a;
+	--color-fd-muted: #f6f7f9;
+	--color-fd-muted-foreground: #5f6878;
+	--color-fd-card: #ffffff;
+	--color-fd-card-foreground: #0f172a;
+	--color-fd-popover: #ffffff;
+	--color-fd-popover-foreground: #0f172a;
+	--color-fd-primary: #0f172a;
+	--color-fd-primary-foreground: #ffffff;
+	--color-fd-secondary: #f4f6f8;
+	--color-fd-secondary-foreground: #172033;
+	--color-fd-accent: #eef2f7;
+	--color-fd-accent-foreground: #172033;
+	--color-fd-border: #d9dee8;
+	--color-fd-ring: #2563eb;
+}
+
+html.dark,
+html[data-theme='dark'] {
+	color-scheme: dark;
+	--wg-page-background: #0a0d12;
+	--wg-page-gradient-start: rgba(16, 22, 32, 0.98);
+	--wg-page-gradient-end: rgba(10, 13, 18, 1);
+	--color-fd-background: #0a0d12;
+	--color-fd-foreground: #e7edf7;
+	--color-fd-muted: #151b24;
+	--color-fd-muted-foreground: #9aa6b7;
+	--color-fd-card: #101722;
+	--color-fd-card-foreground: #e7edf7;
+	--color-fd-popover: #101722;
+	--color-fd-popover-foreground: #e7edf7;
+	--color-fd-primary: #f8fafc;
+	--color-fd-primary-foreground: #0a0d12;
+	--color-fd-secondary: #171f2b;
+	--color-fd-secondary-foreground: #dce5f2;
+	--color-fd-accent: #1d2735;
+	--color-fd-accent-foreground: #f4f7fb;
+	--color-fd-border: #273243;
+	--color-fd-ring: #60a5fa;
+}
+
+body {
+	color: var(--color-fd-foreground);
+	background: linear-gradient(180deg, var(--wg-page-gradient-start), var(--wg-page-gradient-end) 28rem), var(--wg-page-background);
+}
+
+.wg-grid-preview {
+	height: 380px;
+	min-height: 320px;
+	overflow: hidden;
+	border: 1px solid var(--color-fd-border);
+	border-radius: 8px;
+	background: var(--color-fd-card);
+}
+
+.wg-reference-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+
+.wg-reference-table th,
+.wg-reference-table td {
+	border-bottom: 1px solid var(--color-fd-border);
+	padding: 0.75rem;
+	text-align: left;
+	vertical-align: top;
+}
+
+.wg-reference-table th {
+	color: var(--color-fd-muted-foreground);
+	font-size: 0.75rem;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.wg-code {
+	overflow-x: auto;
+	border: 1px solid var(--color-fd-border);
+	border-radius: 8px;
+	background: var(--color-fd-card);
+	padding: 1rem;
+	font-size: 0.8125rem;
+	line-height: 1.55;
+}

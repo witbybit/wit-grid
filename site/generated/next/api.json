@@ -1,0 +1,195 @@
+{
+	"generatedAt": "build",
+	"source": "packages/react/src",
+	"exports": [
+		"export { Grid } from './Grid.js'",
+		"export type { GridProps, GridClientProps, GridInfiniteProps, GridServerSideProps, GridPaginationConfig } from './Grid.js'",
+		"export type {",
+		"export { useGridApi, useGridSelector, useGridKeySelector } from './hooks.js'",
+		"export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelDef } from './sidebar/GridSidebar.js'",
+		"export {",
+		"export {",
+		"export type {",
+		"export type {",
+		"export { resolveColumnFilterDef } from '@eregister/wit-grid-core'",
+		"export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js'",
+		"export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js'",
+		"export type { GridWriteBlockedEventPayload } from './types.js'",
+		"export type { GridWorkspaceAdapter, GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './types.js'",
+		"export { createLocalStorageWorkspaceAdapter } from './types.js'",
+		"export type { StyleRule, RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from './types.js'",
+		"export type {",
+		"export type {",
+		"export { normalizeCapabilityResult, CAPABILITY_ALLOWED } from '@eregister/wit-grid-core'",
+		"export type {",
+		"export type {",
+		"export {"
+	],
+	"interfaces": [
+		{
+			"name": "GridClientProps",
+			"props": [
+				{
+					"name": "rowModelType",
+					"optional": true,
+					"type": "'client'"
+				},
+				{
+					"name": "rows",
+					"optional": false,
+					"type": "TRowData[]"
+				}
+			]
+		},
+		{
+			"name": "GridInfiniteProps",
+			"props": [
+				{
+					"name": "rowModelType",
+					"optional": false,
+					"type": "'infinite'"
+				},
+				{
+					"name": "datasource",
+					"optional": false,
+					"type": "InfiniteDatasource<TRowData>"
+				},
+				{
+					"name": "blockSize",
+					"optional": true,
+					"type": "number"
+				}
+			]
+		},
+		{
+			"name": "GridServerSideProps",
+			"props": [
+				{
+					"name": "rowModelType",
+					"optional": false,
+					"type": "'server'"
+				},
+				{
+					"name": "datasource",
+					"optional": false,
+					"type": "ServerSideDatasource<TRowData>"
+				},
+				{
+					"name": "blockSize",
+					"optional": true,
+					"type": "number"
+				}
+			]
+		},
+		{
+			"name": "GridViewProps",
+			"props": [
+				{
+					"name": "api",
+					"optional": false,
+					"type": "GridApi<TRowData>"
+				},
+				{
+					"name": "pinLeftColumns",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinRightColumns",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinTopRows",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinBottomRows",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "enableColumnReorder",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "enableNavigation",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "enableContextMenu",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "contextMenuOptions",
+					"optional": true,
+					"type": "GridContextMenuOptions<TRowData>"
+				},
+				{
+					"name": "onCellClick",
+					"optional": true,
+					"type": "(params: GridCellClickParams<TRowData>) => void"
+				},
+				{
+					"name": "onWriteBlocked",
+					"optional": true,
+					"type": "(event: GridEventPayloadMap<TRowData>[GridEventName.writeBlocked]) => void"
+				},
+				{
+					"name": "onCellValueChanged",
+					"optional": true,
+					"type": "(event: GridEventPayloadMap<TRowData>[GridEventName.cellValueChanged]) => void"
+				},
+				{
+					"name": "navigationOptions",
+					"optional": true,
+					"type": "{"
+				},
+				{
+					"name": "editTrigger",
+					"optional": true,
+					"type": "'singleClick' | 'doubleClick'"
+				},
+				{
+					"name": "arrowKeyNavigationEdit",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "groupRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "detailRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "footerRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "sidebar",
+					"optional": true,
+					"type": "GridSidebarConfig<TRowData>"
+				},
+				{
+					"name": "enableChart",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "autoRowHeight",
+					"optional": true,
+					"type": "boolean"
+				}
+			]
+		}
+	]
+}

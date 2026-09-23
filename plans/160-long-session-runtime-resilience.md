@@ -60,14 +60,14 @@ Implement and enforce these invariants:
 
 ## Commands you will need
 
-| Purpose             | Command                                                                                                                         | Expected on success                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Core verification   | `corepack pnpm run verify:core`                                                                                                 | exit 0                                                                       |
-| Performance budgets | `corepack pnpm run bench`                                                                                                       | all existing and new deterministic budget tests pass                         |
-| Long-session suite  | `corepack pnpm run bench:long-session`                                                                                          | all long-session resource and backlog invariants pass                        |
+| Purpose             | Command                                                                                                                        | Expected on success                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Core verification   | `corepack pnpm run verify:core`                                                                                                | exit 0                                                                       |
+| Performance budgets | `corepack pnpm run bench`                                                                                                      | all existing and new deterministic budget tests pass                         |
+| Long-session suite  | `corepack pnpm run bench:long-session`                                                                                         | all long-session resource and backlog invariants pass                        |
 | React focused tests | `corepack pnpm --filter @eregister/wit-grid-react exec vitest run src/gridPortalStore.adversarial.test.tsx src/index.test.tsx` | exit 0; use the actual extension of the adversarial test if it remains `.ts` |
-| Build               | `corepack pnpm run build`                                                                                                       | exit 0                                                                       |
-| Format              | `corepack pnpm run format:check`                                                                                                | exit 0                                                                       |
+| Build               | `corepack pnpm run build`                                                                                                      | exit 0                                                                       |
+| Format              | `corepack pnpm run format:check`                                                                                               | exit 0                                                                       |
 
 Do not run package installation unless a required existing workspace dependency is missing. This plan should not require a new runtime dependency.
 

@@ -1,8 +1,32 @@
 {
 	"extends": "../tsconfig.json",
 	"compilerOptions": {
+		"allowJs": true,
+		"declaration": false,
+		"declarationMap": false,
+		"incremental": true,
+		"jsx": "preserve",
 		"noEmit": true,
-		"types": ["vite/client"]
+		"paths": {
+			"@/*": ["./*"]
+		},
+		"types": ["node"]
 	},
-	"include": ["src"]
+	"include": [
+		"next-env.d.ts",
+		".source/**/*.ts",
+		".next/types/**/*.ts",
+		"app/**/*.ts",
+		"app/**/*.tsx",
+		"components/**/*.ts",
+		"components/**/*.tsx",
+		"content/**/*.mdx",
+		"examples/**/*.ts",
+		"examples/**/*.tsx",
+		"generated/**/*.json",
+		"lib/**/*.ts",
+		"mdx-components.tsx",
+		"source.config.ts"
+	],
+	"exclude": ["node_modules"]
 }

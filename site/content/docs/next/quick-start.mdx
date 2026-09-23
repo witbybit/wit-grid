@@ -1,0 +1,36 @@
+---
+title: Quick Start
+description: Install the React adapter and render a basic grid.
+---
+
+Install the React package:
+
+```bash
+pnpm add @eregister/wit-grid-react
+```
+
+Render a grid with row data and column definitions:
+
+```tsx
+import { Grid } from '@eregister/wit-grid-react';
+
+const rows = [
+	{ id: 'r1', name: 'Ada Lovelace', role: 'Engineer' },
+	{ id: 'r2', name: 'Grace Hopper', role: 'Compiler lead' },
+];
+
+const columns = [
+	{ field: 'name', headerName: 'Name' },
+	{ field: 'role', headerName: 'Role' },
+];
+
+export function App() {
+	return (
+		<div style={{ height: 420 }}>
+			<Grid rows={rows} columns={columns} getRowId={(row) => row.id} />
+		</div>
+	);
+}
+```
+
+Use `initialState`, `persistence`, `rowSelection`, `dataIntegrity`, and the row model props when you need more control.

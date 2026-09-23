@@ -421,7 +421,7 @@ Open `demo/src/pages/RealtimeGroupingDemo.tsx`. Find columns with numeric or boo
 | `packages/react/src/resolveColumnTypes.test.ts` | **New file**                                       |
 | `packages/react/src/types.ts`                   | Add `columnTypes` to options interfaces            |
 | `packages/react/src/useGrid.ts`                 | Call `resolveColumnTypes` on column sync           |
-| `packages/react/src/WitGrid.tsx`               | Thread `columnTypes` prop                          |
+| `packages/react/src/WitGrid.tsx`                | Thread `columnTypes` prop                          |
 | `packages/react/src/index.ts`                   | Export new types                                   |
 | `demo/src/pages/NativeCellTypesDemo.tsx`        | Use `type` prop for checkbox/date/number           |
 | `demo/src/pages/RealtimeGroupingDemo.tsx`       | Use `type` prop where applicable                   |

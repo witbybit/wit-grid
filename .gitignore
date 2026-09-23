@@ -10,6 +10,8 @@ build/
 .tmp/
 out/
 .vite
+.next/
+.source/
 
 # Accidental TypeScript emit into source trees
 packages/core/src/**/*.js

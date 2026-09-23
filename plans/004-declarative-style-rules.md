@@ -428,7 +428,7 @@ Open `demo/src/pages/CalculationsArena.tsx`. Find the `setStyleSlots` call (line
 | `packages/react/src/styleRules.test.ts` | **New file**                              |
 | `packages/react/src/types.ts`           | Add `styleRules` to options types         |
 | `packages/react/src/useGrid.ts`         | Apply `styleRules` in effect              |
-| `packages/react/src/WitGrid.tsx`       | Thread `styleRules` prop                  |
+| `packages/react/src/WitGrid.tsx`        | Thread `styleRules` prop                  |
 | `packages/react/src/index.ts`           | Export new types + function               |
 | `demo/src/pages/RealtimeDashboard.tsx`  | Replace `setStyleSlots` with `styleRules` |
 | `demo/src/pages/CalculationsArena.tsx`  | Replace `setStyleSlots` with `styleRules` |
