@@ -9,6 +9,7 @@
 		"start": "next start --hostname 127.0.0.1 --port 5174",
 		"docs:generate": "node scripts/generate-docs.mjs",
 		"docs:check": "node scripts/generate-docs.mjs --check",
+		"docs:lint": "node scripts/lint-docs.mjs",
 		"docs:release": "node scripts/release-docs-version.mjs",
 		"docs:release:from-package": "node scripts/release-docs-version.mjs --from-package"
 	},

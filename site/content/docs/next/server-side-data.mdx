@@ -6,7 +6,7 @@ description: Load rows from a server-owned datasource.
 Use `rowModelType="server"` when the server owns filtering, sorting, grouping, and range loading.
 
 ```tsx
-<Grid rowModelType='server' columns={columns} datasource={datasource} getRowId={(row) => row.id} />
+<Grid rowModelType='server' columns={columns} datasource={datasource} getRowId={(row: { id: string }) => row.id} />
 ```
 
 Server-side state changes emit `GridEventName.serverSideStateChanged`.
