@@ -34,7 +34,11 @@ export const docSections: DocSection[] = [
 			'Wit Grid is a lightweight, framework-agnostic grid engine for high-performance virtualized spreadsheets and data grids.',
 			'The core package owns row models, viewport planning, state, events, persistence, diagnostics, and rendering coordination. The React package provides the supported React component and hook surface on top of that engine.',
 		],
-		checklist: ['@eregister/wit-grid-core for headless usage', '@eregister/wit-grid-react for React apps', 'experimental exports may change during alpha'],
+		checklist: [
+			'@eregister/wit-grid-core for headless usage',
+			'@eregister/wit-grid-react for React apps',
+			'experimental exports may change during alpha',
+		],
 	},
 	{
 		id: 'installation',
@@ -206,6 +210,24 @@ export const apiEntries: ApiEntry[] = [
 		kind: 'event',
 		packageName: '@eregister/wit-grid-core',
 		description: 'Lifecycle event fired when a grid instance is ready for API commands.',
+	},
+	{
+		name: 'GridEventName.cellValueChanged',
+		kind: 'event',
+		packageName: '@eregister/wit-grid-core',
+		description: 'Dispatched after a committed cell value changes.',
+	},
+	{
+		name: 'GridEventName.writeBlocked',
+		kind: 'event',
+		packageName: '@eregister/wit-grid-core',
+		description: 'Dispatched when validation, capabilities, or commit rules block a write.',
+	},
+	{
+		name: 'GridEventName.selectionChanged',
+		kind: 'event',
+		packageName: '@eregister/wit-grid-core',
+		description: 'Dispatched when the cell or range selection model changes.',
 	},
 	{
 		name: 'useGridApi',

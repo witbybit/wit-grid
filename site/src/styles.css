@@ -257,6 +257,46 @@
 		@apply flex min-h-[38px] items-center gap-2 rounded-lg border border-teal-700/20 bg-teal-50 px-3 text-[13px] font-bold text-teal-800;
 	}
 
+	.event-callout {
+		@apply my-5 rounded-lg border border-slate-900/10 bg-slate-50 p-4;
+	}
+
+	.event-callout strong {
+		@apply text-sm font-extrabold text-slate-900;
+	}
+
+	.event-callout p {
+		@apply mb-0 mt-1 text-sm;
+	}
+
+	.event-category-list {
+		@apply mt-8 grid gap-7;
+	}
+
+	.event-category h3 {
+		@apply mb-3 text-lg font-extrabold text-slate-900;
+	}
+
+	.event-table {
+		@apply overflow-hidden rounded-lg border border-slate-900/10;
+	}
+
+	.event-row {
+		@apply grid grid-cols-[210px_minmax(0,1fr)_minmax(220px,0.9fr)] gap-4 border-b border-slate-900/10 bg-white p-4 last:border-b-0 max-[980px]:grid-cols-1;
+	}
+
+	.event-row code {
+		@apply rounded bg-slate-100 px-1.5 py-1 font-mono text-xs font-bold text-slate-900;
+	}
+
+	.event-row p {
+		@apply m-0 text-sm leading-6 text-slate-600;
+	}
+
+	.react-callback {
+		@apply mt-2 block w-fit rounded-full bg-teal-100 px-2 py-1 text-[11px] font-extrabold text-teal-800;
+	}
+
 	.toc {
 		@apply border-l border-slate-900/10 bg-[#fcfcfd] px-4 py-[22px] max-[980px]:hidden;
 	}

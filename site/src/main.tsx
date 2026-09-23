@@ -2,6 +2,7 @@ import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ArrowRight, BookOpen, Check, ChevronRight, Code2, Github, Grid3X3, Layers3, Search } from 'lucide-react';
 import { apiEntries, docSections, type DocSection } from './content/docs';
+import { eventDocs, eventUsageCode } from './content/events';
 import { liveExamples, type LiveExample } from './content/examples';
 import './styles.css';
 
@@ -158,6 +159,7 @@ function ExampleNav({ activePath }: { activePath: string }) {
 }
 
 function DocArticle({ section }: { section: DocSection }) {
+	if (section.id === 'events') return <EventsArticle section={section} />;
 	return (
 		<article className='doc-article' id={section.id}>
 			<div className='article-kicker'>{section.group}</div>
@@ -177,6 +179,49 @@ function DocArticle({ section }: { section: DocSection }) {
 				</div>
 			) : null}
 			{section.code ? <CodeBlock code={section.code} /> : null}
+		</article>
+	);
+}
+
+function EventsArticle({ section }: { section: DocSection }) {
+	const categories = Array.from(new Set(eventDocs.map((event) => event.category)));
+	return (
+		<article className='doc-article' id={section.id}>
+			<div className='article-kicker'>{section.group}</div>
+			<h2>{section.title}</h2>
+			<p className='article-description'>{section.description}</p>
+			{section.body.map((paragraph) => (
+				<p key={paragraph}>{paragraph}</p>
+			))}
+			<div className='event-callout'>
+				<strong>Use React callbacks for common UI hooks.</strong>
+				<p>
+					Use `api.addEventListener(GridEventName.*, listener)` when you need the full event surface, cleanup control, or integration with
+					analytics and persistence code.
+				</p>
+			</div>
+			<CodeBlock code={eventUsageCode} />
+			<div className='event-category-list'>
+				{categories.map((category) => (
+					<section className='event-category' key={category}>
+						<h3>{category}</h3>
+						<div className='event-table'>
+							{eventDocs
+								.filter((event) => event.category === category)
+								.map((event) => (
+									<div className='event-row' key={event.name}>
+										<div>
+											<code>{event.name}</code>
+											{event.reactCallback ? <span className='react-callback'>React callback</span> : null}
+										</div>
+										<p>{event.when}</p>
+										<code>{event.payload}</code>
+									</div>
+								))}
+						</div>
+					</section>
+				))}
+			</div>
 		</article>
 	);
 }
