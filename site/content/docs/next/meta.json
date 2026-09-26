@@ -6,6 +6,7 @@
 		"quick-start",
 		"migrating-from-ag-grid",
 		"columns",
+		"renderer-capabilities",
 		"row-models",
 		"selection",
 		"filtering",

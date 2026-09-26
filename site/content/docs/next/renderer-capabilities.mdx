@@ -1,0 +1,154 @@
+---
+title: Renderer Capabilities
+description: Control what a custom cell renderer shows during active scroll — the core scroll-performance tradeoff.
+icon: Gauge
+---
+
+This is the mechanism behind the "cell-level micro-subscriptions bypass re-renders" claim on the homepage. Any
+column with a custom renderer ([`renderer`](/docs/next/columns#renderers-and-editors) — DOM, React, or
+imperative React) can opt into a **scroll presentation** mode that decides what that cell shows while the grid
+is actively scrolling, independent of what it shows at rest.
+
+<Callout title='Why this exists' type='info'>
+	Re-mounting or re-rendering every custom cell renderer on every scroll frame is the single biggest cost in a
+	virtualized grid with rich cells. `scrollPresentation` lets you trade fidelity for speed per column — a
+	sparkline column can freeze mid-scroll where a live ticking price column cannot.
+</Callout>
+
+## The five modes
+
+`scrollPresentation` is the one field that chooses the mode; each mode has its own config sub-object, valid only
+alongside that mode.
+
+| Mode              | What shows during active scroll                                                          | Cost      |
+| ------------------ | ------------------------------------------------------------------------------------------ | --------- |
+| `primitive`         | N/A — default for columns with no custom renderer. Fast text/class presentation always.     | Lowest    |
+| `freeze`            | The existing rendered cell stays visually frozen. New/cold cells show a shell placeholder.  | Low       |
+| `text-impostor`     | An explicit cheap text/chip stand-in you provide (`textImpostor.render`).                   | Low       |
+| `html-snapshot`     | A captured inert HTML clone of the cell, replayed during scroll.                            | Medium    |
+| `live`              | The real renderer is mounted/updated on every scroll frame. No fallback, no placeholder.     | Highest   |
+
+`freeze` is the default for any column with a renderer but no explicit `scrollPresentation`. `primitive` is the
+default for columns with no renderer at all — there's nothing to freeze or snapshot.
+
+## `live` — real-time cells
+
+Use `live` for cells that must never show stale data, even mid-scroll: ticking prices, live status, anything
+where a frozen frame would be actively misleading.
+
+```typescript
+{
+	field: 'price',
+	header: 'Price',
+	renderer: {
+		kind: 'imperativeReact',
+		component: LivePriceRenderer,
+		capabilities: {
+			scrollPresentation: 'live',
+			live: { update: 'imperative', priority: 'high' },
+		},
+	},
+}
+```
+
+`live.update` chooses how the cell repaints on each tick:
+
+- **`'react'`** (default) — updates flow through React's scheduler, like a normal re-render.
+- **`'imperative'`** — the grid calls `ref.current.update()` directly on a `forwardRef` component
+  exposing [`ImperativeCellHandle`](/docs/next/grid-api), bypassing React's scheduler entirely. Use this for the
+  highest-frequency feeds, where even `setState` latency is too much.
+
+The [Realtime Dashboard example](/docs/next/examples) renders exactly this pattern — its "Change %" column is an
+imperative `live` renderer, its "Price" column is a `html-snapshot` DOM renderer, and its "Volume" column is a
+plain memoized React renderer with no special `scrollPresentation` (implicitly `freeze`) — one grid, three
+renderer strategies, side by side.
+
+## `text-impostor` — cheap stand-in during scroll
+
+Use `text-impostor` when the full renderer is expensive to mount but a plain string is enough for the eye to
+track while scrolling — a rich status badge that becomes plain text mid-scroll, for example.
+
+```typescript
+{
+	field: 'status',
+	header: 'Status',
+	renderer: {
+		kind: 'react',
+		component: StatusBadge,
+		capabilities: {
+			scrollPresentation: 'text-impostor',
+			textImpostor: {
+				render: ({ value, formattedValue }) => formattedValue || String(value ?? ''),
+			},
+		},
+	},
+}
+```
+
+`textImpostor.render` receives the raw and formatted cell value and returns a plain string — no JSX, no DOM
+nodes. It's rendered as cheap text for the duration of the scroll gesture, then swapped back for the real
+renderer once scrolling settles.
+
+## `html-snapshot` — replay a captured clone
+
+Use `html-snapshot` for renderers that are expensive to mount fresh but whose *appearance* barely changes
+between paints — a sparkline canvas, a heavy chart cell. The grid captures an inert HTML clone once and replays
+it during scroll instead of re-mounting.
+
+```typescript
+{
+	field: 'price',
+	header: 'Price',
+	renderer: {
+		kind: 'dom',
+		renderer: SparklineRenderer,
+		capabilities: {
+			scrollPresentation: 'html-snapshot',
+			htmlSnapshot: { allowShellWhenMissing: true },
+		},
+	},
+}
+```
+
+| `htmlSnapshot` option              | Default | Effect                                                                          |
+| ------------------------------------ | ------- | -------------------------------------------------------------------------------- |
+| `strict`                             | grid default | When true, a missing snapshot never falls back to raw text or a stale clone. |
+| `freshness`                          | —       | `'row-version-only'` invalidates only when row data changes; `'visual'` also tracks visual-only changes. |
+| `allowShellWhenMissing`              | `false` | Show a loading shell instead of nothing when no snapshot exists yet.            |
+| `allowTextFallbackWhenMissing`       | `false` | Fall back to plain text instead of a shell when no snapshot exists.             |
+| `invalidateOnWidthChange`            | —       | Re-capture when the column is resized.                                         |
+| `invalidateOnHeightChange`           | —       | Re-capture when the row height changes.                                        |
+
+## Grid-level budgets
+
+Per-column capabilities choose *which* mode a column uses. `rendererOptions` on `<Grid>` controls the *shared
+budget* every `live` and `html-snapshot` column draws from — this is grid-wide policy, not a per-column setting,
+because it's about total frame budget across every visible cell:
+
+```tsx
+<Grid
+	rows={rows}
+	columns={columns}
+	getRowId={(row) => row.id}
+	rendererOptions={{
+		liveReact: { maxMountsPerFrame: 12, maxUpdatesPerFrame: 40, allowEmergencyShell: true },
+		htmlSnapshot: { maxSnapshots: 500, maxTotalBytes: 8_000_000 },
+	}}
+/>
+```
+
+<Callout title='Tune this before you need to' type='warn'>
+	The defaults are conservative. If a dashboard with many `live` columns feels like it's dropping frames under
+	heavy scroll, `liveReact.maxMountsPerFrame` / `maxUpdatesPerFrame` are usually the first things to raise —
+	the tradeoff is exactly the one `scrollPresentation` exists to make explicit: more fidelity per frame costs
+	more per frame.
+</Callout>
+
+## Choosing a mode
+
+- Nothing custom on the cell → don't set `scrollPresentation` at all (`primitive`).
+- Custom renderer, appearance rarely changes → leave the default (`freeze`).
+- Custom renderer, expensive to mount, appearance mostly static mid-scroll → `html-snapshot`.
+- Custom renderer, cheap plain-text equivalent exists → `text-impostor`.
+- Data changes multiple times per second and staleness would mislead → `live`, with `update: 'imperative'` only
+  once `update: 'react'` actually shows dropped frames under your real data volume.

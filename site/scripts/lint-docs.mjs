@@ -110,6 +110,78 @@ function hasNamedImport(code, name) {
 	return new RegExp(`import\\s+(?:type\\s+)?\\{[^}]*\\b${name}\\b[^}]*\\}\\s+from\\s+['"]@eregister/wit-grid-react['"]`).test(code);
 }
 
+/**
+ * TypeScript does not apply excess-property checking to an object literal whose type flows in
+ * only through a generic call's EXPLICIT type argument into a nested arrow function's return
+ * position — e.g. `useMemo<ColumnDef<Row>[]>(() => [{ ...typo... }])` silently accepts unknown
+ * properties (confirmed by direct testing: a definitely-bogus field went uncaught in exactly
+ * this shape). The same literal, checked via a return-type annotation directly on the arrow
+ * function (`useMemo((): ColumnDef<Row>[] => [...])`), IS checked correctly. This rewrites calls
+ * to the React hooks that commonly hit this shape into that safer form before type-checking, so
+ * a typo'd ColumnDef/props object in a doc snippet actually fails lint instead of silently
+ * passing. Scoped to hooks whose generic argument types the factory's RETURN VALUE — useMemo,
+ * and useState's lazy-initializer form — not useCallback, whose generic instead types the
+ * callback's own (params + return) signature; rewriting that would silently change its meaning
+ * rather than just relocating an equivalent annotation. Also scoped to a fixed whitelist (rather
+ * than any `ident<Type>(`) so it can't misinterpret a generic function *declaration*
+ * (`function foo<T>() {}`) as a call.
+ */
+function moveGenericArgOntoArrowReturnType(code) {
+	let result = '';
+	let i = 0;
+	const pattern = /\b(useMemo|useState)</g;
+	pattern.lastIndex = i;
+	let match;
+	while ((match = pattern.exec(code))) {
+		if (match.index < i) continue;
+		result += code.slice(i, match.index);
+		const identStart = match.index;
+		const identEnd = match.index + match[1].length;
+		const genericOpen = identEnd; // points at '<'
+
+		let cursor = genericOpen + 1;
+		let depth = 1;
+		while (cursor < code.length && depth > 0) {
+			if (code[cursor] === '=' && code[cursor + 1] === '>') {
+				cursor += 2; // an arrow-function-type's `=>` is not a generic close
+				continue;
+			}
+			if (code[cursor] === '<') depth++;
+			else if (code[cursor] === '>') depth--;
+			cursor++;
+		}
+		if (depth !== 0) {
+			result += code.slice(identStart);
+			i = code.length;
+			break;
+		}
+		const typeText = code.slice(genericOpen + 1, cursor - 1);
+
+		let afterGeneric = cursor;
+		while (/\s/.test(code[afterGeneric])) afterGeneric++;
+		if (code[afterGeneric] !== '(') {
+			result += code.slice(identStart, cursor);
+			i = cursor;
+			pattern.lastIndex = i;
+			continue;
+		}
+
+		const arrowMatch = /^(\s*\([^()]*\))\s*=>(\s*)/.exec(code.slice(afterGeneric + 1));
+		if (!arrowMatch) {
+			result += code.slice(identStart, afterGeneric + 1);
+			i = afterGeneric + 1;
+			pattern.lastIndex = i;
+			continue;
+		}
+
+		result += `${match[1]}(${arrowMatch[1]}: ${typeText} =>${arrowMatch[2]}`;
+		i = afterGeneric + 1 + arrowMatch[0].length;
+		pattern.lastIndex = i;
+	}
+	result += code.slice(i);
+	return result;
+}
+
 function snippetModule(snippet) {
 	const imports = [];
 	if (!hasNamedImport(snippet.code, 'Grid') && /\bGrid\b/.test(snippet.code)) {
@@ -137,7 +209,7 @@ function snippetModule(snippet) {
 
 	return `// Source: ${toPosix(path.relative(siteRoot, snippet.file))}:${snippet.line}
 ${imports.join('\n')}
-${snippet.code}
+${moveGenericArgOntoArrowReturnType(snippet.code)}
 ${prelude}
 export {};
 `;

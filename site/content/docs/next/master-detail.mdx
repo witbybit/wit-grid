@@ -56,7 +56,7 @@ const NestedItemsGrid = ({ visualRow }: { visualRow: VisualRow<OrderRow> }) => {
 export function MasterOrdersGrid({ orders }: { orders: OrderRow[] }) {
 	const masterColumns = useMemo<ColumnDef<OrderRow>[]>(
 		() => [
-			{ field: 'toggle', header: '', width: 45, cellRenderer: DetailToggleRenderer },
+			{ field: 'toggle', header: '', width: 45, renderer: { kind: 'react', component: DetailToggleRenderer } },
 			{ field: 'id', header: 'Order ID', width: 120 },
 			{ field: 'customerName', header: 'Customer', width: 220 },
 			{ field: 'totalAmount', header: 'Total', width: 120 },

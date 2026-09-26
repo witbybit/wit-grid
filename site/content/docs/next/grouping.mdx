@@ -106,7 +106,7 @@ export function FileDirectoryGrid({ nodes }: { nodes: FileNode[] }) {
 	const TreeNameRenderer = useMemo(() => createTreeNameRenderer(byId), [byId]);
 	const columns = useMemo<ColumnDef<FileNode>[]>(
 		() => [
-			{ field: 'name', header: 'Node Path / Name', width: 300, cellRenderer: TreeNameRenderer },
+			{ field: 'name', header: 'Node Path / Name', width: 300, renderer: { kind: 'react', component: TreeNameRenderer } },
 			{ field: 'size', header: 'Capacity Size', width: 120 },
 		],
 		[TreeNameRenderer]
