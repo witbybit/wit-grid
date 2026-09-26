@@ -53,6 +53,11 @@ const cards = [
 		title: 'Grid API',
 		description: 'The imperative GridApi surface — state, editing, selection, grouping, clipboard, undo/redo.',
 	},
+	{
+		href: '/docs/next/migrating-from-ag-grid',
+		title: 'Coming from AG Grid?',
+		description: 'A concept-by-concept map from rowData/columnDefs to Wit Grid, including grouping, row models, and theming.',
+	},
 ];
 
 export default function HomePage() {
@@ -108,7 +113,7 @@ export default function HomePage() {
 			</section>
 
 			<section className='mx-auto max-w-6xl px-6 pb-20'>
-				<div className='grid gap-4 md:grid-cols-3'>
+				<div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
 					{cards.map((card) => (
 						<Link
 							key={card.href}

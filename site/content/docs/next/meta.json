@@ -4,6 +4,7 @@
 		"index",
 		"installation",
 		"quick-start",
+		"migrating-from-ag-grid",
 		"columns",
 		"row-models",
 		"selection",

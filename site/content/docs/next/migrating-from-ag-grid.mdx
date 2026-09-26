@@ -1,0 +1,266 @@
+---
+title: Migrating from AG Grid
+description: Map AG Grid concepts, props, and column definitions onto Wit Grid.
+icon: ArrowRightLeft
+---
+
+Wit Grid and AG Grid solve the same problem — a virtualized, editable data grid — and share a lot of vocabulary
+(`rowData`/`rows`, `columnDefs`/`columns`, `rowModelType`, `masterDetail`). Most of a migration is a mechanical
+rename. The differences that aren't mechanical are called out explicitly below.
+
+<Callout title='AG Grid API surface varies by version' type='warn'>
+	AG Grid's exact prop and method names have shifted across major versions (legacy `rowSelection='multiple'`
+	vs. the newer `rowSelection={{ mode: 'multiRow' }}` object API, for example). This guide targets the
+	long-stable core concepts. Check your installed AG Grid version's docs for the exact current spelling of a
+	prop before assuming this table is literal.
+</Callout>
+
+## Package and root component
+
+<Tabs items={['AG Grid', 'Wit Grid']}>
+	<Tab value='AG Grid'>
+		```typescript
+		import { AgGridReact } from 'ag-grid-react';
+
+		<AgGridReact rowData={rows} columnDefs={columnDefs} getRowId={(p) => p.data.id} onGridReady={(p) => (apiRef.current = p.api)} />;
+		```
+	</Tab>
+	<Tab value='Wit Grid'>
+		```tsx
+		import { useRef } from 'react';
+		import { Grid, type GridApi } from '@eregister/wit-grid-react';
+
+		const apiRef = useRef<GridApi | null>(null);
+
+		<Grid rows={rows} columns={columns} getRowId={(row) => row.id} onGridReady={({ api }) => (apiRef.current = api)} />;
+		```
+	</Tab>
+</Tabs>
+
+Two shape differences that trip people up on the first pass:
+
+- **`getRowId` takes the row directly**, not a wrapped `params.data`.
+- **`onGridReady` hands you `{ api, rowModelType }` directly**, not a `params` object you dig `.api` out of.
+  There's no separate `onFirstDataRendered` — `onGridReady` fires once, after the grid's first paint.
+
+## Column definitions
+
+| AG Grid                                | Wit Grid                                       | Notes                                                                                     |
+| --------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `field`                                 | `field`                                          | Same. Dot paths for nested data work the same way.                                        |
+| `headerName`                            | `header`                                         | Renamed.                                                                                   |
+| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`                | Same.                                                                                      |
+| `sortable`                              | `sortable`                                       | Same.                                                                                      |
+| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`       | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
+| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`      | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api). |
+| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`      | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form. |
+| `cellEditor`                            | `cellEditor`                                     | Same idea — a component, not a class.                                                     |
+| `valueGetter`                           | `valueGetter`                                    | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                       |
+| `valueFormatter`                        | `valueFormatter`                                 | Same idea.                                                                                 |
+| `valueSetter`                           | `valueSetter`                                    | Return `false` to reject a commit (same convention as AG Grid).                           |
+| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                      | Same.                                                                                      |
+| `checkboxSelection`                     | `checkboxSelection`                              | Same.                                                                                      |
+| `rowGroup: true` (per column)           | `initialState.groupBy: string[]` (grid-level)    | **Different model** — see [Grouping](#row-grouping--aggregation) below.                    |
+| `aggFunc` (per column)                  | `initialState.aggDefs` (grid-level)              | Same built-in names (`sum`/`avg`/`min`/`max`/`count`), different location.                 |
+
+See the full column shape in [Columns](/docs/next/columns).
+
+## Row grouping & aggregation
+
+AG Grid marks grouping and aggregation **on the column** (`rowGroup: true`, `aggFunc: 'sum'`). Wit Grid keeps
+both **on the grid**, in `initialState` — the column stays a plain column definition:
+
+<Tabs items={['AG Grid', 'Wit Grid']}>
+	<Tab value='AG Grid'>
+		```typescript
+		const columnDefs = [
+			{ field: 'department', rowGroup: true, hide: true },
+			{ field: 'salary', aggFunc: 'sum' },
+		];
+		```
+	</Tab>
+	<Tab value='Wit Grid'>
+		```tsx
+		import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
+
+		interface EmployeeRow {
+			id: string;
+			department: string;
+			salary: number;
+		}
+
+		const columns: ColumnDef<EmployeeRow>[] = [
+			{ field: 'department', header: 'Department' },
+			{ field: 'salary', header: 'Salary' },
+		];
+
+		<Grid
+			rows={rows}
+			columns={columns}
+			getRowId={(row) => row.id}
+			initialState={{ groupBy: ['department'], aggDefs: [{ field: 'salary', aggFunc: 'sum' }] }}
+		/>;
+		```
+	</Tab>
+</Tabs>
+
+Grouping renders through a `groupRowRenderer` you supply, not an auto-generated group column — see
+[Grouping & Tree Data](/docs/next/grouping) for the full renderer contract and toggling API
+(`api.toggleGroupExpanded`, `api.expandAllGroups`).
+
+## Row models
+
+Both grids use the same three-way split, and the names are close enough to be a find-and-replace:
+
+| AG Grid `rowModelType` | Wit Grid `rowModelType` |
+| ----------------------- | ------------------------- |
+| `'clientSide'` (default) | `'client'` (default)     |
+| `'infinite'`             | `'infinite'`              |
+| `'serverSide'`           | `'server'`                |
+
+The datasource **contract** is where they diverge — AG Grid uses a success/fail callback shape, Wit Grid uses a
+`Promise`:
+
+<Tabs items={['AG Grid infinite datasource', 'Wit Grid infinite datasource']}>
+	<Tab value='AG Grid infinite datasource'>
+		```typescript
+		const datasource = {
+			getRows(params) {
+				fetch(`/api/rows?start=${params.startRow}&end=${params.endRow}`)
+					.then((res) => res.json())
+					.then((data) => params.successCallback(data.rows, data.lastRow))
+					.catch(() => params.failCallback());
+			},
+		};
+		```
+	</Tab>
+	<Tab value='Wit Grid infinite datasource'>
+		```tsx
+		import type { InfiniteDatasource } from '@eregister/wit-grid-react';
+
+		interface Row {
+			id: string;
+		}
+
+		const datasource: InfiniteDatasource<Row> = {
+			async getRows(params, { signal }) {
+				const res = await fetch(`/api/rows?start=${params.startRow}&end=${params.endRow}`, { signal });
+				if (!res.ok) throw new Error('Failed to load rows');
+				const data = await res.json();
+				return { rows: data.rows, lastRow: data.lastRow };
+			},
+		};
+		```
+	</Tab>
+</Tabs>
+
+Throw (or reject) instead of calling a `failCallback`; the grid marks that block failed. An `AbortSignal` is
+provided for free — no manual request-cancellation bookkeeping. See [Row Models](/docs/next/row-models) for the
+full request/response shape, including the server row model's route-aware request.
+
+## Master-detail
+
+The mental model is the same — a nested grid under an expandable row — and the prop names are nearly identical:
+
+| AG Grid                  | Wit Grid                 |
+| ------------------------- | -------------------------- |
+| `masterDetail: true`       | `initialState.masterDetailEnabled: true` |
+| `detailCellRenderer`       | `detailRowRenderer`        |
+| `detailRowHeight`          | `detailRowHeight`          |
+
+See [Master-Detail](/docs/next/master-detail) for the full renderer signature — Wit Grid's detail renderer
+receives `{ visualRow, api }`, where the nested grid is a fully independent `<Grid>` instance you render yourself
+(not a configured sub-grid options object).
+
+## Selection
+
+```tsx
+<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' />
+```
+
+`rowSelection` takes the same `'single' | 'multiple'` shorthand as AG Grid's mode string, or an options object
+(`{ mode, selectAllScope }`) for finer control over what "select all" means. See [Selection](/docs/next/selection).
+
+## Theming
+
+AG Grid ships CSS-class themes (`ag-theme-alpine`) or, in newer versions, its JS Theming API (`theme={themeQuartz}`).
+Wit Grid's theming is entirely JS/CSS-variable driven through `GridApi` — no separate theme object to import and
+apply:
+
+```tsx
+<Grid rows={rows} columns={columns} initialState={{ themeName: 'dark' }} />
+```
+
+```typescript
+api.switchTheme('light');
+api.setTheme({ ...api.getTheme(), focusRing: '#10b981' });
+```
+
+Seven built-in themes ship out of the box, with runtime switching and system color-scheme detection. See
+[Theming](/docs/next/theming).
+
+## Clipboard, CSV export, and undo/redo
+
+```typescript
+await api.copySelectedRange(); // clipboard copy
+await api.pasteFromClipboard(); // clipboard paste
+api.exportCsv(); // CSV export
+api.undo(); // history
+api.redo();
+```
+
+<Callout title='Not license-gated' type='info'>
+	In AG Grid, range selection, clipboard, Excel/CSV export beyond the basics, server-side row model, row
+	grouping, and master-detail have at various points required an AG Grid **Enterprise** license. In Wit Grid,
+	everything on this page ships in the single open package — there is no separate paid tier to unlock these
+	features. (Always double-check AG Grid's current pricing page for what's gated in the version you're on;
+	their Community/Enterprise split has changed over time.)
+</Callout>
+
+## What doesn't map 1:1
+
+- **No auto-generated group column.** You render group rows yourself via `groupRowRenderer` — more setup for a
+  default look, full control over the result.
+- **No `editable` boolean.** Editability is one of several capability callbacks (`canEdit`, `canSort`,
+  `canCopy`, `canPaste`, `canExport`, …) — see [Grid API](/docs/next/grid-api#columns) and
+  [Columns](/docs/next/columns#capabilities).
+- **No Excel export.** CSV export (`api.exportCsv()`) is built in; there's no equivalent to AG Grid's
+  `exportDataAsExcel`.
+- **Alpha versioning.** Wit Grid is on the `0.1.0-alpha.x` line — see
+  [Migration Notes](/docs/next/migration-notes) before you pin a version in a production migration.
+
+## Suggested migration order
+
+<Steps>
+<Step>
+
+### Get one grid rendering
+
+Swap `<AgGridReact>` for `<Grid>`, rename `rowData`→`rows` and `columnDefs`→`columns`/`headerName`→`header`,
+fix up `getRowId` and `onGridReady`. See [Quick Start](/docs/next/quick-start).
+
+</Step>
+<Step>
+
+### Port column behavior
+
+Editors, renderers, filters, capability callbacks. See [Columns](/docs/next/columns).
+
+</Step>
+<Step>
+
+### Port the row model
+
+Client stays mostly as-is. Infinite/server datasources need their callback contract converted to
+`async`/`Promise`. See [Row Models](/docs/next/row-models).
+
+</Step>
+<Step>
+
+### Port grouping, master-detail, and theming last
+
+These have the largest structural differences (per-column flags → grid-level `initialState`, CSS-class themes →
+`GridApi` theme methods) — tackle them once the basics are solid.
+
+</Step>
+</Steps>
