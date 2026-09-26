@@ -1,0 +1,101 @@
+---
+title: Formulas
+description: Per-cell formulas with automatic dependency tracking, cycle detection, and live recalculation.
+icon: Sigma
+---
+
+Any cell can hold a formula instead of a plain value — a string starting with `=` that references other cells
+and recomputes automatically when they change, backed by a dependency graph (not a full recalculation on every
+edit).
+
+## Writing a formula
+
+A formula is just a cell value that starts with `=`. Typing one directly into an editable cell works exactly
+like a spreadsheet — no separate "formula mode" to opt into:
+
+```typescript
+api.setCellValue('row-1', 'total', '=[row-1:price] * [row-1:quantity]');
+```
+
+Cell references use `[rowId:colField]` — the grid's own row id and column field, not spreadsheet A1 notation.
+Reference any cell in the grid, including ones in other columns or other rows:
+
+```typescript
+api.setCellValue('row-3', 'variance', '=[row-3:actual] - [row-3:budget]');
+```
+
+## Functions
+
+`SUM`, `AVERAGE`, `MIN`, and `MAX` take a comma-separated argument list — each argument can be a cell reference,
+a literal number, or a nested expression:
+
+```typescript
+api.setCellValue('row-1', 'q1Total', '=SUM([row-1:jan], [row-1:feb], [row-1:mar])');
+api.setCellValue('row-1', 'avgDeal', '=AVERAGE([row-1:deal1], [row-1:deal2], [row-1:deal3])');
+```
+
+There's no range syntax (no `SUM(A1:A10)`) — list the cells explicitly, or compute the aggregate on your own data
+and write the result with `setCellValue` if the set of contributing cells is large or dynamic.
+
+Arithmetic supports `+`, `-`, `*`, `/`, parentheses, and unary minus, evaluated by a dedicated safe parser — never
+`eval()`.
+
+## Reading values
+
+`getCellValue` always returns the resolved, computed value — you never need to know whether a cell holds a
+formula to read it:
+
+```typescript
+const total = api.getCellValue('row-1', 'total'); // computed number, not "=[row-1:price] * [row-1:quantity]"
+```
+
+Use the formula-specific methods when you need the formula itself, or want to set/clear one without going
+through a plain value edit:
+
+```typescript
+api.getFormula('row-1', 'total'); // '=[row-1:price] * [row-1:quantity]' | undefined
+api.hasFormula('row-1', 'total'); // boolean
+api.setFormula('row-1', 'total', '=[row-1:price] * [row-1:quantity]');
+api.clearFormula('row-1', 'total'); // reverts the cell to its last raw (non-formula) value
+```
+
+## Dependency tracking & recalculation
+
+Every formula's references are parsed into a dependency graph. Editing `[row-1:price]` automatically invalidates
+and recomputes `total` — and anything else that depends on `total` — without recomputing the rest of the grid.
+Results are cached until a dependency actually changes.
+
+<Callout title='Circular references' type='warn'>
+	Setting a formula that would create a cycle (`total` depends on `price`, `price` depends on `total`) throws
+	immediately, synchronously, from the call that introduces it — the formula is rejected, not silently applied.
+	A cycle that could somehow only appear at evaluation time surfaces as a thrown error from that evaluation
+	instead of an infinite loop.
+</Callout>
+
+## Errors
+
+An expression that fails to evaluate (a non-numeric reference used arithmetically, for example) resolves to a
+string like `#VALUE! (reason)` rather than throwing — so a bad formula shows up visibly in the cell instead of
+crashing the render:
+
+```typescript
+api.getCellValue('row-1', 'total'); // '#VALUE! (Unexpected token...)' when the formula itself is malformed
+```
+
+## Combining with columns
+
+Formulas work with any column — `valueFormatter` still controls how the *computed* result is displayed, and
+`onCopy`/`onPaste` still control clipboard behavior:
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Total',
+		valueFormatter: ({ value }) => `$${Number(value).toFixed(2)}`,
+	},
+];
+```
+
+See [Columns](/docs/next/columns) for the full column configuration surface, and [Grid API](/docs/next/grid-api)
+for the complete `GridApi` reference.
