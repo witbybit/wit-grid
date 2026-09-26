@@ -46,15 +46,7 @@ function resolveAliasImport(specifier) {
 }
 
 function exportedReactSymbols() {
-	const names = new Set();
-	for (const statement of reactApi.exports) {
-		for (const match of statement.matchAll(/\b[A-Za-z_$][\w$]*\b/g)) {
-			const name = match[0];
-			if (['export', 'type', 'from', 'as'].includes(name)) continue;
-			names.add(name);
-		}
-	}
-	return names;
+	return new Set(reactApi.exports.map((item) => item.name));
 }
 
 function validateLinks(file, source, routes) {

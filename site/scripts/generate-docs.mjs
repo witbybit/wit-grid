@@ -214,10 +214,76 @@ function parseInterfaceDoc(sourceFile, interfaces, name) {
 function parseExports(sourceFile) {
 	const exports = [];
 	for (const statement of sourceFile.getStatements()) {
-		if (statement.getKind() !== SyntaxKind.ExportDeclaration && statement.getKind() !== SyntaxKind.ExportAssignment) continue;
-		exports.push(statement.getText().replace(/;$/, ''));
+		if (statement.getKind() !== SyntaxKind.ExportDeclaration) continue;
+		const moduleSpecifier = statement.getModuleSpecifierValue() ?? null;
+		const declarationIsTypeOnly = statement.isTypeOnly();
+		for (const specifier of statement.getNamedExports()) {
+			const name = specifier.getAliasNode()?.getText() ?? specifier.getName();
+			const isType = declarationIsTypeOnly || specifier.isTypeOnly();
+			exports.push({ name, kind: isType ? 'type' : 'value', source: moduleSpecifier });
+		}
 	}
+	exports.sort((a, b) => a.name.localeCompare(b.name));
 	return exports;
+}
+
+// The interfaces GridApi is composed from, in display order, with a human-readable section title.
+// If GridApi's own `extends` list ever drifts from this list, parseGridApi() throws at build time
+// instead of silently omitting a surface — see the drift guard at the end of that function.
+const GRID_API_GROUPS = [
+	{ interfaceName: 'GridDataApi', title: 'State, Rows & Cells' },
+	{ interfaceName: 'GridSelectionEditingApi', title: 'Selection & Editing' },
+	{ interfaceName: 'GridStructureApi', title: 'Columns, Sort, Filter & Grouping' },
+	{ interfaceName: 'GridRuntimeSubscriptionApi', title: 'Events, Subscriptions & Theming' },
+	{ interfaceName: 'GridPersistenceWorkspaceApi', title: 'Persistence & Workspace Views' },
+	{ interfaceName: 'GridDiagnosticsCapabilityApi', title: 'History, Panels & Capabilities' },
+];
+
+function memberSignature(member) {
+	const name = member.getName();
+	const optional = typeof member.hasQuestionToken === 'function' ? member.hasQuestionToken() : false;
+	const text = member.getText().replace(/;\s*$/, '');
+	let rest = text.slice(name.length);
+	if (optional && rest.startsWith('?')) rest = rest.slice(1);
+	rest = rest.replace(/^:\s*/, '');
+	return { name, optional, signature: normalizeType(rest) };
+}
+
+function parseGridApi() {
+	const surfacesSource = createSource('packages/core/src/api/GridApiSurfaces.ts');
+	const surfaceInterfaces = new Map(surfacesSource.getInterfaces().map((item) => [item.getName(), item]));
+
+	const groups = GRID_API_GROUPS.map(({ interfaceName, title }) => {
+		const node = surfaceInterfaces.get(interfaceName);
+		if (!node) throw new Error(`Could not find interface "${interfaceName}" in GridApiSurfaces.ts`);
+		const methods = node
+			.getMembers()
+			.filter((member) => member.getKind() === SyntaxKind.MethodSignature || member.getKind() === SyntaxKind.PropertySignature)
+			.map((member) => ({ ...memberSignature(member), ...getNodeDocs(member) }));
+		return { title, interfaceName, methods };
+	});
+
+	// Drift guard: fail the build if GridApi's own `extends` clause ever adds, removes, or renames a
+	// surface interface without GRID_API_GROUPS above being updated to match.
+	const gridApiNode = surfaceInterfaces.get('GridApi');
+	if (!gridApiNode) throw new Error('Could not find interface "GridApi" in GridApiSurfaces.ts');
+	const actualExtends = gridApiNode.getExtends().map((clause) => clause.getExpression().getText());
+	const expectedExtends = GRID_API_GROUPS.map((group) => group.interfaceName);
+	const missing = expectedExtends.filter((name) => !actualExtends.includes(name));
+	const extra = actualExtends.filter((name) => !expectedExtends.includes(name));
+	if (missing.length > 0 || extra.length > 0) {
+		throw new Error(
+			`GridApi's "extends" list in GridApiSurfaces.ts no longer matches GRID_API_GROUPS in generate-docs.mjs. ` +
+				`Missing from GRID_API_GROUPS: [${missing.join(', ')}]. No longer part of GridApi: [${extra.join(', ')}]. ` +
+				`Update GRID_API_GROUPS to match.`
+		);
+	}
+
+	return {
+		generatedAt: 'build',
+		source: 'packages/core/src/api/GridApiSurfaces.ts',
+		groups,
+	};
 }
 
 function parseApi() {
@@ -334,6 +400,7 @@ function writeJson(relativePath, data) {
 
 writeJson('generated/next/events.json', parseEvents());
 writeJson('generated/next/api.json', parseApi());
+writeJson('generated/next/grid-api.json', parseGridApi());
 writeJson('generated/next/examples.json', await parseExamples());
 
 console.log(check ? 'Generated docs are up to date.' : 'Generated docs updated.');
