@@ -8,13 +8,19 @@
 		"./showcase": "./src/showcase.ts",
 		"./basic-grid": "./src/demos/basic-grid/index.ts",
 		"./row-selection": "./src/demos/row-selection/index.ts",
-		"./persistence": "./src/demos/persistence/index.ts"
+		"./persistence": "./src/demos/persistence/index.ts",
+		"./advanced-filters": "./src/showcases/AdvancedFiltersDemo.tsx",
+		"./data-integrity": "./src/showcases/DataIntegrityLab.tsx",
+		"./infinite-server-scroll": "./src/showcases/InfiniteServerScroll.tsx",
+		"./native-cell-types": "./src/showcases/NativeCellTypesDemo.tsx",
+		"./row-drag": "./src/showcases/RowDragDemo.tsx"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@eregister/wit-grid-react": "workspace:*"
+		"@eregister/wit-grid-react": "workspace:*",
+		"lucide-react": "^0.379.0"
 	},
 	"peerDependencies": {
 		"react": "^18.0.0 || ^19.0.0",

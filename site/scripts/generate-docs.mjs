@@ -255,10 +255,49 @@ function parseExamples() {
 			source,
 		};
 	});
+	const promotedShowcases = [
+		{
+			id: 'infinite-server-scroll',
+			title: 'Infinite server scroll',
+			description: 'Server-side row model with block loading, sort/filter handoff, selection persistence, and load telemetry.',
+			sourcePath: 'packages/examples/src/showcases/InfiniteServerScroll.tsx',
+		},
+		{
+			id: 'advanced-filters',
+			title: 'Advanced filters',
+			description: 'Text, select, async, infinite, custom filters, global quick search, and named workspace views.',
+			sourcePath: 'packages/examples/src/showcases/AdvancedFiltersDemo.tsx',
+		},
+		{
+			id: 'row-drag',
+			title: 'Row drag and drop',
+			description: 'Managed and host-driven row reordering with drag lifecycle events and programmatic ordering.',
+			sourcePath: 'packages/examples/src/showcases/RowDragDemo.tsx',
+		},
+		{
+			id: 'native-cell-types',
+			title: 'Native cell types',
+			description: 'Built-in checkbox, multi-select, date, dropdown, number, and tag-style cells with editors.',
+			sourcePath: 'packages/examples/src/showcases/NativeCellTypesDemo.tsx',
+		},
+		{
+			id: 'data-integrity',
+			title: 'Data integrity lab',
+			description: 'Quality checks, dataset diffing, streamed updates, and conflict markers on the same grid.',
+			sourcePath: 'packages/examples/src/showcases/DataIntegrityLab.tsx',
+		},
+	];
+
+	for (const example of promotedShowcases) {
+		examples.push({
+			...example,
+			source: readRepo(example.sourcePath),
+		});
+	}
 
 	return {
 		generatedAt: 'build',
-		source: 'packages/examples/src/demos',
+		source: 'packages/examples/src',
 		examples,
 	};
 }

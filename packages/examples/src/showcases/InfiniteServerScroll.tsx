@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Grid, GridEventName } from '@eregister/wit-grid-react';
 import type { GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 import { Terminal, Server, Activity, ShieldAlert, Cpu } from 'lucide-react';
-import { createServerColumns, createServerDatasource, createServerRows, type ServerAuditRow } from './demoGridConfigs';
+import { createServerColumns, createServerDatasource, createServerRows, type ServerAuditRow } from './server-scroll-data';
 
 interface InfiniteServerScrollProps {
-	editTrigger: 'singleClick' | 'doubleClick';
-	arrowKeyNavigationEdit: boolean;
+	editTrigger?: 'singleClick' | 'doubleClick';
+	arrowKeyNavigationEdit?: boolean;
 	pinLeftColumns?: number;
 	pinRightColumns?: number;
 	onGridReady?: (event: GridReadyEvent<ServerAuditRow>) => void;
@@ -33,8 +33,8 @@ type SelectionStats = {
 };
 
 export default function InfiniteServerScroll({
-	editTrigger,
-	arrowKeyNavigationEdit,
+	editTrigger = 'doubleClick',
+	arrowKeyNavigationEdit = false,
 	pinLeftColumns = 0,
 	pinRightColumns = 0,
 	onGridReady,

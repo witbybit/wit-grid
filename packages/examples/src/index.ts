@@ -3,3 +3,8 @@ export type { WitGridExampleMeta, WitGridExampleModule } from './types';
 export * as BasicGridExample from './demos/basic-grid';
 export * as PersistenceExample from './demos/persistence';
 export * as RowSelectionExample from './demos/row-selection';
+export { default as AdvancedFiltersShowcase } from './showcases/AdvancedFiltersDemo';
+export { default as DataIntegrityShowcase } from './showcases/DataIntegrityLab';
+export { default as InfiniteServerScrollShowcase } from './showcases/InfiniteServerScroll';
+export { default as NativeCellTypesShowcase } from './showcases/NativeCellTypesDemo';
+export { default as RowDragShowcase } from './showcases/RowDragDemo';

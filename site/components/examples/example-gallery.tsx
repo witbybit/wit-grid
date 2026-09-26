@@ -8,6 +8,11 @@ const previewModules = {
 	'basic-grid': dynamic(() => import('@eregister/wit-grid-examples/basic-grid').then((module) => module.Component), { ssr: false }),
 	'row-selection': dynamic(() => import('@eregister/wit-grid-examples/row-selection').then((module) => module.Component), { ssr: false }),
 	persistence: dynamic(() => import('@eregister/wit-grid-examples/persistence').then((module) => module.Component), { ssr: false }),
+	'infinite-server-scroll': dynamic(() => import('@eregister/wit-grid-examples/infinite-server-scroll'), { ssr: false }),
+	'advanced-filters': dynamic(() => import('@eregister/wit-grid-examples/advanced-filters'), { ssr: false }),
+	'row-drag': dynamic(() => import('@eregister/wit-grid-examples/row-drag'), { ssr: false }),
+	'native-cell-types': dynamic(() => import('@eregister/wit-grid-examples/native-cell-types'), { ssr: false }),
+	'data-integrity': dynamic(() => import('@eregister/wit-grid-examples/data-integrity'), { ssr: false }),
 };
 
 type ExampleDoc = {
