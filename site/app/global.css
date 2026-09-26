@@ -63,6 +63,21 @@ body {
 	background: var(--color-fd-card);
 }
 
+.wg-examples-workbench {
+	width: min(1440px, calc(100vw - 24rem));
+	max-width: calc(100vw - 2rem);
+}
+
+.wg-example-rail {
+	scrollbar-width: thin;
+}
+
+.wg-example-stage {
+	height: min(72vh, 760px);
+	min-height: 620px;
+	background: #020617;
+}
+
 .wg-reference-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -92,6 +107,130 @@ body {
 	padding: 1rem;
 	font-size: 0.8125rem;
 	line-height: 1.55;
+}
+
+.wg-example-source {
+	max-height: min(72vh, 760px);
+	min-height: 620px;
+}
+
+.wg-code-viewer {
+	min-height: 620px;
+	max-height: min(72vh, 760px);
+	overflow: hidden;
+	border: 1px solid var(--color-fd-border);
+	border-radius: 8px;
+	background: #020617;
+	color: #dbeafe;
+}
+
+.wg-code-viewer-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border-bottom: 1px solid rgba(148, 163, 184, 0.22);
+	background: rgba(15, 23, 42, 0.88);
+	padding: 0.75rem 1rem;
+}
+
+.wg-code-copy {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	border: 1px solid rgba(148, 163, 184, 0.25);
+	border-radius: 6px;
+	background: rgba(15, 23, 42, 0.75);
+	color: #cbd5e1;
+	padding: 0.375rem 0.625rem;
+	font-size: 0.75rem;
+	font-weight: 600;
+	transition:
+		border-color 150ms ease,
+		color 150ms ease,
+		background 150ms ease;
+}
+
+.wg-code-copy:hover {
+	border-color: rgba(56, 189, 248, 0.6);
+	background: rgba(14, 165, 233, 0.12);
+	color: #e0f2fe;
+}
+
+.wg-code-viewer-body {
+	max-height: calc(min(72vh, 760px) - 3.25rem);
+	overflow: auto;
+	padding: 1rem 0;
+}
+
+.wg-code-viewer pre {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.65;
+	tab-size: 2;
+}
+
+.wg-code-line {
+	display: grid;
+	grid-template-columns: 4rem minmax(0, 1fr);
+	min-width: max-content;
+	padding: 0 1rem 0 0;
+}
+
+.wg-code-line:hover {
+	background: rgba(30, 41, 59, 0.65);
+}
+
+.wg-code-line-number {
+	user-select: none;
+	padding-right: 1rem;
+	text-align: right;
+	color: #475569;
+}
+
+.wg-code-line-content {
+	white-space: pre;
+	color: #dbeafe;
+}
+
+.wg-token-keyword {
+	color: #c084fc;
+}
+
+.wg-token-string {
+	color: #86efac;
+}
+
+.wg-token-comment {
+	color: #64748b;
+	font-style: italic;
+}
+
+.wg-token-number {
+	color: #fbbf24;
+}
+
+.wg-token-function {
+	color: #7dd3fc;
+}
+
+.wg-token-jsx {
+	color: #f472b6;
+}
+
+.wg-token-type {
+	color: #67e8f9;
+}
+
+.wg-token-operator {
+	color: #93c5fd;
+}
+
+@media (max-width: 1279px) {
+	.wg-examples-workbench {
+		width: 100%;
+		max-width: 100%;
+	}
 }
 
 .wg-docs-toolbar {
