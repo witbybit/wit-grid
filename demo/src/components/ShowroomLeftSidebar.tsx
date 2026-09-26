@@ -27,6 +27,7 @@ import {
 	Building2,
 	LayoutDashboard,
 	Activity,
+	BookOpen,
 } from 'lucide-react';
 import { APP_VERSION } from '../utils';
 import { GridPageType } from './GridShared';
@@ -39,6 +40,12 @@ interface ShowroomLeftSidebarProps {
 
 export default function ShowroomLeftSidebar({ activePage, leftSidebarCollapsed, setLeftSidebarCollapsed }: ShowroomLeftSidebarProps) {
 	const navItems = [
+		{
+			id: 'docs',
+			label: 'Docs Showcase',
+			subtitle: 'Package examples',
+			icon: BookOpen,
+		},
 		{
 			id: 'perf',
 			label: 'Risk & Greeks Engine',

@@ -6,7 +6,7 @@
 	"packageManager": "pnpm@10.33.0",
 	"scripts": {
 		"build": "pnpm run build:packages && pnpm run build:demo && pnpm run build:site",
-		"build:packages": "pnpm --filter @eregister/wit-grid-core run build && pnpm --filter @eregister/wit-grid-react run build",
+		"build:packages": "pnpm --filter @eregister/wit-grid-core run build && pnpm --filter @eregister/wit-grid-react run build && pnpm --filter @eregister/wit-grid-examples run typecheck",
 		"build:demo": "pnpm --filter \"demo-app\" run build",
 		"build:site": "pnpm --filter \"wit-grid-site\" run build",
 		"docs:generate": "pnpm --filter \"wit-grid-site\" run docs:generate",

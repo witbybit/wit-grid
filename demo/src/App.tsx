@@ -34,8 +34,10 @@ const AdvancedFiltersDemo = lazy(() => import('./pages/AdvancedFiltersDemo'));
 const DataIntegrityLab = lazy(() => import('./pages/DataIntegrityLab'));
 const ProjectsComplianceDemo = lazy(() => import('./pages/ProjectsComplianceDemo'));
 const KanbanBoardDemo = lazy(() => import('./pages/KanbanBoardDemo'));
+const DocsShowcase = lazy(() => import('./pages/DocsShowcase'));
 
 const PAGES: readonly GridPageType[] = [
+	'docs',
 	'devtools',
 	'perf',
 	'server',
@@ -229,6 +231,7 @@ export default function App() {
 	};
 
 	const activePageContent = (() => {
+		if (activePage === 'docs') return <DocsShowcase />;
 		if (activePage === 'perf') return <CalculationsArena {...commonGridProps} massiveColumns={massiveColumns} />;
 		if (activePage === 'server') return <InfiniteServerScroll {...commonGridProps} />;
 		if (activePage === 'ranges') return <SpreadsheetWorkspace {...commonGridProps} />;
@@ -261,6 +264,7 @@ export default function App() {
 
 	const showRightSidebar = !(
 		[
+			'docs',
 			'crud',
 			'projects',
 			'integrity',

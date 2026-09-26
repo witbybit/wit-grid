@@ -18,6 +18,7 @@ import {
 	GripVertical,
 	ShieldCheck,
 	Building2,
+	BookOpen,
 } from 'lucide-react';
 import { GridPageType, LatencyProfiler } from './GridShared';
 
@@ -63,9 +64,11 @@ export default function ShowroomTitleBanner({
 					{activePage === 'rowdrag' && <GripVertical className='w-4.5 h-4.5' />}
 					{activePage === 'integrity' && <ShieldCheck className='w-4.5 h-4.5' />}
 					{activePage === 'projects' && <Building2 className='w-4.5 h-4.5' />}
+					{activePage === 'docs' && <BookOpen className='w-4.5 h-4.5' />}
 				</span>
 				<div>
 					<h2 className='text-sm font-extrabold text-slate-200 leading-tight uppercase tracking-wider flex items-center gap-2'>
+						{activePage === 'docs' && 'Docs Showcase - package-backed examples'}
 						{activePage === 'integrity' && 'Data Integrity Lab — Quality · Diff · Live Stream · Conflict Resolution'}
 						{activePage === 'lab' && 'Performance Lab: compiled plans, DOM renderers, and glide telemetry'}
 						{activePage === 'perf' && 'Financial Risk & Option Greeks stress-test engine'}
@@ -85,6 +88,8 @@ export default function ShowroomTitleBanner({
 						{activePage === 'projects' && 'Projects Compliance Dashboard — Tree Data · Style Rules · Live Filter'}
 					</h2>
 					<p className='text-[10px] text-slate-400 leading-tight mt-0.5'>
+						{activePage === 'docs' &&
+							'These examples are imported from @eregister/wit-grid-examples, the same source package used by the documentation site.'}
 						{activePage === 'lab' &&
 							'Drive a 100,000 row by 1,000 column grid through violent scroll patterns while watching bounded-work counters stay flat.'}
 						{activePage === 'perf' &&

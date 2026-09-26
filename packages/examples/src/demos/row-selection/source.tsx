@@ -21,6 +21,6 @@ const columns: ColumnDef<Row>[] = [
 	{ field: 'priority', header: 'Priority', width: 140 },
 ];
 
-export default function EditableGridExample() {
+export default function RowSelectionExample() {
 	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' showStatusBar />;
 }

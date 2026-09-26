@@ -14,6 +14,7 @@
 		"docs:release:from-package": "node scripts/release-docs-version.mjs --from-package"
 	},
 	"dependencies": {
+		"@eregister/wit-grid-examples": "workspace:*",
 		"@eregister/wit-grid-react": "workspace:*",
 		"@tailwindcss/postcss": "latest",
 		"@types/mdx": "latest",

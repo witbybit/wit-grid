@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project, SyntaxKind } from 'ts-morph';
@@ -240,20 +240,25 @@ function parseMeta(source) {
 }
 
 function parseExamples() {
-	const exampleDirs = ['basic-grid', 'editable-grid', 'persistence'];
+	const examplesRoot = path.join(repoRoot, 'packages', 'examples', 'src', 'demos');
+	const exampleDirs = readdirSync(examplesRoot, { withFileTypes: true })
+		.filter((entry) => entry.isDirectory())
+		.map((entry) => entry.name)
+		.sort();
 	const examples = exampleDirs.map((dir) => {
-		const meta = parseMeta(readFileSync(path.join(siteRoot, 'examples', dir, 'meta.ts'), 'utf8'));
-		const source = readFileSync(path.join(siteRoot, 'examples', dir, 'source.tsx'), 'utf8');
+		const meta = parseMeta(readFileSync(path.join(examplesRoot, dir, 'meta.ts'), 'utf8'));
+		const sourcePath = `packages/examples/src/demos/${dir}/source.tsx`;
+		const source = readRepo(sourcePath);
 		return {
 			...meta,
-			sourcePath: `site/examples/${dir}/source.tsx`,
+			sourcePath,
 			source,
 		};
 	});
 
 	return {
 		generatedAt: 'build',
-		source: 'site/examples',
+		source: 'packages/examples/src/demos',
 		examples,
 	};
 }

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { CellRendererProps, CellEditorProps, GridApi, GridCellClickParams, GridContextMenuOptions } from '@eregister/wit-grid-react';
 
 export type GridPageType =
+	| 'docs'
 	| 'devtools'
 	| 'lab'
 	| 'perf'

@@ -5,6 +5,7 @@ const withMDX = createMDX();
 /** @type {import('next').NextConfig} */
 const nextConfig = {
 	reactStrictMode: true,
+	transpilePackages: ['@eregister/wit-grid-examples'],
 };
 
 export default withMDX(nextConfig);

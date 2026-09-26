@@ -78,10 +78,16 @@ function validateMdxImports(file, source) {
 function validateReactImports(file, source, exportedSymbols) {
 	for (const match of source.matchAll(/import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]@eregister\/wit-grid-react['"]/g)) {
 		for (const rawName of match[1].split(',')) {
-			const name = rawName.replace(/\btype\b/g, '').trim().split(/\s+as\s+/)[0]?.trim();
+			const name = rawName
+				.replace(/\btype\b/g, '')
+				.trim()
+				.split(/\s+as\s+/)[0]
+				?.trim();
 			if (!name) continue;
 			if (!exportedSymbols.has(name)) {
-				errors.push(`${file}:${lineForOffset(source, match.index ?? 0)} imports ${name} from @eregister/wit-grid-react, but it is not in generated public exports`);
+				errors.push(
+					`${file}:${lineForOffset(source, match.index ?? 0)} imports ${name} from @eregister/wit-grid-react, but it is not in generated public exports`
+				);
 			}
 		}
 	}
@@ -116,7 +122,8 @@ function snippetModule(snippet) {
 	}
 
 	const declarations = [];
-	if (!/\btype\s+Person\b/.test(snippet.code)) declarations.push('type Person = { id: string; name: string; team: string; score: number; status?: string };');
+	if (!/\btype\s+Person\b/.test(snippet.code))
+		declarations.push('type Person = { id: string; name: string; team: string; score: number; status?: string };');
 	if (!/\btype\s+Order\b/.test(snippet.code)) declarations.push('type Order = { id: string; customer: string; total: number };');
 	if (!/\b(?:const|let|var)\s+rows\b/.test(snippet.code)) declarations.push('declare const rows: Array<{ id: string }>;');
 	if (!/\b(?:const|let|var)\s+columns\b/.test(snippet.code)) declarations.push('declare const columns: any[];');
@@ -172,10 +179,14 @@ function writeSnippetHarness(snippets) {
 function typecheckSnippets(snippets) {
 	if (snippets.length === 0) return;
 	writeSnippetHarness(snippets);
-	const result = spawnSync('node', [path.join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join(snippetRoot, 'tsconfig.json')], {
-		cwd: siteRoot,
-		encoding: 'utf8',
-	});
+	const result = spawnSync(
+		'node',
+		[path.join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc'), '-p', path.join(snippetRoot, 'tsconfig.json')],
+		{
+			cwd: siteRoot,
+			encoding: 'utf8',
+		}
+	);
 	if (result.status !== 0) {
 		errors.push(`TypeScript snippet check failed:\n${result.stdout}${result.stderr}`);
 	}
