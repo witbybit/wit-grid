@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { redirect } from 'next/navigation';
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from 'fumadocs-ui/page';
-import defaultMdxComponents from 'fumadocs-ui/mdx';
+import { getMDXComponents } from '@/mdx-components';
 import { source } from '@/lib/source';
 import { currentDocsVersion } from '@/lib/versions';
 
@@ -18,7 +18,7 @@ export default async function Page({ params }: { params: Promise<{ slug?: string
 			<DocsTitle>{page.data.title}</DocsTitle>
 			<DocsDescription>{page.data.description}</DocsDescription>
 			<DocsBody>
-				<MDX components={defaultMdxComponents} />
+				<MDX components={getMDXComponents()} />
 			</DocsBody>
 		</DocsPage>
 	);

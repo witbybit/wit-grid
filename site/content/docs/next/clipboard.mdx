@@ -1,0 +1,71 @@
+---
+title: Clipboard
+description: Built-in copy/paste, TSV format, and per-column copy/paste overrides.
+---
+
+The grid owns a clipboard controller. <kbd>Ctrl</kbd>+<kbd>C</kbd> and <kbd>Ctrl</kbd>+<kbd>V</kbd> work
+automatically on a focused grid — no wiring required. The programmatic API below lets you trigger the same
+behavior from a toolbar button or an external trigger.
+
+```typescript
+// Copy whatever the user currently has selected
+await api.copySelectedRange();
+
+// Copy an explicit visual-index range (rows 0–4, columns 1–3)
+await api.copyRange(0, 4, 1, 3);
+
+// Paste TSV from the system clipboard into the current selection anchor
+await api.pasteFromClipboard();
+```
+
+## Format
+
+Copied data is TSV (tab-separated values) — compatible with Excel and Google Sheets by default. Each cell is
+serialized using the first matching rule, per column:
+
+1. The column's `onCopy` callback, if defined
+2. The column's `valueFormatter`, if defined
+3. The raw cell value
+
+## Per-column overrides
+
+Use `onCopy` to control what's written to the clipboard, and `onPaste` to pre-process incoming text before it's
+committed to the store — independently of how the value is displayed:
+
+```tsx
+import type { ColumnDef } from '@eregister/wit-grid-react';
+
+interface OrderRow {
+	id: string;
+	price: number;
+}
+
+const columns: ColumnDef<OrderRow>[] = [
+	{
+		field: 'price',
+		header: 'Price',
+		// Displayed: "$149.99"
+		valueFormatter: ({ value }) => `$${Number(value).toFixed(2)}`,
+		// Copied to clipboard: "149.99" — stays numeric when pasted into a spreadsheet
+		onCopy: ({ value }) => String(value),
+		// Pasted from clipboard: strip a leading "$" before it's written to the store
+		onPaste: ({ pastedText }) => Number(pastedText.replace(/^\$/, '')),
+	},
+];
+```
+
+## Events
+
+```typescript
+import { GridEventName } from '@eregister/wit-grid-react';
+
+api.addEventListener(GridEventName.cellsCopied, ({ payload }) => {
+	console.log(`Copied ${payload.rowCount}×${payload.colCount} cells`);
+});
+
+api.addEventListener(GridEventName.cellsPasted, ({ payload }) => {
+	console.log(`Pasted ${payload.rowCount}×${payload.colCount} cells`);
+});
+```
+
+See [Events](/docs/next/events) for the full generated payload shapes.

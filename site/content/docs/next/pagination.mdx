@@ -1,0 +1,48 @@
+---
+title: Pagination
+description: Enable the built-in page-window bar for client-side row data.
+---
+
+Set `pagination` to slice client-mode rows into pages and render a built-in pagination bar under the grid. It's
+a boolean shorthand or a config object:
+
+```tsx
+import { Grid } from '@eregister/wit-grid-react';
+
+export function PaginatedGrid({ rows, columns }: { rows: { id: string }[]; columns: any[] }) {
+	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} pagination={{ pageSize: 50 }} />;
+}
+```
+
+| Field         | Type     | Default | Notes                       |
+| ------------- | -------- | ------- | --------------------------- |
+| `pageSize`    | `number` | `100`   | Rows per page.              |
+| `initialPage` | `number` | `0`     | Zero-indexed starting page. |
+
+`pagination={true}` uses the defaults above. Pagination is **initial-only** — changing the prop after mount
+doesn't reconfigure a live grid instance.
+
+<Callout title='Client-mode row slicing' type='warn'>
+	The pagination bar slices rows on the client. For infinite or server row models, `pagination` shows page chrome driven by the block/range requests
+	your datasource already answers — your datasource still owns the actual paging, sorting, and filtering.
+</Callout>
+
+## Watching page state
+
+There's no dedicated pagination API yet; read the current page back off state, and subscribe to the
+`paginationChanged` event to react to page changes:
+
+```typescript
+import { GridEventName } from '@eregister/wit-grid-react';
+
+const { page, pageSize } = api.getState().pagination ?? {};
+
+api.addEventListener(GridEventName.paginationChanged, () => {
+	console.log(api.getState().pagination);
+});
+```
+
+## Styling
+
+The pagination bar renders with plain, unprefixed class names you can target directly: `og-pagination-btn`,
+`og-pagination-summary`, and `og-pagination-page-info`.

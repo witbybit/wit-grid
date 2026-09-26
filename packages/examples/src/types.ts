@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 
 export type WitGridExampleLevel = 'basic' | 'intermediate' | 'advanced';
 
-export type WitGridExampleCategory = 'Getting started' | 'Selection' | 'State' | 'Row models' | 'Filtering' | 'Editing' | 'Validation';
+export type WitGridExampleCategory = 'Getting started' | 'Selection' | 'State' | 'Row models' | 'Filtering' | 'Editing' | 'Validation' | 'Rendering';
 
 export type WitGridExampleMeta = {
 	id: string;

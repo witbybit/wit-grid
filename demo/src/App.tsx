@@ -15,7 +15,7 @@ const SpreadsheetWorkspace = lazy(() => import('./pages/SpreadsheetWorkspace'));
 const CustomEditorRenderer = lazy(() => import('./pages/CustomEditorRenderer'));
 const DynamicLayout = lazy(() => import('./pages/DynamicLayout'));
 const HeadlessSkinsPlayground = lazy(() => import('./pages/HeadlessSkinsPlayground'));
-const RealtimeDashboard = lazy(() => import('./pages/RealtimeDashboard'));
+const RealtimeDashboard = lazy(() => import('@eregister/wit-grid-examples/realtime-dashboard'));
 const GanttSchedulingWorkspace = lazy(() => import('./pages/GanttSchedulingWorkspace'));
 const NestedTablesGrouping = lazy(() => import('./pages/NestedTablesGrouping'));
 const PerformanceLab = lazy(() => import('./pages/PerformanceLab'));

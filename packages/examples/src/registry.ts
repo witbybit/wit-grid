@@ -59,6 +59,18 @@ const promotedShowcases = [
 		showcase: true,
 		sourcePath: 'packages/examples/src/showcases/DataIntegrityLab.tsx',
 	},
+	{
+		id: 'realtime-dashboard',
+		title: 'Realtime dashboard',
+		description:
+			'A 400-row live portfolio grid comparing DOM, imperative React, and standard React cell renderers side by side, plus the data integrity pipeline.',
+		category: 'Rendering',
+		level: 'advanced',
+		tags: ['renderers', 'performance', 'data integrity'],
+		docs: '/docs/next/columns',
+		showcase: true,
+		sourcePath: 'packages/examples/src/showcases/RealtimeDashboard.tsx',
+	},
 ] satisfies WitGridExampleMeta[];
 
 export const allExamples = [basicGrid, rowSelection, persistence, ...promotedShowcases] as const;

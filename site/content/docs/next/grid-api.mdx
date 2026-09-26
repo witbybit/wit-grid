@@ -1,0 +1,92 @@
+---
+title: Grid API
+description: The imperative GridApi surface — state, editing, selection, grouping, clipboard, and undo/redo.
+---
+
+Application code coordinates with the grid through `GridApi`. Get a handle either from `onGridReady` or with the
+`useGridApi()` hook anywhere inside a `<Grid>` subtree:
+
+```tsx
+import { useGridApi } from '@eregister/wit-grid-react';
+
+function Toolbar() {
+	const api = useGridApi();
+	return <button onClick={() => api.expandAllGroups()}>Expand all</button>;
+}
+```
+
+<Callout title="Generated prop reference" type="info">
+	This page is a curated tour of the imperative `GridApi` methods. For the full, generated list of `<Grid>`
+	component props, see [API reference](/docs/next/api-reference).
+</Callout>
+
+## State & cells
+
+| Method            | Signature                                     | Description                                  |
+| ----------------- | --------------------------------------------- | -------------------------------------------- |
+| `getState`        | `() => GridStateSnapshot`                     | Full synchronous state snapshot.             |
+| `getCellValue`    | `(rowId, colField) => unknown`                | Read the current value of a cell.            |
+| `setCellValue`    | `(rowId, colField, value) => GridWriteResult` | Write a cell, journaling an undo entry.      |
+| `batchCellValues` | `(updates, source?) => GridWriteResult`       | Apply several cell writes as one undo entry. |
+| `subscribeToKey`  | `(key, listener) => () => void`               | Subscribe to updates for one coordinate key. |
+
+## Selection & focus
+
+| Method            | Signature                             | Description                                                |
+| ----------------- | ------------------------------------- | ---------------------------------------------------------- |
+| `selectCell`      | `(pointer, source?) => void`          | Set active cell focus.                                     |
+| `selectRange`     | `(start, end, source?) => void`       | Highlight a rectangular selection.                         |
+| `getRowIndexById` | `(rowId) => number \| undefined`      | Visual index for a row id.                                 |
+| `getRowNode`      | `(rowId) => GridRowNode \| undefined` | Public row-node facade — data, selection, expansion state. |
+
+## Columns
+
+| Method               | Signature                      | Description                                 |
+| -------------------- | ------------------------------ | ------------------------------------------- |
+| `setColumns`         | `(columns) => void`            | Replace the active column schema.           |
+| `setColumnWidth`     | `(colField, width) => void`    | Resize a column.                            |
+| `setColumnVisible`   | `(colField, visible) => void`  | Show or hide a column without removing it.  |
+| `autoSizeColumn`     | `(colField, options?) => void` | Fit one column to its widest rendered cell. |
+| `autoSizeAllColumns` | `(options?) => void`           | Fit every visible column at once.           |
+
+## Sort, filter, grouping
+
+| Method                                      | Signature                       | Description                                                                 |
+| ------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------- |
+| `setSortModel`                              | `(sortModel \| null) => void`   | Set multi-column sort state.                                                |
+| `setFilterModel`                            | `(filterModel \| null) => void` | Set per-column filter state.                                                |
+| `toggleGroupExpanded`                       | `(groupId) => void`             | Toggle one group row.                                                       |
+| `isGroupExpanded`                           | `(groupId) => boolean`          | Read a group's expanded state.                                              |
+| `expandAllGroups` / `collapseAllGroups`     | `() => void`                    | Bulk group expansion.                                                       |
+| `toggleDetailExpanded` / `isDetailExpanded` | `(rowId) => void \| boolean`    | Master-detail row expansion. See [Master-Detail](/docs/next/master-detail). |
+
+## Clipboard
+
+| Method               | Signature                                           | Description                                |
+| -------------------- | --------------------------------------------------- | ------------------------------------------ |
+| `copySelectedRange`  | `() => Promise<void>`                               | Copy the current selection as TSV.         |
+| `copyRange`          | `(minRow, maxRow, minCol, maxCol) => Promise<void>` | Copy an explicit visual-index range.       |
+| `pasteFromClipboard` | `() => Promise<void>`                               | Paste TSV at the current selection anchor. |
+
+See the full walkthrough in [Clipboard](/docs/next/clipboard).
+
+## History
+
+| Method          | Signature    | Description                    |
+| --------------- | ------------ | ------------------------------ |
+| `undo` / `redo` | `() => void` | Traverse the mutation journal. |
+
+## Batching writes
+
+Use `batchCellValues` to apply several cell writes as a single undo entry, instead of calling `setCellValue`
+in a loop:
+
+```typescript
+api.batchCellValues(
+	[
+		{ rowId: 'S-1001', colField: 'revenue', value: 150000 },
+		{ rowId: 'S-1001', colField: 'opex', value: 80000 },
+	],
+	'api'
+);
+```

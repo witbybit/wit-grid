@@ -2,6 +2,16 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Project, SyntaxKind } from 'ts-morph';
+import { codeToTokens } from 'shiki';
+
+// Examples are highlighted once here, at build time, and shipped as pre-computed token arrays —
+// the Examples page renders them directly instead of re-implementing syntax highlighting client-side.
+const EXAMPLE_HIGHLIGHT_THEME = 'github-dark';
+
+async function highlightSource(source) {
+	const { tokens } = await codeToTokens(source, { lang: 'tsx', theme: EXAMPLE_HIGHLIGHT_THEME });
+	return tokens.map((line) => line.map((token) => ({ content: token.content, color: token.color })));
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const siteRoot = path.resolve(__dirname, '..');
@@ -239,7 +249,38 @@ function parseMeta(source) {
 	return { id, title, description };
 }
 
-function parseExamples() {
+// Reads packages/examples/src/registry.ts's `promotedShowcases` array literal so the
+// showcase metadata has exactly one source of truth (the shared examples package),
+// instead of a second hand-maintained copy living in this script.
+function parseRegistryShowcases() {
+	const registryPath = 'packages/examples/src/registry.ts';
+	const registrySource = createSource(registryPath);
+	const declaration = registrySource.getVariableDeclarations().find((decl) => decl.getName() === 'promotedShowcases');
+	if (!declaration) throw new Error(`Could not find "promotedShowcases" in ${registryPath}`);
+
+	const arrayLiteral = declaration.getInitializerIfKind(SyntaxKind.SatisfiesExpression)?.getExpression() ?? declaration.getInitializer();
+	if (!arrayLiteral || arrayLiteral.getKind() !== SyntaxKind.ArrayLiteralExpression) {
+		throw new Error(`"promotedShowcases" in ${registryPath} must be an array literal.`);
+	}
+
+	return arrayLiteral.getElements().map((element) => {
+		const entry = {};
+		for (const property of element.getProperties()) {
+			if (property.getKind() !== SyntaxKind.PropertyAssignment) continue;
+			const key = property.getName();
+			const initializer = property.getInitializer();
+			const text = initializer?.getText() ?? '';
+			if (initializer?.getKind() === SyntaxKind.ArrayLiteralExpression) {
+				entry[key] = initializer.getElements().map((el) => el.getText().replace(/^['"]|['"]$/g, ''));
+			} else {
+				entry[key] = text.replace(/^['"]|['"]$/g, '');
+			}
+		}
+		return entry;
+	});
+}
+
+async function parseExamples() {
 	const examplesRoot = path.join(repoRoot, 'packages', 'examples', 'src', 'demos');
 	const exampleDirs = readdirSync(examplesRoot, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory())
@@ -255,49 +296,25 @@ function parseExamples() {
 			source,
 		};
 	});
-	const promotedShowcases = [
-		{
-			id: 'infinite-server-scroll',
-			title: 'Infinite server scroll',
-			description: 'Server-side row model with block loading, sort/filter handoff, selection persistence, and load telemetry.',
-			sourcePath: 'packages/examples/src/showcases/InfiniteServerScroll.tsx',
-		},
-		{
-			id: 'advanced-filters',
-			title: 'Advanced filters',
-			description: 'Text, select, async, infinite, custom filters, global quick search, and named workspace views.',
-			sourcePath: 'packages/examples/src/showcases/AdvancedFiltersDemo.tsx',
-		},
-		{
-			id: 'row-drag',
-			title: 'Row drag and drop',
-			description: 'Managed and host-driven row reordering with drag lifecycle events and programmatic ordering.',
-			sourcePath: 'packages/examples/src/showcases/RowDragDemo.tsx',
-		},
-		{
-			id: 'native-cell-types',
-			title: 'Native cell types',
-			description: 'Built-in checkbox, multi-select, date, dropdown, number, and tag-style cells with editors.',
-			sourcePath: 'packages/examples/src/showcases/NativeCellTypesDemo.tsx',
-		},
-		{
-			id: 'data-integrity',
-			title: 'Data integrity lab',
-			description: 'Quality checks, dataset diffing, streamed updates, and conflict markers on the same grid.',
-			sourcePath: 'packages/examples/src/showcases/DataIntegrityLab.tsx',
-		},
-	];
 
-	for (const example of promotedShowcases) {
+	for (const showcase of parseRegistryShowcases()) {
 		examples.push({
-			...example,
-			source: readRepo(example.sourcePath),
+			id: showcase.id,
+			title: showcase.title,
+			description: showcase.description,
+			sourcePath: showcase.sourcePath,
+			source: readRepo(showcase.sourcePath),
 		});
+	}
+
+	for (const example of examples) {
+		example.tokens = await highlightSource(example.source);
 	}
 
 	return {
 		generatedAt: 'build',
 		source: 'packages/examples/src',
+		theme: EXAMPLE_HIGHLIGHT_THEME,
 		examples,
 	};
 }
@@ -317,6 +334,6 @@ function writeJson(relativePath, data) {
 
 writeJson('generated/next/events.json', parseEvents());
 writeJson('generated/next/api.json', parseApi());
-writeJson('generated/next/examples.json', parseExamples());
+writeJson('generated/next/examples.json', await parseExamples());
 
 console.log(check ? 'Generated docs are up to date.' : 'Generated docs updated.');

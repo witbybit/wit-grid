@@ -1,12 +1,132 @@
 ---
 title: Theming
-description: Use built-in themes or map theme tokens into your application UI.
+description: Use built-in themes, switch at runtime, or compose your own theme from CSS tokens.
 ---
 
-The React package exports built-in theme helpers from the core package:
+Wit Grid ships a shadcn-style, CSS-variable theming system: seven built-in themes, runtime switching with no
+flash of the wrong theme, and full custom theme composition. All theme interaction goes through `GridApi` — the
+same handle you get from `onGridReady` or `useGridApi()`. There's no separate theming object to construct.
+
+## Built-in themes
+
+<Cards>
+	<Card title='dark' description='Default. High-contrast dark surface tuned for long sessions.' />
+	<Card title='light' description='Neutral light surface for bright environments.' />
+	<Card title='light-hc' description='High-contrast light theme for accessibility.' />
+	<Card title='dark-hc' description='High-contrast dark theme for accessibility.' />
+	<Card title='cool-blue' description='Modern tech aesthetic with a blue accent.' />
+	<Card title='warm-orange' description='Warm accent theme.' />
+	<Card title='minimal-monochrome' description='Greyscale theme with no accent color.' />
+</Cards>
+
+## Setting a theme
+
+Set a built-in theme name declaratively via `initialState`. It's resolved once, atomically, before the grid's
+first paint — no flash of the default theme.
+
+<Tabs items={['React', 'Core (framework-agnostic)']}>
+	<Tab value="React">
+		```typescript
+		<Grid initialState={{ themeName: 'light' }} />
+		```
+	</Tab>
+	<Tab value="Core (framework-agnostic)">
+		```typescript
+		import { createClientGrid } from '@eregister/wit-grid-core';
+
+    	const host = createClientGrid(config);
+
+    	host.switchTheme('light'); // Switch to light theme
+    	host.switchTheme('dark-hc'); // Switch to high-contrast dark
+    	host.switchTheme('cool-blue'); // Modern tech aesthetic
+    	```
+    </Tab>
+
+</Tabs>
+
+## Switching themes at runtime
+
+Get `api` from `onGridReady` (React) or the return value of `createClientGrid` / `createInfiniteGrid` /
+`createServerPageGrid` (core), then call the theme methods directly on it:
+
+```typescript
+api.switchTheme('dark');
+api.switchTheme('cool-blue');
+
+const theme = api.getTheme();
+
+const unsubscribe = api.onThemeChange((theme) => {
+	console.log('Theme changed:', theme);
+});
+```
+
+## Composing a custom theme
+
+`ThemeTokens` is a plain flat object — a themed variant of a built-in theme is just a spread, no helper function
+required:
+
+```typescript
+import { getBuiltInTheme, type ThemeTokens } from '@eregister/wit-grid-core';
+
+export const acmeTheme: ThemeTokens = {
+	...getBuiltInTheme('light'),
+	bgColor: '#1a1a2e',
+	textColor: '#eaeaea',
+	focusRing: '#00d4ff',
+	headerBg: '#0f0f1e',
+	headerText: '#b0b0b0',
+};
+```
+
+Apply it declaratively (atomic, no flicker) or imperatively:
+
+```typescript
+<Grid initialState={{ themeOverrides: acmeTheme }} />
+```
+
+```typescript
+api.setTheme(acmeTheme);
+```
+
+<Callout title="Incremental tweaks" type="info">
+	For small changes on top of whatever theme is currently active, use `api.mergeTheme({ focusRing: '#10b981' })`
+	instead of `setTheme` — it merges into the active theme rather than replacing it.
+</Callout>
+
+## System color scheme detection
+
+`ThemeManager.detectSystemPreference()` is a standalone static helper — use it to pick the right built-in theme
+name up front:
+
+```typescript
+import { ThemeManager } from '@eregister/wit-grid-core';
+
+const prefersDark = ThemeManager.detectSystemPreference();
+
+<Grid initialState={{ themeName: prefersDark ? 'dark' : 'light' }} />
+```
+
+To keep the grid in sync as the OS preference changes live:
+
+```typescript
+useEffect(() => {
+	const mql = window.matchMedia('(prefers-color-scheme: dark)');
+	const onChange = (e: MediaQueryListEvent) => api.switchTheme(e.matches ? 'dark' : 'light');
+	mql.addEventListener('change', onChange);
+	return () => mql.removeEventListener('change', onChange);
+}, [api]);
+```
+
+## Bridging into host CSS
+
+Use `themeToCSSVariables` when you want to expose grid theme tokens as CSS custom properties on your own
+stylesheet — useful for styling a toolbar or footer to match the active grid theme:
 
 ```tsx
 import { BUILT_IN_THEMES, getBuiltInTheme, themeToCSSVariables } from '@eregister/wit-grid-react';
+
+const styleVars = themeToCSSVariables(getBuiltInTheme('dark'));
 ```
 
-Use `themeToCSSVariables` when you want to bridge grid theme tokens into a host stylesheet.
+See the [full theming guide](https://github.com/witbybit/open-grid/blob/main/THEMING_GUIDE.md) in the repository
+for the complete `ThemeTokens` token reference, merging semantics, and CSS variable customization.

@@ -13,7 +13,8 @@
 		"./data-integrity": "./src/showcases/DataIntegrityLab.tsx",
 		"./infinite-server-scroll": "./src/showcases/InfiniteServerScroll.tsx",
 		"./native-cell-types": "./src/showcases/NativeCellTypesDemo.tsx",
-		"./row-drag": "./src/showcases/RowDragDemo.tsx"
+		"./row-drag": "./src/showcases/RowDragDemo.tsx",
+		"./realtime-dashboard": "./src/showcases/RealtimeDashboard.tsx"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"

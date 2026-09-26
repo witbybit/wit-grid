@@ -15,6 +15,12 @@ const previewModules = {
 	'row-drag': dynamic(() => import('@eregister/wit-grid-examples/row-drag'), { ssr: false }),
 	'native-cell-types': dynamic(() => import('@eregister/wit-grid-examples/native-cell-types'), { ssr: false }),
 	'data-integrity': dynamic(() => import('@eregister/wit-grid-examples/data-integrity'), { ssr: false }),
+	'realtime-dashboard': dynamic(() => import('@eregister/wit-grid-examples/realtime-dashboard'), { ssr: false }),
+};
+
+type HighlightToken = {
+	content: string;
+	color?: string;
 };
 
 type ExampleDoc = {
@@ -22,77 +28,10 @@ type ExampleDoc = {
 	title: string;
 	description: string;
 	source: string;
+	tokens?: HighlightToken[][];
 };
 
 type GalleryMode = 'preview' | 'source';
-
-type CodeToken = {
-	text: string;
-	kind: 'plain' | 'keyword' | 'string' | 'comment' | 'number' | 'function' | 'jsx' | 'type' | 'operator';
-};
-
-const codeKeywords = new Set([
-	'as',
-	'async',
-	'await',
-	'break',
-	'case',
-	'catch',
-	'class',
-	'const',
-	'continue',
-	'default',
-	'do',
-	'else',
-	'export',
-	'extends',
-	'false',
-	'finally',
-	'for',
-	'from',
-	'function',
-	'if',
-	'import',
-	'in',
-	'interface',
-	'let',
-	'new',
-	'null',
-	'of',
-	'return',
-	'satisfies',
-	'switch',
-	'throw',
-	'true',
-	'try',
-	'type',
-	'undefined',
-	'use',
-	'while',
-]);
-
-function tokenizeLine(line: string): CodeToken[] {
-	const tokens: CodeToken[] = [];
-	const pattern =
-		/(\/\/.*|\/\*.*?\*\/|(["'`])(?:\\.|(?!\2).)*\2|\b\d+(?:\.\d+)?\b|<\/?[A-Z][\w.:-]*|[{}()[\].,;:<>/=+\-*|&!?]+|\b[A-Za-z_$][\w$]*\b|\s+|.)/g;
-	let match: RegExpExecArray | null;
-
-	while ((match = pattern.exec(line))) {
-		const text = match[0];
-		let kind: CodeToken['kind'] = 'plain';
-		if (text.startsWith('//') || text.startsWith('/*')) kind = 'comment';
-		else if (/^["'`]/.test(text)) kind = 'string';
-		else if (/^\d/.test(text)) kind = 'number';
-		else if (/^<\/?[A-Z]/.test(text)) kind = 'jsx';
-		else if (codeKeywords.has(text)) kind = 'keyword';
-		else if (/^[A-Z][A-Za-z0-9_$]*$/.test(text)) kind = 'type';
-		else if (/^[{}()[\].,;:<>/=+\-*|&!?]+$/.test(text)) kind = 'operator';
-		else if (/^[A-Za-z_$][\w$]*$/.test(text) && line.slice(pattern.lastIndex).trimStart().startsWith('(')) kind = 'function';
-		tokens.push({ text, kind });
-	}
-
-	return tokens;
-}
 
 function getExampleTone(level: WitGridExampleMeta['level']) {
 	if (level === 'advanced') return 'border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300';
@@ -100,10 +39,10 @@ function getExampleTone(level: WitGridExampleMeta['level']) {
 	return 'border-fd-border bg-fd-muted text-fd-muted-foreground';
 }
 
-function CodeViewer({ source, sourcePath }: { source: string; sourcePath: string }) {
+function CodeViewer({ source, sourcePath, tokens }: { source: string; sourcePath: string; tokens?: HighlightToken[][] }) {
 	const [copied, setCopied] = useState(false);
 	const fileName = sourcePath.split('/').at(-1) ?? 'source.tsx';
-	const lines = source.split('\n');
+	const lines: HighlightToken[][] = tokens ?? source.split('\n').map((line) => [{ content: line }]);
 
 	async function copySource() {
 		await navigator.clipboard.writeText(source);
@@ -125,14 +64,14 @@ function CodeViewer({ source, sourcePath }: { source: string; sourcePath: string
 			</div>
 			<div className='wg-code-viewer-body'>
 				<pre>
-					{lines.map((line, index) => (
+					{lines.map((lineTokens, index) => (
 						<span key={index} className='wg-code-line'>
 							<span className='wg-code-line-number'>{index + 1}</span>
 							<span className='wg-code-line-content'>
-								{line
-									? tokenizeLine(line).map((token, tokenIndex) => (
-											<span key={tokenIndex} className={`wg-token-${token.kind}`}>
-												{token.text}
+								{lineTokens.length > 0
+									? lineTokens.map((token, tokenIndex) => (
+											<span key={tokenIndex} style={token.color ? { color: token.color } : undefined}>
+												{token.content}
 											</span>
 										))
 									: ' '}
@@ -152,7 +91,8 @@ export function ExampleGallery() {
 	const [mode, setMode] = useState<GalleryMode>('preview');
 	const selected = items.find((example) => example.id === selectedId) ?? items[0];
 	const Preview = selected ? previewModules[selected.id as keyof typeof previewModules] : null;
-	const source = selected ? (sourceById.get(selected.id as keyof typeof previewModules)?.source ?? '') : '';
+	const selectedDoc = selected ? sourceById.get(selected.id as keyof typeof previewModules) : undefined;
+	const source = selectedDoc?.source ?? '';
 
 	return (
 		<div className='not-prose wg-examples-workbench flex flex-col gap-4'>
@@ -249,7 +189,7 @@ export function ExampleGallery() {
 								<Preview />
 							</div>
 						) : (
-							<CodeViewer source={source} sourcePath={selected.sourcePath} />
+							<CodeViewer source={source} sourcePath={selected.sourcePath} tokens={selectedDoc?.tokens} />
 						)}
 					</div>
 				</section>

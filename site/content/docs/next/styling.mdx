@@ -1,0 +1,65 @@
+---
+title: Conditional Styling
+description: Style rows, cells, and header cells declaratively based on row or column data.
+---
+
+`styleRules` applies CSS classes conditionally, based on row data or column identity — no per-render inline style
+computation, and no separate compiler step. Pass an array of rule objects to `<Grid styleRules={...} />`; the
+grid compiles and re-applies them whenever the array reference changes.
+
+```tsx
+import { useMemo } from 'react';
+import { Grid, type ColumnDef, type StyleRule } from '@eregister/wit-grid-react';
+
+interface ProductRow {
+	id: string;
+	name: string;
+	price: number;
+	status: 'Active' | 'Inactive';
+}
+
+export function ProductGrid({ rows, columns }: { rows: ProductRow[]; columns: ColumnDef<ProductRow>[] }) {
+	const styleRules = useMemo<StyleRule<ProductRow>[]>(
+		() => [
+			{
+				kind: 'row',
+				when: (row) => row.status === 'Inactive',
+				rowClass: 'row-inactive',
+			},
+			{
+				kind: 'cell',
+				field: 'price',
+				when: (row) => row.price > 500,
+				cellClass: 'cell-high-value',
+			},
+			{
+				kind: 'headerCell',
+				field: 'price',
+				when: () => true,
+				headerCellClass: 'header-emphasis',
+			},
+		],
+		[]
+	);
+
+	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} styleRules={styleRules} />;
+}
+```
+
+## Rule kinds
+
+| `kind`       | Targets                                     | Class field       | `when` receives                         |
+| ------------ | ------------------------------------------- | ----------------- | --------------------------------------- |
+| `row`        | A data row                                  | `rowClass`        | `(row, params)`                         |
+| `groupRow`   | A group row                                 | `rowClass`        | `(visualRow)` — optional, defaults true |
+| `detailRow`  | A master-detail row                         | `rowClass`        | `(visualRow)` — optional, defaults true |
+| `cell`       | A cell, optionally scoped to `field`        | `cellClass`       | `(row, col, params)`                    |
+| `headerCell` | A header cell, optionally scoped to `field` | `headerCellClass` | `(col)`                                 |
+
+`field` on `cell` and `headerCell` rules is optional — omit it to evaluate the rule against every column.
+Rules are additive: a row or cell can match several rules at once, and all matching classes are applied together.
+
+<Callout title='Prefer styleRules for conditional decoration' type='info'>
+	Use `styleRules` for data-driven decoration (status colors, thresholds, validation highlights). Use the [theming API](/docs/next/theming) for
+	token-level, grid-wide visual changes (surface colors, borders, fonts).
+</Callout>

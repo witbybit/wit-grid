@@ -1,0 +1,92 @@
+---
+title: Master-Detail
+description: Nest a fully interactive sub-grid, or any custom component, under an expandable parent row.
+---
+
+Master-detail renders a custom component — commonly a nested `<Grid>` — directly under an expandable parent
+row. Enable it with `initialState.masterDetailEnabled`, size the expanded rows with `detailRowHeight`, and supply
+the content with `detailRowRenderer`.
+
+```tsx
+import { useCallback, useMemo } from 'react';
+import { Grid, type ColumnDef, type VisualRow, type GridApi, type CellRendererProps } from '@eregister/wit-grid-react';
+
+interface OrderRow {
+	id: string;
+	customerName: string;
+	totalAmount: number;
+}
+
+interface OrderItemRow {
+	id: string;
+	itemName: string;
+	price: number;
+	quantity: number;
+}
+
+const DetailToggleRenderer = ({ rowId, api }: CellRendererProps<OrderRow>) => (
+	<button onClick={() => api.toggleDetailExpanded(rowId)}>{api.isDetailExpanded(rowId) ? '▼' : '▶'}</button>
+);
+
+const NestedItemsGrid = ({ visualRow }: { visualRow: VisualRow<OrderRow> }) => {
+	if (visualRow.kind !== 'detail') return null;
+
+	const items: OrderItemRow[] = [
+		{ id: 'ITM-01', itemName: 'Widget A', price: 25, quantity: 4 },
+		{ id: 'ITM-02', itemName: 'Widget B', price: 12.5, quantity: 2 },
+	];
+
+	const detailColumns = useMemo<ColumnDef<OrderItemRow>[]>(
+		() => [
+			{ field: 'itemName', header: 'Item', width: 220 },
+			{ field: 'price', header: 'Price', width: 100 },
+			{ field: 'quantity', header: 'Qty', width: 80 },
+		],
+		[]
+	);
+
+	return (
+		<div style={{ height: '100%', padding: '8px 8px 8px 40px' }}>
+			<Grid rows={items} columns={detailColumns} getRowId={(row) => row.id} enableNavigation />
+		</div>
+	);
+};
+
+export function MasterOrdersGrid({ orders }: { orders: OrderRow[] }) {
+	const masterColumns = useMemo<ColumnDef<OrderRow>[]>(
+		() => [
+			{ field: 'toggle', header: '', width: 45, cellRenderer: DetailToggleRenderer },
+			{ field: 'id', header: 'Order ID', width: 120 },
+			{ field: 'customerName', header: 'Customer', width: 220 },
+			{ field: 'totalAmount', header: 'Total', width: 120 },
+		],
+		[]
+	);
+
+	const detailRowRenderer = useCallback(
+		({ visualRow }: { visualRow: VisualRow<OrderRow>; api: GridApi<OrderRow> }) => <NestedItemsGrid visualRow={visualRow} />,
+		[]
+	);
+
+	return (
+		<Grid
+			rows={orders}
+			columns={masterColumns}
+			getRowId={(row) => row.id}
+			initialState={{ masterDetailEnabled: true }}
+			detailRowHeight={220}
+			detailRowRenderer={detailRowRenderer}
+		/>
+	);
+}
+```
+
+<Callout title="Nested grids are independent instances" type="info">
+	The grid rendered inside `detailRowRenderer` is a completely separate `<Grid>` instance with its own state,
+	selection, and API handle — it isn't a view into the parent's data. Fetch or derive its rows from
+	`visualRow.parentId` (the master row's id) as needed.
+</Callout>
+
+Toggle detail rows programmatically with `api.toggleDetailExpanded(rowId)`, and check state with
+`api.isDetailExpanded(rowId)`. `detailRowRenderer` receives `{ visualRow, api }` where `api` is the **master**
+grid's `GridApi` — use it to read sibling row data or coordinate with the parent grid.

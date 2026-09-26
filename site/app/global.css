@@ -54,6 +54,25 @@ body {
 	background: linear-gradient(180deg, var(--wg-page-gradient-start), var(--wg-page-gradient-end) 28rem), var(--wg-page-background);
 }
 
+.wg-hero-grid-frame {
+	overflow: hidden;
+	border: 1px solid var(--color-fd-border);
+	border-radius: 12px;
+	background: var(--color-fd-card);
+	box-shadow: 0 24px 48px -24px rgba(15, 23, 42, 0.25);
+}
+
+.wg-hero-grid {
+	height: 480px;
+	min-height: 360px;
+}
+
+@media (max-width: 640px) {
+	.wg-hero-grid {
+		height: 360px;
+	}
+}
+
 .wg-grid-preview {
 	height: 380px;
 	min-height: 320px;
@@ -191,39 +210,6 @@ body {
 .wg-code-line-content {
 	white-space: pre;
 	color: #dbeafe;
-}
-
-.wg-token-keyword {
-	color: #c084fc;
-}
-
-.wg-token-string {
-	color: #86efac;
-}
-
-.wg-token-comment {
-	color: #64748b;
-	font-style: italic;
-}
-
-.wg-token-number {
-	color: #fbbf24;
-}
-
-.wg-token-function {
-	color: #7dd3fc;
-}
-
-.wg-token-jsx {
-	color: #f472b6;
-}
-
-.wg-token-type {
-	color: #67e8f9;
-}
-
-.wg-token-operator {
-	color: #93c5fd;
 }
 
 @media (max-width: 1279px) {

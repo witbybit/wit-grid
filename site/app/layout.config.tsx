@@ -20,5 +20,10 @@ export const baseOptions: BaseLayoutProps = {
 			url: '/docs/next/api-reference',
 			active: 'nested-url',
 		},
+		{
+			text: 'GitHub',
+			url: 'https://github.com/witbybit/open-grid',
+			external: true,
+		},
 	],
 };

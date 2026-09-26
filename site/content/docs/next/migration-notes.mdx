@@ -3,8 +3,25 @@ title: Migration Notes
 description: Track breaking changes and release-specific upgrade notes.
 ---
 
-Migration notes should be updated whenever a release changes public behavior, exported APIs, event payloads, or documented defaults.
+<Callout title='Alpha surface' type='warn'>
+	Wit Grid is on the `0.1.0-alpha.x` line. Public APIs (`GridApi`, `ColumnDef`, event payloads) can still change between alpha releases without a
+	formal migration entry. Pin an exact version rather than a range until 1.0.
+</Callout>
 
-## Current Line
+Migration notes are updated whenever a release changes public behavior, exported APIs, event payloads, or
+documented defaults. Each fixed version directory (e.g. `1.4`) carries its own copy of this page describing the
+delta from the version before it.
 
-`next` tracks unreleased documentation. When a release is cut, copy `next` into a fixed version directory and add release-specific migration notes there.
+## `next` (unreleased)
+
+No breaking changes are queued for the next release yet. When one lands, add an entry here in this shape:
+
+```md
+### `<old-api>` renamed to `<new-api>`
+
+**Why:** short reason for the change.
+**Before:** \`\`\`tsx ... \`\`\`
+**After:** \`\`\`tsx ... \`\`\`
+```
+
+When a release is cut, copy `next` into a fixed version directory and start a fresh, empty "unreleased" section here.

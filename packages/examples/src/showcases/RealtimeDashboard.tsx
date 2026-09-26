@@ -1,27 +1,302 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * Realtime Dashboard — a 400-row live portfolio grid showcasing three renderer protocols side
+ * by side (DOM, imperative React, and standard React), plus the built-in data integrity
+ * pipeline (validation, quality checks, diffing, a live transaction stream, and conflicts).
+ *
+ *  - price   — DomCellRenderer sparkline: zero React overhead, direct canvas mutation
+ *  - change  — imperative React renderer: updates bypass React's scheduler entirely
+ *  - volume  — standard React renderer (memo), shown as contrast
+ */
+'use client';
+
+import React, { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
 	Grid,
 	GridEventName,
 	duplicateValueRule,
+	type ColumnDef,
+	type DomCellRenderer,
 	type GridApi,
 	type GridContextMenuOptions,
-	type GridReadyEvent,
-	type StyleRule,
 	type GridIntegrityIssue,
+	type GridReadyEvent,
 	type GridTransactionStreamHandle,
+	type ImperativeCellHandle,
+	type CellRendererProps,
+	type StyleRule,
 } from '@eregister/wit-grid-react';
 import { Activity, BarChart3, Code2, RefreshCw, TrendingUp, Zap, ShieldCheck } from 'lucide-react';
-import { createDashboardColumns, createDashboardRows } from './demoGridConfigs';
-import type { DashboardStockRow } from '../components/FastRenderers';
+
+// ─── Data model ────────────────────────────────────────────────────────────────
+
+export interface DashboardStockRow {
+	id: string;
+	symbol: string;
+	name: string;
+	price: string;
+	change: string;
+	volume: string;
+	risk: 'low' | 'medium' | 'high';
+}
+
+const SEED_STOCKS = [
+	{ id: 'AAPL', name: 'Apple Inc.', price: 175.5 },
+	{ id: 'MSFT', name: 'Microsoft Corp.', price: 420.2 },
+	{ id: 'GOOGL', name: 'Alphabet Inc.', price: 150.1 },
+	{ id: 'NVDA', name: 'NVIDIA Corp.', price: 875 },
+	{ id: 'TSLA', name: 'Tesla Inc.', price: 170.3 },
+	{ id: 'AMZN', name: 'Amazon.com Inc.', price: 178.4 },
+	{ id: 'NFLX', name: 'Netflix Inc.', price: 610.5 },
+	{ id: 'AMD', name: 'Advanced Micro Devices', price: 180.2 },
+];
+
+function createDashboardRows(): DashboardStockRow[] {
+	return Array.from({ length: 400 }, (_, index) => {
+		const stock = SEED_STOCKS[index % SEED_STOCKS.length];
+		const change = ((index * 13) % 120) / 10 - 6;
+		const volume = 5 + ((index * 17) % 120);
+		return {
+			id: `${stock.id}${index >= SEED_STOCKS.length ? `.${Math.floor(index / SEED_STOCKS.length)}` : ''}`,
+			symbol: stock.id,
+			name: stock.name,
+			price: (stock.price * (0.75 + ((index * 7) % 50) / 100)).toFixed(2),
+			change: `${change >= 0 ? '+' : ''}${change.toFixed(1)}`,
+			volume: volume.toFixed(1),
+			risk: (stock.price > 500 || Math.abs(change) > 4 ? 'high' : Math.abs(change) > 2 ? 'medium' : 'low') as DashboardStockRow['risk'],
+		};
+	});
+}
+
+// ─── Renderer 1: Sparkline DOM renderer ───────────────────────────────────────
+
+const priceHistory = new Map<string, number[]>();
+
+function addTick(rowId: string, price: number, maxLen = 24): void {
+	let hist = priceHistory.get(rowId);
+	if (!hist) {
+		hist = [];
+		priceHistory.set(rowId, hist);
+	}
+	hist.push(price);
+	if (hist.length > maxLen) hist.shift();
+}
+
+function drawSparkline(ctx: CanvasRenderingContext2D, hist: number[], w: number, h: number): void {
+	ctx.clearRect(0, 0, w, h);
+	if (hist.length < 2) return;
+
+	const min = Math.min(...hist);
+	const max = Math.max(...hist);
+	const range = max - min || 1;
+	const isUp = hist[hist.length - 1] >= hist[0];
+	const color = isUp ? '#10b981' : '#ef4444';
+
+	ctx.beginPath();
+	ctx.strokeStyle = color;
+	ctx.lineWidth = 1.5;
+	ctx.lineJoin = 'round';
+
+	hist.forEach((p, i) => {
+		const x = (i / (hist.length - 1)) * w;
+		const y = h - ((p - min) / range) * h * 0.8 - h * 0.1;
+		if (i === 0) ctx.moveTo(x, y);
+		else ctx.lineTo(x, y);
+	});
+	ctx.stroke();
+
+	const lastX = w;
+	const lastY = h - ((hist[hist.length - 1] - min) / range) * h * 0.8 - h * 0.1;
+	ctx.beginPath();
+	ctx.arc(lastX, lastY, 2, 0, Math.PI * 2);
+	ctx.fillStyle = color;
+	ctx.fill();
+}
+
+/**
+ * Zero-React-overhead sparkline + price cell. Grid calls mount() once per slot, update() on
+ * every tick — no React, no scheduler. Per-row price history persists across slot recycling.
+ */
+const SparklineRenderer: DomCellRenderer<DashboardStockRow> = {
+	mount(container, params) {
+		container.style.cssText =
+			'display:flex;flex-direction:column;align-items:flex-start;justify-content:center;' +
+			'padding:0 6px;gap:1px;width:100%;height:100%;box-sizing:border-box;';
+
+		const valueEl = document.createElement('span');
+		valueEl.style.cssText = 'font-family:ui-monospace,monospace;font-weight:700;font-size:11px;color:#e2e8f0;line-height:1;white-space:nowrap;';
+
+		const canvas = document.createElement('canvas');
+		const DPR = window.devicePixelRatio || 1;
+		const W = 96,
+			H = 16;
+		canvas.width = W * DPR;
+		canvas.height = H * DPR;
+		canvas.style.cssText = `display:block;width:${W}px;height:${H}px;`;
+
+		container.appendChild(valueEl);
+		container.appendChild(canvas);
+
+		const ctx = canvas.getContext('2d')!;
+		ctx.scale(DPR, DPR);
+
+		let currentRowId = params.node.id;
+
+		function render(rowId: string, value: unknown) {
+			const price = parseFloat(String(value));
+			if (!isNaN(price)) addTick(rowId, price);
+			valueEl.textContent = `$${typeof value === 'string' ? value : String(value)}`;
+			const hist = priceHistory.get(rowId) ?? [];
+			drawSparkline(ctx, hist, W, H);
+		}
+
+		render(currentRowId, params.value);
+
+		return {
+			update(p) {
+				currentRowId = p.node.id;
+				render(currentRowId, p.value);
+			},
+			destroy() {
+				container.innerHTML = '';
+			},
+		};
+	},
+};
+
+// ─── Renderer 2: Live price (imperative React) ────────────────────────────────
+
+/**
+ * Imperative React renderer for real-time price changes. Grid calls ref.current.update()
+ * directly — bypasses React's scheduler entirely. Updates are pure DOM mutations.
+ */
+const LivePriceRenderer = forwardRef<ImperativeCellHandle<DashboardStockRow>, CellRendererProps<DashboardStockRow>>(function LivePriceRenderer(
+	{ value },
+	ref
+) {
+	const spanRef = useRef<HTMLSpanElement>(null);
+	const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const prevValueRef = useRef(value);
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			update(params) {
+				const span = spanRef.current;
+				if (!span) return;
+				const prev = parseFloat(String(prevValueRef.current));
+				const next = parseFloat(String(params.value));
+				prevValueRef.current = params.value;
+				const raw = params.value;
+				span.textContent = `${typeof raw === 'string' ? raw : String(raw)}%`;
+				if (next !== prev) {
+					const flashColor = next > prev ? '#10b981' : '#ef4444';
+					span.style.color = flashColor;
+					span.style.fontWeight = '800';
+					if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+					flashTimerRef.current = setTimeout(() => {
+						if (spanRef.current) {
+							spanRef.current.style.color = next > prev ? '#34d399' : '#f87171';
+							spanRef.current.style.fontWeight = '700';
+						}
+					}, 350);
+				}
+			},
+		}),
+		[]
+	);
+
+	useEffect(
+		() => () => {
+			if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+		},
+		[]
+	);
+
+	const raw = value;
+	const numVal = parseFloat(String(raw));
+	const initialColor = numVal >= 0 ? '#34d399' : '#f87171';
+
+	return (
+		<span
+			ref={spanRef}
+			style={{
+				fontFamily: 'ui-monospace,monospace',
+				fontWeight: 700,
+				fontSize: '12px',
+				color: initialColor,
+				transition: 'color 0.35s ease',
+				display: 'inline-block',
+			}}
+		>
+			{typeof raw === 'string' ? raw : String(raw)}%
+		</span>
+	);
+});
+LivePriceRenderer.displayName = 'LivePriceRenderer';
+
+// ─── Renderer 3: Heavy analytics cell (standard React, memo) ──────────────────
+
+function HeavyAnalyticsCellInner({ value, row }: CellRendererProps<DashboardStockRow>) {
+	const stockRow = row as DashboardStockRow;
+	const volume = parseFloat(String(value));
+	const changeVal = parseFloat(stockRow.change || '0');
+	const price = parseFloat(stockRow.price || '0');
+
+	const riskScore = useMemo(() => {
+		const volatility = Math.abs(changeVal) / (price || 1);
+		const liquidityFactor = volume > 50 ? 0.8 : volume > 20 ? 1.0 : 1.3;
+		const raw = volatility * liquidityFactor * 100;
+		return Math.min(Math.max(raw, 0), 10).toFixed(2);
+	}, [price, changeVal, volume]);
+
+	const riskColor = parseFloat(riskScore) > 4 ? '#ef4444' : parseFloat(riskScore) > 2 ? '#f59e0b' : '#10b981';
+
+	return (
+		<div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 4px', lineHeight: 1.2 }}>
+			<span style={{ fontFamily: 'ui-monospace,monospace', fontWeight: 700, fontSize: '11px', color: '#e2e8f0' }}>{volume.toFixed(1)}M</span>
+			<span style={{ fontSize: '9px', color: riskColor, fontWeight: 600 }}>risk {riskScore}</span>
+		</div>
+	);
+}
+
+const HeavyAnalyticsCell = memo(HeavyAnalyticsCellInner);
+HeavyAnalyticsCell.displayName = 'HeavyAnalyticsCell';
+
+function createDashboardColumns(): ColumnDef<DashboardStockRow>[] {
+	return [
+		{ field: 'symbol', header: 'Ticker', width: 80 },
+		{ field: 'name', header: 'Company', width: 160 },
+		{
+			field: 'price',
+			header: 'Price (DOM)',
+			width: 130,
+			renderer: {
+				kind: 'dom',
+				renderer: SparklineRenderer,
+				capabilities: { scrollPresentation: 'html-snapshot', htmlSnapshot: { allowShellWhenMissing: true } },
+			},
+		},
+		{ field: 'change', header: 'Change % (Imperative)', width: 165, renderer: { kind: 'imperativeReact', component: LivePriceRenderer } },
+		{ field: 'volume', header: 'Vol/Analytics (React)', width: 165, renderer: { kind: 'react', component: HeavyAnalyticsCell } },
+		{ field: 'risk', header: 'Risk', width: 90 },
+	];
+}
+
+// ─── Dashboard shell ───────────────────────────────────────────────────────────
 
 interface RealtimeDashboardProps {
-	editTrigger: 'singleClick' | 'doubleClick';
-	arrowKeyNavigationEdit: boolean;
-	onCellValueChanged: (event: { rowId: string; colField: string; oldValue: unknown; newValue: unknown }) => void;
+	editTrigger?: 'singleClick' | 'doubleClick';
+	arrowKeyNavigationEdit?: boolean;
+	onCellValueChanged?: (event: { rowId: string; colField: string; oldValue: unknown; newValue: unknown }) => void;
 	onGridReady?: (event: GridReadyEvent<DashboardStockRow>) => void;
 }
 
-export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit, onCellValueChanged, onGridReady }: RealtimeDashboardProps) {
+export default function RealtimeDashboard({
+	editTrigger = 'doubleClick',
+	arrowKeyNavigationEdit = true,
+	onCellValueChanged,
+	onGridReady,
+}: RealtimeDashboardProps = {}) {
 	const columns = useMemo(() => createDashboardColumns(), []);
 	const rows = useMemo(() => createDashboardRows(), []);
 	const [api, setApi] = useState<GridApi<DashboardStockRow> | null>(null);
@@ -34,7 +309,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 	const [autoFireIntervalMs, setAutoFireIntervalMs] = useState(100);
 	const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-	// ── Integrity state ────────────────────────────────────────────────────────
 	const streamRef = useRef<GridTransactionStreamHandle<DashboardStockRow> | null>(null);
 	const streamTickRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [qualityIssues, setQualityIssues] = useState<GridIntegrityIssue[] | null>(null);
@@ -145,8 +419,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		};
 	}, [api, updateStatsAndChart, refreshStats]);
 
-	// ── autoFire (uses raw updateRows — no conflict tracking) ──────────────────
-
 	const triggerVolatility = useCallback(() => {
 		if (!api) return;
 		api.updateRows((rows) =>
@@ -196,8 +468,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		[]
 	);
 
-	// ── Integrity: Data Quality ────────────────────────────────────────────────
-
 	const handleRunQuality = useCallback(async () => {
 		if (!api) return;
 		const result = await api.integrity.run({ modules: ['quality'] });
@@ -210,8 +480,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		api.integrity.clearIssues({ source: 'dataQuality' });
 		setQualityIssues(null);
 	}, [api]);
-
-	// ── Integrity: Diff ────────────────────────────────────────────────────────
 
 	const handleActivateDiff = useCallback(() => {
 		if (!api) return;
@@ -228,8 +496,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		api.integrity.clearDiff();
 		setDiffActive(false);
 	}, [api]);
-
-	// ── Integrity: Live Stream ─────────────────────────────────────────────────
 
 	const handleStartStream = useCallback(() => {
 		if (!api || streamRef.current) return;
@@ -266,8 +532,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		streamRef.current = null;
 		setStreamRunning(false);
 	}, []);
-
-	// ── Integrity: Conflicts ───────────────────────────────────────────────────
 
 	const handleInjectConflicts = useCallback(() => {
 		if (!api) return;
@@ -316,8 +580,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 		setConflictCount(0);
 	}, [api]);
 
-	// ── Cleanup ────────────────────────────────────────────────────────────────
-
 	useEffect(
 		() => () => {
 			if (streamTickRef.current) clearTimeout(streamTickRef.current);
@@ -354,7 +616,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 	return (
 		<div className='flex flex-col xl:flex-row h-full w-full gap-5 overflow-hidden'>
 			<div className='flex-1 flex flex-col gap-4 min-h-0 min-w-0'>
-				{/* Top bar */}
 				<div className='bg-slate-900/10 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-4 shrink-0'>
 					<div className='flex items-center gap-2'>
 						<span className='w-2 h-2 rounded-full bg-emerald-500 animate-ping' />
@@ -390,7 +651,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 					</div>
 				</div>
 
-				{/* Grid */}
 				<div className='flex-1 min-h-0 min-w-0'>
 					<Grid
 						rowModelType='client'
@@ -481,16 +741,13 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 				</div>
 			</div>
 
-			{/* Right sidebar */}
 			<div className='w-full xl:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
-				{/* Data Integrity Controls */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
 					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
 						<ShieldCheck className='w-4 h-4 text-indigo-400' />
 						Data Integrity Pipeline
 					</h3>
 
-					{/* Quality */}
 					<div className='flex flex-col gap-1.5'>
 						<div className='text-[9px] font-bold uppercase tracking-widest text-slate-600'>Quality</div>
 						<div className='flex gap-2 flex-wrap'>
@@ -518,7 +775,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 						)}
 					</div>
 
-					{/* Diff */}
 					<div className='flex flex-col gap-1.5'>
 						<div className='text-[9px] font-bold uppercase tracking-widest text-slate-600'>Diff vs EOD Snapshot</div>
 						<div className='flex gap-2'>
@@ -541,7 +797,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 						{diffActive && <div className='text-[10px] text-amber-400/80'>Diff active — changed cells highlighted</div>}
 					</div>
 
-					{/* Live Stream */}
 					<div className='flex flex-col gap-1.5'>
 						<div className='text-[9px] font-bold uppercase tracking-widest text-slate-600'>Live Stream (Integrity)</div>
 						<div className='flex gap-2'>
@@ -569,7 +824,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 						)}
 					</div>
 
-					{/* Conflicts */}
 					<div className='flex flex-col gap-1.5'>
 						<div className='text-[9px] font-bold uppercase tracking-widest text-slate-600'>Conflicts</div>
 						<div className='flex gap-2'>
@@ -595,7 +849,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 					</div>
 				</div>
 
-				{/* Selection Analytics */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
 					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
 						<BarChart3 className='w-4 h-4 text-emerald-400' />
@@ -621,7 +874,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 					</div>
 				</div>
 
-				{/* Live Price Sparkline */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
 					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
 						<Activity className='w-4 h-4 text-cyan-400' />
@@ -633,7 +885,6 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 					</svg>
 				</div>
 
-				{/* Realtime Event Logger */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2'>
 					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
 						<RefreshCw className='w-4 h-4 text-purple-400' />
@@ -650,7 +901,7 @@ export default function RealtimeDashboard({ editTrigger, arrowKeyNavigationEdit,
 					)}
 					<div className='mt-2 flex items-center gap-1.5 text-[10px] text-slate-500'>
 						<Code2 className='w-3.5 h-3.5' />
-						Data and controls stay in the demo.
+						Data and controls stay client-side.
 					</div>
 				</div>
 			</div>

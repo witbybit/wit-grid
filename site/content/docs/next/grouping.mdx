@@ -1,0 +1,125 @@
+---
+title: Grouping & Tree Data
+description: Fold rows into expandable groups with aggregates, or nest them into a parent-child tree.
+---
+
+Row grouping organizes flat rows into an expandable folder-like structure based on identical column values.
+Tree data instead nests rows using an explicit parent-child relationship. Both are driven by `initialState` and
+both render through a custom `groupRowRenderer`.
+
+## Row grouping
+
+Set `groupBy` to the fields to fold rows by, and `aggDefs` to compute summary metrics for each group:
+
+```tsx
+import { useCallback, useMemo } from 'react';
+import { Grid, type ColumnDef, type VisualRow, type GridApi } from '@eregister/wit-grid-react';
+
+interface EmployeeRow {
+	id: string;
+	name: string;
+	department: string;
+	salary: number;
+}
+
+export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
+	const columns = useMemo<ColumnDef<EmployeeRow>[]>(
+		() => [
+			{ field: 'id', header: 'ID', width: 100 },
+			{ field: 'name', header: 'Full Name', width: 180 },
+			{ field: 'department', header: 'Department', width: 150 },
+			{ field: 'salary', header: 'Salary', width: 120 },
+		],
+		[]
+	);
+
+	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
+		if (visualRow.kind !== 'group') return null;
+		return (
+			<div onClick={() => api.toggleGroupExpanded(visualRow.id)} style={{ paddingLeft: visualRow.depth * 20 + 10 }}>
+				{visualRow.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.childCount})
+			</div>
+		);
+	}, []);
+
+	return (
+		<Grid
+			rows={data}
+			columns={columns}
+			getRowId={(row) => row.id}
+			initialState={{ groupBy: ['department'], groupRowHeight: 42 }}
+			groupRowRenderer={groupRowRenderer}
+		/>
+	);
+}
+```
+
+<Callout title='Group toggling' type='info'>
+	`visualRow.kind === 'group'` rows carry `field`, `key`, `depth`, `childCount`, and `expanded`. Toggle expansion with
+	`api.toggleGroupExpanded(visualRow.id)`, or drive it from outside the renderer with `api.expandAllGroups()` / `api.collapseAllGroups()`.
+</Callout>
+
+Group footers can be enabled with `initialState.showGroupFooter: true`, and rendered with `footerRowRenderer`.
+
+## Tree data
+
+For parent-child hierarchies (file trees, org charts, bill of materials), set `getParentId` instead of `groupBy`.
+Indentation isn't computed by the grid for you — walk the row's own `parentId` chain to derive its depth, and use
+that inside a cell renderer:
+
+```tsx
+import { useMemo } from 'react';
+import { Grid, type ColumnDef, type CellRendererProps } from '@eregister/wit-grid-react';
+
+interface FileNode {
+	id: string;
+	name: string;
+	parentId?: string;
+	size?: string;
+}
+
+function depthOf(nodeId: string, byId: Map<string, FileNode>): number {
+	let depth = 0;
+	let current = byId.get(nodeId);
+	while (current?.parentId) {
+		depth += 1;
+		current = byId.get(current.parentId);
+	}
+	return depth;
+}
+
+function createTreeNameRenderer(byId: Map<string, FileNode>) {
+	return function TreeNameRenderer({ value, row }: CellRendererProps<FileNode>) {
+		const depth = depthOf(row.id, byId);
+		const hasChildren = [...byId.values()].some((node) => node.parentId === row.id);
+		return (
+			<div style={{ paddingLeft: depth * 20 }}>
+				{hasChildren ? '📁' : '📄'} {String(value)}
+			</div>
+		);
+	};
+}
+
+export function FileDirectoryGrid({ nodes }: { nodes: FileNode[] }) {
+	const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
+	const TreeNameRenderer = useMemo(() => createTreeNameRenderer(byId), [byId]);
+	const columns = useMemo<ColumnDef<FileNode>[]>(
+		() => [
+			{ field: 'name', header: 'Node Path / Name', width: 300, cellRenderer: TreeNameRenderer },
+			{ field: 'size', header: 'Capacity Size', width: 120 },
+		],
+		[TreeNameRenderer]
+	);
+
+	return (
+		<Grid rows={nodes} columns={columns} getRowId={(row) => row.id} initialState={{ getParentId: (row) => row.parentId, groupRowHeight: 38 }} />
+	);
+}
+```
+
+`groupBy` and `getParentId` are mutually exclusive strategies for the same underlying grouped row model — use
+`groupBy` when groups come from repeated column values, `getParentId` when the hierarchy is already explicit in
+the data.
+
+See [Events](/docs/next/events) for the `groupByChanged`, `groupColumnAdded/Removed/Moved`, and
+`aggDefsChanged` events emitted as grouping state changes.
