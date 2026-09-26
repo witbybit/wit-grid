@@ -82,6 +82,28 @@ body {
 	background: var(--color-fd-card);
 }
 
+.wg-preview-frame {
+	overflow: hidden;
+	border: 1px solid var(--color-fd-border);
+	border-radius: 10px;
+	box-shadow: 0 20px 40px -28px rgba(2, 6, 23, 0.45);
+}
+
+.wg-preview-frame .wg-grid-preview {
+	border: none;
+	border-radius: 0;
+}
+
+.wg-preview-frame-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+	background: #0b1120;
+	padding: 0.6rem 0.9rem;
+}
+
 .wg-examples-workbench {
 	width: min(1440px, calc(100vw - 24rem));
 	max-width: calc(100vw - 2rem);

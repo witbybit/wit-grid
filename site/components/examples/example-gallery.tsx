@@ -2,9 +2,33 @@
 
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
-import { Check, Copy } from 'lucide-react';
+import {
+	Check,
+	Copy,
+	Sparkles,
+	MousePointerClick,
+	Database,
+	ListFilter,
+	Pencil,
+	ShieldCheck,
+	Zap,
+	type LucideIcon,
+} from 'lucide-react';
 import examples from '@/generated/next/examples.json';
 import { showcaseExamples, type WitGridExampleMeta } from '@eregister/wit-grid-examples/showcase';
+
+const FEATURED_EXAMPLE_ID = 'realtime-dashboard';
+
+const CATEGORY_ICONS: Record<WitGridExampleMeta['category'], LucideIcon> = {
+	'Getting started': Sparkles,
+	Selection: MousePointerClick,
+	State: Database,
+	'Row models': Database,
+	Filtering: ListFilter,
+	Editing: Pencil,
+	Validation: ShieldCheck,
+	Rendering: Zap,
+};
 
 const previewModules = {
 	'basic-grid': dynamic(() => import('@eregister/wit-grid-examples/basic-grid').then((module) => module.Component), { ssr: false }),
@@ -87,7 +111,8 @@ function CodeViewer({ source, sourcePath, tokens }: { source: string; sourcePath
 export function ExampleGallery() {
 	const sourceById = useMemo(() => new Map((examples.examples as ExampleDoc[]).map((example) => [example.id, example])), []);
 	const items = showcaseExamples as WitGridExampleMeta[];
-	const [selectedId, setSelectedId] = useState(items[0]?.id ?? 'basic-grid');
+	const initialId = items.some((item) => item.id === FEATURED_EXAMPLE_ID) ? FEATURED_EXAMPLE_ID : (items[0]?.id ?? 'basic-grid');
+	const [selectedId, setSelectedId] = useState(initialId);
 	const [mode, setMode] = useState<GalleryMode>('preview');
 	const selected = items.find((example) => example.id === selectedId) ?? items[0];
 	const Preview = selected ? previewModules[selected.id as keyof typeof previewModules] : null;
@@ -95,15 +120,30 @@ export function ExampleGallery() {
 	const source = selectedDoc?.source ?? '';
 
 	return (
-		<div className='not-prose wg-examples-workbench flex flex-col gap-4'>
-			<div className='flex flex-col gap-2 border-b border-fd-border pb-3'>
-				<div className='flex flex-wrap items-center justify-between gap-3'>
-					<div className='text-sm font-medium text-fd-muted-foreground'>{items.length} package-backed examples</div>
-					<div className='rounded-md border border-fd-border px-2 py-1 text-xs text-fd-muted-foreground'>packages/examples</div>
+		<div className='not-prose wg-examples-workbench flex flex-col gap-5'>
+			<div className='flex flex-col gap-4 border-b border-fd-border pb-4'>
+				<div className='flex flex-wrap items-end justify-between gap-3'>
+					<div>
+						<p className='text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400'>Live &amp; interactive</p>
+						<h2 className='mt-1 text-2xl font-bold tracking-tight text-fd-foreground sm:text-3xl'>Try the grid, not a screenshot</h2>
+						<p className='mt-1.5 max-w-2xl text-sm leading-6 text-fd-muted-foreground'>
+							Every example below is a running instance of `@eregister/wit-grid-examples` — sort it, edit it, scroll it. Flip to{' '}
+							<span className='font-semibold text-fd-foreground'>Source</span> to see exactly how it's built.
+						</p>
+					</div>
+					<div className='flex shrink-0 items-center gap-2 rounded-lg border border-fd-border bg-fd-muted/40 px-3 py-2'>
+						<span className='text-2xl font-bold text-fd-foreground'>{items.length}</span>
+						<span className='text-xs leading-tight text-fd-muted-foreground'>
+							live
+							<br />
+							examples
+						</span>
+					</div>
 				</div>
 				<div className='wg-example-rail flex gap-2 overflow-x-auto pb-1'>
 					{items.map((example) => {
 						const isSelected = example.id === selected?.id;
+						const Icon = CATEGORY_ICONS[example.category] ?? Sparkles;
 						return (
 							<button
 								key={example.id}
@@ -112,12 +152,13 @@ export function ExampleGallery() {
 									setSelectedId(example.id);
 									setMode('preview');
 								}}
-								className={`group flex min-w-fit items-center gap-2 rounded-md border px-3 py-2 text-left transition ${
+								className={`group flex min-w-fit items-center gap-2 rounded-lg border px-3 py-2.5 text-left transition ${
 									isSelected
-										? 'border-sky-500/70 bg-sky-500/10 text-fd-foreground shadow-[0_0_0_1px_rgba(14,165,233,0.2)]'
+										? 'border-sky-500/70 bg-sky-500/10 text-fd-foreground shadow-[0_0_0_1px_rgba(14,165,233,0.25)]'
 										: 'border-fd-border bg-fd-card/80 text-fd-card-foreground hover:border-sky-500/45 hover:bg-fd-muted/60'
 								}`}
 							>
+								<Icon aria-hidden size={15} className={isSelected ? 'text-sky-600 dark:text-sky-300' : 'text-fd-muted-foreground'} />
 								<span className='text-sm font-semibold leading-5'>{example.title}</span>
 								<span
 									className={`shrink-0 rounded-md border px-2 py-0.5 text-[10px] font-medium ${
@@ -185,8 +226,21 @@ export function ExampleGallery() {
 
 					<div className='p-3'>
 						{mode === 'preview' ? (
-							<div className='wg-grid-preview wg-example-stage'>
-								<Preview />
+							<div className='wg-preview-frame'>
+								<div className='wg-preview-frame-bar'>
+									<span className='flex gap-1.5'>
+										<span className='h-2.5 w-2.5 rounded-full bg-rose-500/70' />
+										<span className='h-2.5 w-2.5 rounded-full bg-amber-500/70' />
+										<span className='h-2.5 w-2.5 rounded-full bg-emerald-500/70' />
+									</span>
+									<span className='flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400'>
+										<span className='h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400' />
+										Live preview
+									</span>
+								</div>
+								<div className='wg-grid-preview wg-example-stage'>
+									<Preview />
+								</div>
 							</div>
 						) : (
 							<CodeViewer source={source} sourcePath={selected.sourcePath} tokens={selectedDoc?.tokens} />
