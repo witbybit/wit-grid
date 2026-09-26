@@ -1,10 +1,26 @@
 ---
 title: Events
 description: Event names and payload contracts generated from the core package.
+icon: Zap
 ---
 
 import { EventsReference } from '@/components/generated/events-reference';
 
-`GridEventName` and `GridEventPayloadMap` are generated from `packages/core/src/api/GridEvents.ts`.
+`GridEventName` and `GridEventPayloadMap` are generated from `packages/core/src/api/GridEvents.ts`. Subscribe to
+any of them the same way:
+
+```typescript
+import { GridEventName } from '@eregister/wit-grid-react';
+
+const unsubscribe = api.addEventListener(GridEventName.cellValueChanged, ({ payload }) => {
+	console.log(payload);
+});
+
+// later
+unsubscribe();
+```
+
+`addEventListener` always returns an unsubscribe function — call it on cleanup (a `useEffect` return, for
+example) to avoid leaking listeners across remounts.
 
 <EventsReference />

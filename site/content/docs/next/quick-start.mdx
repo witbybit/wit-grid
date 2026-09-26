@@ -1,15 +1,32 @@
 ---
 title: Quick Start
 description: Install the React adapter and render a basic grid.
+icon: Rocket
 ---
 
-Install the React package:
+<Steps>
+<Step>
 
-```bash
-pnpm add @eregister/wit-grid-react
-```
+### Install the package
 
-Render a grid with row data and column definitions:
+<Tabs items={['pnpm', 'npm', 'yarn']}>
+	<Tab value='pnpm'>```bash pnpm add @eregister/wit-grid-react ```</Tab>
+	<Tab value='npm'>```bash npm install @eregister/wit-grid-react ```</Tab>
+	<Tab value='yarn'>```bash yarn add @eregister/wit-grid-react ```</Tab>
+</Tabs>
+
+</Step>
+<Step>
+
+### Give the grid a sized container
+
+The grid measures its own viewport from its parent — give it an explicit height (or a flex/grid parent that
+resolves to one). An unsized container renders a collapsed, empty grid.
+
+</Step>
+<Step>
+
+### Render rows and columns
 
 ```tsx
 import { Grid } from '@eregister/wit-grid-react';
@@ -33,4 +50,19 @@ export function App() {
 }
 ```
 
-Use `initialState`, `persistence`, `rowSelection`, `dataIntegrity`, and the row model props when you need more control.
+`getRowId` is optional but strongly recommended — without it, the grid falls back to array index as row
+identity, which breaks selection/expansion state across sorts, filters, and edits.
+
+</Step>
+<Step>
+
+### Reach for more when you need it
+
+</Step>
+</Steps>
+
+<Cards>
+	<Card title='Row models' href='/docs/next/row-models' description='Client, infinite, or server-owned rows.' />
+	<Card title='Grouping & tree data' href='/docs/next/grouping' description='Fold rows into groups or a hierarchy.' />
+	<Card title='Grid API' href='/docs/next/grid-api' description='The full imperative GridApi surface.' />
+</Cards>

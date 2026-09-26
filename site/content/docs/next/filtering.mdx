@@ -1,12 +1,107 @@
 ---
 title: Filtering
-description: Configure filter UI and listen for filter state changes.
+description: Column filter UI, quick filter, and the query model.
+icon: ListFilter
 ---
 
-Use `showFilterChipBar` to show active filters and `showFloatingFilters` to show inline filter inputs.
+Show filter UI with `showFilterChipBar` (active-filter chips above the header) and `showFloatingFilters`
+(always-visible inline filter inputs below the header):
 
 ```tsx
 <Grid rows={rows} columns={columns} showFilterChipBar showFloatingFilters />
 ```
 
-Filter state changes emit `GridEventName.filterChanged` and quick filter changes emit `GridEventName.quickFilterChanged`.
+## Column filter types
+
+Use `filterDef` on a column to configure rich filter UI — the same definition renders consistently across the
+sidebar panel, the header 3-dot menu, and the floating filter row.
+
+<Tabs items={['Static options', 'Async (server-fetched)', 'Custom']}>
+	<Tab value='Static options'>
+		```typescript
+		const columns: ColumnDef<Person>[] = [
+			{
+				field: 'team',
+				header: 'Team',
+				filterDef: {
+					type: 'multi-select',
+					options: [
+						{ label: 'Compute', value: 'compute' },
+						{ label: 'Flight', value: 'flight', count: 12 },
+					],
+				},
+			},
+		];
+		```
+	</Tab>
+	<Tab value='Async (server-fetched)'>
+		```typescript
+		const columns: ColumnDef<Person>[] = [
+			{
+				field: 'assignee',
+				header: 'Assignee',
+				filterDef: {
+					type: 'async-multi-select',
+					debounceMs: 250,
+					async fetchOptions({ query }, signal) {
+						const res = await fetch(`/api/users?q=${encodeURIComponent(query)}`, { signal });
+						const users = await res.json();
+						return { options: users.map((u: any) => ({ label: u.name, value: u.id })) };
+					},
+				},
+			},
+		];
+		```
+	</Tab>
+	<Tab value='Custom'>
+		```typescript
+		const columns: ColumnDef<Person>[] = [
+			{
+				field: 'status',
+				header: 'Status',
+				filterDef: {
+					type: 'custom',
+					renderFilter: ({ value, onChange, onCommit }) => (
+						<StatusPicker value={value} onChange={onChange} onCommit={onCommit} />
+					),
+				},
+			},
+		];
+		```
+	</Tab>
+</Tabs>
+
+`type: 'infinite-multi-select'` pairs with `fetchPage` instead of `fetchOptions` for a server-paginated,
+virtually-scrolled option list. `filterDef` supersedes the legacy `filterType`/`filterValues` fields, which are
+still supported and normalized internally.
+
+## Quick filter
+
+A single search string matched across multiple columns (or every column):
+
+```typescript
+api.setQuickFilter('nvda', ['symbol', 'name']); // scoped to these columns
+api.setQuickFilter('nvda'); // every column
+const current = api.getQuickFilter();
+```
+
+## Reading and setting filter state directly
+
+```typescript
+api.setFilterModel({ team: { type: 'equals', filter: 'compute' } });
+api.setFilterModel(null); // clear all
+```
+
+## Events
+
+```typescript
+import { GridEventName } from '@eregister/wit-grid-react';
+
+api.addEventListener(GridEventName.filterChanged, () => console.log(api.getState().filterModel));
+api.addEventListener(GridEventName.quickFilterChanged, () => console.log(api.getQuickFilter()));
+```
+
+<Callout title='Query model' type='info'>
+	For filter logic that doesn't fit the column filter model (cross-column expressions, saved searches), use `api.setQueryModel()` /
+	`api.getQueryModel()` / `api.evaluateQueryForRow(rowId)` instead — see [Grid API](/docs/next/grid-api).
+</Callout>

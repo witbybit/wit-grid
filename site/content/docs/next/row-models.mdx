@@ -1,15 +1,16 @@
 ---
 title: Row Models
 description: Choose client, infinite, or server-side row data.
+icon: Database
 ---
 
-Wit Grid supports three row model modes:
+Wit Grid supports three row model modes, chosen with the `rowModelType` prop (default `'client'`):
 
-| Mode       | Use When                                                                                       |
-| ---------- | ---------------------------------------------------------------------------------------------- |
-| `client`   | Rows are already available in memory and the grid can own local sort/filter work.              |
-| `infinite` | Rows load in block ranges as the user scrolls. Sort/filter state is sent to the datasource.    |
-| `server`   | The server owns range loading plus server-side route, grouping, sort, filter, and query state. |
+<Cards>
+	<Card title='client' description='Rows are already in memory; the grid owns local sort/filter work.' />
+	<Card title='infinite' description='Rows load in block ranges as the user scrolls; sort/filter state is sent to the datasource.' />
+	<Card title='server' description='The server owns range loading plus route, grouping, sort, filter, and query state.' />
+</Cards>
 
 ## Client Rows
 
@@ -159,4 +160,7 @@ See [Events](/docs/next/events) for generated event payloads.
 
 ## Selection Scope
 
-Infinite and server-side row models operate on loaded data. Selection scopes such as “all rows” only apply to rows that are loaded or represented by the current model capability.
+<Callout title='Selection is bounded by what is loaded' type='warn'>
+	Infinite and server-side row models operate on loaded data. Selection scopes such as "all rows" (see [Selection](/docs/next/selection)) only apply
+	to rows that are loaded or represented by the current model capability — not the full remote dataset.
+</Callout>

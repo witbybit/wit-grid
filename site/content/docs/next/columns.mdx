@@ -1,6 +1,7 @@
 ---
 title: Columns
 description: Define fields, headers, sizing, renderers, and column behavior.
+icon: Columns3
 ---
 
 Columns describe how row data is read, displayed, edited, filtered, and written back.
@@ -180,6 +181,52 @@ const columns: ColumnDef<Person>[] = [
 	},
 ];
 ```
+
+## Header Groups
+
+Group related columns under a shared spanning header label with `headerGroup`. Columns with the same label at
+the same position are merged into one spanning header cell automatically — no separate registration step.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', width: 160 },
+	{ field: 'q1Revenue', header: 'Q1', headerGroup: 'Revenue', width: 100 },
+	{ field: 'q2Revenue', header: 'Q2', headerGroup: 'Revenue', width: 100 },
+	{ field: 'q1Cost', header: 'Q1', headerGroup: 'Costs', width: 100 },
+	{ field: 'q2Cost', header: 'Q2', headerGroup: 'Costs', width: 100 },
+];
+```
+
+<Callout title='Nesting groups' type='info'>
+	`headerGroup` also accepts an array for nested group levels, outermost to innermost — `headerGroup: ['Financials', 'Revenue']` renders Financials
+	&gt; Revenue &gt; the leaf column header. There is no separate `headerGroupLevel` field; the array's order **is** the nesting.
+</Callout>
+
+## Auto-sizing
+
+Double-click a column's resize handle to auto-size it to fit its content. The same behavior is available
+programmatically through `GridApi`:
+
+```typescript
+// Resize a single column to fit its widest cell (header included by default)
+api.autoSizeColumn('price');
+
+// Resize all visible columns at once
+api.autoSizeAllColumns();
+
+// With options
+api.autoSizeColumn('name', { padding: 24, includeHeader: true });
+api.autoSizeAllColumns({ padding: 16, minWidth: 60, maxWidth: 400 });
+```
+
+| Option          | Type      | Default | Description                                            |
+| :-------------- | :-------- | :------ | :----------------------------------------------------- |
+| `padding`       | `number`  | `16`    | Extra pixels added to the measured content width.      |
+| `includeHeader` | `boolean` | `true`  | Include the header cell text in the width measurement. |
+| `minWidth`      | `number`  | —       | Clamp the result to at least this many pixels.         |
+| `maxWidth`      | `number`  | —       | Clamp the result to at most this many pixels.          |
+
+`autoSizeAllColumns` accepts the same options and applies them uniformly to every visible column.
 
 ## Capabilities
 

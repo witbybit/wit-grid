@@ -1,12 +1,52 @@
 ---
 title: Server-Side Data
-description: Load rows from a server-owned datasource.
+description: Refresh, purge, and inspect a server-owned datasource at runtime.
+icon: Server
 ---
 
-Use `rowModelType="server"` when the server owns filtering, sorting, grouping, and range loading.
+Use `rowModelType="server"` when the server owns filtering, sorting, grouping, and range loading. See
+[Row Models](/docs/next/row-models#server-side-rows) for the full request/response contract; this page covers
+the runtime controls once a server datasource is wired up.
 
 ```tsx
 <Grid rowModelType='server' columns={columns} datasource={datasource} getRowId={(row: { id: string }) => row.id} />
 ```
 
-Server-side state changes emit `GridEventName.serverSideStateChanged`.
+## Refreshing and purging
+
+```typescript
+// Swap the datasource entirely (e.g. after auth or endpoint change)
+api.setServerSideDatasource(nextDatasource);
+
+// Re-fetch the current view without dropping loaded rows
+api.refreshServerSide();
+
+// Re-fetch just one group's route
+api.refreshServerSide({ route: ['north-america', 'usa'] });
+
+// Drop cached rows for a route and re-fetch from scratch
+api.refreshServerSide({ route: ['north-america'], purge: true });
+
+// Drop cached rows without re-fetching
+api.purgeServerSide({ route: ['north-america'] });
+```
+
+`refreshServerSide` and `purgeServerSide` both accept an optional `route` — an array of group keys identifying
+which store to act on. Omit it to act on the root store.
+
+## Inspecting store state
+
+```typescript
+const stores = api.getServerSideStoreState();
+// readonly ServerSideStoreSnapshot[] — one entry per route, each with:
+//   storeId, route, level, rowCountState, blockCount, loadingBlockCount, failedBlockCount, childStoreCount
+```
+
+Use this to build a loading/error indicator without re-deriving it from row data — a failed block increments
+`failedBlockCount` on its store snapshot, and `GridEventName.serverSideStateChanged` fires whenever any of this
+changes.
+
+<Callout title='Errors in getRows' type='warn'>
+	Throwing inside your datasource's `getRows` marks that block failed — the grid does not retry automatically. Surface the failure in your own UI
+	(via `getServerSideStoreState()` or the `serverSideStateChanged` event) and call `refreshServerSide({route})` to retry.
+</Callout>

@@ -1,13 +1,14 @@
 ---
 title: Installation
 description: Add Wit Grid to a React application.
+icon: Download
 ---
 
-Install the React adapter:
-
-```bash
-pnpm add @eregister/wit-grid-react
-```
+<Tabs items={['pnpm', 'npm', 'yarn']}>
+	<Tab value='pnpm'>```bash pnpm add @eregister/wit-grid-react ```</Tab>
+	<Tab value='npm'>```bash npm install @eregister/wit-grid-react ```</Tab>
+	<Tab value='yarn'>```bash yarn add @eregister/wit-grid-react ```</Tab>
+</Tabs>
 
 The React package depends on the core package and exposes the public React API from `@eregister/wit-grid-react`.
 
@@ -15,4 +16,9 @@ The React package depends on the core package and exposes the public React API f
 import { Grid } from '@eregister/wit-grid-react';
 ```
 
-Use the generated [API Reference](/docs/next/api-reference) to confirm exports for the current docs build.
+<Callout title='Alpha versioning' type='warn'>
+	Wit Grid is on the `0.1.0-alpha.x` line — pin an exact version rather than a caret range until 1.0. See [Migration
+	Notes](/docs/next/migration-notes) for what that means in practice.
+</Callout>
+
+Use the generated [API reference](/docs/next/api-reference) to confirm exports for the current docs build.

@@ -1,12 +1,76 @@
 ---
 title: Persistence
-description: Persist grid state with a storage key or adapter.
+description: Persist grid state with a storage key, a custom adapter, or named workspace views.
+icon: Save
 ---
 
-Pass a string key to persist grid state in local storage:
+Pass a string key to persist grid state (columns, sort, filters, groups, theme, etc.) in local storage — the
+grid debounces saves for you:
 
 ```tsx
 <Grid rows={rows} columns={columns} persistence='orders-grid' />
 ```
 
-For application-owned storage, pass a `GridPersistenceAdapter`. Workspace views use the workspace adapter APIs exported from the React package.
+## Custom storage
+
+For anything other than `localStorage` — a remote API, IndexedDB, a database — implement `GridPersistenceAdapter`
+and pass it instead of a string key.
+
+```typescript
+import type { GridPersistenceAdapter, PersistedGridState } from '@eregister/wit-grid-react';
+
+const adapter: GridPersistenceAdapter = {
+	async load() {
+		const res = await fetch('/api/grid-settings');
+		return res.ok ? res.json() : null;
+	},
+	async save(state: PersistedGridState) {
+		await fetch('/api/grid-settings', { method: 'PUT', body: JSON.stringify(state) });
+	},
+	async clear() {
+		await fetch('/api/grid-settings', { method: 'DELETE' });
+	},
+	debounceMs: 500, // default
+};
+
+<Grid rows={rows} columns={columns} persistence={adapter} />;
+```
+
+`clear()` and `debounceMs` are optional. `save` is called on a debounce timer after relevant state changes, not
+on every keystroke.
+
+## Controlling autosave
+
+```typescript
+api.setAutoSave(false); // pause debounced saves
+api.saveNow(); // force an immediate save, bypassing the debounce
+const status = api.getPersistenceStatus(); // { status, autoSave, lastSavedAt?, error? }
+api.subscribeToPersistenceStatus((status) => console.log(status.status));
+```
+
+## Workspace views
+
+Workspace views are named, savable snapshots of grid state — "My saved view" style presets, distinct from the
+single auto-persisted state above. Pass a `GridWorkspaceAdapter` (implement `listViews`/`getView`/`saveView`/
+`deleteView`, or use `createLocalStorageWorkspaceAdapter` for a local-only default):
+
+```tsx
+import { Grid, createLocalStorageWorkspaceAdapter } from '@eregister/wit-grid-react';
+
+const workspace = createLocalStorageWorkspaceAdapter({ storageKey: 'orders-grid-views' });
+
+<Grid rows={rows} columns={columns} workspace={workspace} />;
+```
+
+```typescript
+const views = await api.listViews();
+const saved = await api.saveView('Q1 close', { setAsDefault: true });
+await api.applyView(saved.id);
+await api.renameView(saved.id, 'Q1 close (final)');
+await api.deleteView(saved.id);
+```
+
+<Callout title='Two different mechanisms' type='info'>
+	`persistence` auto-saves the grid's *current* state on every relevant change. `workspace` lets users save and switch between *multiple named*
+	states on demand. Use one, the other, or both together.
+</Callout>

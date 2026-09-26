@@ -1,10 +1,18 @@
 ---
 title: API Reference
 description: Public React props and exports generated from the package source.
+icon: FileCode
 ---
 
 import { ApiReference } from '@/components/generated/api-reference';
 
-The reference below is generated from the React adapter source. It should be treated as the current contract for the docs build.
+The reference below is generated from the React adapter source (`GridClientProps`, `GridInfiniteProps`,
+`GridServerSideProps`, `GridViewProps`) — every prop, its type, and its JSDoc description, extracted directly
+from the TypeScript interfaces. It is regenerated on every docs build, so it can't drift from the shipped types.
+
+<Callout title='Looking for the imperative API?' type='info'>
+	This page covers `<Grid>` component props. For the `GridApi` methods you call at runtime — `setCellValue`,
+	`toggleGroupExpanded`, `copySelectedRange`, and the rest — see [Grid API](/docs/next/grid-api).
+</Callout>
 
 <ApiReference />

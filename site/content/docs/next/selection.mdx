@@ -1,12 +1,60 @@
 ---
 title: Selection
 description: Enable row selection and react to selection changes.
+icon: MousePointerClick
 ---
 
-Enable row selection with `rowSelection`.
+Enable row selection with the `rowSelection` prop — a mode shorthand or a full options object.
 
-```tsx
-<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' showStatusBar />
+<Tabs items={['Shorthand', 'Options object']}>
+	<Tab value='Shorthand'>
+		```tsx
+		<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' showStatusBar />
+		```
+	</Tab>
+	<Tab value='Options object'>
+		```tsx
+		import type { RowSelectionOptions } from '@eregister/wit-grid-react';
+
+    	const rowSelection: RowSelectionOptions = { mode: 'multiple', selectAllScope: 'filtered' };
+
+    	<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection={rowSelection} />;
+    	```
+    </Tab>
+
+</Tabs>
+
+`mode` is `'single'` or `'multiple'`. `selectAllScope` controls what "select all" means — `'page'`, `'loaded'`,
+`'filtered'`, or `'all'` (default `'all'` when omitted).
+
+## Reading and driving selection
+
+```typescript
+// Read
+const selectedIds = api.getSelectedRowIds();
+const count = api.getSelectedRowCount();
+const isSelected = api.isRowNodeSelected('row-42');
+
+// Drive
+api.selectRows(['row-1', 'row-2'], { mode: 'add' });
+api.deselectRows(['row-1']);
+api.toggleRowSelection('row-3');
+api.selectAllRows({ scope: 'filtered' });
+api.clearRowSelection();
 ```
 
-Use `GridEventName.selectionChanged` and `GridEventName.rowSelectionChanged` when the host application needs to react to selection changes.
+## Reacting to changes
+
+```typescript
+import { GridEventName } from '@eregister/wit-grid-react';
+
+api.addEventListener(GridEventName.rowSelectionChanged, ({ payload }) => {
+	console.log('Selected row ids:', payload.selectedRowIds);
+	console.log('Changed row ids:', payload.changedRowIds);
+});
+```
+
+<Callout title='Cell range vs. row selection' type='info'>
+	`rowSelection` controls checkbox-style row selection. Rectangular cell-range selection (the Excel-like highlight used by clipboard copy/paste) is
+	separate and always available — see [Grid API](/docs/next/grid-api) for `selectCell` / `selectRange`.
+</Callout>
