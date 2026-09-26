@@ -66,10 +66,9 @@ and recomputes `total` — and anything else that depends on `total` — without
 Results are cached until a dependency actually changes.
 
 <Callout title='Circular references' type='warn'>
-	Setting a formula that would create a cycle (`total` depends on `price`, `price` depends on `total`) throws
-	immediately, synchronously, from the call that introduces it — the formula is rejected, not silently applied.
-	A cycle that could somehow only appear at evaluation time surfaces as a thrown error from that evaluation
-	instead of an infinite loop.
+	Setting a formula that would create a cycle (`total` depends on `price`, `price` depends on `total`) throws immediately, synchronously, from the
+	call that introduces it — the formula is rejected, not silently applied. A cycle that could somehow only appear at evaluation time surfaces as a
+	thrown error from that evaluation instead of an infinite loop.
 </Callout>
 
 ## Errors
@@ -84,7 +83,7 @@ api.getCellValue('row-1', 'total'); // '#VALUE! (Unexpected token...)' when the 
 
 ## Combining with columns
 
-Formulas work with any column — `valueFormatter` still controls how the *computed* result is displayed, and
+Formulas work with any column — `valueFormatter` still controls how the _computed_ result is displayed, and
 `onCopy`/`onPaste` still control clipboard behavior:
 
 ```tsx

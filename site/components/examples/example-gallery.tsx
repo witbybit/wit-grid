@@ -2,18 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useMemo, useState } from 'react';
-import {
-	Check,
-	Copy,
-	Sparkles,
-	MousePointerClick,
-	Database,
-	ListFilter,
-	Pencil,
-	ShieldCheck,
-	Zap,
-	type LucideIcon,
-} from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Check, Copy, Sparkles, MousePointerClick, Database, ListFilter, Pencil, ShieldCheck, Zap, type LucideIcon } from 'lucide-react';
 import examples from '@/generated/next/examples.json';
 import { showcaseExamples, type WitGridExampleMeta } from '@eregister/wit-grid-examples/showcase';
 
@@ -114,8 +104,9 @@ export function ExampleGallery() {
 	const initialId = items.some((item) => item.id === FEATURED_EXAMPLE_ID) ? FEATURED_EXAMPLE_ID : (items[0]?.id ?? 'basic-grid');
 	const [selectedId, setSelectedId] = useState(initialId);
 	const [mode, setMode] = useState<GalleryMode>('preview');
+	const { resolvedTheme } = useTheme();
 	const selected = items.find((example) => example.id === selectedId) ?? items[0];
-	const Preview = selected ? previewModules[selected.id as keyof typeof previewModules] : null;
+	const Preview: any = selected ? previewModules[selected.id as keyof typeof previewModules] : null;
 	const selectedDoc = selected ? sourceById.get(selected.id as keyof typeof previewModules) : undefined;
 	const source = selectedDoc?.source ?? '';
 
@@ -239,7 +230,7 @@ export function ExampleGallery() {
 									</span>
 								</div>
 								<div className='wg-grid-preview wg-example-stage'>
-									<Preview />
+									<Preview theme={resolvedTheme === 'light' ? 'light' : 'dark'} />
 								</div>
 							</div>
 						) : (

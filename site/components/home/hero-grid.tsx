@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useTheme } from 'next-themes';
 
 const RealtimeDashboard = dynamic(() => import('@eregister/wit-grid-examples/realtime-dashboard'), {
 	ssr: false,
@@ -8,9 +9,10 @@ const RealtimeDashboard = dynamic(() => import('@eregister/wit-grid-examples/rea
 });
 
 export function HeroGrid() {
+	const { resolvedTheme } = useTheme();
 	return (
 		<div className='wg-hero-grid'>
-			<RealtimeDashboard />
+			<RealtimeDashboard compact theme={resolvedTheme === 'light' ? 'light' : 'dark'} />
 		</div>
 	);
 }

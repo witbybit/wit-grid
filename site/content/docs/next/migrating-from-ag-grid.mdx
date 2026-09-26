@@ -9,10 +9,9 @@ Wit Grid and AG Grid solve the same problem — a virtualized, editable data gri
 rename. The differences that aren't mechanical are called out explicitly below.
 
 <Callout title='AG Grid API surface varies by version' type='warn'>
-	AG Grid's exact prop and method names have shifted across major versions (legacy `rowSelection='multiple'`
-	vs. the newer `rowSelection={{ mode: 'multiRow' }}` object API, for example). This guide targets the
-	long-stable core concepts. Check your installed AG Grid version's docs for the exact current spelling of a
-	prop before assuming this table is literal.
+	AG Grid's exact prop and method names have shifted across major versions (legacy `rowSelection='multiple'` vs. the newer `rowSelection=
+	{{ mode: 'multiRow' }}` object API, for example). This guide targets the long-stable core concepts. Check your installed AG Grid version's docs
+	for the exact current spelling of a prop before assuming this table is literal.
 </Callout>
 
 ## Package and root component
@@ -22,19 +21,20 @@ rename. The differences that aren't mechanical are called out explicitly below.
 		```typescript
 		import { AgGridReact } from 'ag-grid-react';
 
-		<AgGridReact rowData={rows} columnDefs={columnDefs} getRowId={(p) => p.data.id} onGridReady={(p) => (apiRef.current = p.api)} />;
-		```
-	</Tab>
-	<Tab value='Wit Grid'>
-		```tsx
-		import { useRef } from 'react';
-		import { Grid, type GridApi } from '@eregister/wit-grid-react';
+    	<AgGridReact rowData={rows} columnDefs={columnDefs} getRowId={(p) => p.data.id} onGridReady={(p) => (apiRef.current = p.api)} />;
+    	```
+    </Tab>
+    <Tab value='Wit Grid'>
+    	```tsx
+    	import { useRef } from 'react';
+    	import { Grid, type GridApi } from '@eregister/wit-grid-react';
 
-		const apiRef = useRef<GridApi | null>(null);
+    	const apiRef = useRef<GridApi | null>(null);
 
-		<Grid rows={rows} columns={columns} getRowId={(row) => row.id} onGridReady={({ api }) => (apiRef.current = api)} />;
-		```
-	</Tab>
+    	<Grid rows={rows} columns={columns} getRowId={(row) => row.id} onGridReady={({ api }) => (apiRef.current = api)} />;
+    	```
+    </Tab>
+
 </Tabs>
 
 Two shape differences that trip people up on the first pass:
@@ -45,23 +45,23 @@ Two shape differences that trip people up on the first pass:
 
 ## Column definitions
 
-| AG Grid                                | Wit Grid                                       | Notes                                                                                     |
-| --------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `field`                                 | `field`                                          | Same. Dot paths for nested data work the same way.                                        |
-| `headerName`                            | `header`                                         | Renamed.                                                                                   |
-| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`                | Same.                                                                                      |
-| `sortable`                              | `sortable`                                       | Same.                                                                                      |
-| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`       | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
-| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`      | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api). |
-| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`      | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form. |
-| `cellEditor`                            | `cellEditor`                                     | Same idea — a component, not a class.                                                     |
-| `valueGetter`                           | `valueGetter`                                    | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                       |
-| `valueFormatter`                        | `valueFormatter`                                 | Same idea.                                                                                 |
-| `valueSetter`                           | `valueSetter`                                    | Return `false` to reject a commit (same convention as AG Grid).                           |
-| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                      | Same.                                                                                      |
-| `checkboxSelection`                     | `checkboxSelection`                              | Same.                                                                                      |
-| `rowGroup: true` (per column)           | `initialState.groupBy: string[]` (grid-level)    | **Different model** — see [Grouping](#row-grouping--aggregation) below.                    |
-| `aggFunc` (per column)                  | `initialState.aggDefs` (grid-level)              | Same built-in names (`sum`/`avg`/`min`/`max`/`count`), different location.                 |
+| AG Grid                                 | Wit Grid                                      | Notes                                                                                                 |
+| --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `field`                                 | `field`                                       | Same. Dot paths for nested data work the same way.                                                    |
+| `headerName`                            | `header`                                      | Renamed.                                                                                              |
+| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`             | Same.                                                                                                 |
+| `sortable`                              | `sortable`                                    | Same.                                                                                                 |
+| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`    | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
+| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`   | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api).          |
+| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`   | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form.        |
+| `cellEditor`                            | `cellEditor`                                  | Same idea — a component, not a class.                                                                 |
+| `valueGetter`                           | `valueGetter`                                 | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                                  |
+| `valueFormatter`                        | `valueFormatter`                              | Same idea.                                                                                            |
+| `valueSetter`                           | `valueSetter`                                 | Return `false` to reject a commit (same convention as AG Grid).                                       |
+| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                   | Same.                                                                                                 |
+| `checkboxSelection`                     | `checkboxSelection`                           | Same.                                                                                                 |
+| `rowGroup: true` (per column)           | `initialState.groupBy: string[]` (grid-level) | **Different model** — see [Grouping](#row-grouping--aggregation) below.                               |
+| `aggFunc` (per column)                  | `initialState.aggDefs` (grid-level)           | Same built-in names (`sum`/`avg`/`min`/`max`/`count`), different location.                            |
 
 See the full column shape in [Columns](/docs/next/columns).
 
@@ -83,25 +83,26 @@ both **on the grid**, in `initialState` — the column stays a plain column defi
 		```tsx
 		import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
 
-		interface EmployeeRow {
-			id: string;
-			department: string;
-			salary: number;
-		}
+    	interface EmployeeRow {
+    		id: string;
+    		department: string;
+    		salary: number;
+    	}
 
-		const columns: ColumnDef<EmployeeRow>[] = [
-			{ field: 'department', header: 'Department' },
-			{ field: 'salary', header: 'Salary' },
-		];
+    	const columns: ColumnDef<EmployeeRow>[] = [
+    		{ field: 'department', header: 'Department' },
+    		{ field: 'salary', header: 'Salary' },
+    	];
 
-		<Grid
-			rows={rows}
-			columns={columns}
-			getRowId={(row) => row.id}
-			initialState={{ groupBy: ['department'], aggDefs: [{ field: 'salary', aggFunc: 'sum' }] }}
-		/>;
-		```
-	</Tab>
+    	<Grid
+    		rows={rows}
+    		columns={columns}
+    		getRowId={(row) => row.id}
+    		initialState={{ groupBy: ['department'], aggDefs: [{ field: 'salary', aggFunc: 'sum' }] }}
+    	/>;
+    	```
+    </Tab>
+
 </Tabs>
 
 Grouping renders through a `groupRowRenderer` you supply, not an auto-generated group column — see
@@ -112,11 +113,11 @@ Grouping renders through a `groupRowRenderer` you supply, not an auto-generated 
 
 Both grids use the same three-way split, and the names are close enough to be a find-and-replace:
 
-| AG Grid `rowModelType` | Wit Grid `rowModelType` |
-| ----------------------- | ------------------------- |
-| `'clientSide'` (default) | `'client'` (default)     |
-| `'infinite'`             | `'infinite'`              |
-| `'serverSide'`           | `'server'`                |
+| AG Grid `rowModelType`   | Wit Grid `rowModelType` |
+| ------------------------ | ----------------------- |
+| `'clientSide'` (default) | `'client'` (default)    |
+| `'infinite'`             | `'infinite'`            |
+| `'serverSide'`           | `'server'`              |
 
 The datasource **contract** is where they diverge — AG Grid uses a success/fail callback shape, Wit Grid uses a
 `Promise`:
@@ -138,20 +139,21 @@ The datasource **contract** is where they diverge — AG Grid uses a success/fai
 		```tsx
 		import type { InfiniteDatasource } from '@eregister/wit-grid-react';
 
-		interface Row {
-			id: string;
-		}
+    	interface Row {
+    		id: string;
+    	}
 
-		const datasource: InfiniteDatasource<Row> = {
-			async getRows(params, { signal }) {
-				const res = await fetch(`/api/rows?start=${params.startRow}&end=${params.endRow}`, { signal });
-				if (!res.ok) throw new Error('Failed to load rows');
-				const data = await res.json();
-				return { rows: data.rows, lastRow: data.lastRow };
-			},
-		};
-		```
-	</Tab>
+    	const datasource: InfiniteDatasource<Row> = {
+    		async getRows(params, { signal }) {
+    			const res = await fetch(`/api/rows?start=${params.startRow}&end=${params.endRow}`, { signal });
+    			if (!res.ok) throw new Error('Failed to load rows');
+    			const data = await res.json();
+    			return { rows: data.rows, lastRow: data.lastRow };
+    		},
+    	};
+    	```
+    </Tab>
+
 </Tabs>
 
 Throw (or reject) instead of calling a `failCallback`; the grid marks that block failed. An `AbortSignal` is
@@ -162,11 +164,11 @@ full request/response shape, including the server row model's route-aware reques
 
 The mental model is the same — a nested grid under an expandable row — and the prop names are nearly identical:
 
-| AG Grid                  | Wit Grid                 |
-| ------------------------- | -------------------------- |
-| `masterDetail: true`       | `initialState.masterDetailEnabled: true` |
-| `detailCellRenderer`       | `detailRowRenderer`        |
-| `detailRowHeight`          | `detailRowHeight`          |
+| AG Grid              | Wit Grid                                 |
+| -------------------- | ---------------------------------------- |
+| `masterDetail: true` | `initialState.masterDetailEnabled: true` |
+| `detailCellRenderer` | `detailRowRenderer`                      |
+| `detailRowHeight`    | `detailRowHeight`                        |
 
 See [Master-Detail](/docs/next/master-detail) for the full renderer signature — Wit Grid's detail renderer
 receives `{ visualRow, api }`, where the nested grid is a fully independent `<Grid>` instance you render yourself
@@ -210,11 +212,10 @@ api.redo();
 ```
 
 <Callout title='Not license-gated' type='info'>
-	In AG Grid, range selection, clipboard, Excel/CSV export beyond the basics, server-side row model, row
-	grouping, and master-detail have at various points required an AG Grid **Enterprise** license. In Wit Grid,
-	everything on this page ships in the single open package — there is no separate paid tier to unlock these
-	features. (Always double-check AG Grid's current pricing page for what's gated in the version you're on;
-	their Community/Enterprise split has changed over time.)
+	In AG Grid, range selection, clipboard, Excel/CSV export beyond the basics, server-side row model, row grouping, and master-detail have at various
+	points required an AG Grid **Enterprise** license. In Wit Grid, everything on this page ships in the single open package — there is no separate
+	paid tier to unlock these features. (Always double-check AG Grid's current pricing page for what's gated in the version you're on; their
+	Community/Enterprise split has changed over time.)
 </Callout>
 
 ## What doesn't map 1:1
