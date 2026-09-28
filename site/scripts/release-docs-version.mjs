@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +56,25 @@ function rewriteSnapshotMdx(dir) {
 			.replaceAll('<EventsReference />', `<EventsReference version="${version}" />`);
 		writeFileSync(target, source);
 	}
+
+	// A frozen snapshot must stay self-contained — an internal link left pointing at /docs/next
+	// would silently pull a reader out of the version they're reading into unreleased docs.
+	// Rewrite every /docs/next/... reference in the snapshot to point at this version instead.
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (!entry.isFile() || !entry.name.endsWith('.mdx')) continue;
+		const target = path.join(dir, entry.name);
+		const source = readFileSync(target, 'utf8');
+		const rewritten = source.replace(/\/docs\/next\b/g, `/docs/${version}`);
+		if (rewritten !== source) writeFileSync(target, rewritten);
+	}
+}
+
+function rewriteSnapshotTitle(dir) {
+	const target = path.join(dir, 'meta.json');
+	if (!existsSync(target)) return;
+	const meta = JSON.parse(readFileSync(target, 'utf8'));
+	meta.title = version;
+	writeFileSync(target, `${JSON.stringify(meta, null, '\t')}\n`);
 }
 
 function updateDocsMeta() {
@@ -109,6 +128,7 @@ mkdirSync(path.dirname(generatedTarget), { recursive: true });
 cpSync(docsSource, docsTarget, { recursive: true });
 cpSync(generatedSource, generatedTarget, { recursive: true });
 rewriteSnapshotMdx(docsTarget);
+rewriteSnapshotTitle(docsTarget);
 updateDocsMeta();
 updateVersionRegistry();
 

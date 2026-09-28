@@ -32,7 +32,7 @@ pnpm --filter wit-grid-site docs:release:from-package
 
 This reads `packages/react/package.json`'s version, derives the `major.minor` (e.g. `1.4.1` → `1.4`), and:
 
-- copies `content/docs/next` → `content/docs/<version>`
+- copies `content/docs/1.4` → `content/docs/<version>`
 - copies `generated/next` → `generated/<version>`
 - rewrites that snapshot's `<ApiReference />`/`<EventsReference />` tags to pin `version="<version>"`, so the
   frozen snapshot keeps showing the reference it shipped with even after `next`'s own reference changes
@@ -47,7 +47,7 @@ or `--dry-run` to preview the copy plan without writing anything.
 
 ### Start a fresh "unreleased" section
 
-Clear out [Migration Notes](/docs/next/migration-notes)'s `next (unreleased)` section in the `next` line — the
+Clear out [Migration Notes](/docs/1.4/migration-notes)'s `next (unreleased)` section in the `next` line — the
 version you just cut keeps its own frozen copy of the notes that led up to it.
 
 </Step>
@@ -76,12 +76,12 @@ generated output or a broken code sample fails before it ships.
 ## Authored content
 
 Guides should explain concepts and workflows. Reference pages should come from source code wherever possible —
-[API reference](/docs/next/api-reference) and [Grid API](/docs/next/grid-api) are both generated via `ts-morph`
+[API reference](/docs/1.4/api-reference) and [Grid API](/docs/1.4/grid-api) are both generated via `ts-morph`
 directly from `packages/react/src` and `packages/core/src`, with a build-time guard that fails if the source
 interfaces they read drift out from under them. Examples should live as runnable files in
 `packages/examples`, not screenshots or copied snippets.
 
 ## Licensing
 
-Wit Grid is proprietary, source-available software — see [Installation](/docs/next/installation#licensing).
+Wit Grid is proprietary, source-available software — see [Installation](/docs/1.4/installation#licensing).
 Docs content should never describe it as "open source" or imply free redistribution rights.

@@ -89,16 +89,8 @@ body {
 	background:
 		radial-gradient(560px circle at 12% 0%, rgba(56, 189, 248, 0.16), transparent 60%),
 		radial-gradient(560px circle at 88% 10%, rgba(139, 92, 246, 0.14), transparent 60%),
-		linear-gradient(
-			to right,
-			color-mix(in srgb, var(--color-fd-border) 40%, transparent) 1px,
-			transparent 1px
-		),
-		linear-gradient(
-			to bottom,
-			color-mix(in srgb, var(--color-fd-border) 40%, transparent) 1px,
-			transparent 1px
-		);
+		linear-gradient(to right, color-mix(in srgb, var(--color-fd-border) 40%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in srgb, var(--color-fd-border) 40%, transparent) 1px, transparent 1px);
 	background-size:
 		100% 100%,
 		100% 100%,

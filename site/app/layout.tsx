@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { SITE_URL } from '@/lib/site-url';
+import { SiteFooter } from '@/components/site-footer';
 import './global.css';
 
 const description = 'A framework-agnostic grid engine for massive, editable datasets — documentation, guides, and live examples.';
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 					}}
 				>
 					{children}
+					<SiteFooter />
 				</RootProvider>
 			</body>
 		</html>
