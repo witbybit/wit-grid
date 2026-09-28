@@ -47,6 +47,9 @@ export interface DashboardStockRow {
 	risk: 'low' | 'medium' | 'high';
 }
 
+// A broad, realistic universe (not just a handful of megacaps repeated) — at 400 rows over ~40
+// names, each symbol appears ~10 times, close enough to plausible multi-lot/multi-account
+// holdings that the default (unsorted) view reads as a real portfolio, not looping seed data.
 const SEED_STOCKS = [
 	{ id: 'AAPL', name: 'Apple Inc.', price: 175.5 },
 	{ id: 'MSFT', name: 'Microsoft Corp.', price: 420.2 },
@@ -56,6 +59,39 @@ const SEED_STOCKS = [
 	{ id: 'AMZN', name: 'Amazon.com Inc.', price: 178.4 },
 	{ id: 'NFLX', name: 'Netflix Inc.', price: 610.5 },
 	{ id: 'AMD', name: 'Advanced Micro Devices', price: 180.2 },
+	{ id: 'META', name: 'Meta Platforms Inc.', price: 505.8 },
+	{ id: 'AVGO', name: 'Broadcom Inc.', price: 1340.6 },
+	{ id: 'CRM', name: 'Salesforce Inc.', price: 275.9 },
+	{ id: 'ORCL', name: 'Oracle Corp.', price: 128.4 },
+	{ id: 'ADBE', name: 'Adobe Inc.', price: 480.3 },
+	{ id: 'INTC', name: 'Intel Corp.', price: 42.7 },
+	{ id: 'CSCO', name: 'Cisco Systems Inc.', price: 48.9 },
+	{ id: 'IBM', name: 'IBM Corp.', price: 172.1 },
+	{ id: 'JPM', name: 'JPMorgan Chase & Co.', price: 198.6 },
+	{ id: 'BAC', name: 'Bank of America Corp.', price: 38.2 },
+	{ id: 'GS', name: 'Goldman Sachs Group', price: 445.7 },
+	{ id: 'V', name: 'Visa Inc.', price: 275.4 },
+	{ id: 'MA', name: 'Mastercard Inc.', price: 465.2 },
+	{ id: 'JNJ', name: 'Johnson & Johnson', price: 152.3 },
+	{ id: 'UNH', name: 'UnitedHealth Group', price: 495.8 },
+	{ id: 'PFE', name: 'Pfizer Inc.', price: 27.6 },
+	{ id: 'LLY', name: 'Eli Lilly and Co.', price: 780.4 },
+	{ id: 'XOM', name: 'Exxon Mobil Corp.', price: 112.9 },
+	{ id: 'CVX', name: 'Chevron Corp.', price: 156.3 },
+	{ id: 'KO', name: 'Coca-Cola Co.', price: 62.4 },
+	{ id: 'PEP', name: 'PepsiCo Inc.', price: 168.7 },
+	{ id: 'WMT', name: 'Walmart Inc.', price: 68.9 },
+	{ id: 'COST', name: 'Costco Wholesale Corp.', price: 735.2 },
+	{ id: 'HD', name: 'Home Depot Inc.', price: 345.6 },
+	{ id: 'DIS', name: 'Walt Disney Co.', price: 108.3 },
+	{ id: 'NKE', name: 'Nike Inc.', price: 92.1 },
+	{ id: 'BA', name: 'Boeing Co.', price: 178.5 },
+	{ id: 'CAT', name: 'Caterpillar Inc.', price: 358.9 },
+	{ id: 'GE', name: 'General Electric Co.', price: 165.4 },
+	{ id: 'UBER', name: 'Uber Technologies Inc.', price: 72.8 },
+	{ id: 'SHOP', name: 'Shopify Inc.', price: 78.3 },
+	{ id: 'PLTR', name: 'Palantir Technologies', price: 24.6 },
+	{ id: 'SNOW', name: 'Snowflake Inc.', price: 168.2 },
 ];
 
 function createDashboardRows(): DashboardStockRow[] {
@@ -63,13 +99,14 @@ function createDashboardRows(): DashboardStockRow[] {
 		const stock = SEED_STOCKS[index % SEED_STOCKS.length];
 		const change = ((index * 13) % 120) / 10 - 6;
 		const volume = 5 + ((index * 17) % 120);
-		const id = `${stock.id}${index >= SEED_STOCKS.length ? `.${Math.floor(index / SEED_STOCKS.length)}` : ''}`;
+		const lot = Math.floor(index / SEED_STOCKS.length);
+		const id = `${stock.id}${lot > 0 ? `.${lot}` : ''}`;
 		const shares = 50 + ((index * 37) % 950);
 		return {
 			id,
 			symbol: stock.id,
 			name: stock.name,
-			price: (stock.price * (0.75 + ((index * 7) % 50) / 100)).toFixed(2),
+			price: (stock.price * (0.92 + ((index * 7) % 16) / 100)).toFixed(2),
 			change: `${change >= 0 ? '+' : ''}${change.toFixed(1)}`,
 			volume: volume.toFixed(1),
 			shares: String(shares),
@@ -528,7 +565,11 @@ export default function RealtimeDashboard({
 	// referentially stable across renders. Live theme changes go through api.switchTheme() below.
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	const initialGridState = useMemo<Partial<GridInitialState<DashboardStockRow>>>(
-		() => ({ themeName: isLight ? 'spreadsheet' : 'dark', sortModel: [{ colId: 'price', sort: 'desc' }] }),
+		// Sorted by today's move rather than raw price — price is dominated by a couple of
+		// high-priced names (AVGO, LLY), which would otherwise stack ~10 rows of the same
+		// company at the very top of the view. Change is spread evenly across every row
+		// regardless of symbol, so the default view reads as a real, varied portfolio.
+		() => ({ themeName: isLight ? 'spreadsheet' : 'dark', sortModel: [{ colId: 'change', sort: 'desc' }] }),
 		[]
 	);
 	const [api, setApi] = useState<GridApi<DashboardStockRow> | null>(null);
