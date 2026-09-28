@@ -22,18 +22,18 @@ const PerformanceLab = lazy(() => import('./pages/PerformanceLab'));
 const FlightRecorderLab = lazy(() => import('./pages/FlightRecorderLab'));
 const SidebarPanelsDemo = lazy(() => import('./pages/SidebarPanelsDemo'));
 const NativeCellTypesDemo = lazy(() => import('@eregister/wit-grid-examples/native-cell-types'));
-const RealtimeGroupingDemo = lazy(() => import('./pages/RealtimeGroupingDemo'));
+const RealtimeGroupingDemo = lazy(() => import('@eregister/wit-grid-examples/realtime-grouping'));
 const RowMultiSelectDemo = lazy(() => import('./pages/RowMultiSelectDemo'));
 const CrudValidationDemo = lazy(() => import('./pages/CrudValidationDemo'));
 const WideGridDemo = lazy(() => import('./pages/WideGridDemo'));
 const ColumnGroupHeaderDemo = lazy(() => import('./pages/ColumnGroupHeaderDemo'));
-const ClipboardDemo = lazy(() => import('./pages/ClipboardDemo'));
+const ClipboardDemo = lazy(() => import('@eregister/wit-grid-examples/clipboard'));
 const FloatingFiltersDemo = lazy(() => import('./pages/FloatingFiltersDemo'));
 const RowDragDemo = lazy(() => import('@eregister/wit-grid-examples/row-drag'));
 const AdvancedFiltersDemo = lazy(() => import('@eregister/wit-grid-examples/advanced-filters'));
 const DataIntegrityLab = lazy(() => import('@eregister/wit-grid-examples/data-integrity'));
 const ProjectsComplianceDemo = lazy(() => import('./pages/ProjectsComplianceDemo'));
-const KanbanBoardDemo = lazy(() => import('./pages/KanbanBoardDemo'));
+const KanbanBoardDemo = lazy(() => import('@eregister/wit-grid-examples/kanban-board'));
 const DocsShowcase = lazy(() => import('./pages/DocsShowcase'));
 
 const PAGES: readonly GridPageType[] = [

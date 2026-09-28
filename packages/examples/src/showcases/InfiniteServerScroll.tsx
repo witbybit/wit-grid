@@ -10,6 +10,8 @@ interface InfiniteServerScrollProps {
 	pinLeftColumns?: number;
 	pinRightColumns?: number;
 	onGridReady?: (event: GridReadyEvent<ServerAuditRow>) => void;
+	/** Hides the telemetry sidebar (severity/selection/renderer/latency cards), keeping just the log grid. */
+	compact?: boolean;
 }
 
 type SeverityStats = {
@@ -38,6 +40,7 @@ export default function InfiniteServerScroll({
 	pinLeftColumns = 0,
 	pinRightColumns = 0,
 	onGridReady,
+	compact = false,
 }: InfiniteServerScrollProps) {
 	const gridHostRef = useRef<HTMLDivElement>(null);
 	const [api, setApi] = useState<GridApi<ServerAuditRow> | null>(null);
@@ -240,6 +243,7 @@ export default function InfiniteServerScroll({
 			</div>
 
 			{/* Right Column: Auditor Telemetry Sidebar */}
+			{!compact && (
 			<div className='w-full xl:w-80 flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
 				{/* 1. SEVERITY TELEMETRY CARD */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3.5 glass-card relative overflow-hidden'>
@@ -414,6 +418,7 @@ export default function InfiniteServerScroll({
 					</p>
 				</div>
 			</div>
+			)}
 		</div>
 	);
 }

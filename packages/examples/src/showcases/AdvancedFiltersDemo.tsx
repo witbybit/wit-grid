@@ -471,7 +471,12 @@ const SCOPE_LABELS: Record<string, string> = {
 
 // ── Demo page ─────────────────────────────────────────────────────────────────
 
-export default function AdvancedFiltersDemo() {
+interface Props {
+	/** Hides the workspace control panel (active view/quick-apply/event log) and the filter-type legend. */
+	compact?: boolean;
+}
+
+export default function AdvancedFiltersDemo({ compact = false }: Props = {}) {
 	const apiRef = useRef<GridApi<EmployeeRow> | null>(null);
 	const [filterModel, setFilterModel] = useState<FilterModel | null>(null);
 	const [wsState, setWsState] = useState<GridWorkspaceState | null>(null);
@@ -630,6 +635,7 @@ export default function AdvancedFiltersDemo() {
 			</div>
 
 			{/* ── Workspace control panel ───────────────────────────────── */}
+			{!compact && (
 			<div
 				style={{
 					display: 'grid',
@@ -816,8 +822,10 @@ export default function AdvancedFiltersDemo() {
 					)}
 				</div>
 			</div>
+			)}
 
 			{/* ── Filter type legend ────────────────────────────────────── */}
+			{!compact && (
 			<div
 				style={{
 					display: 'flex',
@@ -872,6 +880,7 @@ export default function AdvancedFiltersDemo() {
 					<span style={{ color: '#94a3b8' }}>Search box above — matches any column, ANDed with the per-column filters</span>
 				</div>
 			</div>
+			)}
 
 			{/* ── Grid ──────────────────────────────────────────────────── */}
 			<div style={{ flex: 1, minHeight: 0 }}>

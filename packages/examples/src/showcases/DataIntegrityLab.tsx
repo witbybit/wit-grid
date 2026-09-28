@@ -163,7 +163,12 @@ function StageBadge({ label, active, done }: { label: string; active: boolean; d
 
 type Stage = 'quality' | 'diff' | 'stream' | 'conflict';
 
-export default function DataIntegrityLab() {
+interface Props {
+	/** Hides the Activity Log panel, keeping just the stage controls and grid. */
+	compact?: boolean;
+}
+
+export default function DataIntegrityLab({ compact = false }: Props = {}) {
 	const apiRef = useRef<GridApi<TradeRow> | null>(null);
 	const streamRef = useRef<GridTransactionStreamHandle<TradeRow> | null>(null);
 	const [activeStage, setActiveStage] = useState<Stage>('quality');
@@ -480,6 +485,7 @@ export default function DataIntegrityLab() {
 				</div>
 
 				{/* Activity log */}
+				{!compact && (
 				<div className='w-52 shrink-0 rounded-xl border border-slate-800/60 bg-slate-900/30 flex flex-col overflow-hidden'>
 					<div className='flex items-center justify-between px-3 py-2 border-b border-slate-800/60'>
 						<span className='text-[9px] font-extrabold uppercase tracking-widest text-slate-500'>Activity Log</span>
@@ -501,6 +507,7 @@ export default function DataIntegrityLab() {
 						)}
 					</div>
 				</div>
+				)}
 			</div>
 		</div>
 	);

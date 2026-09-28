@@ -44,7 +44,12 @@ const COLUMNS = [
 
 type LogEntry = { kind: 'copy' | 'paste'; text: string; time: string };
 
-export default function ClipboardDemo() {
+interface Props {
+	/** Hides the copy/paste event log panel, keeping just the toolbar and grid. */
+	compact?: boolean;
+}
+
+export default function ClipboardDemo({ compact = false }: Props = {}) {
 	const apiRef = useRef<GridApi<Product> | null>(null);
 	const [log, setLog] = useState<LogEntry[]>([]);
 	const [status, setStatus] = useState<string>('Select cells, then use Ctrl+C / Ctrl+V');
@@ -98,14 +103,15 @@ export default function ClipboardDemo() {
 	return (
 		<div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 12, padding: 16 }}>
 			<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-				<span style={{ fontSize: 13, fontWeight: 600, color: 'var(--og-header-fg, #555)', marginRight: 4 }}>Clipboard</span>
+				<span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0', marginRight: 4 }}>Clipboard</span>
 				<button
 					onClick={handleCopySelected}
 					style={{
 						padding: '5px 12px',
 						borderRadius: 6,
-						border: '1px solid var(--og-border-color, #d1d5db)',
-						background: 'var(--og-header-bg, #f9fafb)',
+						border: '1px solid rgba(148, 163, 184, 0.3)',
+						background: 'rgba(30, 41, 59, 0.6)',
+						color: '#e2e8f0',
 						cursor: 'pointer',
 						fontSize: 12,
 					}}
@@ -117,8 +123,9 @@ export default function ClipboardDemo() {
 					style={{
 						padding: '5px 12px',
 						borderRadius: 6,
-						border: '1px solid var(--og-border-color, #d1d5db)',
-						background: 'var(--og-header-bg, #f9fafb)',
+						border: '1px solid rgba(148, 163, 184, 0.3)',
+						background: 'rgba(30, 41, 59, 0.6)',
+						color: '#e2e8f0',
 						cursor: 'pointer',
 						fontSize: 12,
 					}}
@@ -130,29 +137,30 @@ export default function ClipboardDemo() {
 					style={{
 						padding: '5px 12px',
 						borderRadius: 6,
-						border: '1px solid var(--og-border-color, #d1d5db)',
-						background: 'var(--og-header-bg, #f9fafb)',
+						border: '1px solid rgba(148, 163, 184, 0.3)',
+						background: 'rgba(30, 41, 59, 0.6)',
+						color: '#e2e8f0',
 						cursor: 'pointer',
 						fontSize: 12,
 					}}
 				>
 					Paste (Ctrl+V)
 				</button>
-				<span style={{ fontSize: 12, color: 'var(--og-cell-fg, #6b7280)', marginLeft: 8 }}>{status}</span>
+				<span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 8 }}>{status}</span>
 			</div>
 
 			<div style={{ flex: 1, minHeight: 0 }}>
 				<Grid<Product> rowModelType='client' columns={COLUMNS} rows={ROWS} getRowId={(row) => row.id} onGridReady={handleGridReady} />
 			</div>
 
-			{log.length > 0 && (
+			{!compact && log.length > 0 && (
 				<div
 					style={{
 						height: 120,
 						overflowY: 'auto',
 						borderRadius: 6,
-						border: '1px solid var(--og-border-color, #e5e7eb)',
-						background: 'var(--og-odd-row-bg, #fafafa)',
+						border: '1px solid rgba(148, 163, 184, 0.2)',
+						background: 'rgba(15, 23, 42, 0.6)',
 						fontSize: 11,
 						fontFamily: 'monospace',
 						padding: '6px 10px',
@@ -161,17 +169,17 @@ export default function ClipboardDemo() {
 				>
 					{log.map((entry, i) => (
 						<div key={i} style={{ display: 'flex', gap: 8, marginBottom: 2 }}>
-							<span style={{ color: '#9ca3af', minWidth: 60 }}>{entry.time}</span>
+							<span style={{ color: '#64748b', minWidth: 60 }}>{entry.time}</span>
 							<span
 								style={{
-									color: entry.kind === 'copy' ? '#2563eb' : '#16a34a',
+									color: entry.kind === 'copy' ? '#38bdf8' : '#34d399',
 									minWidth: 40,
 									fontWeight: 600,
 								}}
 							>
 								{entry.kind === 'copy' ? '↑ COPY' : '↓ PASTE'}
 							</span>
-							<span style={{ color: 'var(--og-cell-fg, #374151)' }}>{entry.text}</span>
+							<span style={{ color: '#cbd5e1' }}>{entry.text}</span>
 						</div>
 					))}
 				</div>

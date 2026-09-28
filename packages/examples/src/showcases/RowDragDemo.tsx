@@ -123,7 +123,13 @@ let logSeq = 0;
 
 // ─── Demo component ───────────────────────────────────────────────────────────
 
-export default function RowDragDemo() {
+interface Props {
+	/** Hides the drag-events log panel, keeping just the toolbar and grid. */
+	compact?: boolean;
+}
+
+
+export default function RowDragDemo({ compact = false }: Props = {}) {
 	const [mode, setMode] = useState<'managed' | 'unmanaged'>('managed');
 	const [rows] = useState<TaskRow[]>(() => generateTasks(15));
 	// Unmanaged mode: host keeps own order
@@ -280,6 +286,7 @@ export default function RowDragDemo() {
 			</div>
 
 			{/* Right: event log */}
+			{!compact && (
 			<div className='w-72 shrink-0 flex flex-col gap-2 overflow-hidden rounded-xl border border-slate-900 bg-slate-950/60 p-3'>
 				<div className='flex items-center justify-between shrink-0'>
 					<div className='flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500'>
@@ -313,6 +320,7 @@ export default function RowDragDemo() {
 					)}
 				</div>
 			</div>
+			)}
 		</div>
 	);
 }

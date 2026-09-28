@@ -360,7 +360,15 @@ const columns: ColumnDef<Row>[] = [
 
 // ─── Page component ───────────────────────────────────────────────────────────
 
-function NativeCellTypesDemoInner({ rows, onGridReady }: { rows: SkaterRow[]; onGridReady?: (event: GridReadyEvent<SkaterRow>) => void }) {
+function NativeCellTypesDemoInner({
+	rows,
+	onGridReady,
+	compact,
+}: {
+	rows: SkaterRow[];
+	onGridReady?: (event: GridReadyEvent<SkaterRow>) => void;
+	compact: boolean;
+}) {
 	const [activeType, setActiveType] = useState<number | null>(null);
 	const [showSnippet, setShowSnippet] = useState(false);
 
@@ -398,6 +406,7 @@ function NativeCellTypesDemoInner({ rows, onGridReady }: { rows: SkaterRow[]; on
 			</div>
 
 			{/* ── Info sidebar ── */}
+			{!compact && (
 			<div className='w-full xl:w-[308px] flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
 				{/* Cell type reference */}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
@@ -512,16 +521,19 @@ function NativeCellTypesDemoInner({ rows, onGridReady }: { rows: SkaterRow[]; on
 					)}
 				</div>
 			</div>
+			)}
 		</div>
 	);
 }
 
 interface NativeCellTypesDemoProps {
 	onGridReady?: (event: GridReadyEvent<SkaterRow>) => void;
+	/** Hides the cell-type reference, design notes, and usage-snippet sidebar, keeping just the grid. */
+	compact?: boolean;
 }
 
-export default function NativeCellTypesDemo({ onGridReady }: NativeCellTypesDemoProps) {
+export default function NativeCellTypesDemo({ onGridReady, compact = false }: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateSkaterRows(50), []);
 
-	return <NativeCellTypesDemoInner rows={rows} onGridReady={onGridReady} />;
+	return <NativeCellTypesDemoInner rows={rows} onGridReady={onGridReady} compact={compact} />;
 }

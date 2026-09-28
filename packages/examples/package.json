@@ -14,7 +14,10 @@
 		"./infinite-server-scroll": "./src/showcases/InfiniteServerScroll.tsx",
 		"./native-cell-types": "./src/showcases/NativeCellTypesDemo.tsx",
 		"./row-drag": "./src/showcases/RowDragDemo.tsx",
-		"./realtime-dashboard": "./src/showcases/RealtimeDashboard.tsx"
+		"./realtime-dashboard": "./src/showcases/RealtimeDashboard.tsx",
+		"./kanban-board": "./src/showcases/KanbanBoardDemo.tsx",
+		"./clipboard": "./src/showcases/ClipboardDemo.tsx",
+		"./realtime-grouping": "./src/showcases/RealtimeGroupingDemo.tsx"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit"

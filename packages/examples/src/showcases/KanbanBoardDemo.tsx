@@ -527,6 +527,8 @@ interface Props {
 	onGridReady?: (event: GridReadyEvent<KanbanCard>) => void;
 	pinLeftColumns?: number;
 	pinRightColumns?: number;
+	/** Hides the sprint status counts and the height-mode legend, keeping just the mode toggle and grid. */
+	compact?: boolean;
 }
 
 type HeightMode = 'getRowHeight' | 'autoRowHeight';
@@ -548,7 +550,7 @@ const MODE_META: Record<HeightMode, { label: string; badge: string; description:
 	},
 };
 
-export default function KanbanBoardDemo({ onGridReady, pinLeftColumns = 0, pinRightColumns = 0 }: Props) {
+export default function KanbanBoardDemo({ onGridReady, pinLeftColumns = 0, pinRightColumns = 0, compact = false }: Props) {
 	const [api, setApi] = useState<GridApi<KanbanCard> | null>(null);
 	const [heightMode, setHeightMode] = useState<HeightMode>('getRowHeight');
 	const [stats, setStats] = useState({ total: ROWS.length, byStatus: {} as Record<string, number> });
@@ -575,20 +577,24 @@ export default function KanbanBoardDemo({ onGridReady, pinLeftColumns = 0, pinRi
 		<div className='flex h-full min-h-0 flex-col gap-3'>
 			{/* Header stats + mode toggle */}
 			<div className='flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-slate-900 bg-slate-900/30 px-4 py-2.5'>
-				<span className='mr-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500'>Sprint Board</span>
-				{Object.entries(STATUS_META).map(([status, meta]) => {
-					const count = stats.byStatus[status] ?? 0;
-					if (!count) return null;
-					return (
-						<span
-							key={status}
-							className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${meta.color} bg-slate-900/60 border-slate-700/50`}
-						>
-							<span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-							{status} · {count}
-						</span>
-					);
-				})}
+				{!compact && (
+					<>
+						<span className='mr-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500'>Sprint Board</span>
+						{Object.entries(STATUS_META).map(([status, meta]) => {
+							const count = stats.byStatus[status] ?? 0;
+							if (!count) return null;
+							return (
+								<span
+									key={status}
+									className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${meta.color} bg-slate-900/60 border-slate-700/50`}
+								>
+									<span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+									{status} · {count}
+								</span>
+							);
+						})}
+					</>
+				)}
 				{/* Mode toggle */}
 				<div className='ml-auto flex items-center gap-1 rounded-lg border border-slate-700/40 bg-slate-800/40 p-0.5'>
 					{(Object.keys(MODE_META) as HeightMode[]).map((mode) => (
@@ -639,18 +645,20 @@ export default function KanbanBoardDemo({ onGridReady, pinLeftColumns = 0, pinRi
 			</div>
 
 			{/* Legend */}
-			<div className='flex shrink-0 flex-wrap items-center gap-2 rounded-lg border border-slate-800/60 bg-slate-900/20 px-3 py-2 text-[10px] text-slate-500'>
-				<span
-					className={`shrink-0 rounded border px-1.5 py-px font-bold text-[9px] uppercase tracking-wider ${
-						heightMode === 'getRowHeight'
-							? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-							: 'bg-violet-500/10 text-violet-400 border-violet-500/20'
-					}`}
-				>
-					{modeMeta.badge}
-				</span>
-				<span>{modeMeta.description}</span>
-			</div>
+			{!compact && (
+				<div className='flex shrink-0 flex-wrap items-center gap-2 rounded-lg border border-slate-800/60 bg-slate-900/20 px-3 py-2 text-[10px] text-slate-500'>
+					<span
+						className={`shrink-0 rounded border px-1.5 py-px font-bold text-[9px] uppercase tracking-wider ${
+							heightMode === 'getRowHeight'
+								? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+								: 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+						}`}
+					>
+						{modeMeta.badge}
+					</span>
+					<span>{modeMeta.description}</span>
+				</div>
+			)}
 		</div>
 	);
 }

@@ -332,8 +332,16 @@ function ToolBtn({ children, onClick, title, accent }: { children: React.ReactNo
 
 // ── Inner component ───────────────────────────────────────────────────────────
 
-function RealtimeGroupingDemoInner({ api, onGridReady }: { api: GridApi<SalesRow> | null; onGridReady?: (event: GridReadyEvent<SalesRow>) => void }) {
-	const [showPanel, setShowPanel] = useState(true);
+function RealtimeGroupingDemoInner({
+	api,
+	onGridReady,
+	compact,
+}: {
+	api: GridApi<SalesRow> | null;
+	onGridReady?: (event: GridReadyEvent<SalesRow>) => void;
+	compact: boolean;
+}) {
+	const [showPanel, setShowPanel] = useState(!compact);
 
 	useEffect(() => {
 		if (!api) return;
@@ -353,9 +361,9 @@ function RealtimeGroupingDemoInner({ api, onGridReady }: { api: GridApi<SalesRow
 				<div className='flex items-center gap-2'>
 					<span className='w-2 h-2 rounded-full bg-violet-500 animate-pulse' />
 					<span className='text-[10px] text-slate-400 font-extrabold uppercase tracking-wider'>
-						Sales Pipeline — 500 rows · 10 columns · Live Grouping + Aggregations
+						{compact ? 'Sales Pipeline — Live Grouping' : 'Sales Pipeline — 500 rows · 10 columns · Live Grouping + Aggregations'}
 					</span>
-					{showPanel && (
+					{!compact && showPanel && (
 						<span className='text-[10px] text-blue-400/60 font-semibold ml-2'>· Drag column headers into the group panel to group</span>
 					)}
 				</div>
@@ -379,12 +387,7 @@ function RealtimeGroupingDemoInner({ api, onGridReady }: { api: GridApi<SalesRow
 					pinLeftColumns={1}
 					enableContextMenu={true}
 					groupRowRenderer={(props) => <GroupRowRenderer visualRow={props.visualRow as GroupVisualRow<SalesRow>} api={props.api} />}
-					sidebar={{
-						panels: ['columns', 'filters', 'sort', 'themes'],
-						defaultOpen: 'columns',
-						position: 'right',
-						width: 280,
-					}}
+					sidebar={compact ? undefined : { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }}
 					onGridReady={onGridReady}
 				/>
 			</div>
@@ -396,14 +399,17 @@ function RealtimeGroupingDemoInner({ api, onGridReady }: { api: GridApi<SalesRow
 
 interface RealtimeGroupingDemoProps {
 	onGridReady?: (event: GridReadyEvent<SalesRow>) => void;
+	/** Hides the description subtitle and the built-in columns/filters/sort/themes sidebar. */
+	compact?: boolean;
 }
 
-export default function RealtimeGroupingDemo({ onGridReady }: RealtimeGroupingDemoProps) {
+export default function RealtimeGroupingDemo({ onGridReady, compact = false }: RealtimeGroupingDemoProps) {
 	const [api, setApi] = useState<GridApi<SalesRow> | null>(null);
 
 	return (
 		<RealtimeGroupingDemoInner
 			api={api}
+			compact={compact}
 			onGridReady={(event) => {
 				setApi(event.api);
 				onGridReady?.(event);
