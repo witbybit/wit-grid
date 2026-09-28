@@ -8,6 +8,10 @@ jobs:
         steps:
             - name: Checkout
               uses: actions/checkout@v4
+              with:
+                  # Full history: fumadocs-mdx's `lastModified: true` reads each doc's last-touching
+                  # commit via `git log`, which needs more than the latest commit's history to resolve.
+                  fetch-depth: 0
 
             - name: Enable pnpm
               uses: pnpm/action-setup@v4

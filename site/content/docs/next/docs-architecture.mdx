@@ -11,6 +11,10 @@ version directory (e.g. [`1.4`](/docs/1.4)) is a frozen snapshot of `next` taken
 edited afterward except for its own migration notes. `site/lib/versions.ts` is generated, not hand-edited — it's
 rebuilt automatically whenever a version is cut.
 
+Each version's `meta.json` sets `"root": true`. That's not cosmetic — it tells fumadocs to treat each version as
+its own page-tree root, which scopes the Previous/Next footer navigation to stay inside that version instead of
+silently walking a reader from the last page of one version into the first page of another.
+
 ## Cutting a new version
 
 <Steps>
@@ -47,8 +51,9 @@ or `--dry-run` to preview the copy plan without writing anything.
 
 ### Start a fresh "unreleased" section
 
-Clear out [Migration Notes](/docs/next/migration-notes)'s `next (unreleased)` section in the `next` line — the
-version you just cut keeps its own frozen copy of the notes that led up to it.
+Clear out [Migration Notes](/docs/next/migration-notes)'s and the [Changelog](/docs/next/changelog)'s
+`next (unreleased)` sections in the `next` line — the version you just cut keeps its own frozen copy of the notes
+that led up to it.
 
 </Step>
 <Step>

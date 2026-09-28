@@ -23,6 +23,7 @@
 		"grid-api",
 		"events",
 		"examples",
+		"changelog",
 		"migration-notes",
 		"api-reference",
 		"docs-architecture"
