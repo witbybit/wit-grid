@@ -26,6 +26,12 @@ jobs:
             - name: Build packages
               run: pnpm run build:packages
 
+            - name: Verify generated docs are up to date
+              run: pnpm run docs:check
+
+            - name: Lint docs (typecheck embedded code snippets)
+              run: pnpm run docs:lint
+
             - name: Build the docs for Cloudflare Workers
               run: pnpm run cf:build
               working-directory: site
