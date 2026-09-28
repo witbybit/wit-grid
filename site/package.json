@@ -7,6 +7,9 @@
 		"dev": "next dev --webpack --hostname 127.0.0.1 --port 5174",
 		"build": "pnpm docs:generate && next build --webpack",
 		"start": "next start --hostname 127.0.0.1 --port 5174",
+		"cf:build": "opennextjs-cloudflare build",
+		"cf:deploy": "opennextjs-cloudflare deploy",
+		"cf:preview": "opennextjs-cloudflare preview",
 		"docs:generate": "node scripts/generate-docs.mjs",
 		"docs:check": "node scripts/generate-docs.mjs --check",
 		"docs:lint": "node scripts/lint-docs.mjs",
@@ -30,11 +33,13 @@
 		"typescript": "^7.0.2"
 	},
 	"devDependencies": {
+		"@opennextjs/cloudflare": "^1.20.6",
 		"@types/node": "latest",
 		"@types/react": "latest",
 		"@types/react-dom": "latest",
 		"postcss": "^8.4.38",
 		"shiki": "^4.4.3",
-		"ts-morph": "^28.0.0"
+		"ts-morph": "^28.0.0",
+		"wrangler": "^4.142.0"
 	}
 }
