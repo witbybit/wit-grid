@@ -1,5 +1,6 @@
 {
 	"title": "Next",
+	"root": true,
 	"pages": [
 		"index",
 		"installation",

@@ -1,5 +1,6 @@
 {
 	"title": "1.4",
+	"root": true,
 	"pages": [
 		"index",
 		"installation",
