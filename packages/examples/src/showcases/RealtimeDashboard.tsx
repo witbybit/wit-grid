@@ -538,7 +538,7 @@ export default function RealtimeDashboard({
 	const [eventLogs, setEventLogs] = useState<Array<{ id: number; time: string; msg: string; type: string }>>([]);
 	const eventLogIdRef = useRef(0);
 	const [autoFire, setAutoFire] = useState(true);
-	const [autoFireIntervalMs, setAutoFireIntervalMs] = useState(300);
+	const [autoFireIntervalMs, setAutoFireIntervalMs] = useState(2000);
 	const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const [clock, setClock] = useState<string | null>(null);
 
