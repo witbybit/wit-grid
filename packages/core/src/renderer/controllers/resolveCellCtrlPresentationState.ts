@@ -143,23 +143,6 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	cellCtrl.valueState.displayText = cellCtrl.valueState.formattedValue;
 	cellCtrl.valueState.loading = presentation.kind === 'html-pending';
 	cellCtrl.valueState.empty = !cellCtrl.valueState.formattedValue;
-	cellCtrl.rendererState.portalKey = portalKey;
-	// The controller key is exactly createCellControllerKey(rowId, columnInstanceId) — reuse it.
-	cellCtrl.rendererState.htmlSnapshotKey = presentation.kind === 'html-snapshot' || presentation.kind === 'html-pending' ? cellCtrl.key : undefined;
-	cellCtrl.rendererState.mode =
-		presentation.kind === 'live-renderer' || presentation.kind === 'dom-update'
-			? 'live'
-			: presentation.kind === 'frozen-portal'
-				? 'frozen'
-				: presentation.kind === 'text-impostor' || presentation.kind === 'shell'
-					? 'text-impostor'
-					: presentation.kind === 'html-snapshot'
-						? 'html-snapshot'
-						: presentation.kind === 'html-pending'
-							? 'html-pending'
-							: presentation.kind === 'checkbox-selector'
-								? 'none'
-								: 'primitive';
 	return cellCtrl;
 }
 
@@ -174,17 +157,6 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
 	cellCtrl.valueState.displayText = context.formattedValue;
 	cellCtrl.valueState.loading = context.contentMode === 'loading';
 	cellCtrl.valueState.empty = !context.formattedValue;
-	cellCtrl.rendererState.portalKey = context.portalKey;
-	cellCtrl.rendererState.mode =
-		context.contentMode === 'portal'
-			? 'live'
-			: context.contentMode === 'loading'
-				? 'loading'
-				: context.contentMode === 'custom'
-					? 'none'
-					: context.contentMode === 'fallback'
-						? 'text-impostor'
-						: 'primitive';
 	cellCtrl.presentationState = {
 		kind:
 			context.presentationKind ??

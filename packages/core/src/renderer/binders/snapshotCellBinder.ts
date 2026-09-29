@@ -24,7 +24,6 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 	if (presentation.kind === 'frozen-portal') {
 		deps.cellRenderer.showPortalContent(cellSlot.element);
 		const portalHost = deps.getCellPortalHost(cellSlot.element);
-		if (portalHost) lifecycle.freeze({ cellCtrl, host: portalHost });
 		applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
 		applyCellAccessibilityState(cellSlot, cellCtrl);
 		if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
@@ -54,7 +53,6 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 						columnInstanceId: cellCtrl.columnInstanceId,
 						freshness: cellCtrl.freshness ?? snapshot,
 					},
-					cellSlot,
 					colField: cellCtrl.field,
 					rowHeight: runtime.rowHeight,
 					colWidth: runtime.colWidth,

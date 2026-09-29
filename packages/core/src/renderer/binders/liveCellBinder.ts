@@ -270,7 +270,6 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 			host: ensuredPortalHost,
 			reason: 'full-bind',
 			token,
-			cellSlot,
 			colField: cellCtrl.field,
 			rowHeight: runtime.rowHeight,
 			colWidth: runtime.colWidth,

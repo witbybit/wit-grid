@@ -155,7 +155,6 @@ function makeDispatchInput(
 						? presentation.recordVersions
 						: undefined,
 	};
-	cellCtrl.rendererState.portalKey = cellCtrl.presentationState.portalKey;
 	cellCtrl.visualState.editing = cellCtrl.presentationState.isEditing ?? false;
 	cellCtrl.visualState.focused = cellCtrl.presentationState.isFocused ?? false;
 	return {

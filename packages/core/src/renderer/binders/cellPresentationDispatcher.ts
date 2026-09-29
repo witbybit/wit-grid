@@ -118,7 +118,7 @@ export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentati
 		(existing instanceof PortalRendererHandle ? existing.portalKey : undefined) ??
 		cellSlot.lastPortalKey;
 	if (heldPortalKey && portalKeptBy(nextPresentation) !== heldPortalKey) {
-		getCellRendererLifecycle(deps).release({ cellCtrl, reason: 'invalidated', cellElement: cellSlot.element, portalKey: heldPortalKey });
+		getCellRendererLifecycle(deps).release({ reason: 'invalidated', cellElement: cellSlot.element, portalKey: heldPortalKey });
 		// Scroll binds never reassign the handle; a stale one would re-request this release later.
 		if (existing instanceof PortalRendererHandle) cellSlot.renderer = null;
 	}

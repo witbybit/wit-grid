@@ -92,9 +92,8 @@ export function canFreezeExistingPortalForIdentity<TRowData>(
 	isRowRebind: boolean
 ): boolean {
 	if (isRowRebind) return false;
-	// Equivalent to canFreezePortalForCellCtrl against a controller synthesized from the slot's own
-	// identity (row/column/slot instance all match by construction, so mustClearSlotForControllerChange
-	// is always false) — evaluated directly over the fields instead of allocating that controller.
+	// The slot's own identity always matches here (mustClearSlotForControllerChange is false by
+	// construction), so freezing only needs the held portal to be the one this cell expects.
 	if (!expectedPortalKey) return false;
 	if (cellSlot.lastContentMode !== 'portal' || cellSlot.lastPortalKey !== expectedPortalKey) return false;
 	return hasAuthoritativePortalHostContent(deps, cellSlot, expectedPortalKey);

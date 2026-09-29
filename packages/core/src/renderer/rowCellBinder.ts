@@ -380,11 +380,8 @@ function attachCellCtrl<TRowData>(
 	return cellCtrl;
 }
 
-function recordCellCtrlPhysicalBinding<TRowData>(cellCtrl: CellCtrl, cellSlot: CellSlot<TRowData>, freshness?: VisualFreshness): void {
+function recordCellCtrlPhysicalBinding<TRowData>(cellCtrl: CellCtrl, cellSlot: CellSlot<TRowData>): void {
 	cellCtrl.lifecycle.attachedSlotInstanceId = cellSlot.cellInstanceId;
-	cellCtrl.rendererState.mountedSlotInstanceId = cellSlot.cellInstanceId;
-	cellCtrl.rendererState.mountedFreshness = freshness ?? cellCtrl.freshness;
-	cellCtrl.rendererState.lastBindEpoch = (cellCtrl.rendererState.lastBindEpoch ?? 0) + 1;
 }
 
 /**
@@ -674,7 +671,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 		cellSlot.lastMountedRowVersion = rowVersion;
 		cellSlot.lastMountedGlobalVersion = state.globalVersion;
 		recordCellSlotMountedVisualVersions(cellSlot, currentVisualVersions);
-		recordCellCtrlPhysicalBinding(cellCtrl, cellSlot, { rowVersion, globalVersion: state.globalVersion, ...currentVisualVersions });
+		recordCellCtrlPhysicalBinding(cellCtrl, cellSlot);
 		return;
 	}
 
@@ -821,7 +818,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 	cellSlot.lastMountedRowVersion = rowVersion;
 	cellSlot.lastMountedGlobalVersion = state.globalVersion;
 	recordCellSlotMountedVisualVersions(cellSlot, currentVisualVersions);
-	recordCellCtrlPhysicalBinding(cellCtrl, cellSlot, { rowVersion, globalVersion: state.globalVersion, ...currentVisualVersions });
+	recordCellCtrlPhysicalBinding(cellCtrl, cellSlot);
 }
 
 export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>, request: BindCellDuringScrollRequest<TRowData>): void {

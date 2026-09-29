@@ -103,18 +103,6 @@ export interface CellCtrl {
 		quality?: unknown;
 	};
 
-	rendererState: {
-		mode: 'none' | 'primitive' | 'live' | 'frozen' | 'text-impostor' | 'html-snapshot' | 'html-pending' | 'shell' | 'loading';
-		portalKey?: string;
-		htmlSnapshotKey?: string;
-		mountedSlotInstanceId?: string;
-		mountedHost?: HTMLElement;
-		mountedFreshness?: VisualFreshness;
-		pendingWorkToken?: ControllerWorkToken;
-		lastCommitEpoch?: number;
-		lastBindEpoch?: number;
-	};
-
 	lifecycle: {
 		retainedBecause?: string;
 		attachedSlotInstanceId?: string;
@@ -195,9 +183,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			focused: false,
 			editing: false,
 			readOnly: false,
-		},
-		rendererState: {
-			mode: 'none',
 		},
 		lifecycle: {
 			destroyed: false,
