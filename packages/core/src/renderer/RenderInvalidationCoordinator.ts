@@ -65,11 +65,9 @@ export class RenderInvalidationCoordinator<TRowData = unknown> {
 				this.deps.geometryController.invalidateColumns([event.payload.colField]);
 			})
 		);
-		this.unsubscribers.push(
-			this.deps.engine.eventBus.addEventListener(GridEventName.rowResized, (event) => {
-				this.deps.geometryController.invalidateRows([event.payload.rowId]);
-			})
-		);
+		// No rowResized listener: every rowResized is emitted by a rowHeights commit, and the
+		// projection pipeline already syncs row geometry in that same commit. Re-deriving it
+		// here on the next paint was a second full O(rows) rebuild per resize.
 		this.unsubscribers.push(
 			this.deps.engine.eventBus.addEventListener(GridEventName.renderInvalidated, (event) => {
 				this.requestFlushGated(event.payload.reason, this.deps.engine.takePendingRenderChangeIds());

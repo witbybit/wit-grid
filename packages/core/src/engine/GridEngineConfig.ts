@@ -66,6 +66,13 @@ export interface GridEngineConfig<TRowData = unknown> {
 	 */
 	rowOverscanPx?: number;
 	colBuffer?: number;
+	/**
+	 * Pixel-based horizontal overscan applied on the leading (scroll-direction) edge. The
+	 * effective column buffer on that edge is max(colBuffer, columns covering this many px),
+	 * so grids with many narrow columns keep a real pixel margin during horizontal swipes.
+	 * The rendered-cell runtime limits still apply. Default: 0 (count-based colBuffer only).
+	 */
+	colOverscanPx?: number;
 	runtimeLimits?: {
 		maxRenderedRows?: number;
 		maxRenderedCells?: number;

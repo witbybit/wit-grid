@@ -384,7 +384,7 @@ export class GridEngine<TRowData = unknown> {
 			selection: this.selection,
 			cellNotifications: this.cellNotifications,
 			getRowModel: () => this.rowModel,
-			getRowHeightsList: (rowModel, rowHeightsRecord, defaultRowHeight) => this.getRowHeightsList(rowModel, rowHeightsRecord, defaultRowHeight),
+			syncRowGeometry: (rowModel, rowHeightsRecord, defaultRowHeight) => this.syncRowGeometryFrom(rowModel, rowHeightsRecord, defaultRowHeight),
 			notifyCellChange: (rowId, colField, includeRenderInvalidation, renderColId) =>
 				this.notifyCellChange(rowId, colField, includeRenderInvalidation, renderColId),
 		});
@@ -445,6 +445,7 @@ export class GridEngine<TRowData = unknown> {
 			expansion: config.expansion ?? { groups: {}, treeRows: {}, details: {} },
 			rowOverscanPx: config.rowOverscanPx ?? 400,
 			colBuffer: config.colBuffer ?? 2,
+			colOverscanPx: config.colOverscanPx,
 			runtimeLimits: config.runtimeLimits,
 			overscanAdaptive: config.overscanAdaptive,
 			interaction: buildInteractionState({
@@ -487,6 +488,9 @@ export class GridEngine<TRowData = unknown> {
 				applyStructuralWriteEffects: (writeResult) => this.dataMutation.applyStructuralWriteEffects(writeResult),
 				publishCommittedCellChanges: (changes) => this.publishCommittedCellChanges(changes),
 				requestLayoutTransitionCapture: (reason) => this.requestLayoutTransitionCapture(reason),
+				syncRowGeometryFrom: (startIndex) => {
+					this.syncRowGeometry(startIndex);
+				},
 			},
 			domainMutationExecutorRegistry: createDefaultGridDomainMutationExecutorRegistry<TRowData>(),
 			publishDomains: (domains) => this.publishDomains(domains),
@@ -1172,7 +1176,7 @@ export class GridEngine<TRowData = unknown> {
 		this.rowModel = rowModel;
 		// Refresh coordinates
 		const state = this.stateManager.getState();
-		this.geometry.updateRows(this.getRowHeightsList(rowModel, state.rowHeights, state.defaultRowHeight), state.defaultRowHeight);
+		this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight);
 		this.changeApplier.apply({
 			reason: 'rows:register-model',
 			state: { globalVersion: state.globalVersion + 1 },
@@ -1226,23 +1230,50 @@ export class GridEngine<TRowData = unknown> {
 		return this.formulas.getCachedFormulaValue(rowId, colField);
 	}
 
-	private getRowHeightsList(rowModel: RowModel<TRowData>, rowHeightsRecord: Record<string, number>, defaultRowHeight: number): number[] {
-		let count = rowModel.getVisualRowCount();
+	/**
+	 * Syncs row geometry from the row model straight into the GeometryModel typed arrays
+	 * (no intermediate height list). Only rows whose height differs are written, and prefix
+	 * sums are recomputed from the first changed index.
+	 *
+	 * A data row's `state.rowHeights` entry wins over the height baked into its visual row:
+	 * the row pipeline snapshots heights when it flattens, so an `api.setRowHeight()` or an
+	 * auto-height measurement that lands without a re-flatten must still take effect.
+	 * Non-data rows keep their baked height (group/detail/footer heights are pipeline-owned).
+	 *
+	 * Returns the first changed row index, or -1 when geometry was already current.
+	 */
+	public syncRowGeometry(fromIndex = 0): number {
+		const rowModel = this.rowModel;
+		if (!rowModel) return -1;
 		const state = this.stateManager.getState();
+		return this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight, fromIndex);
+	}
+
+	private syncRowGeometryFrom(
+		rowModel: RowModel<TRowData>,
+		rowHeightsRecord: Record<string, number>,
+		defaultRowHeight: number,
+		fromIndex = 0
+	): number {
+		const state = this.stateManager.getState();
+		let count = rowModel.getVisualRowCount();
 		if (state.loading && count === 0) {
 			count = state.loadingSkeletonCount ?? 15;
 		}
-		const heights: number[] = [];
-		for (let i = 0; i < count; i++) {
-			const row = rowModel.getVisualRow(i);
-			if (row) {
+		return this.geometry.syncRows(
+			count,
+			(i) => {
+				const row = rowModel.getVisualRow(i);
+				if (!row) return defaultRowHeight;
+				if (row.kind === 'data') {
+					const recorded = rowHeightsRecord[row.rowId];
+					if (recorded !== undefined) return recorded;
+				}
 				const explicitHeight = row.height ?? rowHeightsRecord[row.id];
-				heights.push(explicitHeight !== undefined ? explicitHeight : defaultRowHeight);
-			} else {
-				heights.push(defaultRowHeight);
-			}
-		}
-		return heights;
+				return explicitHeight !== undefined ? explicitHeight : defaultRowHeight;
+			},
+			fromIndex
+		);
 	}
 
 	public get batchedUpdates(): boolean {
