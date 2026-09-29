@@ -32,8 +32,12 @@ const runs = Number(args.runs ?? 5);
 const cssVariant = args.css;
 const grids = args.grid ? [args.grid] : ['wit', 'ag'];
 // --trace records Chrome's devtools.timeline trace and reports what each layout touched
-// (layout objects dirtied, objects in the tree, forced layouts). Counts, not time: tracing
-// itself costs main-thread time, so trace runs are for diagnosis, never for the ratio.
+// (layout objects dirtied, objects in the tree, forced layouts) and why elements were restyled
+// or re-laid out. Counts, not time: tracing itself costs main-thread time, so trace runs are for
+// diagnosis, never for the ratio. The counts are only deterministic where the grid's behaviour
+// does not depend on time: the DOM-update budget (rendererOptions.domUpdate.maxMsPerFrame) is
+// time-based, so under tracing it defers far more DOM-renderer cells than in a normal run and
+// the DOM-renderer scenario's counts describe a slower grid, not the real one.
 const traceLayouts = Boolean(args.trace);
 
 const SCENARIOS = [
@@ -170,6 +174,11 @@ async function runOnce(browser, grid, scenario) {
 					'scrollFrames',
 					'rowSlotRebinds',
 					'cellSlotRebinds',
+					'domUpdatesDuringScroll',
+					'domUpdatesDeferredDuringScroll',
+					'textImpostorUsesDuringScroll',
+					'motionCellsDecoratedAfterScroll',
+					'fidelityCellsDecoratedAfterScroll',
 				];
 				return Object.fromEntries(keys.map((k) => [`w_${k}`, stats[k] ?? 0]));
 			})
@@ -233,7 +242,8 @@ function summarizeLayoutTrace(events) {
 	// Why elements were restyled: Chrome's invalidation tracking, grouped by reason and node.
 	const reasons = {};
 	for (const e of events) {
-		if (e.name !== 'StyleRecalcInvalidationTracking' && e.name !== 'ScheduleStyleInvalidationTracking') continue;
+		if (e.name !== 'StyleRecalcInvalidationTracking' && e.name !== 'ScheduleStyleInvalidationTracking' && e.name !== 'LayoutInvalidationTracking')
+			continue;
 		const data = e.args?.data ?? {};
 		const what = data.changedClass
 			? `class ${data.changedClass}`
@@ -242,12 +252,15 @@ function summarizeLayoutTrace(events) {
 				: data.changedPseudo
 					? `pseudo ${data.changedPseudo}`
 					: (data.reason ?? data.extraData ?? '?');
-		const key = `${e.name === 'StyleRecalcInvalidationTracking' ? 'recalc' : 'schedule'}: ${what} @ ${data.nodeName ?? '?'}`;
+		const kind = e.name === 'LayoutInvalidationTracking' ? 'layout' : e.name === 'StyleRecalcInvalidationTracking' ? 'recalc' : 'schedule';
+		// Cell and row ids vary per node; group by class so one kind of node is one line.
+		const node = String(data.nodeName ?? '?').replace(/ id='[^']*'/, '');
+		const key = `${kind}: ${what} @ ${node}`;
 		reasons[key] = (reasons[key] ?? 0) + 1;
 	}
 	const topReasons = Object.entries(reasons)
 		.sort((a, b) => b[1] - a[1])
-		.slice(0, 12);
+		.slice(0, 16);
 	if (topReasons.length)
 		process.stdout.write(`  invalidations: ${JSON.stringify(topReasons)}
 `);

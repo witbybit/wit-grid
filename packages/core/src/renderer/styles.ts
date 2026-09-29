@@ -1073,13 +1073,13 @@ export const CORE_STYLES = `
     align-items: center;
   }
 
+  /*
+   * The portal host is a DOM anchor for renderer containers, not a box: display: contents lets its
+   * children (which size themselves 100% x 100% and clip) lay out directly in the flex cell. A host
+   * box of its own was one more flex container per rich cell for every layout to walk through.
+   */
   .og-cell-portal-host {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
+    display: contents;
   }
 
   .og-custom-renderer-container,

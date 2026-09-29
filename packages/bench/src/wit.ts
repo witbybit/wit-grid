@@ -35,6 +35,11 @@ const cssVariant = new URLSearchParams(location.search).get('css');
 const CSS_VARIANTS: Record<string, string> = {
 	cell: '.og-cell{contain:strict}',
 	cellrow: '.og-cell{contain:strict}.og-row{contain:strict}',
+	// Renderer containers as layout boundaries: a change inside stops there instead of dirtying the cell, row and rows container.
+	hoststrict: '.og-dom-renderer-container,.og-custom-renderer-container{contain:strict}',
+	// The portal host without a box of its own.
+	hostcontents: '.og-cell[data-content-mode="portal"]>.og-cell-portal-host{display:contents}',
+	both: '.og-dom-renderer-container,.og-custom-renderer-container{contain:strict}.og-cell[data-content-mode="portal"]>.og-cell-portal-host{display:contents}',
 };
 if (cssVariant && CSS_VARIANTS[cssVariant]) {
 	const style = document.createElement('style');

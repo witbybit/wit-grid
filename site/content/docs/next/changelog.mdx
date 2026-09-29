@@ -33,6 +33,12 @@ Cells of columns without a custom renderer hold their text directly, one element
 work of vertical scrolling by about a third. See [Migration Notes](/docs/next/migration-notes) if your CSS targets
 `.og-cell-content`.
 
+### Changed — custom renderer cells have one box fewer
+
+The portal host inside a custom-renderer cell is now `display: contents`: the renderer's container lays out directly
+in the cell. This cut layout time for grids with custom DOM renderers by about 12%. See
+[Migration Notes](/docs/next/migration-notes) if your CSS styles `.og-cell-portal-host`.
+
 ### Fixed — rendering limits no longer hide visible rows or columns
 
 When `runtimeLimits` bound the rendering window, rows at the bottom and columns on the right of the viewport could
