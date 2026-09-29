@@ -28,9 +28,7 @@ const SHOWCASES: Record<string, ComponentType<Record<string, unknown>>> = {
 // PR runs use a couple of fixed seeds; GAUNTLET_SEEDS / GAUNTLET_STEPS widen it for nightly runs,
 // and GAUNTLET_SEED=<n> replays a single reported failure.
 const env = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env ?? {};
-const seeds = env.GAUNTLET_SEED
-	? [Number(env.GAUNTLET_SEED)]
-	: Array.from({ length: Number(env.GAUNTLET_SEEDS ?? 2) }, (_, i) => 1009 + i * 7919);
+const seeds = env.GAUNTLET_SEED ? [Number(env.GAUNTLET_SEED)] : Array.from({ length: Number(env.GAUNTLET_SEEDS ?? 2) }, (_, i) => 1009 + i * 7919);
 const steps = Number(env.GAUNTLET_STEPS ?? 40);
 
 describe('showcase composition gauntlet', () => {
@@ -39,7 +37,10 @@ describe('showcase composition gauntlet', () => {
 			it(`${name} · seed ${seed}`, async () => {
 				const result = await runGauntlet(Showcase, { seed, steps });
 				const problems = [...result.faults, ...result.violations];
-				expect(problems, `${name} seed ${seed} — replay with GAUNTLET_SEED=${seed}\nlast actions:\n${result.actions.slice(-12).join('\n')}`).toEqual([]);
+				expect(
+					problems,
+					`${name} seed ${seed} — replay with GAUNTLET_SEED=${seed}\nlast actions:\n${result.actions.slice(-12).join('\n')}`
+				).toEqual([]);
 			});
 		}
 	}
