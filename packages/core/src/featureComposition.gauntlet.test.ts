@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GridEventName } from './api/GridEvents.js';
 import { ClientRowModelController } from './rowModel.js';
 import { GridStore } from './store.js';
 import { RenderEngine } from './renderer/renderEngine.js';
+import { RuntimeFaultReporter } from './diagnostics/RuntimeFaultReporter.js';
 
 type CompositionRow = {
 	id: string;
@@ -66,7 +67,20 @@ function mockClipboard() {
 	};
 }
 
+// Runtime faults are reported, not thrown, so a composition can pass every assertion while the
+// renderer quietly faults. Every scenario must also finish fault-free.
+let runtimeFaults: string[] = [];
+beforeEach(() => {
+	runtimeFaults = [];
+	const report = RuntimeFaultReporter.prototype.report;
+	vi.spyOn(RuntimeFaultReporter.prototype, 'report').mockImplementation(function (this: RuntimeFaultReporter, ...args) {
+		runtimeFaults.push(`${args[0].source}:${args[0].operation}`);
+		return report.apply(this, args);
+	});
+});
+
 afterEach(() => {
+	expect(runtimeFaults).toEqual([]);
 	document.body.textContent = '';
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();

@@ -20,7 +20,8 @@
 		"./realtime-grouping": "./src/showcases/RealtimeGroupingDemo.tsx"
 	},
 	"scripts": {
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@eregister/wit-grid-react": "workspace:*",
