@@ -218,6 +218,21 @@ export type ScrollCellPresentation =
 			validationError: string | undefined;
 	  }
 	| {
+			/**
+			 * `scrollPresentation: 'update'` (DOM renderers): the cell's DOM renderer is updated in place
+			 * this frame, within the frame's DOM-update budget, and recorded fresh so scroll-end does
+			 * not redo it. `formattedValue` is the stand-in shown only if the budget refuses the update.
+			 */
+			kind: 'dom-update';
+			className: string;
+			portalCellKey: string;
+			formattedValue: string;
+			isFocused: boolean;
+			recordVersions: CellDisplaySnapshot | VisualFreshness;
+			title: string | null;
+			validationError: string | undefined;
+	  }
+	| {
 			kind: 'shell';
 			className: string;
 			contentMode: CellContentMode;
@@ -310,7 +325,12 @@ export function resolveScrollCellPresentation<TRowData>(
 	// DOM renderers default to 'freeze' during scroll. An explicit `scrollPresentation: 'live'`
 	// is honoured: DomCellRendererHandle.update() is cheap enough to run in the paint loop.
 	const columnPresentation = getCellScrollPresentation(col);
-	const presentation = isDomRenderer && columnPresentation !== 'live' ? 'freeze' : columnPresentation;
+	// A DOM renderer column follows its own presentation ('update' by default). Any other mode it
+	// does not implement directly (e.g. 'text-impostor') keeps the freeze behaviour it always had.
+	const presentation =
+		isDomRenderer && columnPresentation !== 'live' && columnPresentation !== 'update' && columnPresentation !== 'html-snapshot'
+			? 'freeze'
+			: columnPresentation;
 
 	let cellClassName = buildCellPinClass(lane);
 	if (rendererKind === 'loading') cellClassName += ' og-cell-loading';
@@ -320,7 +340,9 @@ export function resolveScrollCellPresentation<TRowData>(
 		cellClassName = cellSlot.lastClassName;
 	}
 
-	if (!isInVisibleContent && presentation !== 'live') {
+	// 'update' cells in the overscan band update in place too (within budget), so they are already
+	// drawn when they reach the viewport.
+	if (!isInVisibleContent && presentation !== 'live' && presentation !== 'update') {
 		const primitiveSnapshot = isPrimitiveSnapshotContent(snapshot) ? snapshot : undefined;
 		const canReuseSnapshotContent = !!primitiveSnapshot;
 		const canReuseSnapshotPortal =
@@ -419,6 +441,41 @@ export function resolveScrollCellPresentation<TRowData>(
 			isFocused,
 			forceLiveInteractive: false,
 			recordVersionsFrom: snapshot,
+			title: snapshot?.title || null,
+			validationError: snapshot?.validationError,
+		};
+	}
+
+	// 'update' — DOM renderers update in place. An editor is a React portal, so an editing cell takes
+	// the interactive path below instead. A slot still holding this cell's current content needs
+	// nothing; anything else (a row rebind, or data that changed) updates within the frame budget.
+	if (presentation === 'update' && !isEditing) {
+		if (canFreezeExistingPortalForIdentity(deps, cellSlot, portalCellKey, isRowRebind)) {
+			const { globalChanged, rowChanged } = hasMountedDataVersionDrifted(cellSlot, {
+				rowVersion: input.rowVersion,
+				globalVersion: ctx.globalVersion,
+			});
+			if (!globalChanged && !rowChanged) {
+				return {
+					kind: 'frozen-portal',
+					className: cellClassName,
+					portalCellKey,
+					title: snapshot?.title || null,
+					validationError: snapshot?.validationError,
+					markDirty: false,
+					captureFrozenHtml: false,
+					keepVersionFresh: false,
+					recordVersionsFrom: snapshot,
+				};
+			}
+		}
+		return {
+			kind: 'dom-update',
+			className: cellClassName,
+			portalCellKey,
+			formattedValue: deps.getCheapDisplayValue(node.id, col.field) ?? '',
+			isFocused,
+			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
 		};

@@ -404,7 +404,7 @@ export class RowRenderer<TRowData = unknown> {
 
 		// ── Live-mode frame budget ────────────────────────────────────────────────────
 		// rendererOptions is immutable; reconfiguring every frame is redundant but cheap.
-		this.liveFrameBudget.configure(this.engine.rendererOptions?.liveReact);
+		this.liveFrameBudget.configure(this.engine.rendererOptions?.liveReact, this.engine.rendererOptions?.domUpdate);
 		this.liveFrameBudget.resetFrame();
 
 		// ── Slot count management ─────────────────────────────────────────────────────

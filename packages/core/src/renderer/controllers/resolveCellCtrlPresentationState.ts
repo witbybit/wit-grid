@@ -74,6 +74,8 @@ function resolvePresentationFreshness<TRowData>(presentation: ScrollCellPresenta
 		case 'html-pending':
 		case 'shell':
 			return presentation.recordVersions;
+		case 'dom-update':
+			return 'rowVersion' in presentation.recordVersions ? presentation.recordVersions : snapshotFreshness(presentation.recordVersions);
 		case 'checkbox-selector':
 			return scrollFallbackFreshness(input);
 	}
@@ -145,7 +147,7 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	// The controller key is exactly createCellControllerKey(rowId, columnInstanceId) — reuse it.
 	cellCtrl.rendererState.htmlSnapshotKey = presentation.kind === 'html-snapshot' || presentation.kind === 'html-pending' ? cellCtrl.key : undefined;
 	cellCtrl.rendererState.mode =
-		presentation.kind === 'live-renderer'
+		presentation.kind === 'live-renderer' || presentation.kind === 'dom-update'
 			? 'live'
 			: presentation.kind === 'frozen-portal'
 				? 'frozen'

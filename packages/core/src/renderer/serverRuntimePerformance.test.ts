@@ -725,7 +725,9 @@ describe('Server demo ruthless runtime performance contracts', () => {
 		cleanupGrid(grid);
 	}, 20_000);
 
-	it('BLOCKER: a cold, never-before-seen DOM-renderer cell never live-mounts during active scroll', async () => {
+	it("BLOCKER: with scrollPresentation 'freeze', a cold, never-before-seen DOM-renderer cell never mounts during active scroll", async () => {
+		// DOM renderers default to 'update' (drawn in place within a frame budget — see
+		// domUpdatePresentation.e2e.test.ts). An explicit 'freeze' keeps this original guarantee.
 		// mode:'custom-dom' is NOT in the impostor-capable set (custom-live/custom-imperative/custom) —
 		// this is the real compiled-plan shape for any column using a DOM cell renderer. Scrolling a
 		// never-before-visited window of such columns into view previously fell through to a synchronous
@@ -747,14 +749,18 @@ describe('Server demo ruthless runtime performance contracts', () => {
 				field: 'value',
 				header: 'DOM Metric',
 				width: 120,
-				cellRenderer: {
-					mount(container: HTMLElement, params: { value: unknown; isScrolling: boolean; phase: string }) {
-						domRendererMounts.push(String(params.value));
-						domRendererMountPhases.push({ isScrolling: params.isScrolling, phase: params.phase });
-						container.textContent = String(params.value);
-						return { update: () => {}, destroy: () => {} };
-					},
-				} as any,
+				renderer: {
+					kind: 'dom',
+					renderer: {
+						mount(container: HTMLElement, params: { value: unknown; isScrolling: boolean; phase: string }) {
+							domRendererMounts.push(String(params.value));
+							domRendererMountPhases.push({ isScrolling: params.isScrolling, phase: params.phase });
+							container.textContent = String(params.value);
+							return { update: () => {}, destroy: () => {} };
+						},
+					} as any,
+					capabilities: { scrollPresentation: 'freeze' },
+				},
 			},
 		];
 		const store = new GridStore<ColdRow>({

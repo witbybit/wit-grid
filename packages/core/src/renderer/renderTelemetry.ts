@@ -57,6 +57,10 @@ export interface RenderRuntimeStats {
 	/** A live-mount was deferred to a shell/pending placeholder because maxMountsPerFrame was
 	 *  exhausted this frame (see liveFrameBudget.ts, GridRendererOptions.liveReact). */
 	liveReactEmergencyShellsDuringScroll: number;
+	/** DOM renderer cells updated in place during scroll (`scrollPresentation: 'update'`). */
+	domUpdatesDuringScroll: number;
+	/** DOM renderer cells the frame's DOM-update budget refused (stand-in until scroll settles). */
+	domUpdatesDeferredDuringScroll: number;
 	htmlSnapshotHitsDuringScroll: number;
 	htmlSnapshotMissesDuringScroll: number;
 	textImpostorUsesDuringScroll: number;
@@ -143,6 +147,8 @@ export function createRenderRuntimeStats(): RenderRuntimeStats {
 		liveReactOverscanMounts: 0,
 		liveReactUpdatesDuringScroll: 0,
 		liveReactEmergencyShellsDuringScroll: 0,
+		domUpdatesDuringScroll: 0,
+		domUpdatesDeferredDuringScroll: 0,
 		htmlSnapshotHitsDuringScroll: 0,
 		htmlSnapshotMissesDuringScroll: 0,
 		textImpostorUsesDuringScroll: 0,
@@ -253,6 +259,8 @@ export function collectRenderStats<TRowData>(deps: RenderTelemetrySnapshotDeps<T
 		liveReactOverscanMounts: deps.runtimeStats.liveReactOverscanMounts,
 		liveReactUpdatesDuringScroll: deps.runtimeStats.liveReactUpdatesDuringScroll,
 		liveReactEmergencyShellsDuringScroll: deps.runtimeStats.liveReactEmergencyShellsDuringScroll,
+		domUpdatesDuringScroll: deps.runtimeStats.domUpdatesDuringScroll,
+		domUpdatesDeferredDuringScroll: deps.runtimeStats.domUpdatesDeferredDuringScroll,
 		htmlSnapshotHitsDuringScroll: deps.runtimeStats.htmlSnapshotHitsDuringScroll,
 		htmlSnapshotMissesDuringScroll: deps.runtimeStats.htmlSnapshotMissesDuringScroll,
 		textImpostorUsesDuringScroll: deps.runtimeStats.textImpostorUsesDuringScroll,

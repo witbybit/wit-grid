@@ -134,6 +134,14 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	/** Returns false when this frame's live-mode budget for `kind` is exhausted. Omitted (or a
 	 *  caller-side default of always-true) means unlimited — see liveFrameBudget.ts. */
 	tryConsumeLiveBudget?: (kind: 'mount' | 'update') => boolean;
+	/** Admits one in-frame DOM renderer update ('update' presentation) against the frame's DOM-work budget. */
+	tryConsumeDomUpdateBudget?: () => boolean;
+	/** Ends the admitted update, charging its duration to the frame's DOM-work budget. */
+	endDomUpdate?: () => void;
+	/** A DOM renderer cell updated in place during scroll. */
+	incrementDomUpdatesDuringScroll?: () => void;
+	/** A DOM renderer cell the frame budget refused (shown as a stand-in until scroll settles). */
+	incrementDomUpdatesDeferredDuringScroll?: () => void;
 	/** Whether an over-budget fresh mount may fall back to an emergency shell instead of mounting
 	 *  anyway. Omitted defaults to true (shell allowed). */
 	allowLiveEmergencyShell?: () => boolean;
@@ -887,7 +895,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				cellCtrl,
 				rowCtrl,
 				rowVersion,
-				cellCtrl.presentationState.kind === 'live-renderer'
+				cellCtrl.presentationState.kind === 'live-renderer' || cellCtrl.presentationState.kind === 'dom-update'
 					? getScrollMountValue(deps, request.node, request.col, request.cellSlot)
 					: undefined
 			)

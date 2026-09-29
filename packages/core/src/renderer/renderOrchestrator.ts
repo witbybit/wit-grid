@@ -114,6 +114,8 @@ export interface RenderStats {
 	liveReactOverscanMounts?: number;
 	liveReactUpdatesDuringScroll?: number;
 	liveReactEmergencyShellsDuringScroll?: number;
+	domUpdatesDuringScroll?: number;
+	domUpdatesDeferredDuringScroll?: number;
 	htmlSnapshotHitsDuringScroll?: number;
 	htmlSnapshotMissesDuringScroll?: number;
 	textImpostorUsesDuringScroll?: number;
@@ -231,6 +233,8 @@ export function createEmptyRenderStats(): RenderStats {
 		liveReactOverscanMounts: 0,
 		liveReactUpdatesDuringScroll: 0,
 		liveReactEmergencyShellsDuringScroll: 0,
+		domUpdatesDuringScroll: 0,
+		domUpdatesDeferredDuringScroll: 0,
 		htmlSnapshotHitsDuringScroll: 0,
 		htmlSnapshotMissesDuringScroll: 0,
 		textImpostorUsesDuringScroll: 0,
@@ -335,6 +339,8 @@ export class RenderOrchestrator {
 		liveReactOverscanMounts: 0,
 		liveReactUpdatesDuringScroll: 0,
 		liveReactEmergencyShellsDuringScroll: 0,
+		domUpdatesDuringScroll: 0,
+		domUpdatesDeferredDuringScroll: 0,
 		htmlSnapshotHitsDuringScroll: 0,
 		htmlSnapshotMissesDuringScroll: 0,
 		textImpostorUsesDuringScroll: 0,
@@ -489,6 +495,8 @@ export class RenderOrchestrator {
 		this.stats.liveReactOverscanMounts = 0;
 		this.stats.liveReactUpdatesDuringScroll = 0;
 		this.stats.liveReactEmergencyShellsDuringScroll = 0;
+		this.stats.domUpdatesDuringScroll = 0;
+		this.stats.domUpdatesDeferredDuringScroll = 0;
 		this.stats.htmlSnapshotHitsDuringScroll = 0;
 		this.stats.htmlSnapshotMissesDuringScroll = 0;
 		this.stats.textImpostorUsesDuringScroll = 0;

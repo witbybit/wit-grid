@@ -19,8 +19,14 @@ import { IndexMapper } from './IndexMapper.js';
  * on a `text-impostor` column) fails fast at column-definition time instead of silently poisoning
  * the scroll-time resolver with a config the active mode never reads.
  */
-export function normalizeRendererCapabilities(cap: CellRendererCapabilities | undefined): NormalizedCellRendererCapabilities {
-	const mode = cap?.scrollPresentation ?? 'freeze';
+export function normalizeRendererCapabilities(
+	cap: CellRendererCapabilities | undefined,
+	options: { domRenderer?: boolean } = {}
+): NormalizedCellRendererCapabilities {
+	const mode = cap?.scrollPresentation ?? (options.domRenderer ? 'update' : 'freeze');
+	if (mode === 'update' && !options.domRenderer) {
+		throw new Error("Wit Grid: scrollPresentation:'update' is only valid for DOM renderers (renderer.kind 'dom').");
+	}
 
 	if (mode !== 'live' && cap?.live) {
 		throw new Error("Wit Grid: capabilities.live is only valid with scrollPresentation:'live'.");
@@ -171,7 +177,10 @@ export class ColumnModel<TRowData = unknown> {
 			return {
 				...column,
 				cellRenderer: renderer.renderer,
-				cellRendererCapabilities: normalizeRendererCapabilities({ ...renderer.renderer.capabilities, ...renderer.capabilities }),
+				cellRendererCapabilities: normalizeRendererCapabilities(
+					{ ...renderer.renderer.capabilities, ...renderer.capabilities },
+					{ domRenderer: true }
+				),
 			};
 		}
 		if (renderer.kind === 'imperativeReact') {

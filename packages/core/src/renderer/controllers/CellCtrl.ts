@@ -24,6 +24,7 @@ export interface CellCtrlPresentationState {
 		| 'loading'
 		| 'checkbox-selector'
 		| 'live-renderer'
+		| 'dom-update'
 		| 'frozen-portal'
 		| 'shell'
 		| 'text-impostor'

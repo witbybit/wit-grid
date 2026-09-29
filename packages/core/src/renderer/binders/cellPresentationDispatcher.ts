@@ -74,6 +74,7 @@ const RENDER_STATE: Record<CellCtrlPresentationState['kind'], CellRenderState> =
 	'text-impostor': 'text',
 	'html-pending': 'text',
 	'live-renderer': 'live',
+	'dom-update': 'live',
 	'frozen-portal': 'snapshot',
 	'html-snapshot': 'snapshot',
 	'checkbox-selector': 'checkbox',
@@ -87,6 +88,7 @@ export function getCellRenderState(kind: CellCtrlPresentationState['kind']): Cel
 function portalKeptBy(presentation: CellCtrlPresentationState): string | undefined {
 	switch (presentation.kind) {
 		case 'live-renderer':
+		case 'dom-update':
 		case 'frozen-portal':
 			return presentation.portalKey;
 		case 'buffered':

@@ -1,4 +1,4 @@
-import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle } from '../columnDef.js';
+import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle, InternalColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 
@@ -184,6 +184,9 @@ export class DomCellRendererManager<TRowData = unknown> {
 	}
 
 	private rebindInstance(instance: DomRendererInstance<TRowData>, params: AcquireDomRendererParams<TRowData>): void {
+		// isScrolling/phase changes alone update the renderer only when it opts in (capabilities
+		// .scrollState): otherwise every scroll start/end would re-run update() on every DOM cell.
+		const receivesScrollState = (params.col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollState === true;
 		const needsUpdate =
 			instance.value !== params.value ||
 			instance.node !== params.node ||
@@ -191,8 +194,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 			instance.isEditing !== params.isEditing ||
 			instance.isFocused !== params.isFocused ||
 			instance.isSelected !== params.isSelected ||
-			instance.phase !== params.phase ||
-			instance.isScrolling !== params.isScrolling ||
+			(receivesScrollState && (instance.phase !== params.phase || instance.isScrolling !== params.isScrolling)) ||
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey;
 

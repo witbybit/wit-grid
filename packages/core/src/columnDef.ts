@@ -74,11 +74,30 @@ export type CellRendererPhase = 'initial' | 'scroll' | 'scroll-force-live' | 'sc
  * - `'html-snapshot'`— Replays a captured inert HTML clone during scroll. Missing HTML shows a
  *                       shell/pending placeholder, not raw text, unless explicitly allowed.
  */
-export type CellScrollPresentation = 'primitive' | 'live' | 'freeze' | 'text-impostor' | 'html-snapshot';
+/**
+ * What a renderer column's cells show while the grid is actively scrolling.
+ * - `'update'` (DOM renderers only, and their default): a cell entering during scroll calls the
+ *   renderer's `update()` in place, within the per-frame budget (`GridRendererOptions.domUpdate`).
+ *   The cell is final when drawn, so nothing is redone when scrolling settles; only cells beyond
+ *   the budget show a stand-in until then.
+ * - `'freeze'` (React renderers' default): mounted content stays frozen; entering cells show a
+ *   cheap stand-in and the real renderer mounts once scrolling settles.
+ * - `'live'`: the renderer mounts/updates on every scroll frame.
+ * - `'text-impostor'`, `'html-snapshot'`: explicit stand-ins, see their capabilities.
+ */
+export type CellScrollPresentation = 'primitive' | 'live' | 'freeze' | 'update' | 'text-impostor' | 'html-snapshot';
 
 export interface CellRendererCapabilities {
 	/** Chooses what this column's cells show while the grid is actively scrolling. */
 	scrollPresentation?: CellScrollPresentation;
+
+	/**
+	 * When true, the renderer is also updated when only `isScrolling` or `phase` changes, e.g. to
+	 * draw a lighter version while scrolling. Default false: a renderer is updated only when its
+	 * value, row, column, or editing / focus / selection state changes, so scroll start and end
+	 * cost nothing.
+	 */
+	scrollState?: boolean;
 
 	/** Only valid for `scrollPresentation: 'live'`. */
 	live?: {
@@ -124,6 +143,11 @@ export interface NormalizedCellRendererCapabilities extends CellRendererCapabili
  * wide concern, not a per-column one.
  */
 export interface GridRendererOptions {
+	/** Per-frame budget for DOM renderers updating in place during scroll (`scrollPresentation: 'update'`). */
+	domUpdate?: {
+		/** Milliseconds of in-frame DOM renderer work allowed per frame before cells fall back to a stand-in. Default 4. */
+		maxMsPerFrame?: number;
+	};
 	liveReact?: {
 		rowOverscan?: number;
 		columnOverscan?: number;

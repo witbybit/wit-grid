@@ -253,6 +253,24 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 				const budget = this.deps.stateHost.liveFrameBudget;
 				return budget ? budget.tryConsume(kind) : true;
 			},
+			tryConsumeDomUpdateBudget: () => {
+				const budget = this.deps.stateHost.liveFrameBudget;
+				return budget ? budget.beginDomUpdate() : true;
+			},
+			endDomUpdate: () => {
+				this.deps.stateHost.liveFrameBudget?.endDomUpdate();
+			},
+			incrementDomUpdatesDuringScroll: () => {
+				if (this.deps.stateHost.renderStats) {
+					this.deps.stateHost.renderStats.domUpdatesDuringScroll = (this.deps.stateHost.renderStats.domUpdatesDuringScroll || 0) + 1;
+				}
+			},
+			incrementDomUpdatesDeferredDuringScroll: () => {
+				if (this.deps.stateHost.renderStats) {
+					this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll =
+						(this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll || 0) + 1;
+				}
+			},
 			allowLiveEmergencyShell: () => {
 				const budget = this.deps.stateHost.liveFrameBudget;
 				return budget ? budget.allowEmergencyShell : true;
