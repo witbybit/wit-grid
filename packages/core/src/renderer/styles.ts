@@ -1042,6 +1042,28 @@ export const CORE_STYLES = `
     white-space: nowrap;
   }
 
+  /*
+   * Direct-text cells (columns with no custom renderer): the text is the cell's own child, with no
+   * .og-cell-content wrapper — one element and one text box per cell. Block layout keeps
+   * text-overflow: ellipsis working; align-content centres the line vertically.
+   */
+  .og-cell[data-text-cell] {
+    display: block;
+    align-content: center;
+  }
+
+  /* An editor (portal host) or a skeleton is a box, not text: centre it like wrapped cells do. */
+  .og-cell[data-text-cell][data-content-mode="portal"],
+  .og-cell[data-text-cell][data-content-mode="pending"],
+  .og-cell[data-text-cell][data-content-mode="loading"] {
+    display: flex;
+    align-items: center;
+  }
+
+  .og-cell-readonly[data-text-cell] {
+    color: color-mix(in srgb, currentColor calc(var(--og-readonly-cell-opacity, 0.65) * 100%), transparent);
+  }
+
   /* Content that is not text centres a child box: the row-selector checkbox, loading skeletons. */
   .og-cell-row-selector .og-cell-content,
   .og-cell[data-content-mode="pending"] > .og-cell-content,
@@ -1079,7 +1101,8 @@ export const CORE_STYLES = `
     display: none;
   }
 
-  .og-cell[data-content-mode="pending"] > .og-cell-content::before {
+  .og-cell[data-content-mode="pending"] > .og-cell-content::before,
+  .og-cell[data-text-cell][data-content-mode="pending"]::before {
     content: '';
     width: min(72%, 120px);
     height: 16px;
@@ -1087,7 +1110,8 @@ export const CORE_STYLES = `
     background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.22), rgba(148, 163, 184, 0.12));
   }
 
-  .og-cell[data-content-mode="loading"] > .og-cell-content::before {
+  .og-cell[data-content-mode="loading"] > .og-cell-content::before,
+  .og-cell[data-text-cell][data-content-mode="loading"]::before {
     content: '';
     width: var(--og-skeleton-width);
     height: var(--og-skeleton-height);

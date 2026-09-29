@@ -4295,7 +4295,7 @@ describe('RenderEngine', () => {
 
 		cell = container.querySelector('.og-cell') as HTMLDivElement;
 		expect(cell.className).not.toContain('og-cell-loading');
-		expect(cell.querySelector('.og-cell-content')?.textContent).toBe('A0');
+		expect(cell.textContent).toBe('A0');
 
 		renderer.unmount();
 		store.destroy();

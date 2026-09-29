@@ -492,7 +492,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	}
 
 	private ensureCellPortalHost(cell: HTMLDivElement): HTMLDivElement {
-		this.deps.cellRenderer.getOrCreateCellContentLayer(cell);
 		return this.deps.cellRenderer.getOrCreatePortalHost(cell) as HTMLDivElement;
 	}
 

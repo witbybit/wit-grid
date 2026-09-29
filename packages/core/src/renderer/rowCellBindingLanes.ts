@@ -3,7 +3,7 @@ import type { CellRendererPhase, ColumnDef, ColumnInstanceId, InternalColumnDef 
 import { getColumnInstanceIdentity } from '../columnDef.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
-import { CellSlot, recordCellSlotMountedVisualVersions } from './cellSlot.js';
+import { CellSlot, isDirectTextColumn, recordCellSlotMountedVisualVersions } from './cellSlot.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import type { RowSlot } from './rowSlot.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
@@ -162,10 +162,11 @@ function reconcileTopology<TRowData>(
 
 	// columnInstanceId is set at construction time — the cell's permanent column identity.
 	// colField mirrors the display name and is guarded-written by update() in the bind loop.
-	function ensureCell(instanceId: ColumnInstanceId): CellSlot<TRowData> {
+	function ensureCell(instanceId: ColumnInstanceId, col: ColumnDef<TRowData>): CellSlot<TRowData> {
 		let cell = slot.cellsByColumnInstanceId.get(instanceId);
 		if (!cell) {
 			const el = document.createElement('div');
+			if (isDirectTextColumn(col)) el.dataset.textCell = '';
 			initFn(el);
 			cell = CellSlot.fromElement<TRowData>(el);
 			cell.columnInstanceId = instanceId;
@@ -185,7 +186,7 @@ function reconcileTopology<TRowData>(
 		for (const p of topology.left) {
 			const col = columns[p.absoluteIndex];
 			if (!col?.field || !p.columnId) continue;
-			const cell = ensureCell(p.columnId);
+			const cell = ensureCell(p.columnId, col);
 			if (cell.element.parentNode !== pinLeftContainer) {
 				pinLeftContainer.appendChild(cell.element);
 				instrumentation?.increment(GridMetric.CELL_VIEW_RELOCATED);
@@ -200,7 +201,7 @@ function reconcileTopology<TRowData>(
 		if (c < centerColStart || c >= centerColStart + centerColCount) continue;
 		const col = columns[c];
 		if (!col?.field || !p.columnId) continue;
-		const cell = ensureCell(p.columnId);
+		const cell = ensureCell(p.columnId, col);
 		if (cell.element.parentNode !== slot.element) {
 			slot.element.appendChild(cell.element);
 			instrumentation?.increment(GridMetric.CELL_VIEW_RELOCATED);
@@ -213,7 +214,7 @@ function reconcileTopology<TRowData>(
 		for (const p of topology.right) {
 			const col = columns[p.absoluteIndex];
 			if (!col?.field || !p.columnId) continue;
-			const cell = ensureCell(p.columnId);
+			const cell = ensureCell(p.columnId, col);
 			if (cell.element.parentNode !== pinRightContainer) {
 				pinRightContainer.appendChild(cell.element);
 				instrumentation?.increment(GridMetric.CELL_VIEW_RELOCATED);
@@ -285,10 +286,11 @@ function reconcileCellTopologyForScroll<TRowData>(
 		detachCellsOutside(slot.centerCells, visibleInstanceIds);
 		detachCellsOutside(slot.rightCells, visibleInstanceIds);
 
-		function ensureCell(instanceId: ColumnInstanceId): CellSlot<TRowData> {
+		function ensureCell(instanceId: ColumnInstanceId, col: ColumnDef<TRowData>): CellSlot<TRowData> {
 			let cell = slot.cellsByColumnInstanceId.get(instanceId);
 			if (!cell) {
 				const el = document.createElement('div');
+				if (isDirectTextColumn(col)) el.dataset.textCell = '';
 				initFn(el);
 				cell = CellSlot.fromElement<TRowData>(el);
 				cell.columnInstanceId = instanceId;
@@ -307,7 +309,7 @@ function reconcileCellTopologyForScroll<TRowData>(
 			for (const p of topology.left) {
 				const col = columns[p.absoluteIndex];
 				if (!col?.field || !p.columnId) continue;
-				const cell = ensureCell(p.columnId);
+				const cell = ensureCell(p.columnId, col);
 				if (cell.element.parentNode !== pinLeftContainer) pinLeftContainer.appendChild(cell.element);
 				slot.leftCells.push(cell);
 			}
@@ -319,7 +321,7 @@ function reconcileCellTopologyForScroll<TRowData>(
 			if (c < centerColStart || c >= centerColStart + centerColCount) continue;
 			const col = columns[c];
 			if (!col?.field || !p.columnId) continue;
-			const cell = ensureCell(p.columnId);
+			const cell = ensureCell(p.columnId, col);
 			if (cell.element.parentNode !== slot.element) slot.element.appendChild(cell.element);
 			slot.centerCells.push(cell);
 		}
@@ -329,7 +331,7 @@ function reconcileCellTopologyForScroll<TRowData>(
 			for (const p of topology.right) {
 				const col = columns[p.absoluteIndex];
 				if (!col?.field || !p.columnId) continue;
-				const cell = ensureCell(p.columnId);
+				const cell = ensureCell(p.columnId, col);
 				if (cell.element.parentNode !== pinRightContainer) pinRightContainer.appendChild(cell.element);
 				slot.rightCells.push(cell);
 			}

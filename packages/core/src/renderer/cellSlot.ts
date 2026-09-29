@@ -2,7 +2,7 @@ export type CellContentMode = 'text' | 'portal' | 'loading' | 'empty' | 'fallbac
 
 import type { CellRendererHandle, CellPlacement } from './cellRendererHandle.js';
 import { isMountedCellVisuallyFresh } from './visualFreshness.js';
-import type { ColumnInstanceId } from '../columnDef.js';
+import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
 import { createCellInstanceRendererKey } from './identityKeys.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
 
@@ -137,9 +137,25 @@ function setCellText(element: HTMLElement, text: string): void {
 	element.textContent = text;
 }
 
+/**
+ * Whether a column's cells hold their text directly (`data-text-cell`), without the
+ * `.og-cell-content` wrapper. True for columns with no custom renderer and no row-selection
+ * checkbox: their cells only ever show text, so the wrapper — which exists to let a cell swap
+ * between text and a renderer by flipping one attribute — is pure cost there: one more element to
+ * style-match and one more layout object to re-lay out whenever the text changes.
+ * A CellSlot belongs to one column for its whole life, so the choice never changes for a slot.
+ */
+export function isDirectTextColumn(col: Pick<ColumnDef<unknown>, 'checkboxSelection'> & { cellRenderer?: unknown }): boolean {
+	return !col.cellRenderer && !col.checkboxSelection;
+}
+
 export class CellSlot<TRowData = unknown> {
 	public readonly element: HTMLDivElement;
-	public readonly contentElement: HTMLDivElement;
+	/** Text lives directly in `element` (a text-only column); there is no content wrapper. */
+	public readonly directText: boolean;
+	private readonly wrapper: HTMLDivElement | null;
+	/** Direct-text cells: the cell's single text node, written in place. */
+	private readonly textNode: Text | null;
 	/**
 	 * Unique identity for this physical CellSlot object. Assigned once at construction
 	 * and never changes — not even across row rebinds or lane relocations.
@@ -263,15 +279,50 @@ export class CellSlot<TRowData = unknown> {
 		// ARIA grid semantics — role is static per element; positional/state attrs are
 		// written (guarded) in update().
 		if (element.getAttribute('role') !== 'gridcell') element.setAttribute('role', 'gridcell');
-		let content = element.querySelector('.og-cell-content') as HTMLDivElement;
-		if (!content) {
-			content = document.createElement('div');
-			content.className = 'og-cell-content';
-			element.appendChild(content);
+		this.directText = element.dataset.textCell !== undefined;
+		if (this.directText) {
+			const first = element.firstChild;
+			let textNode = first !== null && first.nodeType === 3 ? (first as Text) : null;
+			if (!textNode) {
+				textNode = document.createTextNode('');
+				element.insertBefore(textNode, element.firstChild);
+			}
+			this.textNode = textNode;
+			this.wrapper = null;
+		} else {
+			let content = element.querySelector('.og-cell-content') as HTMLDivElement;
+			if (!content) {
+				content = document.createElement('div');
+				content.className = 'og-cell-content';
+				element.appendChild(content);
+			}
+			this.wrapper = content;
+			this.textNode = null;
 		}
-		this.contentElement = content;
 		// Adopt an existing portal host (recycled element); otherwise create lazily.
 		this.portalHostElement = element.querySelector('.og-cell-portal-host') as HTMLDivElement | null;
+	}
+
+	/**
+	 * The `.og-cell-content` wrapper of a cell that can show more than text (custom renderer or
+	 * row-selection checkbox). Direct-text cells have none; asking for it is a programming error.
+	 */
+	public get contentElement(): HTMLDivElement {
+		if (!this.wrapper) throw new Error('CellSlot: a direct-text cell has no content wrapper');
+		return this.wrapper;
+	}
+
+	/** Writes the cell's text; callers keep lastFormattedValue in step. */
+	private writeText(text: string): void {
+		if (this.textNode) this.textNode.nodeValue = text;
+		else setCellText(this.wrapper!, text);
+	}
+
+	/** Clears the text and the text cache together (loading skeletons, cold unbind). */
+	public clearText(): void {
+		if (this.lastFormattedValue === '') return;
+		this.lastFormattedValue = '';
+		this.writeText('');
 	}
 
 	/** Portal host accessor — creates the div on first use only. */
@@ -521,19 +572,21 @@ export class CellSlot<TRowData = unknown> {
 			if (contentMode === 'text' || contentMode === 'fallback') {
 				if (this.lastFormattedValue !== formattedValue) {
 					this.lastFormattedValue = formattedValue;
-					setCellText(this.contentElement, formattedValue);
+					this.writeText(formattedValue);
 					cellSlotWriteStats.cellTextWrites++;
 					domUpdated = true;
 				} else {
 					cellSlotWriteStats.cellDomReadsAvoided++;
 				}
-			} else if (contentMode !== 'portal') {
-				// Portal mode leaves existing text in the DOM — CSS hides .og-cell-content via
-				// [data-content-mode="portal"] > .og-cell-content { display: none }.
-				// Text is cleared lazily when the cell transitions to empty/loading/pending.
+			} else if (contentMode !== 'portal' || this.directText) {
+				// Wrapped cells in portal mode leave their text in the DOM — CSS hides .og-cell-content
+				// via [data-content-mode="portal"] > .og-cell-content { display: none }, so a
+				// text <-> renderer swap costs one attribute write. A direct-text cell only enters portal
+				// mode to host an editor, and a bare text node cannot be hidden, so it clears its text.
+				// Text is otherwise cleared lazily when the cell transitions to empty/loading/pending.
 				if (this.lastFormattedValue !== '') {
 					this.lastFormattedValue = '';
-					this.contentElement.textContent = '';
+					this.writeText('');
 					cellSlotWriteStats.cellTextWrites++;
 					domUpdated = true;
 				} else {
@@ -678,7 +731,7 @@ export class CellSlot<TRowData = unknown> {
 		this.rowIndex = -1;
 		this.rowId = '';
 
-		this.contentElement.textContent = '';
+		this.writeText('');
 		this.element.className = '';
 		this.element.removeAttribute('style');
 		delete this.element.dataset.colField;
