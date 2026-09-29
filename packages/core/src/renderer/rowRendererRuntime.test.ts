@@ -63,6 +63,7 @@ function makeDeps(stateHost: RowRendererRuntimeStateHost<unknown>): RowRendererR
 			getActiveIdentity: vi.fn(() => ({ rowSlotId: 'slot-0', slotGeneration: 1 })),
 			cancelDeferredMount: vi.fn(() => false),
 			isCellMounted: vi.fn(() => true),
+			getMountedKeyForContainer: vi.fn(() => undefined),
 		} as any,
 		getViewportContainer: () => null,
 		selectionPaint: {} as any,

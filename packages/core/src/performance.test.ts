@@ -378,7 +378,7 @@ describe('Performance Benchmarks', () => {
 			} finally {
 				controller.dispose();
 			}
-		});
+		}, 30_000); // counter assertion, not timing: builds 50k rows, which is slow under full-suite load
 	});
 
 	describe('Column Resize Performance', () => {

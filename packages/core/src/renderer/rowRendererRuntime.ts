@@ -382,12 +382,19 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		portalKey?: string
 	): void {
 		const cellSlot = CellSlot.fromElement(cell);
-		// Release what the slot actually holds: an edit portal is keyed by row (E…), not by the
-		// slot's current cell binding (C…), so the binding key would miss it and leak the editor.
-		const heldPortalKey = cellSlot.renderer instanceof PortalRendererHandle ? cellSlot.renderer.portalKey : undefined;
-		const cellKey = portalKey ?? heldPortalKey ?? cellSlot.lastPortalKey ?? cellSlot.binding?.cellKey ?? cell.dataset.cellKey;
-		if (!cellKey) return;
 		const container = this.getCellPortalHost(cell) ?? cell;
+		// Release what the cell actually holds. The portal registry knows exactly which key is wanted
+		// in this host; slot bookkeeping is the fallback. The binding key comes last: an edit portal
+		// is keyed by row (E…), not by the slot's current cell binding (C…), so it would miss it.
+		const heldPortalKey = cellSlot.renderer instanceof PortalRendererHandle ? cellSlot.renderer.portalKey : undefined;
+		const cellKey =
+			portalKey ??
+			this.deps.portalMountManager.getMountedKeyForContainer(container) ??
+			heldPortalKey ??
+			cellSlot.lastPortalKey ??
+			cellSlot.binding?.cellKey ??
+			cell.dataset.cellKey;
+		if (!cellKey) return;
 		const isDeferred = forceDeferred ?? this.deps.stateHost.runtimeState.isScrolling();
 		const activeIdentity = this.deps.portalMountManager.getActiveIdentity(cellKey);
 		if (!activeIdentity) {

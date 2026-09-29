@@ -26,6 +26,7 @@ import { GridMetric } from '../diagnostics/GridInstrumentation.js';
 import type { RenderRuntimeStats } from './renderTelemetry.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
+import { CellPortalRegistry, type CellPortalPhysicalIdentity } from './cellPortalRegistry.js';
 
 function isVisualRowEqual<TRowData>(a: VisualRow<TRowData> | undefined, b: VisualRow<TRowData> | undefined): boolean {
 	if (a === b) return true;
@@ -80,15 +81,6 @@ export interface DeferredPortalFlushResult {
 	remaining: number;
 }
 
-/** Full physical identity record for a mounted cell portal. Stored in activeIdentityByKey. */
-interface CellPortalPhysicalIdentity {
-	cellInstanceId: string;
-	portalHostId: string;
-	rowSlotId: string;
-	slotGeneration: number;
-	cellRowBindingGeneration: number;
-}
-
 export class PortalMountManager<TRowData = unknown> {
 	public onMountCellContent?: (mount: GridCellContentMount<TRowData>) => void;
 	public onUnmountCellContent?: (unmount: GridCellContentUnmount) => void;
@@ -117,7 +109,8 @@ export class PortalMountManager<TRowData = unknown> {
 		this.getPhysicalRowSlotId = resolver;
 	}
 
-	private mountedCells = new Map<string, HTMLElement | undefined>();
+	/** Single source of truth for every cell portal's lifecycle (see CellPortalRegistry). */
+	private readonly cells = new CellPortalRegistry<TRowData>();
 	private mountedRows = new Map<string, HTMLElement | undefined>();
 	// Pre-allocated priority buckets for flushDeferred — zero allocation per flush.
 	// Bucket layout: [0] active-edit (≥1000), [1] focused (≥900), [2] everything else.
@@ -129,17 +122,6 @@ export class PortalMountManager<TRowData = unknown> {
 	private mountedRowVisualRows = new Map<string, GridRowContentMount<TRowData>['visualRow']>();
 	private mountedMenus = new Map<string, HTMLElement | undefined>();
 	private cellReleaseTransactionDepth = 0;
-	private pendingCellReleases = new Map<string, GridCellContentUnmount>();
-	private deferredCellMounts = new Map<string, GridCellContentMount<TRowData>>();
-	private deferredCellReleases = new Map<string, GridCellContentUnmount>();
-	/** Tracks the current physical identity for each mounted cellKey. */
-	private activeIdentityByKey = new Map<string, CellPortalPhysicalIdentity>();
-	/**
-	 * Mounted edit-portal keys. Editing is single-cell, so at most one may be live; any other is an
-	 * editor whose release was missed on some bind path (it would stay open as a second editor).
-	 */
-	private readonly editPortalKeys = new Set<string>();
-	private deferredNewCellMounts = new Set<string>();
 	private deferredRowMounts = new Map<string, GridRowContentMount<TRowData>>();
 	private deferredRowReleases = new Map<string, GridRowContentUnmount>();
 	private runtimeState: RenderRuntimeState | null = null;
@@ -166,11 +148,21 @@ export class PortalMountManager<TRowData = unknown> {
 
 	/** Returns the active slot generation for a cell key, or undefined if not mounted. */
 	public getActiveGeneration(cellKey: string): number | undefined {
-		return this.activeIdentityByKey.get(cellKey)?.slotGeneration;
+		return this.cells.getIdentity(cellKey)?.slotGeneration;
 	}
 
 	public getActiveIdentity(cellKey: string): CellPortalPhysicalIdentity | undefined {
-		return this.activeIdentityByKey.get(cellKey);
+		return this.cells.getIdentity(cellKey);
+	}
+
+	/** The cell portal key currently wanted in `container` (a cell's portal host), if any. */
+	public getMountedKeyForContainer(container: HTMLElement): string | undefined {
+		return this.cells.getKeyForContainer(container);
+	}
+
+	/** Registry self-check for tests and the composition gauntlet; empty means consistent. */
+	public checkCellPortalInvariants(): string[] {
+		return this.cells.checkInvariants();
 	}
 
 	private reportMissingPooledIdentity(operation: string, cellKey: string): void {
@@ -192,13 +184,17 @@ export class PortalMountManager<TRowData = unknown> {
 
 	private mountCellReal(mount: GridCellContentMount<TRowData>): void {
 		if (mount.isEditing) this.releaseSupersededEditPortals(mount.cellKey);
-		this.activeIdentityByKey.set(mount.cellKey, {
-			cellInstanceId: mount.cellInstanceId ?? '',
-			portalHostId: mount.portalHostId ?? '',
-			rowSlotId: mount.rowSlotId,
-			slotGeneration: mount.slotGeneration,
-			cellRowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
-		});
+		this.cells.recordMounted(
+			mount.cellKey,
+			{
+				cellInstanceId: mount.cellInstanceId ?? '',
+				portalHostId: mount.portalHostId ?? '',
+				rowSlotId: mount.rowSlotId,
+				slotGeneration: mount.slotGeneration,
+				cellRowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
+			},
+			!!mount.isEditing
+		);
 		const col = mount.col as InternalColumnDef<TRowData>;
 		const columnInstanceId = getColumnInstanceIdentity(col);
 		const isCustom = !!(col.cellRenderer || mount.isEditing);
@@ -270,27 +266,18 @@ export class PortalMountManager<TRowData = unknown> {
 
 	/** Unmounts every live edit portal except `keepKey`: a newly mounted editor supersedes them. */
 	private releaseSupersededEditPortals(keepKey: string): void {
-		if (this.editPortalKeys.size === 0 || (this.editPortalKeys.size === 1 && this.editPortalKeys.has(keepKey))) {
-			this.editPortalKeys.add(keepKey);
-			return;
-		}
-		for (const key of [...this.editPortalKeys]) {
-			if (key === keepKey) continue;
-			this.mountedCells.delete(key);
-			this.deferredCellMounts.delete(key);
-			this.deferredNewCellMounts.delete(key);
-			this.deferredCellReleases.delete(key);
-			this.pendingCellReleases.delete(key);
+		for (const key of this.cells.editKeysExcept(keepKey)) {
+			this.cells.markUnwanted(key);
+			this.cells.cancelMount(key);
+			this.cells.cancelRelease(key);
 			this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
 			this.releaseCellReal(key, 'edited');
 		}
-		this.editPortalKeys.add(keepKey);
 	}
 
 	private releaseCellReal(cellKey: string, reason: ReleaseReason, originalUnmount?: GridCellContentUnmount): void {
-		const activeIdentity = this.activeIdentityByKey.get(cellKey);
-		this.activeIdentityByKey.delete(cellKey);
-		this.editPortalKeys.delete(cellKey);
+		const container = this.cells.getContainer(cellKey);
+		const activeIdentity = this.cells.recordReleased(cellKey);
 		// DOM renderer path — no portal/React involved
 		if (this.domCellRendererManager.releaseByCellKey(cellKey, reason)) return;
 
@@ -303,7 +290,6 @@ export class PortalMountManager<TRowData = unknown> {
 					this.reportMissingPooledIdentity('portal-unmount-without-identity', cellKey);
 					return;
 				}
-				const container = this.mountedCells.get(cellKey);
 				this.onUnmountCellContent?.({
 					cellKey,
 					container,
@@ -319,20 +305,14 @@ export class PortalMountManager<TRowData = unknown> {
 	}
 
 	public mountCell(mount: GridCellContentMount<TRowData>): void {
-		const wasMounted = this.mountedCells.has(mount.cellKey);
-		this.mountedCells.set(mount.cellKey, mount.container);
-		// A release of this key still queued in the current release transaction belongs to the
-		// previous owner (row-anchored edit keys move between slots when a row re-sorts); letting
-		// it run after this mount would unmount the new owner's renderer.
-		this.pendingCellReleases.delete(mount.cellKey);
+		const wasMounted = this.cells.isWanted(mount.cellKey);
+		// Wanting the key cancels any release of it still waiting: a release queued by the previous
+		// owner (row-anchored edit keys move between slots when a row re-sorts) must never run later.
+		this.cells.markWanted(mount.cellKey, mount.container);
 		if (this.scrolling) {
 			this.stats.mountsDuringScroll++;
 			this.stats.deferredDuringScroll++;
-			this.deferredCellReleases.delete(mount.cellKey);
-			this.deferredCellMounts.set(mount.cellKey, mount);
-			if (!wasMounted) {
-				this.deferredNewCellMounts.add(mount.cellKey);
-			}
+			this.cells.queueMount(mount, !wasMounted);
 			return;
 		}
 		this.mountCellReal(mount);
@@ -344,54 +324,53 @@ export class PortalMountManager<TRowData = unknown> {
 	 * the queued mount instead of unmounting — otherwise the stale mount would still land later.
 	 */
 	public cancelDeferredMount(cellKey: string): boolean {
-		if (this.activeIdentityByKey.has(cellKey) || !this.deferredCellMounts.delete(cellKey)) return false;
-		this.deferredNewCellMounts.delete(cellKey);
-		this.mountedCells.delete(cellKey);
+		if (this.cells.getIdentity(cellKey) || !this.cells.cancelMount(cellKey).canceled) return false;
+		this.cells.markUnwanted(cellKey);
 		return true;
 	}
 
 	public mountCellImmediately(mount: GridCellContentMount<TRowData>): void {
-		this.mountedCells.set(mount.cellKey, mount.container);
-		this.pendingCellReleases.delete(mount.cellKey);
-		this.deferredCellReleases.delete(mount.cellKey);
-		this.deferredCellMounts.delete(mount.cellKey);
-		this.deferredNewCellMounts.delete(mount.cellKey);
+		this.cells.markWanted(mount.cellKey, mount.container);
+		this.cells.cancelMount(mount.cellKey);
 		if (this.scrolling) {
 			this.stats.mountsDuringScroll++;
 		}
 		this.mountCellReal(mount);
 	}
 
+	/** A release naming a different container than the one the key is wanted in belongs to a stale owner. */
+	private isForeignContainer(unmount: GridCellContentUnmount): boolean {
+		const existingContainer = this.cells.getContainer(unmount.cellKey);
+		return !!unmount.container && !!existingContainer && existingContainer !== unmount.container;
+	}
+
 	public releaseCell(unmount: GridCellContentUnmount): void {
-		if (!this.mountedCells.has(unmount.cellKey)) return;
-		const existingContainer = this.mountedCells.get(unmount.cellKey);
-		if (unmount.container && existingContainer && existingContainer !== unmount.container) return;
-		this.mountedCells.delete(unmount.cellKey);
+		if (!this.cells.isWanted(unmount.cellKey)) return;
+		if (this.isForeignContainer(unmount)) return;
 		if (this.scrolling) {
 			this.stats.releasesDuringScroll++;
 			this.stats.deferredDuringScroll++;
-			const canceledDeferredMount = this.deferredCellMounts.delete(unmount.cellKey);
-			const wasNewDeferredMount = this.deferredNewCellMounts.delete(unmount.cellKey);
-			if (canceledDeferredMount && wasNewDeferredMount) return;
-			this.deferredCellReleases.set(unmount.cellKey, { ...unmount, flushSync: false });
+			const { canceled, cold } = this.cells.cancelMount(unmount.cellKey);
+			this.cells.markUnwanted(unmount.cellKey);
+			if (canceled && cold) return;
+			this.cells.queueRelease(unmount.cellKey, { ...unmount, flushSync: false }, 'deferred');
 			return;
 		}
 		if (this.cellReleaseTransactionDepth > 0) {
-			this.pendingCellReleases.set(unmount.cellKey, { ...unmount, flushSync: false });
+			this.cells.markUnwanted(unmount.cellKey);
+			this.cells.queueRelease(unmount.cellKey, { ...unmount, flushSync: false }, 'transaction');
 			return;
 		}
 		this.releaseCellReal(unmount.cellKey, unmount.reason ?? 'destroyed', unmount);
+		this.cells.markUnwanted(unmount.cellKey);
 	}
 
 	public releaseCellForScroll(unmount: GridCellContentUnmount): void {
-		const existingContainer = this.mountedCells.get(unmount.cellKey);
-		if (unmount.container && existingContainer && existingContainer !== unmount.container) return;
-		this.mountedCells.delete(unmount.cellKey);
-
-		const canceledDeferredMount = this.deferredCellMounts.delete(unmount.cellKey);
-		const wasNewDeferredMount = this.deferredNewCellMounts.delete(unmount.cellKey);
-		this.deferredCellReleases.delete(unmount.cellKey);
-		if (canceledDeferredMount && wasNewDeferredMount) return;
+		if (this.isForeignContainer(unmount)) return;
+		const { canceled, cold } = this.cells.cancelMount(unmount.cellKey);
+		this.cells.cancelRelease(unmount.cellKey);
+		this.cells.markUnwanted(unmount.cellKey);
+		if (canceled && cold) return;
 
 		// DOM renderer — warm cache it, no portal unmount needed
 		if (unmount.container && this.domCellRendererManager.releaseByParentContainer(unmount.container, 'scrolled-out')) {
@@ -409,25 +388,24 @@ export class PortalMountManager<TRowData = unknown> {
 		}
 
 		this.stats.releasesDuringScroll++;
-		this.deferredCellReleases.set(unmount.cellKey, { ...unmount, flushSync: false });
+		this.cells.queueRelease(unmount.cellKey, { ...unmount, flushSync: false }, 'deferred');
 	}
 
 	public releaseCells(unmounts: GridCellContentUnmount[], flushSync = false): void {
 		if (unmounts.length === 0) return;
 		for (const unmount of unmounts) {
-			const existingContainer = this.mountedCells.get(unmount.cellKey);
-			if (unmount.container && existingContainer && existingContainer !== unmount.container) continue;
-			this.mountedCells.delete(unmount.cellKey);
+			if (this.isForeignContainer(unmount)) continue;
 			if (this.scrolling) {
 				this.stats.releasesDuringScroll++;
 				this.stats.deferredDuringScroll++;
-				const canceledDeferredMount = this.deferredCellMounts.delete(unmount.cellKey);
-				const wasNewDeferredMount = this.deferredNewCellMounts.delete(unmount.cellKey);
-				if (canceledDeferredMount && wasNewDeferredMount) continue;
-				this.deferredCellReleases.set(unmount.cellKey, { ...unmount, flushSync: false });
+				const { canceled, cold } = this.cells.cancelMount(unmount.cellKey);
+				this.cells.markUnwanted(unmount.cellKey);
+				if (canceled && cold) continue;
+				this.cells.queueRelease(unmount.cellKey, { ...unmount, flushSync: false }, 'deferred');
 				continue;
 			}
 			this.releaseCellReal(unmount.cellKey, unmount.reason ?? 'destroyed', unmount);
+			this.cells.markUnwanted(unmount.cellKey);
 		}
 		if (flushSync) {
 			if (this.scrolling) {
@@ -442,26 +420,26 @@ export class PortalMountManager<TRowData = unknown> {
 	}
 
 	public flushCellReleaseTransaction(flushSync = true): void {
-		if (this.pendingCellReleases.size === 0) return;
+		if (this.cells.pendingReleaseCount('transaction') === 0) return;
+		const releases = this.cells.pendingReleases('transaction');
 		if (this.scrolling) {
-			for (const [cellKey, unmount] of this.pendingCellReleases) {
+			for (const { cellKey, unmount } of releases) {
 				this.stats.releasesDuringScroll++;
 				this.stats.deferredDuringScroll++;
-				this.deferredCellReleases.set(cellKey, { ...unmount, flushSync: false });
+				this.cells.queueRelease(cellKey, unmount, 'deferred');
 			}
-			this.pendingCellReleases.clear();
 			return;
 		}
-		for (const unmount of this.pendingCellReleases.values()) {
+		for (const { cellKey, unmount } of releases) {
+			this.cells.cancelRelease(cellKey);
 			// Same stale-owner guard as the deferred flush: the key was remounted by another slot.
-			const activeIdentity = this.activeIdentityByKey.get(unmount.cellKey);
+			const activeIdentity = this.cells.getIdentity(cellKey);
 			if (activeIdentity !== undefined && !this.isSamePhysicalIdentity(activeIdentity, unmount)) {
 				this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
 				continue;
 			}
-			this.releaseCellReal(unmount.cellKey, 'destroyed', unmount);
+			this.releaseCellReal(cellKey, 'destroyed', unmount);
 		}
-		this.pendingCellReleases.clear();
 		if (flushSync) {
 			this.onFlushCellContent?.({ flushSync: true });
 		}
@@ -508,16 +486,15 @@ export class PortalMountManager<TRowData = unknown> {
 
 		// Iterate Maps directly — deleting the current key during iteration is safe and
 		// avoids an O(remaining) Array.from copy per chunk (O(N²/budget) over the drain).
-		for (const [cellKey, unmount] of this.deferredCellReleases) {
+		for (const { cellKey, unmount } of this.cells.pendingReleases('deferred')) {
 			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
-			const activeIdentity = this.activeIdentityByKey.get(cellKey);
+			this.cells.cancelRelease(cellKey);
+			const activeIdentity = this.cells.getIdentity(cellKey);
 			if (activeIdentity !== undefined && !this.isSamePhysicalIdentity(activeIdentity, unmount)) {
-				this.deferredCellReleases.delete(cellKey);
 				this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
 				continue;
 			}
-			this.releaseCellReal(unmount.cellKey, 'scrolled-out', unmount);
-			this.deferredCellReleases.delete(cellKey);
+			this.releaseCellReal(cellKey, 'scrolled-out', unmount);
 			processed++;
 			budgetUsed++;
 		}
@@ -529,7 +506,7 @@ export class PortalMountManager<TRowData = unknown> {
 		mb1.length = 0;
 		const mb2 = this._mountBuckets[2];
 		mb2.length = 0;
-		for (const mount of this.deferredCellMounts.values()) {
+		for (const mount of this.cells.pendingMounts()) {
 			const p = this.getDeferredMountPriority(mount, activeEdit, focusedCell, rowModel, rowCenter, colCenter);
 			if (p >= 1000) mb0.push(mount);
 			else if (p >= 900) mb1.push(mount);
@@ -539,17 +516,14 @@ export class PortalMountManager<TRowData = unknown> {
 			const bucket = this._mountBuckets[bi];
 			for (let i = 0; i < bucket.length && !isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed); i++) {
 				const mount = bucket[i];
-				const isColdMount = this.deferredNewCellMounts.has(mount.cellKey);
-				const activeIdentity = this.activeIdentityByKey.get(mount.cellKey);
+				const isColdMount = this.cells.isColdMount(mount.cellKey);
+				const activeIdentity = this.cells.getIdentity(mount.cellKey);
 				if (activeIdentity !== undefined && !this.isSamePhysicalIdentity(activeIdentity, mount)) {
-					this.deferredCellMounts.delete(mount.cellKey);
-					this.deferredNewCellMounts.delete(mount.cellKey);
+					this.cells.cancelMount(mount.cellKey);
 					this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
 					continue;
 				}
 				this.mountCellReal(mount);
-				this.deferredCellMounts.delete(mount.cellKey);
-				this.deferredNewCellMounts.delete(mount.cellKey);
 				processed++;
 				budgetUsed += isColdMount ? COLD_MOUNT_WEIGHT : 1;
 			}
@@ -665,13 +639,11 @@ export class PortalMountManager<TRowData = unknown> {
 	}
 
 	public releaseAll(): void {
-		this.deferredCellMounts.clear();
-		this.deferredCellReleases.clear();
-		this.deferredNewCellMounts.clear();
+		this.cells.clearQueues();
 		this.deferredRowMounts.clear();
 		this.deferredRowReleases.clear();
 
-		for (const [cellKey, container] of this.mountedCells) {
+		for (const cellKey of this.cells.wantedKeys()) {
 			this.releaseCellReal(cellKey, 'destroyed');
 		}
 		this.domCellRendererManager.releaseAll();
@@ -683,28 +655,31 @@ export class PortalMountManager<TRowData = unknown> {
 		for (const [colField, container] of this.mountedMenus) {
 			this.onUnmountHeaderMenu?.({ colField, container });
 		}
-		this.mountedCells.clear();
+		this.cells.clear();
 		this.mountedRows.clear();
 		this.mountedRowVisualRows.clear();
 		this.mountedMenus.clear();
-		this.activeIdentityByKey.clear();
-		this.editPortalKeys.clear();
 	}
 
 	public isCellMounted(cellKey: string): boolean {
-		return this.mountedCells.has(cellKey);
+		return this.cells.isWanted(cellKey);
 	}
 
 	public getStats(): { cells: number; rows: number; menus: number } {
 		return {
-			cells: this.mountedCells.size,
+			cells: this.cells.getWantedCount(),
 			rows: this.mountedRows.size,
 			menus: this.mountedMenus.size,
 		};
 	}
 
 	public getDeferredCount(): number {
-		return this.deferredCellReleases.size + this.deferredCellMounts.size + this.deferredRowReleases.size + this.deferredRowMounts.size;
+		return (
+			this.cells.pendingReleaseCount('deferred') +
+			this.cells.getPendingMountCount() +
+			this.deferredRowReleases.size +
+			this.deferredRowMounts.size
+		);
 	}
 
 	/** Live ownership gauges for deterministic long-session diagnostics. */
@@ -718,11 +693,11 @@ export class PortalMountManager<TRowData = unknown> {
 		deferredRowReleases: number;
 	}> {
 		return Object.freeze({
-			activeCells: this.mountedCells.size,
+			activeCells: this.cells.getWantedCount(),
 			activeRows: this.mountedRows.size,
 			activeMenus: this.mountedMenus.size,
-			deferredCellMounts: this.deferredCellMounts.size,
-			deferredCellReleases: this.deferredCellReleases.size,
+			deferredCellMounts: this.cells.getPendingMountCount(),
+			deferredCellReleases: this.cells.pendingReleaseCount('deferred'),
 			deferredRowMounts: this.deferredRowMounts.size,
 			deferredRowReleases: this.deferredRowReleases.size,
 		});

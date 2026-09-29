@@ -1771,7 +1771,18 @@ describe('Architecture guardrails', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'portalMountManager.ts'), 'utf-8');
 		expect(content).toContain('getActiveGeneration(');
 		expect(content).toContain('getActiveIdentity(');
-		expect(content).toContain('activeIdentityByKey.get(');
+		// Identity lives in the single cell-portal registry, not a parallel map that can drift.
+		expect(content).toContain('this.cells.getIdentity(');
+		for (const retired of [
+			'activeIdentityByKey',
+			'mountedCells',
+			'deferredCellMounts',
+			'deferredCellReleases',
+			'pendingCellReleases',
+			'deferredNewCellMounts',
+		]) {
+			expect(content).not.toContain(`private ${retired}`);
+		}
 	});
 
 	it('stale-detection guards in portalMountManager no longer have redundant !== undefined checks (Plan 100)', () => {

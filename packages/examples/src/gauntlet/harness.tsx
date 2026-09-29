@@ -11,6 +11,7 @@ import React, { act, type ComponentType } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { vi } from 'vitest';
 import { RuntimeFaultReporter } from '../../../core/src/diagnostics/RuntimeFaultReporter.js';
+import { PortalMountManager } from '../../../core/src/renderer/portalMountManager.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -62,7 +63,12 @@ function installEnvironment(timerSpeedup: number): () => void {
 	});
 	vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(noop as never);
 	const g = globalThis as Record<string, unknown>;
-	const originals = { ResizeObserver: g.ResizeObserver, IntersectionObserver: g.IntersectionObserver, matchMedia: window.matchMedia, setInterval: g.setInterval };
+	const originals = {
+		ResizeObserver: g.ResizeObserver,
+		IntersectionObserver: g.IntersectionObserver,
+		matchMedia: window.matchMedia,
+		setInterval: g.setInterval,
+	};
 	class NoopObserver {
 		observe() {}
 		unobserve() {}
@@ -113,9 +119,19 @@ function checkInvariants(root: HTMLElement): string[] {
 			const describe = Array.from(grid.querySelectorAll<HTMLElement>('.og-cell-editor')).map((el) => {
 				const cell = el.closest<HTMLElement>('.og-cell');
 				const row = el.closest<HTMLElement>('.og-row');
-				return `[cell ${cell?.dataset.rowId}/${cell?.dataset.colField} key=${cell?.dataset.cellKey} mode=${cell?.dataset.contentMode} parent=${el.parentElement?.className} rowVis=${row?.style.visibility || '-'} hiddenAncestor=${(() => { for (let n: HTMLElement | null = el; n && n !== grid; n = n.parentElement) { if (n.style.display === 'none' || n.style.visibility === 'hidden') return n.className || n.tagName; } return 'none'; })()} html=${el.outerHTML.slice(0, 90)}]`;
+				return `[cell ${cell?.dataset.rowId}/${cell?.dataset.colField} key=${cell?.dataset.cellKey} mode=${cell?.dataset.contentMode} parent=${el.parentElement?.className} rowVis=${row?.style.visibility || '-'} hiddenAncestor=${(() => {
+					for (let n: HTMLElement | null = el; n && n !== grid; n = n.parentElement) {
+						if (n.style.display === 'none' || n.style.visibility === 'hidden') return n.className || n.tagName;
+					}
+					return 'none';
+				})()} html=${el.outerHTML.slice(0, 90)}]`;
 			});
-			const owners = ((globalThis as any).__portalStores ?? []).flatMap((st: any) => st.__debugEntries()).filter((e: any) => Array.from(grid.querySelectorAll('.og-cell-editor')).some((ed) => e.container.contains(ed))).map((e: any) => `${e.cellKey} editing=${e.isEditing} phase=${e.phase} scrolling=${e.isScrolling} inDom=${grid.contains(e.container)}`);
+			const owners = ((globalThis as any).__portalStores ?? [])
+				.flatMap((st: any) => st.__debugEntries())
+				.filter((e: any) => Array.from(grid.querySelectorAll('.og-cell-editor')).some((ed) => e.container.contains(ed)))
+				.map(
+					(e: any) => `${e.cellKey} editing=${e.isEditing} phase=${e.phase} scrolling=${e.isScrolling} inDom=${grid.contains(e.container)}`
+				);
 			violations.push(`${editors} cell editors open at once ${describe.join(' ')} OWNERS ${owners.join(' | ')}`);
 		}
 		// One visual row index must never be painted by two row slots in the same lane container.
@@ -139,6 +155,13 @@ export async function runGauntlet(Showcase: ComponentType<Record<string, unknown
 	const faults: string[] = [];
 	const violations: string[] = [];
 	const actions: string[] = [];
+	// Every live PortalMountManager, so its cell-portal registry can self-check after each step.
+	const portalManagers = new Set<PortalMountManager<unknown>>();
+	const mountCell = PortalMountManager.prototype.mountCell;
+	vi.spyOn(PortalMountManager.prototype, 'mountCell').mockImplementation(function (this: PortalMountManager<unknown>, ...args) {
+		portalManagers.add(this);
+		return mountCell.apply(this, args);
+	});
 	const report = RuntimeFaultReporter.prototype.report;
 	vi.spyOn(RuntimeFaultReporter.prototype, 'report').mockImplementation(function (this: RuntimeFaultReporter, ...args) {
 		faults.push(`${args[0].source}:${args[0].operation} - ${args[0].error instanceof Error ? args[0].error.message : String(args[0].error)}`);
@@ -184,7 +207,8 @@ export async function runGauntlet(Showcase: ComponentType<Record<string, unknown
 				if (cell) {
 					action = `click ${cell.dataset.rowId}/${cell.dataset.colField}`;
 					await act(async () => {
-						for (const type of ['mousedown', 'mouseup', 'click']) cell.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, detail: 1 }));
+						for (const type of ['mousedown', 'mouseup', 'click'])
+							cell.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, detail: 1 }));
 					});
 				}
 			} else if (roll < 0.72) {
@@ -193,7 +217,8 @@ export async function runGauntlet(Showcase: ComponentType<Record<string, unknown
 					action = `edit ${cell.dataset.rowId}/${cell.dataset.colField}`;
 					await act(async () => {
 						for (const detail of [1, 2]) {
-							for (const type of ['mousedown', 'mouseup', 'click']) cell.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, detail }));
+							for (const type of ['mousedown', 'mouseup', 'click'])
+								cell.dispatchEvent(new MouseEvent(type, { bubbles: true, button: 0, detail }));
 						}
 						cell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, button: 0, detail: 2 }));
 					});
@@ -227,6 +252,8 @@ export async function runGauntlet(Showcase: ComponentType<Record<string, unknown
 			await sleep(Math.floor(rng() * (rng() < 0.2 ? 700 : 120)));
 			actions.push(`#${step} ${action}`);
 			for (const violation of checkInvariants(host)) violations.push(`#${step} ${violation}`);
+			for (const manager of portalManagers)
+				for (const violation of manager.checkCellPortalInvariants()) violations.push(`#${step} portal registry: ${violation}`);
 			if (faults.length > 0 || violations.length > 0) break;
 		}
 	} finally {
