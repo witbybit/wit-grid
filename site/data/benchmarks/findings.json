@@ -9,9 +9,9 @@
 	{
 		"id": "layout-dom-renderers",
 		"title": "Slightly more layout work than AG Grid with custom DOM renderers",
-		"detail": "With 10 columns drawn by a custom DOM renderer, Wit Grid's layout time has been about 10% above AG Grid's in consecutive runs (197 vs 178 ms and 274 vs 243 ms), although its total main-thread work is lower.",
-		"status": "open",
-		"impact": "Next: trace which layout objects a DOM-renderer cell adds (portal host, renderer container, the renderer's own elements) against AG Grid's cell renderer structure."
+		"detail": "With 10 columns drawn by a custom DOM renderer, Wit Grid's layout time was about 10% above AG Grid's in consecutive runs (197 vs 178 ms, 274 vs 243 ms). A custom-renderer cell was three nested flex boxes (cell, portal host, renderer container) where AG Grid's cell holds the renderer directly.",
+		"status": "fixed",
+		"impact": "Fixed to parity. The portal host no longer has a box of its own (display: contents), so the renderer container lays out directly in the cell. Layout time is now even with AG Grid within run-to-run noise (318 vs 324 ms and 324 vs 310 ms in two runs), and total main-thread work fell from 0.79x to about 0.70x of AG Grid's."
 	},
 	{
 		"id": "style-horizontal",
