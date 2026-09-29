@@ -1,5 +1,5 @@
 import { AllCommunityModule, ModuleRegistry, createGrid, type ColDef, type ICellRendererComp, type ICellRendererParams } from 'ag-grid-community';
-import { createBarElements, installMeasurement, makeRows, markReady, paintBar, readScenario, type BenchRow } from './common.js';
+import { createBarElements, rendererCalls, installMeasurement, makeRows, markReady, paintBar, readScenario, type BenchRow } from './common.js';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -20,6 +20,7 @@ class BarRenderer implements ICellRendererComp {
 		return this.gui;
 	}
 	refresh(params: ICellRendererParams) {
+		rendererCalls.updates++;
 		paintBar(this.bar, this.label, params.value);
 		return true;
 	}

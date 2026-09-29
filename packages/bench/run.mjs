@@ -22,11 +22,14 @@ const args = Object.fromEntries(
 	})
 );
 const runs = Number(args.runs ?? 3);
+// --css=<variant> forwards an experimental CSS override to the Wit Grid page (see src/wit.ts).
+const cssVariant = args.css;
 const grids = args.grid ? [args.grid] : ['wit', 'ag'];
 
 const SCENARIOS = [
 	{ name: 'vertical-text', query: { rows: 100_000, cols: 50, domCols: 0 }, wheel: { dy: 360, events: 150 } },
 	{ name: 'vertical-dom-renderers', query: { rows: 100_000, cols: 50, domCols: 10 }, wheel: { dy: 360, events: 150 } },
+	{ name: 'vertical-dom-live', query: { rows: 100_000, cols: 50, domCols: 10, domLive: 1 }, wheel: { dy: 360, events: 150 } },
 	{ name: 'horizontal-200-cols', query: { rows: 100_000, cols: 200, domCols: 0 }, wheel: { dx: 300, events: 150 } },
 	{ name: 'vertical-fast-fling', query: { rows: 100_000, cols: 50, domCols: 0 }, wheel: { dy: 2400, events: 90 } },
 ].filter((s) => !args.only || s.name === args.only);
@@ -78,6 +81,7 @@ async function runOnce(browser, grid, scenario) {
 	const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 	const url = pathToFileURL(join(out, `${grid}.html`));
 	for (const [key, value] of Object.entries(scenario.query)) url.searchParams.set(key, String(value));
+	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
 	await page.goto(url.href);
 	await page.waitForFunction(() => window.benchReady === true, null, { timeout: 60_000 });
 	await page.mouse.move(600, 360);
@@ -102,6 +106,7 @@ async function runOnce(browser, grid, scenario) {
 	await page.waitForTimeout(400);
 	const raw = await page.evaluate(() => window.bench.stop());
 	const after = await readMetrics();
+	const calls = await page.evaluate(() => window.rendererCalls);
 	await page.close();
 	const deltaMs = (name) => ((after[name] ?? 0) - (before[name] ?? 0)) * 1000;
 	return {
@@ -111,6 +116,8 @@ async function runOnce(browser, grid, scenario) {
 		layoutMs: deltaMs('LayoutDuration'),
 		styleMs: deltaMs('RecalcStyleDuration'),
 		taskMs: deltaMs('TaskDuration'),
+		mounts: calls.mounts,
+		updates: calls.updates,
 	};
 }
 
@@ -147,6 +154,7 @@ const table = results.map((r) => ({
 	'long tasks': `${r.longTasks} (${fmt(r.longTaskMs, 0)}ms)`,
 	'min cover': fmt(r.minCoverage, 2),
 	'blank %': fmt(r.blankSamplesPct),
+	'renderer mounts/updates': `${r.mounts}/${r.updates}`,
 }));
 console.log();
 console.table(table);

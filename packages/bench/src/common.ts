@@ -29,6 +29,10 @@ export function makeRows(scenario: Scenario): BenchRow[] {
 }
 
 /** A tiny DOM cell renderer both grids share: a proportional bar plus the value as text. */
+/** Renderer call counters, so a run can report mounts vs in-place updates for each grid. */
+export const rendererCalls = { mounts: 0, updates: 0 };
+(window as unknown as { rendererCalls: typeof rendererCalls }).rendererCalls = rendererCalls;
+
 export function paintBar(bar: HTMLElement, label: HTMLElement, value: unknown): void {
 	const n = typeof value === 'number' ? value : 0;
 	bar.style.width = `${n / 10}%`;
@@ -36,6 +40,7 @@ export function paintBar(bar: HTMLElement, label: HTMLElement, value: unknown): 
 }
 
 export function createBarElements(container: HTMLElement): { bar: HTMLElement; label: HTMLElement } {
+	rendererCalls.mounts++;
 	container.style.position = 'relative';
 	const bar = document.createElement('div');
 	bar.style.cssText = 'position:absolute;left:0;top:25%;height:50%;background:#4f8cff55;';
@@ -54,8 +59,10 @@ interface Measurement {
 
 /**
  * Frame intervals from a rAF loop, long tasks from PerformanceObserver, and blank-area samples:
- * the fraction of the scroll viewport's height covered by rendered rows. Coverage forces layout,
- * so it is sampled only every 12th frame and the frame after a sample is excluded from timing.
+ * the fraction of the body (below the sticky header) covered by rendered rows, taken after the
+ * frame's work so both grids are judged on what they actually drew for their scroll position.
+ * Coverage forces layout, so it is sampled only every 12th frame and the frame after a sample is
+ * excluded from timing. It measures main-thread rendering, not compositor-only checkerboarding.
  */
 export function installMeasurement(options: {
 	viewport: () => HTMLElement | null;
@@ -117,7 +124,12 @@ export function installMeasurement(options: {
 				skipNext = false;
 				last = now;
 				if (++frame % 12 === 0) {
-					m.coverage.push(sampleCoverage());
+					// Sample after this frame's work: rAF callbacks run in registration order, so sampling
+					// here directly would run before a grid that renders in its own rAF and count its
+					// not-yet-drawn rows as blank (a grid rendering inside the scroll event would not be).
+					setTimeout(() => {
+						if (m.running) m.coverage.push(sampleCoverage());
+					}, 0);
 					skipNext = true;
 				}
 				requestAnimationFrame(tick);
