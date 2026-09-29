@@ -43,7 +43,9 @@ if (cssVariant && CSS_VARIANTS[cssVariant]) {
 }
 
 const api = createClientGrid<BenchRow>({ columns, rows: makeRows(scenario), getRowId: (row) => row.id });
-mountGridHost(api, container);
+const host = mountGridHost(api, container);
+// Diagnostics only (bench --trace): the grid's own write counters for the measured window.
+(window as unknown as { witHost: typeof host }).witHost = host;
 
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.og-scroll-viewport'),

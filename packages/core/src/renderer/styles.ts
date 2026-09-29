@@ -1027,15 +1027,28 @@ export const CORE_STYLES = `
     background: linear-gradient(var(--og-row-hover-bg), var(--og-row-hover-bg)), var(--og-bg-color);
   }
 
+  /*
+   * Cell text: a plain block, vertically centred by the .og-cell flex parent. Not a flex
+   * container itself — text in a flex container is wrapped in an anonymous flex item (one more
+   * layout object per cell, re-laid out whenever the text changes) and text-overflow: ellipsis
+   * does not apply to it, so long values were cut off without the ellipsis.
+   */
   .og-cell-content {
     width: 100%;
-    height: 100%;
     min-width: 0;
-    display: flex;
-    align-items: center;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* Content that is not text centres a child box: the row-selector checkbox, loading skeletons. */
+  .og-cell-row-selector .og-cell-content,
+  .og-cell[data-content-mode="pending"] > .og-cell-content,
+  .og-cell[data-content-mode="loading"] > .og-cell-content {
+    height: 100%;
+    display: flex;
+    align-items: center;
   }
 
   .og-cell-portal-host {

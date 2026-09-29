@@ -31,6 +31,10 @@ const runs = Number(args.runs ?? 5);
 // --css=<variant> forwards an experimental CSS override to the Wit Grid page (see src/wit.ts).
 const cssVariant = args.css;
 const grids = args.grid ? [args.grid] : ['wit', 'ag'];
+// --trace records Chrome's devtools.timeline trace and reports what each layout touched
+// (layout objects dirtied, objects in the tree, forced layouts). Counts, not time: tracing
+// itself costs main-thread time, so trace runs are for diagnosis, never for the ratio.
+const traceLayouts = Boolean(args.trace);
 
 const SCENARIOS = [
 	{
@@ -119,7 +123,16 @@ async function runOnce(browser, grid, scenario) {
 	const cdp = await page.context().newCDPSession(page);
 	await cdp.send('Performance.enable');
 	const readMetrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map((m) => [m.name, m.value]));
+	const traceEvents = [];
+	if (traceLayouts) {
+		cdp.on('Tracing.dataCollected', ({ value }) => traceEvents.push(...value));
+		await cdp.send('Tracing.start', {
+			categories: 'devtools.timeline,disabled-by-default-devtools.timeline',
+			transferMode: 'ReportEvents',
+		});
+	}
 	const before = await readMetrics();
+	if (traceLayouts) await page.evaluate(() => window.witHost?.resetRenderStats());
 	await page.evaluate(() => window.bench.start());
 	const { dx = 0, dy = 0, events } = scenario.wheel;
 	const inputStart = performance.now();
@@ -135,18 +148,94 @@ async function runOnce(browser, grid, scenario) {
 	await page.waitForTimeout(400);
 	const raw = await page.evaluate(() => window.bench.stop());
 	const after = await readMetrics();
+	if (traceLayouts) {
+		const done = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve));
+		await cdp.send('Tracing.end');
+		await done;
+	}
 	const calls = await page.evaluate(() => window.rendererCalls);
+	const writeStats = traceLayouts
+		? await page.evaluate(() => {
+				const stats = window.witHost?.getRenderStats();
+				if (!stats) return {};
+				const keys = [
+					'cellTextWrites',
+					'cellClassWrites',
+					'cellTransformWrites',
+					'cellWidthWrites',
+					'cellLeftWrites',
+					'rowClassWrites',
+					'rowTransformWrites',
+					'rowHeightWrites',
+					'scrollFrames',
+					'rowSlotRebinds',
+					'cellSlotRebinds',
+				];
+				return Object.fromEntries(keys.map((k) => [`w_${k}`, stats[k] ?? 0]));
+			})
+		: {};
+	if (traceLayouts && Object.keys(writeStats).length)
+		process.stdout.write(`  ${grid} writes: ${JSON.stringify(writeStats)}
+`);
+	const census = traceLayouts
+		? await page.evaluate(() => {
+				const root = document.getElementById('grid');
+				const rows = root.querySelectorAll('.og-rows-container > .og-row, .ag-row');
+				const cells = root.querySelectorAll('.og-rows-container .og-cell, .ag-cell');
+				const vp = root.querySelector('.og-scroll-viewport, .ag-body-viewport');
+				return {
+					domElements: root.getElementsByTagName('*').length,
+					domRows: rows.length,
+					domCells: cells.length,
+					domElementsPerCell: cells.length
+						? Array.from(cells).reduce((n, c) => n + c.getElementsByTagName('*').length + 1, 0) / cells.length
+						: 0,
+					viewportHeight: vp ? vp.clientHeight : 0,
+				};
+			})
+		: {};
 	await page.close();
 	const deltaMs = (name) => ((after[name] ?? 0) - (before[name] ?? 0)) * 1000;
+	const delta = (name) => (after[name] ?? 0) - (before[name] ?? 0);
 	return {
 		...summarize(raw),
 		inputOverheadMs,
 		scriptMs: deltaMs('ScriptDuration'),
 		layoutMs: deltaMs('LayoutDuration'),
 		styleMs: deltaMs('RecalcStyleDuration'),
+		// Counts separate "too many layouts" (a read after a write forcing an extra one per frame)
+		// from "each layout too large" (missing containment).
+		layoutCount: delta('LayoutCount'),
+		styleCount: delta('RecalcStyleCount'),
 		taskMs: deltaMs('TaskDuration'),
 		mounts: calls.mounts,
 		updates: calls.updates,
+		...(traceLayouts ? summarizeLayoutTrace(traceEvents) : {}),
+		...census,
+	};
+}
+
+/** Per-layout scope from Chrome's Layout trace events (B/E pairs or complete X events). */
+function summarizeLayoutTrace(events) {
+	const layouts = events.filter((e) => e.name === 'Layout' && (e.ph === 'B' || e.ph === 'X'));
+	const styles = events.filter((e) => e.name === 'UpdateLayoutTree' && (e.ph === 'B' || e.ph === 'X' || e.ph === 'E'));
+	let dirty = 0;
+	let total = 0;
+	let forced = 0;
+	for (const e of layouts) {
+		const data = e.args?.beginData ?? {};
+		dirty += data.dirtyObjects ?? 0;
+		total += data.totalObjects ?? 0;
+		if (data.stackTrace?.length) forced++;
+	}
+	let styledElements = 0;
+	for (const e of styles) styledElements += e.args?.elementCount ?? e.args?.endData?.elementCount ?? 0;
+	return {
+		traceLayouts: layouts.length,
+		traceForcedLayouts: forced,
+		traceDirtyPerLayout: layouts.length ? dirty / layouts.length : 0,
+		traceTreeObjectsPerLayout: layouts.length ? total / layouts.length : 0,
+		traceStyledElements: styledElements,
 	};
 }
 
@@ -224,6 +313,18 @@ const table = results
 		'script ms': fmt(r.scriptMs, 0),
 		'layout ms': fmt(r.layoutMs, 0),
 		'style ms': fmt(r.styleMs, 0),
+		'layouts/frame': fmt(r.layoutCount / Math.max(1, r.frames), 2),
+		'ms/layout': fmt(r.layoutMs / Math.max(1, r.layoutCount), 2),
+		...(traceLayouts
+			? {
+					'trace layouts (forced)': `${fmt(r.traceLayouts, 0)} (${fmt(r.traceForcedLayouts, 0)})`,
+					'dirty objs/layout': fmt(r.traceDirtyPerLayout, 0),
+					'tree objs/layout': fmt(r.traceTreeObjectsPerLayout, 0),
+					'styled elements': fmt(r.traceStyledElements, 0),
+					'DOM rows/cells/els-per-cell': `${fmt(r.domRows, 0)}/${fmt(r.domCells, 0)}/${fmt(r.domElementsPerCell, 1)}`,
+					'DOM elements': fmt(r.domElements, 0),
+				}
+			: {}),
 		'input +ms/evt': fmt(r.inputOverheadMs, 2),
 		'p99 frame ms': fmt(r.p99Ms),
 		'dropped %': fmt(r.droppedPct),
