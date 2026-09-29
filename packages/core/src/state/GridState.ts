@@ -86,6 +86,8 @@ export interface GridModelState<TRowData = unknown> {
 	styleRules?: GridStyleRule<TRowData>[];
 	/** Grid-wide scroll presentation policy — see columnDef.ts's GridRendererOptions. Initial-only. */
 	rendererOptions?: GridRendererOptions;
+	/** See GridEngineConfig.asyncTransactionWaitMs. */
+	asyncTransactionWaitMs?: number;
 	rowOverscanPx?: number;
 	/**
 	 * Number of off-screen columns to pre-render on each side of the visible range.

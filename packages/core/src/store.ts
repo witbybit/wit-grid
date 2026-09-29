@@ -239,6 +239,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			colBuffer: initialState.colBuffer ?? 2,
 			colOverscanPx: initialState.colOverscanPx,
 			rendererOptions: initialState.rendererOptions,
+			asyncTransactionWaitMs: initialState.asyncTransactionWaitMs,
 			// Always normalize runtimeLimits so all callers can assume it exists.
 			runtimeLimits: {
 				maxRenderedRows: 500,
@@ -950,6 +951,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public applyTransaction = (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {
 		return this.engine.applyTransaction(transaction);
+	};
+
+	public applyTransactionAsync = (
+		transaction: RowDataTransaction<TRowData>,
+		callback?: (result: RowNodeTransaction<TRowData> | null) => void
+	): void => {
+		this.engine.applyTransactionAsync(transaction, callback);
+	};
+
+	public flushAsyncTransactions = (): void => {
+		this.engine.flushAsyncTransactions();
 	};
 
 	public transaction = (transaction: GridTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {

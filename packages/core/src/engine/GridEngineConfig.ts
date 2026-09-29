@@ -90,4 +90,9 @@ export interface GridEngineConfig<TRowData = unknown> {
 	/** Grid-wide scroll presentation policy — live-mode overscan/budgets, html-snapshot cache limits
 	 *  and missing-capture defaults, text-impostor defaults. See columnDef.ts's GridRendererOptions. */
 	rendererOptions?: GridRendererOptions;
+	/**
+	 * How long `applyTransactionAsync` waits before applying queued transactions, in ms. When unset,
+	 * they are applied on the next animation frame.
+	 */
+	asyncTransactionWaitMs?: number;
 }

@@ -64,6 +64,9 @@ export function createGridRuntimeComposition<TRowData>({
 		setRows: (rows: TRowData[]) => runtime.setRows(rows),
 		updateRows: (updater: (rows: TRowData[]) => TRowData[]) => runtime.updateRows(updater),
 		applyTransaction: (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => runtime.applyTransaction(transaction),
+		applyTransactionAsync: (transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void) =>
+			runtime.applyTransactionAsync(transaction, callback),
+		flushAsyncTransactions: () => runtime.flushAsyncTransactions(),
 		getRowOrder: () => runtime.getRowOrder(),
 		setRowOrder: (rowIds: string[]) => runtime.setRowOrder(rowIds),
 		refreshRows: () => runtime.refreshRows(),

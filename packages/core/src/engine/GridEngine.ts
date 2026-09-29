@@ -1,4 +1,5 @@
 import { canEditCell, isDataCellSelectable } from '../visualRow.js';
+import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { GridEventListener, GridEventPayloadMap } from '../api/GridEvents.js';
 import type {
@@ -106,6 +107,16 @@ export type ManagedRowDragPolicyResult =
 			reason: ManagedRowDragBlockReason;
 			message: string;
 	  };
+
+/** Next frame by default (through the grid scheduler); a fixed delay when waitMs is set. */
+function scheduleAsyncTransactionFlush(flush: () => void, waitMs: number | undefined): () => void {
+	if (waitMs === undefined) {
+		const id = defaultGridScheduler.raf(flush);
+		return () => defaultGridScheduler.cancelRaf(id);
+	}
+	const id = defaultGridScheduler.timeout(flush, waitMs);
+	return () => defaultGridScheduler.clearTimeout(id);
+}
 
 export class GridEngine<TRowData = unknown> {
 	public readonly data: DataModel<TRowData>;
@@ -275,6 +286,7 @@ export class GridEngine<TRowData = unknown> {
 			maxSingleEntryBytes: config.rendererOptions?.htmlSnapshot?.maxSingleSnapshotBytes,
 		});
 		this.eventBus = new EventBus<TRowData>();
+		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
 		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows
 		// permanently removed via a structural transaction (grid.applyTransaction({ remove: [...] })).
@@ -475,6 +487,7 @@ export class GridEngine<TRowData = unknown> {
 			eventBus: this.eventBus,
 			dispatchEvent: (type, payload) => {
 				if (type === GridEventName.rowsUpdated) {
+			beforeCommit: () => this.asyncTransactions.flush(),
 					this.dispatchRowsUpdated(payload as RowsUpdatedDispatchPayload<TRowData>);
 					return;
 				}
@@ -769,6 +782,28 @@ export class GridEngine<TRowData = unknown> {
 			reason: 'rows:apply-transaction',
 			domainMutations: [{ kind: 'row-transaction', transaction }],
 		});
+	/** Queued row transactions for applyTransactionAsync; flushed before any other commit. */
+	private readonly asyncTransactions = new AsyncTransactionQueue<TRowData>({
+		apply: (transaction) => this.applyTransaction(transaction),
+		getRowId: (row) => this.getRowId(row),
+		schedule: (flush) => scheduleAsyncTransactionFlush(flush, this.asyncTransactionWaitMs),
+	});
+	private asyncTransactionWaitMs: number | undefined;
+
+	/**
+	 * Queues a row transaction and applies it with the others queued before the next frame, in call
+	 * order. Independent transactions (disjoint rows, no addIndex) are applied as one, so a burst of
+	 * streaming updates costs one commit and one render. Any synchronous write flushes the queue first.
+	 */
+	public applyTransactionAsync(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void {
+		this.asyncTransactions.enqueue(transaction, callback);
+	}
+
+	/** Applies queued async transactions now. */
+	public flushAsyncTransactions(): void {
+		this.asyncTransactions.flush();
+	}
+
 		const result = execution.appliedMutations[0]?.result as InternalRowNodeTransaction<TRowData> | undefined;
 		return result ? mapInternalRowNodeTransaction(this.getPublicRowNodeDispatchDeps(), result) : null;
 	}
@@ -1527,6 +1562,7 @@ export class GridEngine<TRowData = unknown> {
 		this.cellNotifications.clear();
 		this.eventBus.clear();
 		this.stateManager.destroy();
+		this.asyncTransactions.destroy();
 		this.domainSubscriptions.clear();
 	}
 

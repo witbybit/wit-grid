@@ -9,6 +9,8 @@ export function createGridPluginRuntime<TRowData>(source: GridPluginRuntime<TRow
 		setRows: source.setRows,
 		updateRows: source.updateRows,
 		applyTransaction: source.applyTransaction,
+		applyTransactionAsync: source.applyTransactionAsync,
+		flushAsyncTransactions: source.flushAsyncTransactions,
 		refreshRows: source.refreshRows,
 		setRowHeights: source.setRowHeights,
 		setDefaultRowHeight: source.setDefaultRowHeight,

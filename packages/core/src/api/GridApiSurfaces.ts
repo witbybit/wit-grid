@@ -55,6 +55,15 @@ export interface GridDataApi<TRowData = unknown> {
 	setRows(rows: TRowData[]): GridWriteResult;
 	updateRows(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult;
 	applyTransaction(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null;
+	/**
+	 * Queues a transaction to apply with others before the next frame, in call order. Independent
+	 * transactions are applied together as one commit and one render, which suits high-frequency
+	 * feeds. The callback receives this transaction's own result. Any synchronous write (including
+	 * applyTransaction) applies the queue first, so writes always land in the order they were made.
+	 */
+	applyTransactionAsync(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void;
+	/** Applies queued applyTransactionAsync transactions immediately. */
+	flushAsyncTransactions(): void;
 	getRowOrder(): string[];
 	setRowOrder(rowIds: string[]): GridWriteResult;
 	refreshRows(): void;
