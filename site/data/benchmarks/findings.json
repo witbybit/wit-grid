@@ -2,9 +2,9 @@
 	{
 		"id": "layout-vertical",
 		"title": "More layout work than AG Grid on vertical scroll",
-		"detail": "Wit Grid spends more time in layout than AG Grid on every vertical scenario: 172 vs 143 ms on plain text, 223 vs 189 ms with custom renderers, and 758 vs 496 ms on the very fast fling (about 1.5x). Total main-thread work is still lower, because script and style time are lower.",
+		"detail": "Wit Grid spends more time in layout than AG Grid on vertical scroll (about 1.5x on the very fast fling). Chrome's layout trace located the cause: both grids render the same rows and cells and neither forces a layout, but each Wit layout touched far more layout objects (2,010 vs 1,271 in the tree), because every text cell carried an extra anonymous flex box. That box also stopped text-overflow ellipsis from rendering.",
 		"status": "open",
-		"impact": "Next to investigate: which DOM writes during row rebinding invalidate layout beyond the rebound rows."
+		"impact": "Partly fixed: cell text is now a plain block, which removes 24% of the layout objects dirtied per frame and makes long values end in an ellipsis. Remaining gap: each Wit text cell is still two elements (cell and content wrapper) where AG Grid uses one."
 	},
 	{
 		"id": "style-horizontal",
