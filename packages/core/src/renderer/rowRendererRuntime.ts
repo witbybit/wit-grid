@@ -383,6 +383,10 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		if (!activeIdentity) {
 			// Mounted during scroll but still queued: there is nothing to unmount yet, just cancel it.
 			if (this.deps.portalMountManager.cancelDeferredMount(cellKey)) return;
+			// Already released (or never mounted): callers re-request release from slot bookkeeping
+			// that outlives the portal (lastPortalKey, a stale handle), so a repeat is a no-op. Only a
+			// cell still recorded as mounted without an identity is a real inconsistency.
+			if (!this.deps.portalMountManager.isCellMounted(cellKey)) return;
 			reportRendererFault(
 				this.deps.engine,
 				'release-cell-portal-without-identity',

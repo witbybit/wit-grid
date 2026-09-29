@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { CellSlot } from '../cellSlot.js';
+import { PortalRendererHandle } from '../cellRendererHandle.js';
 import type { RowCellBinderDeps, BindCellDuringScrollRequest } from '../rowCellBinder.js';
 import type { ScrollCellPresentation } from '../scrollCellPresentation.js';
 import { dispatchCellPresentation } from './cellPresentationDispatcher.js';
@@ -385,6 +386,30 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 		};
 		dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 		expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
+	});
+
+	it('releases a stale portal handle once, not again on every later bind', () => {
+		const deps = makeDeps();
+		const request = makeRequest('center', { isRowRebind: true });
+		// The slot still holds the editor portal of the row that scrolled out.
+		request.cellSlot.renderer = new PortalRendererHandle('E4:MA.65:coli3');
+		const shell: ScrollCellPresentation = {
+			kind: 'frozen-portal',
+			className: laneClass.center,
+			portalCellKey: 'ck-new-row',
+			title: null,
+			validationError: undefined,
+			markDirty: true,
+			captureFrozenHtml: false,
+			keepVersionFresh: false,
+			recordVersionsFrom: undefined,
+		};
+
+		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
+		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
+
+		expect(deps.releaseCellPortal).toHaveBeenCalledTimes(1);
+		expect(request.cellSlot.renderer).not.toBeInstanceOf(PortalRendererHandle);
 	});
 
 	it('freeze-live-portal with shouldMarkDirty:false does not mark the cell dirty', () => {

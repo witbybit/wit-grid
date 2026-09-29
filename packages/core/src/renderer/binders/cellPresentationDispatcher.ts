@@ -70,6 +70,10 @@ export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentati
 
 		if (!nextPortalKey || existing.portalKey !== nextPortalKey) {
 			deps.releaseCellPortal(cellSlot.element, false, 'invalidated');
+			// Scroll binds never reassign the handle, so drop it here: otherwise every later bind
+			// (each scroll frame, then the settling full bind) releases the same portal again, and
+			// once the deferred release has run that repeat finds no identity and reports a fault.
+			cellSlot.renderer = null;
 		}
 	}
 
