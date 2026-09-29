@@ -295,6 +295,10 @@ export class PortalMountManager<TRowData = unknown> {
 	public mountCell(mount: GridCellContentMount<TRowData>): void {
 		const wasMounted = this.mountedCells.has(mount.cellKey);
 		this.mountedCells.set(mount.cellKey, mount.container);
+		// A release of this key still queued in the current release transaction belongs to the
+		// previous owner (row-anchored edit keys move between slots when a row re-sorts); letting
+		// it run after this mount would unmount the new owner's renderer.
+		this.pendingCellReleases.delete(mount.cellKey);
 		if (this.scrolling) {
 			this.stats.mountsDuringScroll++;
 			this.stats.deferredDuringScroll++;
@@ -322,6 +326,7 @@ export class PortalMountManager<TRowData = unknown> {
 
 	public mountCellImmediately(mount: GridCellContentMount<TRowData>): void {
 		this.mountedCells.set(mount.cellKey, mount.container);
+		this.pendingCellReleases.delete(mount.cellKey);
 		this.deferredCellReleases.delete(mount.cellKey);
 		this.deferredCellMounts.delete(mount.cellKey);
 		this.deferredNewCellMounts.delete(mount.cellKey);
@@ -422,6 +427,12 @@ export class PortalMountManager<TRowData = unknown> {
 			return;
 		}
 		for (const unmount of this.pendingCellReleases.values()) {
+			// Same stale-owner guard as the deferred flush: the key was remounted by another slot.
+			const activeIdentity = this.activeIdentityByKey.get(unmount.cellKey);
+			if (activeIdentity !== undefined && !this.isSamePhysicalIdentity(activeIdentity, unmount)) {
+				this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
+				continue;
+			}
 			this.releaseCellReal(unmount.cellKey, 'destroyed', unmount);
 		}
 		this.pendingCellReleases.clear();

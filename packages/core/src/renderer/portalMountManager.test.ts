@@ -769,3 +769,36 @@ describe('PortalMountManager – cancelDeferredMount', () => {
 		expect(manager.cancelDeferredMount('r1:name')).toBe(false);
 	});
 });
+
+describe('PortalMountManager – row-anchored key moving slots inside a release transaction', () => {
+	it('does not let the old slot’s queued release unmount the new slot’s mount', () => {
+		const manager = new PortalMountManager();
+		manager.setRuntimeState(makeIdleRuntimeState());
+		const mount = vi.fn();
+		const unmount = vi.fn();
+		manager.onMountCellContent = mount;
+		manager.onUnmountCellContent = unmount;
+		const oldHost = document.createElement('div');
+		const newHost = document.createElement('div');
+		const base = {
+			cellKey: 'E5:IBM.35:coli3',
+			value: 1,
+			node: {} as never,
+			col: { field: 'change', header: 'Change' },
+			isEditing: false,
+			isLoading: false,
+		};
+
+		manager.mountCell({ ...base, container: oldHost, rowSlotId: 'slot-2', slotGeneration: 1 });
+
+		// A live re-sort moves the focused row from slot-2 to slot-5 within one recycle pass.
+		manager.beginCellReleaseTransaction();
+		manager.releaseCell({ cellKey: base.cellKey, container: oldHost, flushSync: false, rowSlotId: 'slot-2', slotGeneration: 1 });
+		manager.mountCell({ ...base, container: newHost, rowSlotId: 'slot-5', slotGeneration: 3 });
+		manager.endCellReleaseTransaction();
+
+		expect(unmount).not.toHaveBeenCalled();
+		expect(manager.isCellMounted(base.cellKey)).toBe(true);
+		expect(manager.getActiveIdentity(base.cellKey)?.rowSlotId).toBe('slot-5');
+	});
+});
