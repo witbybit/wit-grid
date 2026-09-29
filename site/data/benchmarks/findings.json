@@ -1,0 +1,64 @@
+[
+	{
+		"id": "layout-vertical",
+		"title": "More layout work than AG Grid on vertical scroll",
+		"detail": "Wit Grid spends more time in layout than AG Grid on every vertical scenario: 172 vs 143 ms on plain text, 223 vs 189 ms with custom renderers, and 758 vs 496 ms on the very fast fling (about 1.5x). Total main-thread work is still lower, because script and style time are lower.",
+		"status": "open",
+		"impact": "Next to investigate: which DOM writes during row rebinding invalidate layout beyond the rebound rows."
+	},
+	{
+		"id": "style-horizontal",
+		"title": "More style recalculation than AG Grid on horizontal scroll",
+		"detail": "On the 200-column horizontal scroll Wit Grid spends 286 ms in style recalculation against AG Grid's 222 ms, although it is ahead on script and layout.",
+		"status": "open",
+		"impact": "Next to investigate: class and attribute churn on cells re-entering the column window."
+	},
+	{
+		"id": "dom-renderer-shell-flip",
+		"title": "Custom DOM renderer columns did more work than AG Grid",
+		"detail": "Cells entering during scroll showed a text stand-in, then flipped to the real renderer when scrolling settled: two writes per cell, and each flip changed the cell's content mode, layer visibility and key, forcing style recalculation. AG Grid updates its renderer in place with refresh().",
+		"status": "fixed",
+		"impact": "DOM renderers now default to scrollPresentation 'update': an entering cell's update() runs in place within a per-frame budget and is final as drawn. With 10 custom-renderer columns Wit Grid went from about 1.23x AG Grid's main-thread work to 0.88x, ahead in every paired round.",
+		"commits": ["0a67f8f9"]
+	},
+	{
+		"id": "scroll-state-reupdate",
+		"title": "Scroll start and end re-ran every DOM renderer",
+		"detail": "The DOM renderer manager treated a change of isScrolling or phase alone as a reason to call update(), so every mounted DOM renderer ran again when scrolling stopped, even when nothing it draws had changed.",
+		"status": "fixed",
+		"impact": "Renderers are updated only when their value, row, column, or editing / focus / selection state changes. A renderer that wants scroll state opts in with capabilities.scrollState.",
+		"commits": ["0a67f8f9"]
+	},
+	{
+		"id": "buffered-clear-refill",
+		"title": "Cells just outside the viewport were cleared, then refilled",
+		"detail": "Rows in the overscan band were written empty when no display snapshot existed, then filled when they scrolled in: a second write, a text node replacement and a content-mode change (a style recalculation) per cell.",
+		"status": "fixed",
+		"impact": "Plain text columns fill those cells with their real value. On the plain-text scenario, content-mode changes went from 27,850 to 0 and style recalculation from 212 to 143 ms.",
+		"commits": ["99d84650"]
+	},
+	{
+		"id": "renderer-key-rewrites",
+		"title": "Renderer key attributes rewritten on every bind",
+		"detail": "The custom and DOM renderer managers rewrote data-renderer-key and data-cell-key on every rebind, even when unchanged: about 44,000 DOM mutations each in one scroll.",
+		"status": "fixed",
+		"impact": "Written only when the key changes.",
+		"commits": ["99d84650"]
+	},
+	{
+		"id": "fast-fling-blank",
+		"title": "Blank rows on a very fast fling",
+		"detail": "The first benchmark run reported 38% blank samples for Wit Grid on a scrollbar-drag-speed fling. The sampler was measuring before Wit Grid's own frame work had run; AG Grid renders inside the scroll event, so it was always measured after.",
+		"status": "not-an-issue",
+		"impact": "The benchmark now samples after each frame's work. Both grids show no main-thread blank area. Compositor-only checkerboarding is not measured by this benchmark.",
+		"commits": ["6c5c8cb6"]
+	},
+	{
+		"id": "run-to-run-noise",
+		"title": "Results varied widely between runs",
+		"detail": "The same scenario measured 1,534 ms in one run and 3,085 ms in another on a busy machine, with AG Grid moving just as much. Single-grid medians were not trustworthy.",
+		"status": "fixed",
+		"impact": "Rounds are now paired and interleaved, and the page reports the per-round Wit/AG ratio with its full spread.",
+		"commits": []
+	}
+]

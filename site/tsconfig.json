@@ -24,6 +24,7 @@
 		"examples/**/*.ts",
 		"examples/**/*.tsx",
 		"generated/**/*.json",
+		"data/**/*.json",
 		"lib/**/*.ts",
 		"mdx-components.tsx",
 		"source.config.ts"

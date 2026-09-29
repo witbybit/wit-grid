@@ -1,15 +1,21 @@
 // Real-browser scroll benchmark: Wit Grid vs AG Grid, driven through the locally installed Chrome
 // with genuine mouse-wheel input (compositor scroll path, not scripted scrollTop).
 //
-//   pnpm --filter @eregister/wit-grid-bench bench              # all scenarios, both grids, headless
-//   pnpm --filter @eregister/wit-grid-bench bench -- --headed  # watch it
-//   ... -- --only=vertical-text --runs=5 --grid=wit
+//   pnpm bench:browser                          # all scenarios, both grids, headless, 5 paired rounds
+//   pnpm bench:browser --headed                 # watch it
+//   pnpm bench:browser --only=vertical-text --runs=9 --grid=wit
+//   pnpm bench:browser --publish                # also update the docs comparison page's data
 //
-// Frame timing reflects this machine and Chrome's frame rate; compare grids within one run, not
-// numbers across machines. Results are also written to packages/bench/results/<timestamp>.json.
+// Method: each round runs both grids back to back on the same scenario, alternating which goes
+// first, so machine drift (thermals, background load) hits both equally. Per metric we report the
+// median and min-max across rounds, plus the per-round Wit/AG ratio of main-thread time, which is
+// the number to compare. Absolute numbers depend on this machine; ratios travel better.
+// Results go to packages/bench/results/<timestamp>.json and results/latest.json.
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -21,17 +27,40 @@ const args = Object.fromEntries(
 		return [key, value ?? true];
 	})
 );
-const runs = Number(args.runs ?? 3);
+const runs = Number(args.runs ?? 5);
 // --css=<variant> forwards an experimental CSS override to the Wit Grid page (see src/wit.ts).
 const cssVariant = args.css;
 const grids = args.grid ? [args.grid] : ['wit', 'ag'];
 
 const SCENARIOS = [
-	{ name: 'vertical-text', query: { rows: 100_000, cols: 50, domCols: 0 }, wheel: { dy: 360, events: 150 } },
-	{ name: 'vertical-dom-renderers', query: { rows: 100_000, cols: 50, domCols: 10 }, wheel: { dy: 360, events: 150 } },
-	{ name: 'vertical-dom-live', query: { rows: 100_000, cols: 50, domCols: 10, domLive: 1 }, wheel: { dy: 360, events: 150 } },
-	{ name: 'horizontal-200-cols', query: { rows: 100_000, cols: 200, domCols: 0 }, wheel: { dx: 300, events: 150 } },
-	{ name: 'vertical-fast-fling', query: { rows: 100_000, cols: 50, domCols: 0 }, wheel: { dy: 2400, events: 90 } },
+	{
+		name: 'vertical-text',
+		title: 'Vertical scroll, plain text',
+		description: '100,000 rows x 50 text columns; 150 wheel events of 360px down, then back up.',
+		query: { rows: 100_000, cols: 50, domCols: 0 },
+		wheel: { dy: 360, events: 150 },
+	},
+	{
+		name: 'vertical-dom-renderers',
+		title: 'Vertical scroll, custom DOM renderers',
+		description: 'Same grid with 10 columns drawn by a custom renderer (a bar and a label); each grid uses its own default renderer path.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+	},
+	{
+		name: 'horizontal-200-cols',
+		title: 'Horizontal scroll, 200 columns',
+		description: '100,000 rows x 200 text columns; 150 wheel events of 300px right, then back left.',
+		query: { rows: 100_000, cols: 200, domCols: 0 },
+		wheel: { dx: 300, events: 150 },
+	},
+	{
+		name: 'vertical-fast-fling',
+		title: 'Very fast fling',
+		description: '90 wheel events of 2,400px, close to dragging the scrollbar; stresses blank area.',
+		query: { rows: 100_000, cols: 50, domCols: 0 },
+		wheel: { dy: 2400, events: 90 },
+	},
 ].filter((s) => !args.only || s.name === args.only);
 
 async function bundle() {
@@ -121,45 +150,133 @@ async function runOnce(browser, grid, scenario) {
 	};
 }
 
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+const sortedCopy = (values) => [...values].sort((a, b) => a - b);
+const spread = (values) => {
+	const sorted = sortedCopy(values);
+	return { median: sorted[Math.floor(sorted.length / 2)], min: sorted[0], max: sorted[sorted.length - 1] };
+};
+const packageVersion = (path) => {
+	try {
+		return JSON.parse(readFileSync(path, 'utf8')).version;
+	} catch {
+		return 'unknown';
+	}
+};
+
+function gitInfo() {
+	try {
+		const commit = execSync('git rev-parse --short HEAD', { cwd: here }).toString().trim();
+		const dirty = execSync('git status --porcelain -- ../core ../react', { cwd: here }).toString().trim().length > 0;
+		return { commit, uncommittedChanges: dirty };
+	} catch {
+		return { commit: 'unknown', uncommittedChanges: false };
+	}
+}
 
 await bundle();
 const browser = await chromium.launch({ channel: 'chrome', headless: !args.headed });
+const environment = {
+	chrome: browser.version(),
+	headless: !args.headed,
+	os: `${os.type()} ${os.release()}`,
+	cpu: os.cpus()[0]?.model?.trim() ?? 'unknown',
+	cores: os.cpus().length,
+	witGrid: packageVersion(join(here, '../core/package.json')),
+	agGrid: packageVersion(join(here, 'node_modules/ag-grid-community/package.json')),
+	...gitInfo(),
+};
 const results = [];
 try {
 	for (const scenario of SCENARIOS) {
-		for (const grid of grids) {
-			const samples = [];
-			for (let r = 0; r < runs; r++) samples.push(await runOnce(browser, grid, scenario));
-			const summary = Object.fromEntries(Object.keys(samples[0]).map((key) => [key, median(samples.map((s) => s[key]))]));
-			results.push({ scenario: scenario.name, grid, ...summary });
-			process.stdout.write(`${scenario.name} / ${grid}: done\n`);
+		const samples = Object.fromEntries(grids.map((grid) => [grid, []]));
+		for (let r = 0; r < runs; r++) {
+			// Paired round: both grids back to back, alternating which goes first.
+			const order = r % 2 === 0 ? grids : [...grids].reverse();
+			for (const grid of order) samples[grid].push(await runOnce(browser, grid, scenario));
 		}
+		for (const grid of grids) {
+			const list = samples[grid];
+			const metrics = Object.fromEntries(Object.keys(list[0]).map((key) => [key, spread(list.map((s) => s[key]))]));
+			results.push({
+				scenario: scenario.name,
+				grid,
+				...Object.fromEntries(Object.entries(metrics).map(([key, value]) => [key, value.median])),
+				spread: metrics,
+			});
+		}
+		if (grids.length === 2) {
+			const ratios = samples.wit.map((w, i) => w.taskMs / samples.ag[i].taskMs);
+			results.push({ scenario: scenario.name, grid: 'ratio', witOverAgTaskMs: spread(ratios), rounds: runs });
+		}
+		process.stdout.write(`${scenario.name}: done\n`);
 	}
 } finally {
 	await browser.close();
 }
 
 const fmt = (n, digits = 1) => (typeof n === 'number' ? n.toFixed(digits) : String(n));
-const table = results.map((r) => ({
-	scenario: r.scenario,
-	grid: r.grid,
-	'main thread ms': fmt(r.taskMs, 0),
-	'script ms': fmt(r.scriptMs, 0),
-	'layout ms': fmt(r.layoutMs, 0),
-	'style ms': fmt(r.styleMs, 0),
-	'input +ms/evt': fmt(r.inputOverheadMs, 2),
-	'p99 frame ms': fmt(r.p99Ms),
-	'dropped %': fmt(r.droppedPct),
-	'long tasks': `${r.longTasks} (${fmt(r.longTaskMs, 0)}ms)`,
-	'min cover': fmt(r.minCoverage, 2),
-	'blank %': fmt(r.blankSamplesPct),
-	'renderer mounts/updates': `${r.mounts}/${r.updates}`,
-}));
+const table = results
+	.filter((r) => r.grid !== 'ratio')
+	.map((r) => ({
+		scenario: r.scenario,
+		grid: r.grid,
+		'main thread ms (min-max)': `${fmt(r.taskMs, 0)} (${fmt(r.spread.taskMs.min, 0)}-${fmt(r.spread.taskMs.max, 0)})`,
+		'script ms': fmt(r.scriptMs, 0),
+		'layout ms': fmt(r.layoutMs, 0),
+		'style ms': fmt(r.styleMs, 0),
+		'input +ms/evt': fmt(r.inputOverheadMs, 2),
+		'p99 frame ms': fmt(r.p99Ms),
+		'dropped %': fmt(r.droppedPct),
+		'blank %': fmt(r.blankSamplesPct),
+		'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+	}));
 console.log();
 console.table(table);
+for (const r of results.filter((x) => x.grid === 'ratio')) {
+	const q = r.witOverAgTaskMs;
+	console.log(
+		`${r.scenario.padEnd(26)} Wit/AG main thread: ${fmt(q.median, 2)}x  (rounds ${fmt(q.min, 2)}-${fmt(q.max, 2)}x, ${r.rounds} paired rounds)`
+	);
+}
+const report = {
+	generatedAt: new Date().toISOString(),
+	method: {
+		rounds: runs,
+		pairing: 'Each round runs both grids back to back on the same scenario, alternating which goes first.',
+		input: 'Real mouse-wheel events through Chrome (playwright-core), 16ms apart; each grid uses its own defaults.',
+		metrics:
+			'Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame.',
+	},
+	environment,
+	scenarios: SCENARIOS.map(({ name, title, description, query, wheel }) => ({ name, title, description, query, wheel })),
+	results,
+};
 const resultsDir = join(here, 'results');
 mkdirSync(resultsDir, { recursive: true });
 const file = join(resultsDir, `${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
-writeFileSync(file, JSON.stringify({ runs, date: new Date().toISOString(), results }, null, 2));
+writeFileSync(file, JSON.stringify(report, null, 2));
+writeFileSync(join(resultsDir, 'latest.json'), JSON.stringify(report, null, 2));
 console.log(`\nwrote ${file}`);
+if (args.publish) {
+	const dataDir = join(here, '../../site/data/benchmarks');
+	mkdirSync(dataDir, { recursive: true });
+	writeFileSync(join(dataDir, 'wit-vs-ag.json'), JSON.stringify(report, null, 2) + '\n');
+	// One compact entry per publish, so the docs page can chart the Wit/AG ratio over time.
+	const historyFile = join(dataDir, 'history.json');
+	let history = [];
+	try {
+		history = JSON.parse(readFileSync(historyFile, 'utf8'));
+	} catch {
+		history = [];
+	}
+	history.push({
+		generatedAt: report.generatedAt,
+		commit: environment.commit,
+		uncommittedChanges: environment.uncommittedChanges,
+		witGrid: environment.witGrid,
+		agGrid: environment.agGrid,
+		ratios: Object.fromEntries(results.filter((r) => r.grid === 'ratio').map((r) => [r.scenario, r.witOverAgTaskMs.median])),
+	});
+	writeFileSync(historyFile, JSON.stringify(history, null, 2) + '\n');
+	console.log(`published ${join(dataDir, 'wit-vs-ag.json')} (history: ${history.length} runs)`);
+}

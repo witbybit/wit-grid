@@ -1,0 +1,984 @@
+{
+	"generatedAt": "2026-09-29T13:56:32.205Z",
+	"method": {
+		"rounds": 5,
+		"pairing": "Each round runs both grids back to back on the same scenario, alternating which goes first.",
+		"input": "Real mouse-wheel events through Chrome (playwright-core), 16ms apart; each grid uses its own defaults.",
+		"metrics": "Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame."
+	},
+	"environment": {
+		"chrome": "153.0.8010.53",
+		"headless": true,
+		"os": "Windows_NT 10.0.26200",
+		"cpu": "AMD Ryzen 5 7535HS with Radeon Graphics",
+		"cores": 12,
+		"witGrid": "1.4.1",
+		"agGrid": "36.2.0",
+		"commit": "0a67f8f9",
+		"uncommittedChanges": false
+	},
+	"scenarios": [
+		{
+			"name": "vertical-text",
+			"title": "Vertical scroll, plain text",
+			"description": "100,000 rows x 50 text columns; 150 wheel events of 360px down, then back up.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 0
+			},
+			"wheel": {
+				"dy": 360,
+				"events": 150
+			}
+		},
+		{
+			"name": "vertical-dom-renderers",
+			"title": "Vertical scroll, custom DOM renderers",
+			"description": "Same grid with 10 columns drawn by a custom renderer (a bar and a label); each grid uses its own default renderer path.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 10
+			},
+			"wheel": {
+				"dy": 360,
+				"events": 150
+			}
+		},
+		{
+			"name": "horizontal-200-cols",
+			"title": "Horizontal scroll, 200 columns",
+			"description": "100,000 rows x 200 text columns; 150 wheel events of 300px right, then back left.",
+			"query": {
+				"rows": 100000,
+				"cols": 200,
+				"domCols": 0
+			},
+			"wheel": {
+				"dx": 300,
+				"events": 150
+			}
+		},
+		{
+			"name": "vertical-fast-fling",
+			"title": "Very fast fling",
+			"description": "90 wheel events of 2,400px, close to dragging the scrollbar; stresses blank area.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 0
+			},
+			"wheel": {
+				"dy": 2400,
+				"events": 90
+			}
+		}
+	],
+	"results": [
+		{
+			"scenario": "vertical-text",
+			"grid": "wit",
+			"frames": 304,
+			"meanMs": 18.02574257425743,
+			"p95Ms": 25.09999999999991,
+			"p99Ms": 25.199999999999818,
+			"maxMs": 33.59999999999991,
+			"droppedPct": 7.260726072607261,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 20.940155999999988,
+			"scriptMs": 433.856,
+			"layoutMs": 172.19799999999998,
+			"styleMs": 134.07,
+			"taskMs": 1485.4630000000002,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 304,
+					"min": 299,
+					"max": 354
+				},
+				"meanMs": {
+					"median": 18.02574257425743,
+					"min": 17.544350282485876,
+					"max": 18.451973684210525
+				},
+				"p95Ms": {
+					"median": 25.09999999999991,
+					"min": 16.800000000000182,
+					"max": 25.09999999999991
+				},
+				"p99Ms": {
+					"median": 25.199999999999818,
+					"min": 25.100000000000364,
+					"max": 50.099999999999454
+				},
+				"maxMs": {
+					"median": 33.59999999999991,
+					"min": 25.200000000000728,
+					"max": 150.30000000000018
+				},
+				"droppedPct": {
+					"median": 7.260726072607261,
+					"min": 1.1299435028248588,
+					"max": 10.033444816053512
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 20.940155999999988,
+					"min": 20.771369999999976,
+					"max": 26.16312533333334
+				},
+				"scriptMs": {
+					"median": 433.856,
+					"min": 413.879,
+					"max": 713.601
+				},
+				"layoutMs": {
+					"median": 172.19799999999998,
+					"min": 160.858,
+					"max": 394.716
+				},
+				"styleMs": {
+					"median": 134.07,
+					"min": 123.53999999999999,
+					"max": 218.31
+				},
+				"taskMs": {
+					"median": 1485.4630000000002,
+					"min": 1423.499,
+					"max": 2604.94
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-text",
+			"grid": "ag",
+			"frames": 431,
+			"meanMs": 17.940515222482425,
+			"p95Ms": 25.09999999999991,
+			"p99Ms": 25.100000000000364,
+			"maxMs": 25.5,
+			"droppedPct": 6.557377049180328,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 36.916985333333336,
+			"scriptMs": 676.6790000000001,
+			"layoutMs": 143.317,
+			"styleMs": 185.45700000000002,
+			"taskMs": 1819.6380000000001,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 431,
+					"min": 427,
+					"max": 451
+				},
+				"meanMs": {
+					"median": 17.940515222482425,
+					"min": 16.728381374722833,
+					"max": 18.39561484918793
+				},
+				"p95Ms": {
+					"median": 25.09999999999991,
+					"min": 16.800000000000182,
+					"max": 25.09999999999991
+				},
+				"p99Ms": {
+					"median": 25.100000000000364,
+					"min": 16.90000000000009,
+					"max": 25.19999999999891
+				},
+				"maxMs": {
+					"median": 25.5,
+					"min": 25.199999999999818,
+					"max": 50.09999999999991
+				},
+				"droppedPct": {
+					"median": 6.557377049180328,
+					"min": 0.22172949002217296,
+					"max": 8.584686774941995
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 36.916985333333336,
+					"min": 36.035473333333336,
+					"max": 39.00297999999995
+				},
+				"scriptMs": {
+					"median": 676.6790000000001,
+					"min": 608.666,
+					"max": 1139.384
+				},
+				"layoutMs": {
+					"median": 143.317,
+					"min": 132.965,
+					"max": 280.618
+				},
+				"styleMs": {
+					"median": 185.45700000000002,
+					"min": 176.567,
+					"max": 334.606
+				},
+				"taskMs": {
+					"median": 1819.6380000000001,
+					"min": 1684.771,
+					"max": 2939.165
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-text",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.8427965347141441,
+				"min": 0.5290107904796091,
+				"max": 0.9213711025193093
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "wit",
+			"frames": 298,
+			"meanMs": 18.36608996539792,
+			"p95Ms": 25.09999999999991,
+			"p99Ms": 25.100000000000364,
+			"maxMs": 25.200000000000728,
+			"droppedPct": 8.135593220338983,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 20.645032666666665,
+			"scriptMs": 481.71599999999995,
+			"layoutMs": 222.51999999999998,
+			"styleMs": 211.66299999999998,
+			"taskMs": 2035.281,
+			"mounts": 370,
+			"updates": 14100,
+			"spread": {
+				"frames": {
+					"median": 298,
+					"min": 289,
+					"max": 309
+				},
+				"meanMs": {
+					"median": 18.36608996539792,
+					"min": 17.449190938511325,
+					"max": 18.51375838926175
+				},
+				"p95Ms": {
+					"median": 25.09999999999991,
+					"min": 25,
+					"max": 25.09999999999991
+				},
+				"p99Ms": {
+					"median": 25.100000000000364,
+					"min": 25.100000000000364,
+					"max": 25.100000000000364
+				},
+				"maxMs": {
+					"median": 25.200000000000728,
+					"min": 25.100000000000364,
+					"max": 33.40000000000009
+				},
+				"droppedPct": {
+					"median": 8.135593220338983,
+					"min": 3.883495145631068,
+					"max": 8.724832214765101
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 20.645032666666665,
+					"min": 19.916151333333303,
+					"max": 21.481487333333355
+				},
+				"scriptMs": {
+					"median": 481.71599999999995,
+					"min": 452.681,
+					"max": 546.601
+				},
+				"layoutMs": {
+					"median": 222.51999999999998,
+					"min": 213.029,
+					"max": 274.11
+				},
+				"styleMs": {
+					"median": 211.66299999999998,
+					"min": 207.917,
+					"max": 241.7
+				},
+				"taskMs": {
+					"median": 2035.281,
+					"min": 1916.6999999999998,
+					"max": 2275.277
+				},
+				"mounts": {
+					"median": 370,
+					"min": 370,
+					"max": 370
+				},
+				"updates": {
+					"median": 14100,
+					"min": 14078,
+					"max": 14103
+				}
+			}
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "ag",
+			"frames": 428,
+			"meanMs": 18.119906323185013,
+			"p95Ms": 25.09999999999991,
+			"p99Ms": 25.100000000000364,
+			"maxMs": 25.200000000000045,
+			"droppedPct": 7.962529274004684,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 37.53075599999992,
+			"scriptMs": 740.9200000000001,
+			"layoutMs": 188.5,
+			"styleMs": 254.77,
+			"taskMs": 2274.588,
+			"mounts": 12990,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 428,
+					"min": 424,
+					"max": 435
+				},
+				"meanMs": {
+					"median": 18.119906323185013,
+					"min": 17.59953271028037,
+					"max": 18.48278301886793
+				},
+				"p95Ms": {
+					"median": 25.09999999999991,
+					"min": 25,
+					"max": 25.100000000000364
+				},
+				"p99Ms": {
+					"median": 25.100000000000364,
+					"min": 25.100000000000364,
+					"max": 25.199999999999818
+				},
+				"maxMs": {
+					"median": 25.200000000000045,
+					"min": 25.100000000000364,
+					"max": 33.40000000000009
+				},
+				"droppedPct": {
+					"median": 7.962529274004684,
+					"min": 4.672897196261682,
+					"max": 9.19811320754717
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 37.53075599999992,
+					"min": 35.87755066666674,
+					"max": 38.496996666666625
+				},
+				"scriptMs": {
+					"median": 740.9200000000001,
+					"min": 715.172,
+					"max": 1325.2679999999998
+				},
+				"layoutMs": {
+					"median": 188.5,
+					"min": 173.944,
+					"max": 358.77
+				},
+				"styleMs": {
+					"median": 254.77,
+					"min": 243.46,
+					"max": 464.776
+				},
+				"taskMs": {
+					"median": 2274.588,
+					"min": 2184.6130000000003,
+					"max": 3711.176
+				},
+				"mounts": {
+					"median": 12990,
+					"min": 12990,
+					"max": 12990
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.879417322063346,
+				"min": 0.6130878729545568,
+				"max": 0.931643728202661
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "wit",
+			"frames": 317,
+			"meanMs": 16.69305993690852,
+			"p95Ms": 16.800000000000182,
+			"p99Ms": 16.900000000000546,
+			"maxMs": 17.299999999999272,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 19.96541599999997,
+			"scriptMs": 863.711,
+			"layoutMs": 262.478,
+			"styleMs": 286.215,
+			"taskMs": 2487.3979999999997,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 317,
+					"min": 315,
+					"max": 334
+				},
+				"meanMs": {
+					"median": 16.69305993690852,
+					"min": 16.69111111111111,
+					"max": 16.849683544303808
+				},
+				"p95Ms": {
+					"median": 16.800000000000182,
+					"min": 16.800000000000182,
+					"max": 16.800000000000182
+				},
+				"p99Ms": {
+					"median": 16.900000000000546,
+					"min": 16.899999999999636,
+					"max": 25
+				},
+				"maxMs": {
+					"median": 17.299999999999272,
+					"min": 17.199999999999818,
+					"max": 25.200000000000273
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0.9493670886075949
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 19.96541599999997,
+					"min": 19.52241466666669,
+					"max": 21.811133999999925
+				},
+				"scriptMs": {
+					"median": 863.711,
+					"min": 736.542,
+					"max": 883.496
+				},
+				"layoutMs": {
+					"median": 262.478,
+					"min": 234.598,
+					"max": 274.227
+				},
+				"styleMs": {
+					"median": 286.215,
+					"min": 236.905,
+					"max": 292.134
+				},
+				"taskMs": {
+					"median": 2487.3979999999997,
+					"min": 2130.935,
+					"max": 2545.359
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "ag",
+			"frames": 440,
+			"meanMs": 16.69068181818182,
+			"p95Ms": 16.800000000000182,
+			"p99Ms": 17,
+			"maxMs": 17.300000000000182,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 34.637273999999934,
+			"scriptMs": 1144.617,
+			"layoutMs": 354.833,
+			"styleMs": 221.806,
+			"taskMs": 2941.08,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 440,
+					"min": 435,
+					"max": 441
+				},
+				"meanMs": {
+					"median": 16.69068181818182,
+					"min": 16.690182648401827,
+					"max": 16.767800453514734
+				},
+				"p95Ms": {
+					"median": 16.800000000000182,
+					"min": 16.800000000000182,
+					"max": 16.80000000000109
+				},
+				"p99Ms": {
+					"median": 17,
+					"min": 16.90000000000009,
+					"max": 17.100000000000364
+				},
+				"maxMs": {
+					"median": 17.300000000000182,
+					"min": 17,
+					"max": 33.40000000000009
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0.45351473922902497
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 34.637273999999934,
+					"min": 34.05896600000017,
+					"max": 35.0221219999999
+				},
+				"scriptMs": {
+					"median": 1144.617,
+					"min": 1119.901,
+					"max": 1295.0459999999998
+				},
+				"layoutMs": {
+					"median": 354.833,
+					"min": 337.843,
+					"max": 410.614
+				},
+				"styleMs": {
+					"median": 221.806,
+					"min": 213.71200000000002,
+					"max": 246.394
+				},
+				"taskMs": {
+					"median": 2941.08,
+					"min": 2852.521,
+					"max": 3373.914
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.7929063473281924,
+				"min": 0.7122894570591007,
+				"max": 0.8823196577777994
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "wit",
+			"frames": 274,
+			"meanMs": 19.063405797101453,
+			"p95Ms": 33.40000000000009,
+			"p99Ms": 33.5,
+			"maxMs": 33.80000000000018,
+			"droppedPct": 13.768115942028986,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 42.522470000000126,
+			"scriptMs": 824.671,
+			"layoutMs": 757.744,
+			"styleMs": 148.388,
+			"taskMs": 3188.2929999999997,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 274,
+					"min": 272,
+					"max": 276
+				},
+				"meanMs": {
+					"median": 19.063405797101453,
+					"min": 18.390875912408767,
+					"max": 19.872161172161178
+				},
+				"p95Ms": {
+					"median": 33.40000000000009,
+					"min": 33.399999999999636,
+					"max": 33.400000000000546
+				},
+				"p99Ms": {
+					"median": 33.5,
+					"min": 33.5,
+					"max": 50
+				},
+				"maxMs": {
+					"median": 33.80000000000018,
+					"min": 33.5,
+					"max": 50.100000000000364
+				},
+				"droppedPct": {
+					"median": 13.768115942028986,
+					"min": 10.218978102189782,
+					"max": 17.582417582417584
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 3
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 167
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 42.522470000000126,
+					"min": 40.24650555555579,
+					"max": 44.429882222221934
+				},
+				"scriptMs": {
+					"median": 824.671,
+					"min": 752.359,
+					"max": 872.792
+				},
+				"layoutMs": {
+					"median": 757.744,
+					"min": 708.681,
+					"max": 854.435
+				},
+				"styleMs": {
+					"median": 148.388,
+					"min": 128.182,
+					"max": 152.194
+				},
+				"taskMs": {
+					"median": 3188.2929999999997,
+					"min": 2935.201,
+					"max": 3427.559
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "ag",
+			"frames": 343,
+			"meanMs": 21.34281524926686,
+			"p95Ms": 41.70000000000073,
+			"p99Ms": 50.100000000000364,
+			"maxMs": 50.19999999999982,
+			"droppedPct": 19.533527696793,
+			"longTasks": 15,
+			"longTaskMs": 827,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 68.48831666666665,
+			"scriptMs": 1994.7330000000002,
+			"layoutMs": 495.64200000000005,
+			"styleMs": 557.575,
+			"taskMs": 4354.084000000001,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 343,
+					"min": 341,
+					"max": 345
+				},
+				"meanMs": {
+					"median": 21.34281524926686,
+					"min": 20.417101449275357,
+					"max": 22.64285714285716
+				},
+				"p95Ms": {
+					"median": 41.70000000000073,
+					"min": 33.5,
+					"max": 50
+				},
+				"p99Ms": {
+					"median": 50.100000000000364,
+					"min": 50,
+					"max": 50.5
+				},
+				"maxMs": {
+					"median": 50.19999999999982,
+					"min": 50.19999999999982,
+					"max": 83.29999999999995
+				},
+				"droppedPct": {
+					"median": 19.533527696793,
+					"min": 17.10144927536232,
+					"max": 27.113702623906704
+				},
+				"longTasks": {
+					"median": 15,
+					"min": 12,
+					"max": 24
+				},
+				"longTaskMs": {
+					"median": 827,
+					"min": 626,
+					"max": 1337
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 68.48831666666665,
+					"min": 63.78698111111105,
+					"max": 72.39655111111092
+				},
+				"scriptMs": {
+					"median": 1994.7330000000002,
+					"min": 1933.2830000000001,
+					"max": 2347.5229999999997
+				},
+				"layoutMs": {
+					"median": 495.64200000000005,
+					"min": 447.325,
+					"max": 538.011
+				},
+				"styleMs": {
+					"median": 557.575,
+					"min": 530.4259999999999,
+					"max": 627.5150000000001
+				},
+				"taskMs": {
+					"median": 4354.084000000001,
+					"min": 4135.547,
+					"max": 4966.210999999999
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.7322534429744578,
+				"min": 0.6223507217071527,
+				"max": 0.7893778174718145
+			},
+			"rounds": 5
+		}
+	]
+}

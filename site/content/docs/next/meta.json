@@ -6,6 +6,7 @@
 		"installation",
 		"quick-start",
 		"migrating-from-ag-grid",
+		"performance-vs-ag-grid",
 		"columns",
 		"renderer-capabilities",
 		"row-models",
