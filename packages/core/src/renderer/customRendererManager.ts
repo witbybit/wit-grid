@@ -1,4 +1,4 @@
-import { getColumnInstanceIdentity, type ColumnDef, type CellRendererPhase } from '../columnDef.js';
+import { getColumnInstanceIdentity, type ColumnDef, type CellRendererPhase, type InternalColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridCellContentMount, GridCellContentUnmount, RendererLifecycleOperation } from './IGridRenderer.js';
 import type { GridEngine } from '../engine/GridEngine.js';
@@ -416,6 +416,9 @@ export class CustomRendererManager<TRowData = unknown> {
 	): void {
 		// Detect whether any props the renderer cares about actually changed before
 		// notifying React — avoids a reconciliation round trip on stayed cells.
+		// isScrolling/phase changes alone re-render a renderer only when it opts in (capabilities
+		// .scrollState); otherwise every mounted React cell re-rendered at each scroll start and end.
+		const receivesScrollState = (params.col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollState === true;
 		const needsUpdate =
 			instance.value !== params.value ||
 			instance.node !== params.node ||
@@ -424,8 +427,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			instance.isLoading !== params.isLoading ||
 			instance.isFocused !== params.isFocused ||
 			instance.isSelected !== params.isSelected ||
-			instance.phase !== params.phase ||
-			instance.isScrolling !== params.isScrolling ||
+			(receivesScrollState && (instance.phase !== params.phase || instance.isScrolling !== params.isScrolling)) ||
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey ||
 			instance.cellRowBindingGeneration !== params.cellRowBindingGeneration ||
