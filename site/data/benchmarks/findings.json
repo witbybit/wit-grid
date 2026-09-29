@@ -2,16 +2,16 @@
 	{
 		"id": "layout-vertical",
 		"title": "More layout work than AG Grid on vertical scroll",
-		"detail": "Wit Grid spends more time in layout than AG Grid on vertical scroll (about 1.5x on the very fast fling). Chrome's layout trace located the cause: both grids render the same rows and cells and neither forces a layout, but each Wit layout touched far more layout objects (2,010 vs 1,271 in the tree), because every text cell carried an extra anonymous flex box. That box also stopped text-overflow ellipsis from rendering.",
-		"status": "open",
-		"impact": "Partly fixed: cell text is now a plain block, which removes 24% of the layout objects dirtied per frame and makes long values end in an ellipsis. Remaining gap: each Wit text cell is still two elements (cell and content wrapper) where AG Grid uses one."
+		"detail": "Wit Grid spent more time in layout than AG Grid on vertical scroll (about 1.5x on the very fast fling). Chrome's layout trace located the cause: both grids render the same rows and cells and neither forces a layout, but every Wit text cell carried two extra layout objects: a content wrapper, and an anonymous flex box inside it (which also stopped long values from ending in an ellipsis).",
+		"status": "fixed",
+		"impact": "Fixed. Cell text is a plain block, and cells of columns without a custom renderer hold their text directly, as AG Grid's do. Over a whole run Wit now dirties fewer layout objects than AG Grid on every vertical scenario (fast fling 87,480 vs 97,740; plain text 38,100 vs 42,300). Layout time is lower on plain text and the fast fling; with custom DOM renderers the two are even within run-to-run noise."
 	},
 	{
 		"id": "style-horizontal",
 		"title": "More style recalculation than AG Grid on horizontal scroll",
-		"detail": "On the 200-column horizontal scroll Wit Grid spends 286 ms in style recalculation against AG Grid's 222 ms, although it is ahead on script and layout.",
+		"detail": "On the 200-column horizontal scroll, style recalculation has favoured AG Grid in some runs (125 vs 107 ms) and Wit Grid in others (207 vs 231 ms in the published run), so the timing alone does not settle it. The layout trace shows Wit dirtying about twice as many layout objects as AG Grid on this scenario, although its layout time is lower.",
 		"status": "open",
-		"impact": "Next to investigate: class and attribute churn on cells re-entering the column window."
+		"impact": "Open. Next: trace style recalculation per element on horizontal scroll to see whether cells re-entering the column window restyle more than needed."
 	},
 	{
 		"id": "dom-renderer-shell-flip",
