@@ -996,8 +996,8 @@ describe('Architecture guardrails', () => {
 		// reindexFrom must exist and update maps in-place (no new Map() calls in incremental paths).
 		expect(content).toContain('private reindexFrom(');
 		expect(content).toContain('this.reindexFrom(');
-		// Cost model must exist.
-		expect(content).toContain('isIncrementalCheaper');
+		// Cost model must exist (the transaction-size threshold; the unused isIncrementalCheaper was removed).
+		expect(content).toContain('INCREMENTAL_TX_LIMIT');
 		// Stale entries for removed rows must be deleted before splice.
 		expect(content).toContain('this.rowIdToVisualIndex.delete(node.id)');
 	});

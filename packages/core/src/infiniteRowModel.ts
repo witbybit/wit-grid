@@ -407,6 +407,22 @@ class InfiniteBlockCache<TData = unknown> {
 		return nodes;
 	}
 
+	/** Blocks holding at least one committed row, by ascending block index. Does not touch LRU. */
+	public getCommittedBlocksInOrder(): InfiniteBlock<TData>[] {
+		return Array.from(this.blocks.values())
+			.filter((block) => this.hasCommittedRows(block))
+			.sort((a, b) => a.blockIndex - b.blockIndex);
+	}
+
+	/** Refreshes `lastAccessedAt` of every cached block starting at or before `rowIndex`, in block order. */
+	public touchBlocksThrough(rowIndex: number): void {
+		if (rowIndex < 0) return;
+		const touched = Array.from(this.blocks.values())
+			.filter((block) => block.startRow <= rowIndex)
+			.sort((a, b) => a.blockIndex - b.blockIndex);
+		for (const block of touched) block.lastAccessedAt = InfiniteBlockCache.now();
+	}
+
 	public getSnapshots(): readonly InfiniteBlockSnapshot[] {
 		return Array.from(this.blocks.values())
 			.sort((a, b) => a.blockIndex - b.blockIndex)
@@ -1098,28 +1114,47 @@ export class InfiniteRowModelController<TData = unknown>
 		return best;
 	}
 
+	/**
+	 * Rebuilds the id → visual index maps in O(committed rows) by walking the blocks in order and
+	 * using `block.startRow + offset` (the SSRM approach). Previously each node scanned from row 0,
+	 * which was quadratic in the loaded row count. Semantics are unchanged: a row id maps to its
+	 * first in-range occurrence, and `nodeMap` keeps the last committed node for that id.
+	 */
 	private rebuildBlockDerivedIndexes(): void {
 		this.nodeMap.clear();
 		this.visualRowIdToIndex.clear();
 		this.rowIdToVisualIndex.clear();
-		for (const node of this.blockCache.getSelectableRowNodes()) {
-			const visualIndex = this.findVisualIndexForRowId(node.id);
-			if (visualIndex < 0) continue;
-			this.nodeMap.set(node.id, node);
-			this.rowIdToVisualIndex.set(node.id, visualIndex);
-			this.visualRowIdToIndex.set(toDataVisualRowId(node.id), visualIndex);
-		}
-	}
-
-	private findVisualIndexForRowId(rowId: string): number {
 		const rowCount = this.blockCache.getVisualRowCount();
-		for (let index = 0; index < rowCount; index++) {
-			const block = this.blockCache.getBlockForRow(index, this.blockSize);
-			if (!block) continue;
-			const node = block.rows[index - block.startRow];
-			if (node?.id === rowId) return index;
+		const committedBlocks = this.blockCache.getCommittedBlocksInOrder();
+		let hasNodes = false;
+		let unresolvedNode = false;
+		let maxResolvedIndex = -1;
+		for (const block of committedBlocks) {
+			const limit = Math.min(block.rows.length, this.blockSize, rowCount - block.startRow);
+			for (let offset = 0; offset < limit; offset++) {
+				const node = block.rows[offset];
+				if (!node || this.rowIdToVisualIndex.has(node.id)) continue;
+				const visualIndex = block.startRow + offset;
+				this.rowIdToVisualIndex.set(node.id, visualIndex);
+				this.visualRowIdToIndex.set(toDataVisualRowId(node.id), visualIndex);
+			}
 		}
-		return -1;
+		for (const block of committedBlocks) {
+			for (const node of block.rows) {
+				if (!node) continue;
+				hasNodes = true;
+				const visualIndex = this.rowIdToVisualIndex.get(node.id);
+				if (visualIndex === undefined) {
+					unresolvedNode = true;
+					continue;
+				}
+				if (visualIndex > maxResolvedIndex) maxResolvedIndex = visualIndex;
+				this.nodeMap.set(node.id, node);
+			}
+		}
+		// The old per-node scan read every block up to the furthest row it looked at, refreshing
+		// their LRU timestamps in block order. Keep that eviction ordering without the scan.
+		if (hasNodes) this.blockCache.touchBlocksThrough(unresolvedNode ? rowCount - 1 : maxResolvedIndex);
 	}
 
 	private isRetryReason(reason?: string): boolean {

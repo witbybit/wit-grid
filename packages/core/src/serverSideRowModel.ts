@@ -670,7 +670,12 @@ export class ServerSideRowModelController<TRowData = unknown>
 
 	public getVisualRowCount(): number {
 		if (this.rowCountState.kind === 'known' || this.rowCountState.kind === 'estimated') return this.rowCountState.count;
-		return this.blocks.size > 0 ? Math.max(...[...this.blocks.values()].map((block) => block.endRow + 1)) : 0;
+		// Loop instead of Math.max(...spread): no per-call arrays, no argument-count limit.
+		let count = 0;
+		for (const block of this.blocks.values()) {
+			if (block.endRow + 1 > count) count = block.endRow + 1;
+		}
+		return count;
 	}
 
 	public getVisualIndexById(visualRowId: string): number {
@@ -960,12 +965,30 @@ export class ServerSideRowModelController<TRowData = unknown>
 	private drainQueuedBlocks(): void {
 		if (this.disposed) return;
 		while (this.activeRequestCount < this.maxConcurrentRequests) {
-			const nextQueuedBlock = [...this.getAllBlocks()]
-				.filter((block) => block.state === 'queued' && block.queryGeneration === this.queryGeneration)
-				.sort((a, b) => b.lastAccessedAt - a.lastAccessedAt || a.storeId.localeCompare(b.storeId) || a.blockIndex - b.blockIndex)[0];
+			// Single pass for the best queued block (same ordering the old filter+sort()[0] used):
+			// most recently accessed first, then storeId, then blockIndex.
+			let nextQueuedBlock: ServerSideLoadedBlock<TRowData> | null = null;
+			nextQueuedBlock = this.pickQueuedBlock(this.blocks, nextQueuedBlock);
+			for (const store of this.childStores.values()) nextQueuedBlock = this.pickQueuedBlock(store.blocks, nextQueuedBlock);
 			if (!nextQueuedBlock) return;
 			this.startStoreBlockRequest(this.getStoreById(nextQueuedBlock.storeId), nextQueuedBlock.blockIndex);
 		}
+	}
+
+	private pickQueuedBlock(
+		blocks: ReadonlyMap<number, ServerSideLoadedBlock<TRowData>>,
+		best: ServerSideLoadedBlock<TRowData> | null
+	): ServerSideLoadedBlock<TRowData> | null {
+		for (const block of blocks.values()) {
+			if (block.state !== 'queued' || block.queryGeneration !== this.queryGeneration) continue;
+			if (
+				!best ||
+				(block.lastAccessedAt - best.lastAccessedAt || best.storeId.localeCompare(block.storeId) || best.blockIndex - block.blockIndex) > 0
+			) {
+				best = block;
+			}
+		}
+		return best;
 	}
 
 	private rebuildIndexes(): void {

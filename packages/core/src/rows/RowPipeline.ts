@@ -190,8 +190,12 @@ export class RowPipeline<TData = unknown> {
 			}
 		}
 
-		if (roots && (groupDefs.length > 0 || effectiveGetParentId) && sortModel && sortModel.length > 0) {
-			sortTreeStage(roots, sortModel, columns);
+		if (
+			roots &&
+			(groupDefs.length > 0 || effectiveGetParentId) &&
+			((sortModel && sortModel.length > 0) || groupDefs.some((def) => def.comparator))
+		) {
+			sortTreeStage(roots, sortModel, columns, groupDefs);
 		}
 
 		if (roots && aggDefs && aggDefs.length > 0) {

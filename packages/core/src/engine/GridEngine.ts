@@ -276,17 +276,22 @@ export class GridEngine<TRowData = unknown> {
 		});
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
-		// Sweep RowCtrl/CellCtrl identity for rows permanently removed via a structural transaction
-		// (grid.applyTransaction({ remove: [...] })). Known gap, not a regression: a full row-data
-		// replace (setRowData) does not emit removedNodes (see RowDataStore.setRows/
-		// replaceRowsStructurally), so it isn't swept here either — this matches the codebase's
-		// existing convention for rowVersions/cellDisplaySnapshots, neither of which is swept on
-		// removal today. A sweep() call against the full live-rowId set would close that gap but
-		// costs O(total rows) per event, which is undesirable on every transaction for large grids.
+		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows
+		// permanently removed via a structural transaction (grid.applyTransaction({ remove: [...] })).
+		// Known gap, not a regression: a full row-data replace (setRowData) does not emit
+		// removedNodes (see RowDataStore.setRows/replaceRowsStructurally), so it isn't swept here
+		// (cellDisplaySnapshots are not swept either). A sweep() against the full live-rowId set
+		// would close that gap but costs O(total rows) per event.
 		this.eventBus.addEventListener(GridEventName.rowsUpdated, (event) => {
 			const removedNodes = event.payload.removedNodes;
 			if (!removedNodes || removedNodes.length === 0) return;
-			for (const node of removedNodes) this.rowCtrls.delete(node.id);
+			for (const node of removedNodes) {
+				this.rowCtrls.delete(node.id);
+				// Per-row caches keyed by id would otherwise grow without bound under add/remove
+				// churn; a re-added row with the same id also must not see stale valueGetter results.
+				this.rowVersions.delete(node.id);
+				this.data.clearValueGetterCache(node.id);
+			}
 		});
 		this.runtimeFaults = new RuntimeFaultReporter<TRowData>({
 			emit: (fault) => this.eventBus.dispatchEvent(GridEventName.runtimeFault, fault),

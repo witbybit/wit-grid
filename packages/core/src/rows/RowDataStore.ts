@@ -23,10 +23,25 @@ export interface StoreTransactionResult<T> {
 	changedValuesByRow: Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>;
 }
 
+/**
+ * Inverse (delta) snapshot of a transaction: only the rows the transaction can touch.
+ * Rows are replaced immutably (`RowNode.setData` swaps the reference), so the captured
+ * data reference already *is* the pre-transaction value — nothing is cloned.
+ */
 export interface RowDataStoreTransactionSnapshot<T> {
-	readonly nodesById: ReadonlyMap<string, RowNode<T>>;
-	readonly rowDataById: ReadonlyMap<string, T>;
-	readonly sourceOrder: readonly string[];
+	/** Touched row id → the node it resolved to before the write (null = absent) and that node's data. */
+	readonly entries: ReadonlyMap<string, { readonly node: RowNode<T> | null; readonly data: T | undefined }>;
+	/** Pre-write source order; only captured when the write can change membership/order (add/remove). */
+	readonly sourceOrder: readonly string[] | null;
+	/** True when captured without a scope: `entries` then covers every row that existed. */
+	readonly complete?: boolean;
+}
+
+/** The rows a transaction may touch — used to scope `captureTransactionSnapshot`. */
+export interface RowDataStoreTransactionScope<T> {
+	add?: readonly T[];
+	remove?: readonly T[];
+	update?: readonly T[];
 }
 
 const hasOwn = Object.prototype.hasOwnProperty;
@@ -68,6 +83,8 @@ function diffRows(prevRow: unknown, nextRow: unknown): RowDiff | null {
 export class RowDataStore<T> {
 	private rowsById = new Map<string, RowNode<T>>();
 	private sourceOrder: string[] = [];
+	/** Lazily built rowId → source position; null when stale. See getSourceIndex(). */
+	private sourceIndexById: Map<string, number> | null = null;
 	private getRowId: (row: T) => string;
 
 	constructor(getRowId: (row: T) => string) {
@@ -101,6 +118,7 @@ export class RowDataStore<T> {
 			nextNodeMap.set(id, node);
 		}
 		this.sourceOrder = ids;
+		this.sourceIndexById = null;
 		this.rowsById = nextNodeMap;
 	}
 
@@ -183,6 +201,7 @@ export class RowDataStore<T> {
 			if (removed.length > 0) {
 				const removedIds = new Set(removed.map((n) => n.id));
 				this.sourceOrder = this.sourceOrder.filter((id) => !removedIds.has(id));
+				this.sourceIndexById = null;
 			}
 		}
 
@@ -217,9 +236,22 @@ export class RowDataStore<T> {
 			}
 
 			if (newNodes.length > 0) {
-				const addIndex = transaction.addIndex ?? this.sourceOrder.length;
-				const newIds = newNodes.map((n) => n.id);
-				this.sourceOrder.splice(addIndex, 0, ...newIds);
+				const length = this.sourceOrder.length;
+				// Same start normalization as Array.prototype.splice, without spreading newIds into
+				// call arguments (which throws RangeError for very large adds).
+				const requested = Math.trunc(transaction.addIndex ?? length) || 0;
+				const start = requested < 0 ? Math.max(length + requested, 0) : Math.min(requested, length);
+				if (start === length) {
+					const index = this.sourceIndexById;
+					for (const node of newNodes) {
+						index?.set(node.id, this.sourceOrder.length);
+						this.sourceOrder.push(node.id);
+					}
+				} else {
+					const newIds = newNodes.map((n) => n.id);
+					this.sourceOrder = this.sourceOrder.slice(0, start).concat(newIds, this.sourceOrder.slice(start));
+					this.sourceIndexById = null;
+				}
 			}
 		}
 
@@ -238,20 +270,65 @@ export class RowDataStore<T> {
 		return this.sourceOrder.slice();
 	}
 
-	public captureTransactionSnapshot(): RowDataStoreTransactionSnapshot<T> {
-		return {
-			nodesById: new Map(this.rowsById),
-			rowDataById: new Map(this.sourceOrder.map((id) => [id, structuredClone(this.rowsById.get(id)!.data)])),
-			sourceOrder: this.sourceOrder.slice(),
+	/**
+	 * Source-order position of `rowId`, served from a lazily built index that survives
+	 * value-only writes and is invalidated (or extended, for appends) on order changes.
+	 */
+	public getSourceIndex(rowId: string): number | undefined {
+		let index = this.sourceIndexById;
+		if (!index) {
+			index = new Map<string, number>();
+			for (let i = 0; i < this.sourceOrder.length; i++) index.set(this.sourceOrder[i], i);
+			this.sourceIndexById = index;
+		}
+		return index.get(rowId);
+	}
+
+	/**
+	 * Captures the inverse of `scope` (the rows it adds/removes/updates) so
+	 * `restoreTransactionSnapshot` can undo it. Omitting `scope` captures every row —
+	 * still by reference, never cloned. Cost is O(touched rows), plus an O(n) id-array
+	 * copy of the source order only when the scope adds or removes rows.
+	 */
+	public captureTransactionSnapshot(scope?: RowDataStoreTransactionScope<T>): RowDataStoreTransactionSnapshot<T> {
+		const entries = new Map<string, { node: RowNode<T> | null; data: T | undefined }>();
+		const capture = (id: string): void => {
+			if (entries.has(id)) return;
+			const node = this.rowsById.get(id) ?? null;
+			entries.set(id, { node, data: node?.data });
 		};
+		if (!scope) {
+			for (const id of this.sourceOrder) capture(id);
+			return { entries, sourceOrder: this.sourceOrder.slice(), complete: true };
+		}
+		const captureRows = (rows: readonly T[] | undefined): void => {
+			if (!rows) return;
+			for (const row of rows) {
+				if (row != null) capture(this.getRowId(row));
+			}
+		};
+		captureRows(scope.remove);
+		captureRows(scope.update);
+		captureRows(scope.add);
+		const structural = (scope.add?.length ?? 0) > 0 || (scope.remove?.length ?? 0) > 0;
+		return { entries, sourceOrder: structural ? this.sourceOrder.slice() : null };
 	}
 
 	public restoreTransactionSnapshot(snapshot: RowDataStoreTransactionSnapshot<T>): void {
-		for (const [id, node] of snapshot.nodesById) {
-			node.setData(structuredClone(snapshot.rowDataById.get(id)!));
+		// A complete snapshot owns the whole id space: rows added after capture are dropped.
+		if (snapshot.complete) this.rowsById = new Map();
+		for (const [id, entry] of snapshot.entries) {
+			if (entry.node) {
+				entry.node.setData(entry.data as T);
+				this.rowsById.set(id, entry.node);
+			} else {
+				this.rowsById.delete(id);
+			}
 		}
-		this.rowsById = new Map(snapshot.nodesById);
-		this.sourceOrder = snapshot.sourceOrder.slice();
+		if (snapshot.sourceOrder) {
+			this.sourceOrder = snapshot.sourceOrder.slice();
+			this.sourceIndexById = null;
+		}
 	}
 
 	/** Reorder rows by providing a new array of row IDs. IDs not present in the store are silently dropped. */
@@ -261,5 +338,6 @@ export class RowDataStore<T> {
 			if (this.rowsById.has(id)) next.push(id);
 		}
 		this.sourceOrder = next;
+		this.sourceIndexById = null;
 	}
 }

@@ -11,8 +11,11 @@ export function aggregateStage<TData>(roots: RowTreeNode<TData>[], aggDefs: Aggr
 	if (aggDefs.length === 0) return;
 
 	const needsLeafNodes = aggDefs.some((def) => typeof def.aggFunc === 'function');
+	// One shared DFS-ordered accumulator: a subtree's leaves are a contiguous tail of it.
+	const leafAccumulator: GridRowDataRef<TData>[] | null = needsLeafNodes ? [] : null;
 	for (const root of roots) {
-		aggregateNodeRecursively(root, aggDefs, context, needsLeafNodes);
+		aggregateNodeRecursively(root, aggDefs, context, null, leafAccumulator);
+		if (leafAccumulator) leafAccumulator.length = 0;
 	}
 }
 
@@ -22,11 +25,6 @@ interface NumericStats {
 	sum: number;
 	min: number;
 	max: number;
-}
-
-interface AggregateVisitResult<TData> {
-	statsByField: Map<string, NumericStats>;
-	leafNodes?: GridRowDataRef<TData>[];
 }
 
 function createStats(): NumericStats {
@@ -67,17 +65,38 @@ function getStats(statsByField: Map<string, NumericStats>, field: string): Numer
 	return stats;
 }
 
+/**
+ * Folds `node`'s subtree into `parentStats` (null at a root). Plain leaves add straight into the
+ * parent's stats — only nodes with children allocate their own stats map — and leaf refs are
+ * appended to the shared DFS accumulator (no per-level array copies or argument spreads).
+ */
 function aggregateNodeRecursively<TData>(
 	node: RowTreeNode<TData>,
 	aggDefs: AggregationDef<TData>[],
 	context: RowPipelineContext<TData>,
-	needsLeafNodes: boolean
-): AggregateVisitResult<TData> {
-	const statsByField = new Map<string, NumericStats>();
-	const leafNodes: GridRowDataRef<TData>[] | undefined = needsLeafNodes ? [] : undefined;
+	parentStats: Map<string, NumericStats> | null,
+	leafAccumulator: GridRowDataRef<TData>[] | null
+): void {
+	const children = node.children;
+	const hasChildren = node.kind === 'group' || (children !== undefined && children.length > 0);
 
 	if (node.kind === 'data') {
-		if (leafNodes) leafNodes.push(createGridRowDataRef(node.node.id, node.node.data));
+		if (leafAccumulator) leafAccumulator.push(createGridRowDataRef(node.node.id, node.node.data));
+		if (!hasChildren) {
+			if (parentStats) {
+				for (const def of aggDefs) {
+					if (typeof def.aggFunc !== 'function') {
+						addNodeValue(getStats(parentStats, def.field), node.node, def.field, context);
+					}
+				}
+			}
+			return;
+		}
+	}
+
+	const leafStart = leafAccumulator ? leafAccumulator.length - (node.kind === 'data' ? 1 : 0) : 0;
+	const statsByField = new Map<string, NumericStats>();
+	if (node.kind === 'data') {
 		for (const def of aggDefs) {
 			if (typeof def.aggFunc !== 'function') {
 				addNodeValue(getStats(statsByField, def.field), node.node, def.field, context);
@@ -85,20 +104,19 @@ function aggregateNodeRecursively<TData>(
 		}
 	}
 
-	for (const child of node.children ?? []) {
-		const childResult = aggregateNodeRecursively(child, aggDefs, context, needsLeafNodes);
-		for (const [field, childStats] of childResult.statsByField) {
-			mergeStats(getStats(statsByField, field), childStats);
-		}
-		if (leafNodes && childResult.leafNodes) {
-			leafNodes.push(...childResult.leafNodes);
+	for (const child of children ?? []) {
+		aggregateNodeRecursively(child, aggDefs, context, statsByField, leafAccumulator);
+	}
+
+	if (parentStats) {
+		for (const [field, stats] of statsByField) {
+			mergeStats(getStats(parentStats, field), stats);
 		}
 	}
 
-	if (node.kind === 'data') {
-		return { statsByField, leafNodes };
-	}
+	if (node.kind === 'data') return;
 
+	const leafNodes = leafAccumulator ? leafAccumulator.slice(leafStart) : undefined;
 	const aggregateValues: Record<string, unknown> = {};
 
 	for (const def of aggDefs) {
@@ -142,5 +160,4 @@ function aggregateNodeRecursively<TData>(
 	}
 
 	node.aggregateValues = aggregateValues;
-	return { statsByField, leafNodes };
 }
