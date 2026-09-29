@@ -565,8 +565,18 @@ function previewCellValueMutation<TRowData>(context: GridCommitContext<TRowData>
 }
 
 export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unknown>(): GridDomainMutationExecutorRegistry<TRowData> {
+	// The commit kernel calls validate() and then immediately prepare() for the same mutation
+	// object and context, with nothing applied in between. Hand the validate-time preview to that
+	// prepare() instead of re-reading raw/computed/stored values; any other call order misses the
+	// single slot and previews afresh.
+	let validatedCellPreview: {
+		mutation: CellValueMutation;
+		context: GridCommitContext<TRowData>;
+		preview: CellValueMutationPreview;
+	} | null = null;
 	const cellValueExecutor: GridDomainMutationExecutor<TRowData, CellValueMutation> = {
 		validate(mutation, context) {
+			validatedCellPreview = null;
 			if (!context.applyCellValueChange) {
 				return {
 					ok: false,
@@ -575,6 +585,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 				};
 			}
 			const preview = previewCellValueMutation(context, mutation);
+			if (preview.status !== 'rejected') validatedCellPreview = { mutation, context, preview };
 			if (preview.status === 'rejected') {
 				return {
 					ok: false,
@@ -585,7 +596,12 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 			return { ok: true };
 		},
 		prepare(mutation, context) {
-			const preview = previewCellValueMutation(context, mutation);
+			const validated = validatedCellPreview;
+			validatedCellPreview = null;
+			const preview =
+				validated && validated.mutation === mutation && validated.context === context
+					? validated.preview
+					: previewCellValueMutation(context, mutation);
 			return {
 				mutation,
 				preview,

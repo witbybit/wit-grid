@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { RowDataStore } from './RowDataStore.js';
 
 function makeStore() {
@@ -142,22 +142,73 @@ describe('RowDataStore.applyTransaction', () => {
 		expect(result.changedValuesByRow.get('a')?.get('note')).toEqual({ oldValue: undefined, newValue: 'new' });
 	});
 
-	it('captures and restores nested row data without aliasing the original objects', () => {
+	it('captures a delta snapshot by reference: restores the pre-write row object without cloning', () => {
 		type NestedRow = { id: string; profile: { name: string; stats: { score: number } } };
 		const store = new RowDataStore<NestedRow>((row) => row.id);
-		const rows: NestedRow[] = [{ id: 'a', profile: { name: 'Alice', stats: { score: 1 } } }];
+		const rows: NestedRow[] = [
+			{ id: 'a', profile: { name: 'Alice', stats: { score: 1 } } },
+			{ id: 'b', profile: { name: 'Bob', stats: { score: 2 } } },
+		];
 		store.setRows(rows);
 
-		const snapshot = store.captureTransactionSnapshot();
-
-		rows[0]!.profile.stats.score = 99;
-		store.getNode('a')!.data.profile.name = 'Mutated';
-
+		const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
+		const update = { id: 'a', profile: { name: 'Alicia', stats: { score: 5 } } };
+		const snapshot = store.captureTransactionSnapshot({ update: [update] });
+		store.applyTransaction({ update: [update] });
 		store.restoreTransactionSnapshot(snapshot);
+		expect(cloneSpy).not.toHaveBeenCalled();
+		cloneSpy.mockRestore();
 
-		expect(store.getNode('a')!.data.profile.name).toBe('Alice');
-		expect(store.getNode('a')!.data.profile.stats.score).toBe(1);
-		expect(store.getNode('a')!.data).not.toBe(rows[0]);
+		// Immutable replacement means the captured reference *is* the old value.
+		expect(store.getNode('a')!.data).toBe(rows[0]);
+		expect(store.getNode('b')!.data).toBe(rows[1]);
+		// Untouched rows are not part of the snapshot at all.
+		expect([...snapshot.entries.keys()]).toEqual(['a']);
+		expect(snapshot.sourceOrder).toBeNull();
+	});
+
+	it('snapshots rows that hold functions or class instances (structuredClone would throw)', () => {
+		class Money {
+			constructor(readonly cents: number) {}
+		}
+		type FnRow = { id: string; onClick: () => void; price: Money };
+		const store = new RowDataStore<FnRow>((row) => row.id);
+		const original: FnRow = { id: 'a', onClick: () => {}, price: new Money(100) };
+		store.setRows([original]);
+
+		const update: FnRow = { id: 'a', onClick: () => {}, price: new Money(200) };
+		const snapshot = store.captureTransactionSnapshot({ update: [update] });
+		store.applyTransaction({ update: [update] });
+		expect(store.getNode('a')!.data.price.cents).toBe(200);
+		store.restoreTransactionSnapshot(snapshot);
+		expect(store.getNode('a')!.data).toBe(original);
+		expect(store.getNode('a')!.data.price).toBeInstanceOf(Money);
+	});
+
+	it('keeps getSourceIndex in sync across appends, inserts, removals, reorders and restores', () => {
+		type Row = { id: string };
+		const store = new RowDataStore<Row>((row) => row.id);
+		store.setRows([{ id: 'a' }, { id: 'b' }, { id: 'c' }]);
+		const expectIndexes = () => {
+			store.getSourceOrder().forEach((id, index) => expect(store.getSourceIndex(id)).toBe(index));
+		};
+		expectIndexes();
+		store.applyTransaction({ add: [{ id: 'd' }] });
+		expectIndexes();
+		store.applyTransaction({ add: [{ id: 'e' }], addIndex: 1 });
+		expectIndexes();
+		const snapshot = store.captureTransactionSnapshot({ remove: [{ id: 'a' }] });
+		store.applyTransaction({ remove: [{ id: 'a' }] });
+		expect(store.getSourceIndex('a')).toBeUndefined();
+		expectIndexes();
+		store.restoreTransactionSnapshot(snapshot);
+		expect(store.getSourceOrder()).toEqual(['a', 'e', 'b', 'c', 'd']);
+		expectIndexes();
+		store.setRowOrder(['d', 'c', 'b', 'e', 'a']);
+		expectIndexes();
+		store.applyTransaction({ add: [{ id: 'f' }], addIndex: -1 });
+		expect(store.getSourceOrder()).toEqual(['d', 'c', 'b', 'e', 'f', 'a']);
+		expectIndexes();
 	});
 
 	it('restores original row node identities, deep data, added/removal state, and source order', () => {

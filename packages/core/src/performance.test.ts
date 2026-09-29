@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GridStore, type ColumnDef, type ValueGetterParams } from './store.js';
 import { ClientRowModelController } from './rowModel.js';
+import { RowDataStore } from './rows/RowDataStore.js';
 
 interface PerfTestRow {
 	id: string;
@@ -15,6 +16,13 @@ type PerformanceWithMemory = Performance & {
 		usedJSHeapSize: number;
 	};
 };
+
+/** Current JS heap usage in bytes: process.memoryUsage() in Node, performance.memory in Chromium. */
+function readHeapUsedBytes(): number | null {
+	const nodeProcess = (globalThis as { process?: { memoryUsage?: () => { heapUsed: number } } }).process;
+	if (typeof nodeProcess?.memoryUsage === 'function') return nodeProcess.memoryUsage().heapUsed;
+	return (performance as PerformanceWithMemory).memory?.usedJSHeapSize ?? null;
+}
 
 describe('Performance Benchmarks', () => {
 	describe('Scroll Performance', () => {
@@ -284,24 +292,92 @@ describe('Performance Benchmarks', () => {
 				});
 			}
 
-			const perf = performance as PerformanceWithMemory;
-			const memBefore = perf.memory?.usedJSHeapSize || 0;
+			const heapBefore = readHeapUsedBytes();
+			// Honest in every environment: Node reports via process.memoryUsage(), browsers via
+			// performance.memory. If neither exists the budget cannot be checked — fail loudly
+			// rather than silently skipping the assertion.
+			expect(heapBefore, 'no heap usage source (process.memoryUsage / performance.memory)').not.toBeNull();
 
 			const controller = new ClientRowModelController<PerfTestRow>(store.getClientRowModelRuntime(), {
 				rows,
 				columns: store.getState().columns,
 			});
 
-			const memAfter = perf.memory?.usedJSHeapSize || 0;
-			const memUsedMB = (memAfter - memBefore) / 1024 / 1024;
-
-			if (memUsedMB > 0) {
-				console.log(`Memory Usage: ${memUsedMB.toFixed(2)} MB for 100k rows`);
-				// Should be under 150 MB
-				expect(memUsedMB).toBeLessThan(150);
-			}
+			const heapAfter = readHeapUsedBytes()!;
+			// Without a forced GC the delta also includes collectable garbage, so this is an upper bound.
+			const memUsedMB = Math.max(0, heapAfter - heapBefore!) / 1024 / 1024;
+			console.log(`Memory Usage: ${memUsedMB.toFixed(2)} MB for 100k rows`);
+			expect(memUsedMB).toBeLessThan(150);
 
 			controller.dispose();
+		});
+	});
+
+	describe('Write-path scaling budgets', () => {
+		const makeRows = (count: number): PerfTestRow[] =>
+			Array.from({ length: count }, (_, i) => ({ id: `row-${i}`, name: `Product ${i}`, price: i, quantity: i % 100, status: 'Active' }));
+		const makeGrid = (rows: PerfTestRow[]) => {
+			const store = new GridStore<PerfTestRow>({
+				columns: [
+					{ field: 'name', header: 'Name', width: 150 },
+					{ field: 'price', header: 'Price', width: 100 },
+				],
+			});
+			const controller = new ClientRowModelController<PerfTestRow>(store.getClientRowModelRuntime(), {
+				rows,
+				columns: store.getState().columns,
+			});
+			return { store, controller };
+		};
+
+		it('a one-row transaction on 100k rows deep-copies nothing (undo snapshot is a delta)', () => {
+			const rows = makeRows(100_000);
+			const { store, controller } = makeGrid(rows);
+			const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
+			try {
+				for (let i = 0; i < 20; i++) {
+					store.applyTransaction({ update: [{ ...rows[i]!, quantity: -i - 1 }] });
+				}
+				expect(cloneSpy).not.toHaveBeenCalled();
+			} finally {
+				cloneSpy.mockRestore();
+				controller.dispose();
+			}
+		});
+
+		it('transaction cost does not scale with dataset size (10k vs 100k within a generous ratio)', () => {
+			const time = (count: number): number => {
+				const rows = makeRows(count);
+				const { store, controller } = makeGrid(rows);
+				// Warm up, then take the best of several runs to damp scheduler noise.
+				for (let i = 0; i < 5; i++) store.applyTransaction({ update: [{ ...rows[i]!, quantity: 1_000 + i }] });
+				let best = Infinity;
+				for (let run = 0; run < 5; run++) {
+					const start = performance.now();
+					for (let i = 0; i < 20; i++) store.applyTransaction({ update: [{ ...rows[i]!, quantity: run * 100 + i }] });
+					best = Math.min(best, performance.now() - start);
+				}
+				controller.dispose();
+				return best;
+			};
+			const small = time(10_000);
+			const large = time(100_000);
+			console.log(`Value-only transactions: 10k=${small.toFixed(2)}ms, 100k=${large.toFixed(2)}ms (20 tx each)`);
+			// A full-dataset deep copy per transaction made this ~10x; per-row work keeps it near 1x.
+			expect(large).toBeLessThan(Math.max(small, 1) * 5);
+		});
+
+		it('live sort-key relocation does not materialize the whole source order', () => {
+			const { store, controller } = makeGrid(makeRows(50_000));
+			store.setSortModel([{ colId: 'price', sort: 'asc' }]);
+			const allNodesSpy = vi.spyOn(RowDataStore.prototype, 'getAllNodes');
+			try {
+				for (let i = 0; i < 50; i++) store.setCellValue(`row-${i}`, 'price', 1_000_000 + i);
+				expect(allNodesSpy).not.toHaveBeenCalled();
+				expect(store.getVisualIndexByRowId('row-49')).toBe(49_999);
+			} finally {
+				controller.dispose();
+			}
 		});
 	});
 

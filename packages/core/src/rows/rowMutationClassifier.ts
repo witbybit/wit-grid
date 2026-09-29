@@ -174,6 +174,20 @@ function anyFieldMatchesSet(changedFields: ReadonlySet<string>, keys: ReadonlySe
 }
 
 /**
+ * True when the changed fields could move a row within the active sort order. The
+ * single-impact classification reports 'filter-key' ahead of 'sort-key', so a caller that
+ * handles 'filter-key' must consult this to avoid dropping a needed re-sort.
+ */
+export function mutationAffectsSortKeys(
+	changedFields: ReadonlySet<string>,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	registry: RowDependencyRegistry<any>
+): boolean {
+	if (registry.sortKeys.size === 0 || changedFields.size === 0) return false;
+	return registry.opaqueStructuralDependency || anyFieldMatchesSet(changedFields, registry.sortKeys);
+}
+
+/**
  * Classify the highest-impact consequence of mutating the given set of fields.
  * Callers should supply 'insert' or 'remove' directly for structural row
  * additions/removals; those cases are not handled here.

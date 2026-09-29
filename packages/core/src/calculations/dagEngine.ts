@@ -3,6 +3,8 @@ export interface FormulaCellCoordinate {
 	colField: string;
 }
 
+const NO_CACHED_FORMULA_VALUE: { hasCached: boolean; value: unknown } = Object.freeze({ hasCached: false, value: undefined });
+
 export class DagEngine {
 	private dependents = new Map<string, Set<string>>(); // dependencyKey -> Set of dependentKeys
 	private dependencies = new Map<string, Set<string>>(); // dependentKey -> Set of dependencyKeys
@@ -10,6 +12,12 @@ export class DagEngine {
 	private formulas = new Map<string, string>(); // cellKey -> formulaString
 	private dirty = new Set<string>(); // Set of dirty cellKeys
 	private isEvaluating = new Set<string>(); // Reentrancy protection tracker
+	/**
+	 * colField -> number of registered formulas in that column. Lets the per-cell lookups on the
+	 * render/bind path answer "no formula" without building a composite key string.
+	 * The value cache only ever holds formula cells, so this gates cache lookups too.
+	 */
+	private formulaCountByField = new Map<string, number>();
 
 	/**
 	 * Register or update a formula for a specific cell coordinate.
@@ -30,6 +38,9 @@ export class DagEngine {
 		this.unregisterFormulaDependencies(targetKey);
 
 		// Save the formula
+		if (!this.formulas.has(targetKey)) {
+			this.formulaCountByField.set(colField, (this.formulaCountByField.get(colField) ?? 0) + 1);
+		}
 		this.formulas.set(targetKey, formula);
 
 		// Register new dependencies
@@ -52,9 +63,13 @@ export class DagEngine {
 	 * Remove a formula from a cell.
 	 */
 	public clearFormula(rowId: string, colField: string): void {
+		if (!this.formulaCountByField.has(colField)) return;
 		const targetKey = this.getCellKey(rowId, colField);
 		if (this.formulas.has(targetKey)) {
 			this.formulas.delete(targetKey);
+			const remaining = (this.formulaCountByField.get(colField) ?? 1) - 1;
+			if (remaining > 0) this.formulaCountByField.set(colField, remaining);
+			else this.formulaCountByField.delete(colField);
 			this.unregisterFormulaDependencies(targetKey);
 			const invalidated = new Map<string, FormulaCellCoordinate>();
 			this.invalidateCell(rowId, colField, invalidated);
@@ -65,6 +80,7 @@ export class DagEngine {
 	 * Check if a cell has a formula registered.
 	 */
 	public hasFormula(rowId: string, colField: string): boolean {
+		if (!this.formulaCountByField.has(colField)) return false;
 		return this.formulas.has(this.getCellKey(rowId, colField));
 	}
 
@@ -72,10 +88,12 @@ export class DagEngine {
 	 * Retrieve the registered formula for a cell, if any.
 	 */
 	public getFormula(rowId: string, colField: string): string | undefined {
+		if (!this.formulaCountByField.has(colField)) return undefined;
 		return this.formulas.get(this.getCellKey(rowId, colField));
 	}
 
 	public getCachedFormulaValue(rowId: string, colField: string): { hasCached: boolean; value: unknown } {
+		if (this.cache.size === 0 || !this.formulaCountByField.has(colField)) return NO_CACHED_FORMULA_VALUE;
 		const key = this.getCellKey(rowId, colField);
 		if (this.cache.has(key) && !this.dirty.has(key)) {
 			return { hasCached: true, value: this.cache.get(key) };
@@ -88,6 +106,7 @@ export class DagEngine {
 		this.dependencies.clear();
 		this.cache.clear();
 		this.formulas.clear();
+		this.formulaCountByField.clear();
 		this.dirty.clear();
 		this.isEvaluating.clear();
 	}
@@ -97,6 +116,7 @@ export class DagEngine {
 	 * If it is a raw value, return it directly.
 	 */
 	public getCellValue(rowId: string, colField: string, getRawValue: (rId: string, cField: string) => unknown): unknown {
+		if (!this.formulaCountByField.has(colField)) return getRawValue(rowId, colField);
 		const key = this.getCellKey(rowId, colField);
 		const formula = this.formulas.get(key);
 

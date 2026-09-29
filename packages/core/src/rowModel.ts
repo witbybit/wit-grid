@@ -9,7 +9,8 @@ import { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
 import { RowPipeline, type RowModelConfig, type RowPipelineOutput } from './rows/RowPipeline.js';
-import { RowDependencyRegistry, classifyMutation, type RowMutationImpact } from './rows/rowMutationClassifier.js';
+import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
+import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
@@ -537,6 +538,10 @@ interface PreparedQuickFilter<TData> {
 	kind: 'quick';
 	getters: Array<(node: RowNode<TData>) => unknown>;
 	textValue: string;
+	/** Per getter: whether its lowercased text may be cached per row (plain-field columns only). */
+	cacheable: boolean[];
+	/** Identifies the target column set; a cached row entry is reused only for the same signature. */
+	signature: string;
 }
 
 type PreparedColumnFilter<TData> =
@@ -565,28 +570,6 @@ function parseCellDate(value: unknown): Date | null {
 		return isNaN(d.getTime()) ? null : d;
 	}
 	return null;
-}
-
-function compareValues(a: unknown, b: unknown): number {
-	if (a === b) return 0;
-	if (a == null) return -1;
-	if (b == null) return 1;
-
-	if (typeof a === 'number' && typeof b === 'number') {
-		return a - b;
-	}
-
-	const aNumber = Number(a);
-	const bNumber = Number(b);
-	if (!Number.isNaN(aNumber) && !Number.isNaN(bNumber)) {
-		return aNumber - bNumber;
-	}
-
-	const aStr = String(a);
-	const bStr = String(b);
-	if (aStr < bStr) return -1;
-	if (aStr > bStr) return 1;
-	return 0;
 }
 
 export function getColumnValue<TData>(node: RowNode<TData>, column: ColumnDef<TData> | undefined): unknown {
@@ -686,11 +669,7 @@ function matchPreparedFilter<TData>(node: RowNode<TData>, pf: PreparedColumnFilt
 		return pf.logicalOp === 'AND' ? l && r : l || r;
 	}
 	if (pf.kind === 'quick') {
-		for (const getter of pf.getters) {
-			const text = String(getter(node) ?? '').toLowerCase();
-			if (text.includes(pf.textValue)) return true;
-		}
-		return false;
+		return matchQuickFilter(node, pf);
 	}
 	const value = pf.getter(node);
 	switch (pf.kind) {
@@ -821,7 +800,45 @@ function prepareQuickFilter<TData>(
 		kind: 'quick',
 		getters: targetColumns.map((column) => makeGetter(column)),
 		textValue: quickFilterModel.text.trim().toLowerCase(),
+		// Plain-field columns read node-cached values that only change with node.data, so their
+		// lowercased text can be cached per row. valueGetter columns may be impure: never cached.
+		cacheable: targetColumns.map((column) => !column.valueGetter),
+		signature: targetColumns.map((column) => (column.valueGetter ? '' : column.field)).join('\u0000'),
 	};
+}
+
+interface QuickFilterTextCacheEntry {
+	data: unknown;
+	signature: string;
+	lowered: Array<string | undefined>;
+}
+
+/**
+ * Per-row lowercased quick-filter text, so each keystroke does not re-run
+ * `String().toLowerCase()` for rows × columns. An entry is valid while the row's data
+ * reference (rows are replaced immutably) and the target column set are unchanged.
+ */
+const quickFilterTextCache = new WeakMap<RowNode<unknown>, QuickFilterTextCacheEntry>();
+
+function matchQuickFilter<TData>(node: RowNode<TData>, pf: PreparedQuickFilter<TData>): boolean {
+	const getters = pf.getters;
+	let entry = quickFilterTextCache.get(node as RowNode<unknown>);
+	if (!entry || entry.data !== node.data || entry.signature !== pf.signature) {
+		entry = { data: node.data, signature: pf.signature, lowered: new Array(getters.length) };
+		quickFilterTextCache.set(node as RowNode<unknown>, entry);
+	}
+	const lowered = entry.lowered;
+	for (let i = 0; i < getters.length; i++) {
+		let text: string;
+		if (pf.cacheable[i]) {
+			const cached = lowered[i];
+			text = cached !== undefined ? cached : (lowered[i] = String(getters[i](node) ?? '').toLowerCase());
+		} else {
+			text = String(getters[i](node) ?? '').toLowerCase();
+		}
+		if (text.includes(pf.textValue)) return true;
+	}
+	return false;
 }
 
 function prepareFilters<TData>(
@@ -904,10 +921,11 @@ export function applyClientSortAndFilter<TData>(
 		});
 
 		// Schwartzian transform: extract sort keys in O(N) using pre-allocated arrays to minimize allocation overhead
+		// Keys carry their Number()/String() coercions so the comparator never re-coerces.
 		const sortData = result.map((item) => {
-			const keys = new Array(sortModel.length);
+			const keys: SortKey[] = new Array(sortModel.length);
 			for (let i = 0; i < sortModel.length; i++) {
-				keys[i] = precompiledSortGetters[i](item.node);
+				keys[i] = toSortKey(precompiledSortGetters[i](item.node));
 			}
 			return { item, keys };
 		});
@@ -915,7 +933,7 @@ export function applyClientSortAndFilter<TData>(
 		sortData.sort((left, right) => {
 			for (let i = 0; i < sortModel.length; i++) {
 				const sortItem = sortModel[i];
-				const comparison = compareValues(left.keys[i], right.keys[i]);
+				const comparison = compareSortKeys(left.keys[i], right.keys[i]);
 				if (comparison !== 0) {
 					return sortItem.sort === 'desc' ? -comparison : comparison;
 				}
@@ -1162,6 +1180,36 @@ export class ClientRowModelController<TData = unknown>
 	}
 
 	/**
+	 * Builds the comparator the incremental paths binary-search with. It mirrors the pipeline's
+	 * flat sort (same getters, same comparison, source order as the stable tiebreak) and reads the
+	 * tiebreak from the store's cached source index, so no O(n) structure is built per call.
+	 * `compareToNode(a)` precomputes `a`'s keys once and returns `(b) => compare(a, b)`.
+	 */
+	private createIncrementalSortComparator(
+		columns: Array<ColumnDef<TData>>,
+		sortModel: SortModel
+	): (a: RowNode<TData>) => (b: RowNode<TData>) => number {
+		const columnById = createColumnLookup(columns);
+		const sortGetters = sortModel.map((sortItem) => {
+			const col = columnById.get(sortItem.colId);
+			return col ? makeGetter(col) : (): undefined => undefined;
+		});
+		const descending = sortModel.map((sortItem) => sortItem.sort === 'desc');
+		const dataStore = this.dataStore;
+		return (a) => {
+			const aKeys = sortGetters.map((getter) => toSortKey(getter(a)));
+			const aSourceIndex = dataStore.getSourceIndex(a.id) ?? 0;
+			return (b) => {
+				for (let i = 0; i < aKeys.length; i++) {
+					const cmp = compareSortKeys(aKeys[i], toSortKey(sortGetters[i](b)));
+					if (cmp !== 0) return descending[i] ? -cmp : cmp;
+				}
+				return aSourceIndex - (dataStore.getSourceIndex(b.id) ?? 0);
+			};
+		};
+	}
+
+	/**
 	 * Incrementally repositions changed rows within the sorted visual array, avoiding a full
 	 * pipeline rebuild. Only applicable to flat (non-grouped, non-tree) grids with an active sort
 	 * and no pagination. Returns false to signal that the caller must fall back to full refresh.
@@ -1174,36 +1222,7 @@ export class ClientRowModelController<TData = unknown>
 		if (!state.sortModel || state.sortModel.length === 0) return null;
 		if (this._pageWindow !== null) return null;
 
-		// Build sort key getters mirroring the pipeline's comparator
-		const columnById = createColumnLookup(state.columns);
-		const sortGetters = state.sortModel.map((sortItem) => {
-			const col = columnById.get(sortItem.colId);
-			if (col) {
-				if (col.valueGetter) {
-					const vg = col.valueGetter;
-					return (node: RowNode<TData>): unknown =>
-						vg({ node: createGridRowDataRef(node.id, node.data), row: node.data, colField: col.field });
-				}
-				const pg = compilePathGetter(col.field);
-				return (node: RowNode<TData>): unknown => node.getCellValue(col.field, pg);
-			}
-			return (): undefined => undefined;
-		});
-
-		// Pre-build source index map for stable-sort tiebreaker
-		const allNodes = this.dataStore.getAllNodes();
-		const sourceIndexOf = new Map<string, number>();
-		for (let i = 0; i < allNodes.length; i++) sourceIndexOf.set(allNodes[i].id, i);
-
-		const compareNodes = (a: RowNode<TData>, b: RowNode<TData>): number => {
-			for (let i = 0; i < state.sortModel!.length; i++) {
-				const aVal = sortGetters[i](a);
-				const bVal = sortGetters[i](b);
-				const cmp = compareValues(aVal, bVal);
-				if (cmp !== 0) return state.sortModel![i].sort === 'desc' ? -cmp : cmp;
-			}
-			return (sourceIndexOf.get(a.id) ?? 0) - (sourceIndexOf.get(b.id) ?? 0);
-		};
+		const compareToNode = this.createIncrementalSortComparator(state.columns, state.sortModel);
 
 		// Collect VisualRow objects and old indices for each changed node
 		const toRelocate: Array<{ node: RowNode<TData>; vr: VisualRow<TData>; oldIdx: number }> = [];
@@ -1219,30 +1238,37 @@ export class ClientRowModelController<TData = unknown>
 		// After sort, toRelocate[last].oldIdx is the smallest (earliest) affected position.
 		toRelocate.sort((a, b) => b.oldIdx - a.oldIdx);
 		const earliestRemovedIndex = toRelocate[toRelocate.length - 1].oldIdx;
-		const mutable = this.visualRows.slice();
+		// Edit the (private) visual array in place: a relocation allocates O(changed rows), not O(n).
+		const mutable = this.visualRows;
 		for (const item of toRelocate) mutable.splice(item.oldIdx, 1);
 
 		// Insert each row at its new sorted position; track earliest insertion index.
 		let earliestInsertedIndex = mutable.length;
-		for (const item of toRelocate) {
-			let lo = 0,
-				hi = mutable.length;
-			while (lo < hi) {
-				const mid = (lo + hi) >>> 1;
-				const midVR = mutable[mid];
-				if (midVR?.kind !== 'data') {
-					lo = mid + 1;
-					continue;
+		try {
+			for (const item of toRelocate) {
+				const compare = compareToNode(item.node);
+				let lo = 0,
+					hi = mutable.length;
+				while (lo < hi) {
+					const mid = (lo + hi) >>> 1;
+					const midVR = mutable[mid];
+					if (midVR?.kind !== 'data') {
+						lo = mid + 1;
+						continue;
+					}
+					if (compare(midVR.node) <= 0) hi = mid;
+					else lo = mid + 1;
 				}
-				if (compareNodes(item.node, midVR.node) <= 0) hi = mid;
-				else lo = mid + 1;
+				mutable.splice(lo, 0, item.vr);
+				if (lo < earliestInsertedIndex) earliestInsertedIndex = lo;
 			}
-			mutable.splice(lo, 0, item.vr);
-			if (lo < earliestInsertedIndex) earliestInsertedIndex = lo;
+		} catch (error) {
+			// A throwing getter left the in-place array half-edited — rebuild it from the store.
+			this.refresh('sort' as RowRefreshReason);
+			throw error;
 		}
 
 		// Update maps in-place from the earliest affected index — no Map allocations.
-		this.visualRows = mutable;
 		const changedStartIndex = Math.min(earliestRemovedIndex, earliestInsertedIndex);
 		this.reindexFrom(changedStartIndex);
 		return changedStartIndex;
@@ -1348,29 +1374,56 @@ export class ClientRowModelController<TData = unknown>
 			return this.refresh('bulk');
 		}
 		if (impact === 'sort-key') {
-			const nodes = writeResult.updatedNodes ?? [];
-			const changedStartIndex = nodes.length > 0 ? this.relocateSortedRows(nodes) : null;
-			if (changedStartIndex !== null) {
-				inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
-				return {
-					changed: true,
-					reason: 'sort',
-					layoutTransitionHint: 'live-reorder',
-					changedStartIndex,
-					changedEndIndex: Math.max(changedStartIndex, this.visualRows.length - 1),
-				};
-			}
-			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
-			return this.refresh('sort' as RowRefreshReason);
+			return this.reconcileSortKeyWrite(writeResult);
 		}
 		if (impact === 'filter-key') {
-			inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
 			const nodes = writeResult.updatedNodes ?? [];
-			const changed = nodes.length > 0 && this.filterMembershipChanged(nodes);
-			return changed ? this.refresh('filter' as RowRefreshReason) : { changed: false };
+			if (nodes.length > 0 && this.filterMembershipChanged(nodes)) {
+				inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+				return this.refresh('filter' as RowRefreshReason);
+			}
+			// Membership held, but 'filter-key' outranks 'sort-key' in the classification — with a
+			// quick filter active every field is a filter key — so the write may still have moved
+			// a row within the sort order.
+			if (nodes.length > 0 && this.writeMayAffectSortOrder(writeResult)) {
+				return this.reconcileSortKeyWrite(writeResult);
+			}
+			inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+			return { changed: false };
 		}
 		inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
 		return { changed: false };
+	}
+
+	private reconcileSortKeyWrite(writeResult: RowModelWriteResult<TData>): RowModelRefreshResult {
+		const inst = this.runtime.getInstrumentation();
+		const nodes = writeResult.updatedNodes ?? [];
+		const changedStartIndex = nodes.length > 0 ? this.relocateSortedRows(nodes) : null;
+		if (changedStartIndex !== null) {
+			inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+			return {
+				changed: true,
+				reason: 'sort',
+				layoutTransitionHint: 'live-reorder',
+				changedStartIndex,
+				changedEndIndex: Math.max(changedStartIndex, this.visualRows.length - 1),
+			};
+		}
+		inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
+		return this.refresh('sort' as RowRefreshReason);
+	}
+
+	/** Conservative: without per-row changed fields, any write may affect an active sort. */
+	private writeMayAffectSortOrder(writeResult: RowModelWriteResult<TData>): boolean {
+		const sortModel = this.runtime.getState().sortModel;
+		if (!sortModel || sortModel.length === 0) return false;
+		const changedFieldsByRow = writeResult.changedFieldsByRow;
+		if (!changedFieldsByRow || changedFieldsByRow.size === 0) return true;
+		const allFields = new Set<string>();
+		for (const fields of changedFieldsByRow.values()) {
+			for (const field of fields) allFields.add(field);
+		}
+		return mutationAffectsSortKeys(allFields, this.dependencyRegistry);
 	}
 
 	/**
@@ -1379,20 +1432,6 @@ export class ClientRowModelController<TData = unknown>
 	 * individual array splices + map rebuilds outperform a full O(N log N) sort.
 	 */
 	private static readonly INCREMENTAL_TX_LIMIT = 100;
-
-	/**
-	 * Returns false when the estimated reindex cost — proportional to the number of rows
-	 * that must have their map entries updated — exceeds the rebuild threshold.
-	 *
-	 * Rule: if reindexing would touch more than INCREMENTAL_TX_LIMIT × 10 rows AND more than
-	 * 40 % of the total visual model, a full O(N log N) pipeline rebuild is cheaper than
-	 * the O(N - earliestChangedIndex) partial reindex.
-	 */
-	private static isIncrementalCheaper(totalVisualRows: number, earliestChangedIndex: number): boolean {
-		const shiftCount = totalVisualRows - earliestChangedIndex;
-		if (shiftCount <= ClientRowModelController.INCREMENTAL_TX_LIMIT * 10) return true;
-		return shiftCount / totalVisualRows < 0.4;
-	}
 
 	/**
 	 * Update map entries in-place for all rows from `start` to the end of `visualRows`.
@@ -1453,34 +1492,7 @@ export class ClientRowModelController<TData = unknown>
 			const preparedFilters = prepareFilters(state.columns, state.filterModel, state.quickFilterModel);
 			const hasSort = !!(state.sortModel && state.sortModel.length > 0);
 
-			let sortComparator: ((a: RowNode<TData>, b: RowNode<TData>) => number) | null = null;
-			if (hasSort) {
-				const columnById = createColumnLookup(state.columns);
-				const sortGetters = state.sortModel!.map((sortItem) => {
-					const col = columnById.get(sortItem.colId);
-					if (col) {
-						if (col.valueGetter) {
-							const vg = col.valueGetter;
-							return (node: RowNode<TData>): unknown =>
-								vg({ node: createGridRowDataRef(node.id, node.data), row: node.data, colField: col.field });
-						}
-						const pg = compilePathGetter(col.field);
-						return (node: RowNode<TData>): unknown => node.getCellValue(col.field, pg);
-					}
-					return (): undefined => undefined;
-				});
-				const allNodes = this.dataStore.getAllNodes();
-				const sourceIndexOf = new Map<string, number>();
-				for (let i = 0; i < allNodes.length; i++) sourceIndexOf.set(allNodes[i].id, i);
-
-				sortComparator = (a: RowNode<TData>, b: RowNode<TData>): number => {
-					for (let i = 0; i < state.sortModel!.length; i++) {
-						const cmp = compareValues(sortGetters[i](a), sortGetters[i](b));
-						if (cmp !== 0) return state.sortModel![i].sort === 'desc' ? -cmp : cmp;
-					}
-					return (sourceIndexOf.get(a.id) ?? 0) - (sourceIndexOf.get(b.id) ?? 0);
-				};
-			}
+			const compareToNode = hasSort ? this.createIncrementalSortComparator(state.columns, state.sortModel!) : null;
 
 			for (const node of added) {
 				if (preparedFilters.length > 0 && !nodeMatchesPreparedFilters(node, preparedFilters)) continue;
@@ -1497,7 +1509,8 @@ export class ClientRowModelController<TData = unknown>
 					editable: true,
 				};
 
-				if (sortComparator) {
+				if (compareToNode) {
+					const compare = compareToNode(node);
 					let lo = 0,
 						hi = mutable.length;
 					while (lo < hi) {
@@ -1507,7 +1520,7 @@ export class ClientRowModelController<TData = unknown>
 							lo = mid + 1;
 							continue;
 						}
-						if (sortComparator(node, midVR.node) <= 0) hi = mid;
+						if (compare(midVR.node) <= 0) hi = mid;
 						else lo = mid + 1;
 					}
 					mutable.splice(lo, 0, vr);
@@ -1527,12 +1540,13 @@ export class ClientRowModelController<TData = unknown>
 	}
 
 	public captureTransactionSnapshot = (
-		_mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TData>
+		mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TData>
 	): RowModelTransactionSnapshot<TData> => {
+		// Delta snapshot: only the rows this transaction touches, captured by reference.
 		return {
 			modelType: 'client',
 			snapshot: {
-				dataStore: this.dataStore.captureTransactionSnapshot(),
+				dataStore: this.dataStore.captureTransactionSnapshot(mutation.transaction),
 			},
 		};
 	};
@@ -1669,6 +1683,15 @@ export class ClientRowModelController<TData = unknown>
 		}
 		if (scope === 'filtered') {
 			const state = this.runtime.getState();
+			// Without client pagination the cached visual rows already are the full filtered
+			// pipeline output; only a paginated view needs the unpaginated re-run below.
+			if (this._pageWindow === null && !state.pagination) {
+				const ids: string[] = [];
+				for (const row of this.visualRows) {
+					if (row?.kind === 'data') ids.push(row.rowId);
+				}
+				return ids;
+			}
 			const expansion = state.expansion;
 			const rowModelConfig: RowModelConfig<TData> | undefined =
 				state.rowModelConfig ??
