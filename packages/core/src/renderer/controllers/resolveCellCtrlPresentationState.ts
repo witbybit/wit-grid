@@ -1,4 +1,4 @@
-import { createCellControllerKey, type CellCtrl } from './CellCtrl.js';
+import type { CellCtrl } from './CellCtrl.js';
 import type { RowCtrl } from './RowCtrl.js';
 import type { ViewportPlan } from '../viewportPlanner.js';
 import type { CellDisplaySnapshot } from '../cellDisplaySnapshot.js';
@@ -41,13 +41,26 @@ function snapshotFreshness(snapshot: CellDisplaySnapshot): VisualFreshness {
 	};
 }
 
-function resolvePresentationFreshness(presentation: ScrollCellPresentation, fallback: VisualFreshness): VisualFreshness {
+/** Scroll-frame freshness used when a presentation carries no snapshot/version stamp of its own.
+ *  Built lazily — most presentations record their own versions, so this is rarely allocated. */
+function scrollFallbackFreshness<TRowData>(input: ScrollCellPresentationInput<TRowData>): VisualFreshness {
+	return {
+		rowVersion: input.rowVersion,
+		globalVersion: input.ctx.globalVersion,
+		insightVersion: input.ctx.insightVersion,
+		styleVersion: input.ctx.styleVersion,
+		loadingVersion: input.ctx.loadingVersion,
+		selectionVersion: input.ctx.selectionVersion,
+	};
+}
+
+function resolvePresentationFreshness<TRowData>(presentation: ScrollCellPresentation, input: ScrollCellPresentationInput<TRowData>): VisualFreshness {
 	switch (presentation.kind) {
 		case 'buffered':
 		case 'primitive':
 		case 'live-renderer':
 		case 'frozen-portal':
-			return presentation.recordVersionsFrom ? snapshotFreshness(presentation.recordVersionsFrom) : fallback;
+			return presentation.recordVersionsFrom ? snapshotFreshness(presentation.recordVersionsFrom) : scrollFallbackFreshness(input);
 		case 'html-snapshot':
 			return 'rowVersion' in presentation.recordVersionsFrom
 				? presentation.recordVersionsFrom
@@ -62,7 +75,7 @@ function resolvePresentationFreshness(presentation: ScrollCellPresentation, fall
 		case 'shell':
 			return presentation.recordVersions;
 		case 'checkbox-selector':
-			return fallback;
+			return scrollFallbackFreshness(input);
 	}
 }
 
@@ -74,66 +87,69 @@ function getPresentationValidationError(presentation: ScrollCellPresentation): s
 	return 'validationError' in presentation ? presentation.validationError : undefined;
 }
 
-function hydrateCellCtrlFromScrollPresentation(
+function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	cellCtrl: CellCtrl,
 	presentation: ScrollCellPresentation,
-	fallbackFreshness: VisualFreshness
+	input: ScrollCellPresentationInput<TRowData>
 ): CellCtrl {
-	const freshness = resolvePresentationFreshness(presentation, fallbackFreshness);
+	const freshness = resolvePresentationFreshness(presentation, input);
+	const title = getPresentationTitle(presentation);
+	const validationError = getPresentationValidationError(presentation);
+	const portalKey = 'portalCellKey' in presentation ? presentation.portalCellKey : 'portalKey' in presentation ? presentation.portalKey : undefined;
+	const formattedValue = 'formattedValue' in presentation ? presentation.formattedValue : undefined;
 	cellCtrl.freshness = freshness;
-	cellCtrl.presentationState = {
-		kind: presentation.kind,
-		className: presentation.className,
-		title: getPresentationTitle(presentation),
-		validationError: getPresentationValidationError(presentation),
-		releaseStalePortal:
-			'releaseStalePortal' in presentation
-				? presentation.releaseStalePortal
-				: 'releasePriorPortal' in presentation
-					? presentation.releasePriorPortal
-					: false,
-		requiresFidelity:
-			presentation.kind === 'primitive' ||
-			presentation.kind === 'frozen-portal' ||
-			presentation.kind === 'shell' ||
-			presentation.kind === 'text-impostor' ||
-			presentation.kind === 'html-pending' ||
-			presentation.kind === 'html-snapshot',
-		freshness,
-		contentMode: 'contentMode' in presentation ? presentation.contentMode : undefined,
-		formattedValue: 'formattedValue' in presentation ? presentation.formattedValue : undefined,
-		portalKey: 'portalCellKey' in presentation ? presentation.portalCellKey : 'portalKey' in presentation ? presentation.portalKey : undefined,
-		html: 'frozenHtml' in presentation ? presentation.frozenHtml : undefined,
-		markDirty: 'markDirty' in presentation ? presentation.markDirty : undefined,
-		isEditing: 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing,
-		isFocused: 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused,
-		forceLiveInteractive: 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined,
-		keepVersionFresh: 'keepVersionFresh' in presentation ? presentation.keepVersionFresh : undefined,
-		captureFrozenHtml: 'captureFrozenHtml' in presentation ? presentation.captureFrozenHtml : undefined,
-		textImpostorSource: 'source' in presentation ? presentation.source : undefined,
-		recordVersions:
-			'recordVersionsFrom' in presentation
-				? presentation.recordVersionsFrom
-				: 'recordVersions' in presentation
-					? presentation.recordVersions
-					: undefined,
-	};
+	// Written in place: presentationState is owned by exactly one CellCtrl and only ever read
+	// through `cellCtrl.presentationState` at dispatch time, so reusing the object (every field is
+	// overwritten below) is equivalent to replacing it and saves a ~20-field allocation per cell.
+	const state = cellCtrl.presentationState;
+	state.kind = presentation.kind;
+	state.className = presentation.className;
+	state.title = title;
+	state.validationError = validationError;
+	state.releaseStalePortal =
+		'releaseStalePortal' in presentation
+			? presentation.releaseStalePortal
+			: 'releasePriorPortal' in presentation
+				? presentation.releasePriorPortal
+				: false;
+	state.requiresFidelity =
+		presentation.kind === 'primitive' ||
+		presentation.kind === 'frozen-portal' ||
+		presentation.kind === 'shell' ||
+		presentation.kind === 'text-impostor' ||
+		presentation.kind === 'html-pending' ||
+		presentation.kind === 'html-snapshot';
+	state.freshness = freshness;
+	state.contentMode = 'contentMode' in presentation ? presentation.contentMode : undefined;
+	state.formattedValue = formattedValue;
+	state.portalKey = portalKey;
+	state.html = 'frozenHtml' in presentation ? presentation.frozenHtml : undefined;
+	state.markDirty = 'markDirty' in presentation ? presentation.markDirty : undefined;
+	state.isEditing = 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing;
+	state.isFocused = 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused;
+	state.forceLiveInteractive = 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined;
+	state.keepVersionFresh = 'keepVersionFresh' in presentation ? presentation.keepVersionFresh : undefined;
+	state.captureFrozenHtml = 'captureFrozenHtml' in presentation ? presentation.captureFrozenHtml : undefined;
+	state.textImpostorSource = 'source' in presentation ? presentation.source : undefined;
+	state.recordVersions =
+		'recordVersionsFrom' in presentation
+			? presentation.recordVersionsFrom
+			: 'recordVersions' in presentation
+				? presentation.recordVersions
+				: undefined;
 	cellCtrl.visualState.className = presentation.className;
-	cellCtrl.visualState.title = getPresentationTitle(presentation);
-	cellCtrl.visualState.validationError = getPresentationValidationError(presentation);
+	cellCtrl.visualState.title = title;
+	cellCtrl.visualState.validationError = validationError;
 	cellCtrl.visualState.focused = 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused;
 	cellCtrl.visualState.editing = 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing;
 	cellCtrl.visualState.readOnly = presentation.className.includes('og-cell-readonly');
-	cellCtrl.valueState.formattedValue = 'formattedValue' in presentation ? presentation.formattedValue : '';
+	cellCtrl.valueState.formattedValue = formattedValue ?? '';
 	cellCtrl.valueState.displayText = cellCtrl.valueState.formattedValue;
 	cellCtrl.valueState.loading = presentation.kind === 'html-pending';
 	cellCtrl.valueState.empty = !cellCtrl.valueState.formattedValue;
-	cellCtrl.rendererState.portalKey =
-		'portalCellKey' in presentation ? presentation.portalCellKey : 'portalKey' in presentation ? presentation.portalKey : undefined;
-	cellCtrl.rendererState.htmlSnapshotKey =
-		presentation.kind === 'html-snapshot' || presentation.kind === 'html-pending'
-			? createCellControllerKey(cellCtrl.rowId, cellCtrl.columnInstanceId)
-			: undefined;
+	cellCtrl.rendererState.portalKey = portalKey;
+	// The controller key is exactly createCellControllerKey(rowId, columnInstanceId) — reuse it.
+	cellCtrl.rendererState.htmlSnapshotKey = presentation.kind === 'html-snapshot' || presentation.kind === 'html-pending' ? cellCtrl.key : undefined;
 	cellCtrl.rendererState.mode =
 		presentation.kind === 'live-renderer'
 			? 'live'
@@ -190,6 +206,18 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
 	return cellCtrl;
 }
 
+/**
+ * Scroll-phase resolve without the generic wrapper objects — the per-cell scroll bind path calls
+ * this directly. Neither `deps` nor `input` is retained, so callers may pass reused scratch objects.
+ */
+export function resolveCellCtrlScrollPresentationState<TRowData>(
+	cellCtrl: CellCtrl,
+	deps: ScrollCellPresentationDeps,
+	input: ScrollCellPresentationInput<TRowData>
+): CellCtrl {
+	return hydrateCellCtrlFromScrollPresentation(cellCtrl, resolveScrollCellPresentation(deps, input), input);
+}
+
 export function resolveCellCtrlPresentationState<TRowData>(input: {
 	cellCtrl: CellCtrl;
 	rowCtrl: RowCtrl;
@@ -199,16 +227,7 @@ export function resolveCellCtrlPresentationState<TRowData>(input: {
 }): CellCtrl {
 	const { cellCtrl, context } = input;
 	if (context.scroll) {
-		const presentation = resolveScrollCellPresentation(context.scroll.deps, context.scroll.input);
-		const fallbackFreshness: VisualFreshness = {
-			rowVersion: context.scroll.input.rowVersion,
-			globalVersion: context.scroll.input.ctx.globalVersion,
-			insightVersion: context.scroll.input.ctx.insightVersion,
-			styleVersion: context.scroll.input.ctx.styleVersion,
-			loadingVersion: context.scroll.input.ctx.loadingVersion,
-			selectionVersion: context.scroll.input.ctx.selectionVersion,
-		};
-		return hydrateCellCtrlFromScrollPresentation(cellCtrl, presentation, fallbackFreshness);
+		return resolveCellCtrlScrollPresentationState(cellCtrl, context.scroll.deps, context.scroll.input);
 	}
 	if (context.fullBind) {
 		return hydrateCellCtrlFromFullBind(cellCtrl, context.fullBind);

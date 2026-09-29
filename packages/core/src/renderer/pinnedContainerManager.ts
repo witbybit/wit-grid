@@ -19,7 +19,9 @@ export class PinnedContainerManager<TRowData = unknown> {
 		}
 
 		let container = side === 'left' ? slot.pinLeftContainer : slot.pinRightContainer;
-		if (!container || !slot.element.contains(container)) {
+		// The container is always a direct child of the row element, so a parent check is an O(1)
+		// equivalent of the former subtree-walking contains().
+		if (!container || container.parentNode !== slot.element) {
 			container = document.createElement('div');
 			container.className = side === 'left' ? 'og-row-pin-left' : 'og-row-pin-right';
 			slot.element.appendChild(container);

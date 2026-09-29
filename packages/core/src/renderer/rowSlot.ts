@@ -31,6 +31,9 @@ export class RowSlot<TRowData = unknown> {
 	public lastVisualRowId = '\0'; // guaranteed != any real rowId on first update
 
 	public keepAlive = false;
+	/** Mirrors the inline `visibility: hidden` unbindHot() writes (the only writer), so update()
+	 *  doesn't read the style back on every bind. */
+	private hiddenByUnbind = false;
 	public lastPortalRowKey: string | undefined = undefined;
 
 	/**
@@ -76,6 +79,7 @@ export class RowSlot<TRowData = unknown> {
 		this.element = element;
 		if (element.getAttribute('role') !== 'row') element.setAttribute('role', 'row');
 		element.dataset.rowSlotId = id;
+		this.hiddenByUnbind = element.style.visibility === 'hidden';
 	}
 
 	// ── Lookup ───────────────────────────────────────────────────────────────────────
@@ -127,7 +131,8 @@ export class RowSlot<TRowData = unknown> {
 		this.rowTop = rowTop;
 		this.rowHeight = rowHeight;
 
-		if (this.element.style.visibility === 'hidden') {
+		if (this.hiddenByUnbind) {
+			this.hiddenByUnbind = false;
 			this.element.style.visibility = '';
 			domUpdated = true;
 		}
@@ -192,6 +197,7 @@ export class RowSlot<TRowData = unknown> {
 		this.keepAlive = false;
 		this.lastPortalRowKey = undefined;
 		this.element.style.visibility = 'hidden';
+		this.hiddenByUnbind = true;
 		// Keep dataset/ARIA mirrors warm as well as the DOM subtree. A rebound to the same
 		// visual row should not need to rewrite debug mirrors we just tore down.
 	}
@@ -230,6 +236,8 @@ export class RowSlot<TRowData = unknown> {
 
 		this.element.className = '';
 		this.element.removeAttribute('style');
+		this.hiddenByUnbind = false;
+
 		delete this.element.dataset.rowIndex;
 		delete this.element.dataset.rowId;
 		delete this.element.dataset.rowKey;

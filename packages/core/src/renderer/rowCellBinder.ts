@@ -7,7 +7,7 @@ import type { CanonicalGridCellPointer, GridCellPointer } from '../api/GridApi.j
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
-import { matchesCellSlotMountedFreshness, recordCellSlotMountedVisualVersions, type CellSlot, type CellContentMode } from './cellSlot.js';
+import { isCellSlotMountedFreshAt, recordCellSlotMountedVisualVersions, type CellSlot, type CellContentMode } from './cellSlot.js';
 import {
 	TextRendererHandle,
 	FallbackRendererHandle,
@@ -27,15 +27,20 @@ import {
 	mergeCellSnapshotTitle,
 	type CellDisplaySnapshot,
 } from './cellDisplaySnapshot.js';
-import { isVisualFresh, type VisualFreshness } from './visualFreshness.js';
-import type { ScrollCellPresentationDeps } from './scrollCellPresentation.js';
+import type { VisualFreshness } from './visualFreshness.js';
+import type { ScrollCellPresentationDeps, ScrollCellPresentationInput } from './scrollCellPresentation.js';
 import { getCellScrollPresentation, isHtmlSnapshotPresentation, isTextImpostorPresentation } from './scrollPresentationMode.js';
-import { dispatchCellPresentation } from './binders/cellPresentationDispatcher.js';
+import {
+	dispatchCellPresentation,
+	type CellBindGeometry,
+	type CellBindRuntime,
+	type DispatchCellPresentationInput,
+} from './binders/cellPresentationDispatcher.js';
 import { buildCellPinClass, applyCellTitlesAndValidation, getScrollMountValue } from './binders/binderShared.js';
 import { getOrCreateCellCtrl, createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
 import type { CellCtrl } from './controllers/CellCtrl.js';
 import { CellCtrlStore } from './controllers/CellCtrlStore.js';
-import { resolveCellCtrlPresentationState } from './controllers/resolveCellCtrlPresentationState.js';
+import { resolveCellCtrlPresentationState, resolveCellCtrlScrollPresentationState } from './controllers/resolveCellCtrlPresentationState.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 import type { ProgrammaticScrollTarget } from './programmaticScrollTarget.js';
@@ -44,17 +49,23 @@ import { getProgrammaticScrollCellPointer } from './programmaticScrollTarget.js'
 const fallbackCellCtrlStores = new WeakMap<object, CellCtrlStore<any>>();
 
 function subtractNormalizedClassName(fullClassName: string, baseClassName: string): string {
+	// Fast path: no state classes on top of the base (the common unfocused/unselected cell).
+	if (fullClassName === baseClassName) return '';
 	const fullTokens = fullClassName.trim().split(/\s+/).filter(Boolean);
 	if (fullTokens.length === 0) return '';
 	const baseTokenSet = new Set(baseClassName.trim().split(/\s+/).filter(Boolean));
 	return fullTokens.filter((token) => !baseTokenSet.has(token)).join(' ');
 }
 
+/** The snapshot for (rowId, column) if it is visually fresh against this scroll frame — the same
+ *  six-dimension predicate as isVisualFresh, compared over scalars so the per-cell path allocates
+ *  no expected-freshness object. */
 function getFreshCellSnapshot<TRowData>(
 	deps: RowCellBinderDeps<TRowData>,
 	rowId: string,
 	col: ColumnDef<TRowData>,
-	ctx?: ScrollRenderContext<TRowData>
+	ctx: ScrollRenderContext<TRowData>,
+	rowVersion: number
 ): CellDisplaySnapshot | undefined {
 	const snapshotLookup = deps.engine as GridEngine<TRowData> & {
 		getCellDisplaySnapshot?: (rowId: string, columnInstanceId: ColumnInstanceId | string) => CellDisplaySnapshot | undefined;
@@ -62,16 +73,14 @@ function getFreshCellSnapshot<TRowData>(
 	};
 	const snapshotKey = getColumnInstanceIdentity(col);
 	const snapshot = snapshotLookup.getCellDisplaySnapshot?.(rowId, snapshotKey) ?? snapshotLookup.cellDisplaySnapshots?.get(rowId, snapshotKey);
-	if (!snapshot || !ctx) return snapshot;
-	const currentRowVersion = ctx.rowVersions?.get(rowId) ?? -1;
-	const isFresh = isVisualFresh(snapshot, {
-		rowVersion: currentRowVersion,
-		globalVersion: ctx.globalVersion,
-		insightVersion: ctx.insightVersion,
-		styleVersion: ctx.styleVersion,
-		loadingVersion: ctx.loadingVersion,
-		selectionVersion: ctx.selectionVersion,
-	});
+	if (!snapshot) return undefined;
+	const isFresh =
+		snapshot.rowVersion === rowVersion &&
+		snapshot.globalVersion === ctx.globalVersion &&
+		snapshot.insightVersion === ctx.insightVersion &&
+		snapshot.styleVersion === ctx.styleVersion &&
+		snapshot.loadingVersion === ctx.loadingVersion &&
+		snapshot.selectionVersion === ctx.selectionVersion;
 	return isFresh ? snapshot : undefined;
 }
 
@@ -194,12 +203,24 @@ function getCheapCellText<TRowData>(
 	node: RowNode<TRowData>,
 	col: ColumnDef<TRowData>,
 	cellSlot?: CellSlot<TRowData>,
-	ctx?: ScrollRenderContext<TRowData>
+	ctx?: ScrollRenderContext<TRowData>,
+	versions?: { rowVersion: number; globalVersion: number }
 ): string {
 	const isScrolling = ctx ? ctx.isScrolling : deps.getIsScrollFrameActive() || deps.engine.isScrolling;
 	if (isScrolling) {
 		const cachedVal = deps.engine.data.getCachedDisplayValue(node.id, col.field);
-		if (cachedVal !== undefined) return col.valueFormatter ? applyValueFormatter(col, cachedVal, node) : cachedVal;
+		if (cachedVal !== undefined) {
+			if (!col.valueFormatter) return cachedVal;
+			// The formatter must see the raw value, exactly as the non-scroll path below hands it —
+			// not the cache's String() of it.
+			const rawForFormatter =
+				col.valueGetter || deps.engine.hasFormula(node.id, col.field)
+					? (deps.engine.data.getCachedCellValue?.(node.id, col.field) ?? cachedVal)
+					: node.data
+						? (node.data as Record<string, unknown>)[col.field]
+						: cachedVal;
+			return applyValueFormatter(col, rawForFormatter, node);
+		}
 		// Warm DOM may accelerate only when it still belongs to this exact row/column — otherwise
 		// it's a different row's leftover text and must not be shown as a stand-in for this one.
 		const isSameIdentity = !!cellSlot && cellSlot.rowId === node.id && cellSlot.colField === col.field;
@@ -210,6 +231,18 @@ function getCheapCellText<TRowData>(
 		return applyValueFormatter(col, val, node);
 	}
 	const raw = node.data ? (node.data as Record<string, unknown>)[col.field] : undefined;
+	// Plain field + formatter: memoize the formatter output per (row, column), keyed on the row/global
+	// versions plus the raw value and row object, so an unchanged cell doesn't re-run it on every
+	// full bind. Formula strings ('=...') never reach here — hasFormula() is checked above.
+	const data = deps.engine.data;
+	if (col.valueFormatter && versions && data.getCachedFormattedValue && !(typeof raw === 'string' && raw.startsWith('='))) {
+		const columnKey = getColumnInstanceIdentity(col);
+		const cached = data.getCachedFormattedValue(node.id, columnKey, versions.rowVersion, versions.globalVersion, raw, node.data);
+		if (cached !== undefined) return cached;
+		const text = applyValueFormatter(col, raw, node);
+		data.setCachedFormattedValue(node.id, columnKey, versions.rowVersion, versions.globalVersion, raw, node.data, text);
+		return text;
+	}
 	return applyValueFormatter(col, raw, node);
 }
 
@@ -281,34 +314,51 @@ function attachCellCtrl<TRowData>(
 		colIndex?: number;
 	},
 	isEditing: boolean,
-	isFocused: boolean
+	isFocused: boolean,
+	rowCtrl: RowCtrl<TRowData>
 ): CellCtrl {
 	const { cellSlot, node, col } = request;
-	// Defensive fallback for lightweight test doubles that construct a partial `engine` mock without
-	// a real RowCtrlStore — a real GridEngine always has `rowCtrls` (see GridEngine.ts), so this only
-	// ever triggers in tests, producing a throwaway, unshared RowCtrl rather than crashing.
-	const rowCtrl = request.rowCtrl ?? deps.engine.rowCtrls?.getOrCreate(node.id) ?? createRowCtrl<TRowData>(node.id);
+	const rowCtrlStore = deps.engine.rowCtrls;
 	const instanceId = getColumnInstanceIdentity(col);
-	const existingCellCtrlStore = deps.engine.rowCtrls?.cellCtrls ?? fallbackCellCtrlStores.get(rowCtrl as object);
-	const cellCtrlStore =
-		existingCellCtrlStore ??
-		(() => {
-			const store = new CellCtrlStore<TRowData>();
-			fallbackCellCtrlStores.set(rowCtrl as object, store);
-			return store;
-		})();
-	const { cellCtrl, created } = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, {
-		rowIndex: request.rowIndex,
-		rowCtrlKey: rowCtrl.rowId,
-		colId: col.colId ?? col.field,
-		colField: col.field,
-		colIndex: request.colIndex,
-		scrollPresentation: getCellScrollPresentation(col as InternalColumnDef<TRowData>),
-	});
-	if (deps.engine.rowCtrls) {
-		if (created) deps.engine.rowCtrls.stats.cellCtrlsCreated++;
-		else deps.engine.rowCtrls.stats.cellCtrlsReused++;
+	let cellCtrl: CellCtrl;
+	const bound = cellSlot.boundCellCtrl;
+	if (rowCtrlStore && bound && !bound.lifecycle.destroyed && bound.rowId === node.id && bound.columnInstanceId === instanceId) {
+		// Fast path: the slot already presents this exact (row, column) controller — the common
+		// warm rebind during scroll. Same bookkeeping getOrCreate's reuse branch performs, without
+		// rebuilding the controller key or the metadata/input objects.
+		cellCtrl = bound;
+		if (request.rowIndex !== undefined) cellCtrl.rowIndex = request.rowIndex;
+		cellCtrl.rowCtrlKey = rowCtrl.rowId;
+		if (request.colIndex !== undefined) cellCtrl.colIndex = request.colIndex;
+		cellCtrl.scrollPresentation = getCellScrollPresentation(col as InternalColumnDef<TRowData>);
+		if (rowCtrl.cellKeysByColumnInstanceId.get(instanceId) !== cellCtrl.key) rowCtrl.cellKeysByColumnInstanceId.set(instanceId, cellCtrl.key);
+		rowCtrlStore.stats.cellCtrlsReused++;
+	} else {
+		// Defensive fallback for lightweight test doubles that construct a partial `engine` mock without
+		// a real RowCtrlStore — a real GridEngine always has `rowCtrls` (see GridEngine.ts), so this only
+		// ever triggers in tests, producing a throwaway, unshared store rather than crashing.
+		let cellCtrlStore = rowCtrlStore?.cellCtrls ?? fallbackCellCtrlStores.get(rowCtrl as object);
+		if (!cellCtrlStore) {
+			cellCtrlStore = new CellCtrlStore<TRowData>();
+			fallbackCellCtrlStores.set(rowCtrl as object, cellCtrlStore);
+		}
+		const result = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, {
+			rowIndex: request.rowIndex,
+			rowCtrlKey: rowCtrl.rowId,
+			colId: col.colId ?? col.field,
+			colField: col.field,
+			colIndex: request.colIndex,
+			scrollPresentation: getCellScrollPresentation(col as InternalColumnDef<TRowData>),
+		});
+		cellCtrl = result.cellCtrl;
+		if (rowCtrlStore) {
+			if (result.created) rowCtrlStore.stats.cellCtrlsCreated++;
+			else rowCtrlStore.stats.cellCtrlsReused++;
+		}
 	}
+	// Hand the previously presented controller (another row's) back to its store — this is what
+	// bounds CellCtrl lifetime to the physical slot pool rather than to every row ever visited.
+	cellSlot.attachCellCtrl(cellCtrl, rowCtrlStore ?? null);
 	cellCtrl.lifecycle.attachedSlotInstanceId = cellSlot.cellInstanceId;
 	cellCtrl.visualState.editing = isEditing;
 	cellCtrl.visualState.focused = isFocused;
@@ -324,50 +374,134 @@ function recordCellCtrlPhysicalBinding<TRowData>(cellCtrl: CellCtrl, cellSlot: C
 	cellCtrl.rendererState.lastBindEpoch = (cellCtrl.rendererState.lastBindEpoch ?? 0) + 1;
 }
 
-function makeScrollDispatchInput<TRowData>(
+/**
+ * Per-binder-deps adapter onto the resolver's narrow ScrollCellPresentationDeps. Built once per
+ * deps object (not once per cell); `ctx` is re-pointed at the current frame's context before each
+ * resolve. The resolver never retains its deps, so sharing one adapter is safe.
+ */
+interface ScrollPresentationDepsAdapter<TRowData> extends ScrollCellPresentationDeps {
+	ctx: ScrollRenderContext<TRowData> | null;
+}
+
+const scrollPresentationDepsByBinderDeps = new WeakMap<object, ScrollPresentationDepsAdapter<any>>();
+
+function createScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): ScrollPresentationDepsAdapter<TRowData> {
+	const adapter: ScrollPresentationDepsAdapter<TRowData> = {
+		ctx: null,
+		getCellPortalHost: (cell) => deps.getCellPortalHost(cell),
+		getRowHeight: (idx) => deps.engine.geometry?.rowHeights?.[idx],
+		getColWidth: (idx) => adapter.ctx?.plan?.colWidths?.[idx],
+		getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
+		hasFormula: (rowId, colField) => deps.engine.hasFormula?.(rowId, colField) ?? true,
+		getFrozenHtmlSnapshot: (rowId, columnInstanceId, expected, rowHeight, colWidth) => {
+			const store = deps.engine.htmlScrollSnapshots as
+				| {
+						getFresh?: (input: {
+							rowId: string;
+							columnInstanceId: ColumnInstanceId;
+							expectedFreshness: any;
+							rowHeight?: number;
+							colWidth?: number;
+							policy: 'visual';
+						}) => any;
+						get?: (
+							rowId: string,
+							columnInstanceId: ColumnInstanceId | string,
+							expected: any,
+							options?: { rowHeight?: number; colWidth?: number; mode?: 'visual' }
+						) => any;
+				  }
+				| undefined;
+			return store?.getFresh
+				? store.getFresh({ rowId, columnInstanceId, expectedFreshness: expected, rowHeight, colWidth, policy: 'visual' })
+				: store?.get?.(rowId, columnInstanceId, expected, { rowHeight, colWidth, mode: 'visual' });
+		},
+		getHtmlSnapshotDefaults: deps.getHtmlSnapshotDefaults ? () => deps.getHtmlSnapshotDefaults!() : undefined,
+	};
+	return adapter;
+}
+
+function getScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>, ctx: ScrollRenderContext<TRowData>): ScrollCellPresentationDeps {
+	let adapter = scrollPresentationDepsByBinderDeps.get(deps) as ScrollPresentationDepsAdapter<TRowData> | undefined;
+	if (!adapter) {
+		adapter = createScrollPresentationDeps(deps);
+		scrollPresentationDepsByBinderDeps.set(deps, adapter);
+	}
+	adapter.ctx = ctx;
+	return adapter;
+}
+
+/**
+ * Scratch objects for the per-cell scroll bind. None of the callees retain them (the resolver and
+ * the binders copy what they keep), so one set is reused per cell instead of allocating ~5 objects.
+ * The in-use flag makes a re-entrant bind (user renderer code synchronously triggering another
+ * bind) fall back to fresh objects rather than clobbering the outer bind's inputs.
+ */
+let scrollScratchInUse = false;
+const scrollInputScratch = {} as ScrollCellPresentationInput<any>;
+const scrollGeometryScratch: CellBindGeometry = { rowIndex: 0, colIndex: 0, left: 0, right: 0, width: 0, dragShift: 0, lane: 'center' };
+const scrollRuntimeScratch: CellBindRuntime<any> = { globalVersion: 0, rowSlotId: '', slotGeneration: 0 };
+const scrollDispatchScratch = {
+	phase: 'scroll',
+	viewportPlan: null,
+	rowVersion: -1,
+	geometry: scrollGeometryScratch,
+	runtime: scrollRuntimeScratch,
+} as unknown as DispatchCellPresentationInput<any>;
+
+function fillScrollDispatchInput<TRowData>(
+	target: DispatchCellPresentationInput<TRowData>,
 	deps: RowCellBinderDeps<TRowData>,
 	request: BindCellDuringScrollRequest<TRowData>,
 	cellCtrl: CellCtrl,
 	rowCtrl: RowCtrl<TRowData>,
 	rowVersion: number,
 	mountValue?: unknown
-) {
+): DispatchCellPresentationInput<TRowData> {
+	target.deps = deps;
+	target.cellCtrl = cellCtrl;
+	target.rowCtrl = rowCtrl;
+	target.cellSlot = request.cellSlot;
+	target.viewportPlan = request.viewportPlan ?? null;
+	target.phase = 'scroll';
+	target.rowVersion = rowVersion;
+	const geometry = target.geometry;
+	geometry.rowIndex = request.rowIndex;
+	geometry.colIndex = request.colIndex;
+	geometry.left = request.left;
+	geometry.right = request.right;
+	geometry.width = request.width;
+	geometry.dragShift = deps.getColumnShift ? deps.getColumnShift(request.colIndex) : 0;
+	geometry.lane = request.lane;
+	const runtime = target.runtime;
+	runtime.globalVersion = request.ctx.globalVersion;
+	runtime.rowSlotId = request.pooledRowId;
+	runtime.slotGeneration = request.pooledRowGeneration;
+	runtime.rowHeight = deps.engine.geometry?.rowHeights?.[request.rowIndex];
+	runtime.colWidth = request.ctx.plan?.colWidths?.[request.colIndex];
+	runtime.checkbox = undefined;
+	runtime.mount =
+		mountValue === undefined
+			? undefined
+			: {
+					node: request.node,
+					col: request.col,
+					value: mountValue,
+					isLoading: request.isRowLoading,
+					isSelected: false,
+					renderPhase: 'scroll' as const,
+				};
+	return target;
+}
+
+function createScrollDispatchInput<TRowData>(): DispatchCellPresentationInput<TRowData> {
 	return {
-		deps,
-		cellCtrl,
-		rowCtrl,
-		cellSlot: request.cellSlot,
-		viewportPlan: request.viewportPlan ?? null,
-		geometry: {
-			rowIndex: request.rowIndex,
-			colIndex: request.colIndex,
-			left: request.left,
-			right: request.right,
-			width: request.width,
-			dragShift: deps.getColumnShift ? deps.getColumnShift(request.colIndex) : 0,
-			lane: request.lane,
-		},
-		runtime: {
-			globalVersion: request.ctx.globalVersion,
-			rowSlotId: request.pooledRowId,
-			slotGeneration: request.pooledRowGeneration,
-			rowHeight: deps.engine.geometry?.rowHeights?.[request.rowIndex],
-			colWidth: request.ctx.plan?.colWidths?.[request.colIndex],
-			mount:
-				mountValue === undefined
-					? undefined
-					: {
-							node: request.node,
-							col: request.col,
-							value: mountValue,
-							isLoading: request.isRowLoading,
-							isSelected: false,
-							renderPhase: 'scroll' as const,
-						},
-		},
-		phase: 'scroll' as const,
-		rowVersion,
-	};
+		phase: 'scroll',
+		viewportPlan: null,
+		rowVersion: -1,
+		geometry: { rowIndex: 0, colIndex: 0, left: 0, right: 0, width: 0, dragShift: 0, lane: 'center' },
+		runtime: { globalVersion: 0, rowSlotId: '', slotGeneration: 0 },
+	} as unknown as DispatchCellPresentationInput<TRowData>;
 }
 
 function isCellSelectedInBounds(selectionBounds: ScrollRenderContext['selectionBounds'], rowIndex: number, colIndex: number): boolean {
@@ -394,8 +528,8 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 		selectionVersion: deps.engine.selectionVersion,
 	};
 	const interaction = readInteractionState(state);
-	const cellCtrl = attachCellCtrl(deps, request, access.isEditing, access.isFocused);
 	const rowCtrl = request.rowCtrl ?? deps.engine.rowCtrls?.getOrCreate(node.id) ?? createRowCtrl(node.id);
+	const cellCtrl = attachCellCtrl(deps, request, access.isEditing, access.isFocused, rowCtrl);
 	cellCtrl.visualState.selected = access.isSelected;
 
 	const baseCellClassName = buildCellPinClass(lane);
@@ -550,7 +684,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 		if (access.isLoading) {
 			contentMode = 'loading';
 		} else {
-			formattedValue = getCheapCellText(deps, node, col, cellSlot, ctx);
+			formattedValue = getCheapCellText(deps, node, col, cellSlot, ctx, { rowVersion, globalVersion: state.globalVersion });
 			contentMode = formattedValue === '' ? 'empty' : 'text';
 		}
 	}
@@ -681,32 +815,22 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 	deps.incrementGeometryOnlyCellBinds?.();
 	deps.incrementCellSlotRebinds?.();
 	const { cellSlot, node, rowIndex, colIndex, col, lane, ctx, isRowRebind, isRowLoading, isInVisibleContent } = request;
+	const rowCtrl = request.rowCtrl ?? deps.engine.rowCtrls?.getOrCreate(node.id) ?? createRowCtrl<TRowData>(node.id);
 
 	// 1. Geometry / warm-state precomputation shared by every presentation kind.
 	const canPreserveWarmVisuals = !isRowRebind && cellSlot.rowId === node.id && cellSlot.colField === col.field && !isRowLoading;
 	const rowVersion = ctx.rowVersions?.get(node.id) ?? -1;
-	const isWarmBindingVersionFresh =
-		canPreserveWarmVisuals &&
-		matchesCellSlotMountedFreshness(cellSlot, {
-			rowVersion,
-			globalVersion: ctx.globalVersion,
-			visualVersions: {
-				insightVersion: ctx.insightVersion,
-				styleVersion: ctx.styleVersion,
-				loadingVersion: ctx.loadingVersion,
-				selectionVersion: ctx.selectionVersion,
-			},
-		});
-	const cellKey = createCellInstanceRendererKey(cellSlot.cellInstanceId, getColumnInstanceIdentity(col));
-	const snapshot = getFreshCellSnapshot(deps, node.id, col, ctx);
+	const isWarmBindingVersionFresh = canPreserveWarmVisuals && isCellSlotMountedFreshAt(cellSlot, rowVersion, ctx);
+	const cellKey = cellSlot.getRendererKey(getColumnInstanceIdentity(col));
+	const snapshot = getFreshCellSnapshot(deps, node.id, col, ctx, rowVersion);
 	const isFocused = doesCanonicalCellPointerMatchColumn(ctx.focusedCell, node.id, col);
 	const isEditing = doesCanonicalCellPointerMatchColumn(ctx.activeEdit, node.id, col);
-	const cellCtrl = attachCellCtrl(deps, request, isEditing, isFocused);
+	const cellCtrl = attachCellCtrl(deps, request, isEditing, isFocused, rowCtrl);
 	cellCtrl.visualState.selected = isCellSelectedInBounds(ctx.selectionBounds, rowIndex, colIndex);
 
 	// Focus tab-index bookkeeping is independent of which presentation gets resolved below —
 	// it applies whenever this cell is the focused cell, regardless of content.
-	if (doesCanonicalCellPointerMatchColumn(ctx.focusedCell, node.id, col)) {
+	if (isFocused) {
 		const programmaticScrollCell = getProgrammaticScrollCellPointer(deps.programmaticScrollCell);
 		const isProgrammatic = doesCanonicalCellPointerMatchColumn(programmaticScrollCell, node.id, col);
 		deps.setDeferredFocusCell(cellSlot.element);
@@ -726,77 +850,45 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		deps.incrementStyleHookCallsDuringScroll();
 	}
 
-	// 2. Resolve what to show — the only place that decides, never mutates. Deliberately adapted
-	// down to the resolver's narrow ScrollCellPresentationDeps here, not the full binder deps bag —
-	// see the type comment on ScrollCellPresentationDeps for why.
-	const scrollPresentationDeps: ScrollCellPresentationDeps = {
-		getCellPortalHost: deps.getCellPortalHost,
-		getRowHeight: (idx) => deps.engine.geometry?.rowHeights?.[idx],
-		getColWidth: (idx) => ctx.plan?.colWidths?.[idx],
-		getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
-		getFrozenHtmlSnapshot: (rowId, columnInstanceId, expected, rowHeight, colWidth) => {
-			const store = deps.engine.htmlScrollSnapshots as
-				| {
-						getFresh?: (input: {
-							rowId: string;
-							columnInstanceId: ColumnInstanceId;
-							expectedFreshness: any;
-							rowHeight?: number;
-							colWidth?: number;
-							policy: 'visual';
-						}) => any;
-						get?: (
-							rowId: string,
-							columnInstanceId: ColumnInstanceId | string,
-							expected: any,
-							options?: { rowHeight?: number; colWidth?: number; mode?: 'visual' }
-						) => any;
-				  }
-				| undefined;
-			return store?.getFresh
-				? store.getFresh({ rowId, columnInstanceId, expectedFreshness: expected, rowHeight, colWidth, policy: 'visual' })
-				: store?.get?.(rowId, columnInstanceId, expected, { rowHeight, colWidth, mode: 'visual' });
-		},
-		getHtmlSnapshotDefaults: deps.getHtmlSnapshotDefaults,
-	};
-	resolveCellCtrlPresentationState({
-		cellCtrl,
-		rowCtrl: request.rowCtrl ?? deps.engine.rowCtrls?.getOrCreate(node.id) ?? createRowCtrl(node.id),
-		viewportPlan: null,
-		phase: 'scroll',
-		context: {
-			scroll: {
-				deps: scrollPresentationDeps,
-				input: {
-					cellSlot,
-					node,
-					rowIndex,
-					colIndex,
-					col,
-					lane,
-					ctx,
-					isRowRebind,
-					isRowLoading,
-					isInVisibleContent,
-					snapshot,
-					isWarmBindingVersionFresh,
-					rowVersion,
-					cellKey,
-				},
-			},
-		},
-	});
+	const useScratch = !scrollScratchInUse;
+	scrollScratchInUse = true;
+	try {
+		// 2. Resolve what to show — the only place that decides, never mutates. Deliberately adapted
+		// down to the resolver's narrow ScrollCellPresentationDeps here, not the full binder deps bag —
+		// see the type comment on ScrollCellPresentationDeps for why.
+		const input = useScratch ? (scrollInputScratch as ScrollCellPresentationInput<TRowData>) : ({} as ScrollCellPresentationInput<TRowData>);
+		input.cellSlot = cellSlot;
+		input.node = node;
+		input.rowIndex = rowIndex;
+		input.colIndex = colIndex;
+		input.col = col;
+		input.lane = lane;
+		input.ctx = ctx;
+		input.isRowRebind = isRowRebind;
+		input.isRowLoading = isRowLoading;
+		input.isInVisibleContent = isInVisibleContent;
+		input.snapshot = snapshot;
+		input.isWarmBindingVersionFresh = isWarmBindingVersionFresh;
+		input.rowVersion = rowVersion;
+		input.cellKey = cellKey;
+		resolveCellCtrlScrollPresentationState(cellCtrl, getScrollPresentationDeps(deps, ctx), input);
 
-	// 3. Dispatch to the mode-specific binder — enqueues fidelity work, updates mounted slot bookkeeping.
-	dispatchCellPresentation(
-		makeScrollDispatchInput(
-			deps,
-			request,
-			cellCtrl,
-			request.rowCtrl ?? deps.engine.rowCtrls?.getOrCreate(node.id) ?? createRowCtrl(node.id),
-			rowVersion,
-			cellCtrl.presentationState.kind === 'live-renderer' ? getScrollMountValue(deps, request.node, request.col, request.cellSlot) : undefined
-		)
-	);
+		// 3. Dispatch to the mode-specific binder — enqueues fidelity work, updates mounted slot bookkeeping.
+		dispatchCellPresentation(
+			fillScrollDispatchInput(
+				useScratch ? (scrollDispatchScratch as DispatchCellPresentationInput<TRowData>) : createScrollDispatchInput<TRowData>(),
+				deps,
+				request,
+				cellCtrl,
+				rowCtrl,
+				rowVersion,
+				cellCtrl.presentationState.kind === 'live-renderer'
+					? getScrollMountValue(deps, request.node, request.col, request.cellSlot)
+					: undefined
+			)
+		);
+	} finally {
+		if (useScratch) scrollScratchInUse = false;
+	}
 	recordCellCtrlPhysicalBinding(cellCtrl, cellSlot);
 }

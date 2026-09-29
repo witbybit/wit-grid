@@ -1,7 +1,12 @@
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
-import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	recordDispatchWrite,
+	stampMountedVersions,
+	getCellRendererLifecycle,
+} from './binderShared.js';
 
 /**
  * scrollPresentation: 'freeze' - an existing live portal may remain visually frozen during scroll;
@@ -10,13 +15,17 @@ import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispat
 export function applyFreezeCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
-	const lifecycle = createCellRendererLifecycle(deps);
+	const lifecycle = getCellRendererLifecycle(deps);
 
 	switch (presentation.kind) {
 		case 'checkbox-selector': {
 			if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
 			if (input.phase === 'full-bind' && runtime.checkbox) {
-				let checkbox = cellSlot.contentElement.querySelector<HTMLInputElement>('input[type="checkbox"].og-row-checkbox');
+				// Cached on the slot; the parent check re-queries only if something replaced it.
+				let checkbox = cellSlot.rowCheckbox;
+				if (!checkbox || checkbox.parentNode !== cellSlot.contentElement) {
+					checkbox = cellSlot.contentElement.querySelector<HTMLInputElement>('input[type="checkbox"].og-row-checkbox');
+				}
 				if (!checkbox) {
 					checkbox = document.createElement('input');
 					checkbox.type = 'checkbox';
@@ -24,6 +33,7 @@ export function applyFreezeCellPresentation<TRowData>(input: DispatchCellPresent
 					cellSlot.contentElement.textContent = '';
 					cellSlot.contentElement.appendChild(checkbox);
 				}
+				cellSlot.rowCheckbox = checkbox;
 				checkbox.dataset.rowId = cellCtrl.rowId;
 				checkbox.setAttribute('aria-label', runtime.checkbox.ariaLabel);
 				checkbox.title = runtime.checkbox.title;
@@ -65,7 +75,9 @@ export function applyFreezeCellPresentation<TRowData>(input: DispatchCellPresent
 			applyCellAccessibilityState(cellSlot, cellCtrl);
 			if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
 
-			if (presentation.captureFrozenHtml && presentation.recordVersions && 'rowId' in presentation.recordVersions && portalHost?.innerHTML) {
+			// Serialize the host once — innerHTML is a full subtree serialization per read.
+			const hostHtml = presentation.captureFrozenHtml && portalHost ? portalHost.innerHTML : '';
+			if (presentation.captureFrozenHtml && presentation.recordVersions && 'rowId' in presentation.recordVersions && hostHtml) {
 				const snapshot = presentation.recordVersions;
 				const existing = deps.engine.htmlScrollSnapshots.getFresh
 					? deps.engine.htmlScrollSnapshots.getFresh({
@@ -75,10 +87,12 @@ export function applyFreezeCellPresentation<TRowData>(input: DispatchCellPresent
 							policy: 'visual',
 						})
 					: deps.engine.htmlScrollSnapshots.get?.(snapshot.rowId, cellCtrl.columnInstanceId, snapshot, { mode: 'visual' });
-				if (portalHost.innerHTML !== existing?.html) {
+				if (hostHtml !== existing?.html) {
 					lifecycle.captureHtml({
 						cellCtrl,
-						host: portalHost,
+						host: portalHost!,
+						html: hostHtml,
+
 						reason: 'freeze',
 						token: {
 							epoch: runtime.globalVersion,

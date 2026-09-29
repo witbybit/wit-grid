@@ -57,6 +57,35 @@ export class CellCtrlStore<TRowData = unknown> {
 		return { cellCtrl, created: true };
 	}
 
+	/**
+	 * Removes one controller from the store, but only when the store still owns that exact object
+	 * (a stale reference to a controller that was already replaced under the same key is a no-op).
+	 * The released controller is marked destroyed so any outstanding ControllerWorkToken for it is
+	 * rejected by isControllerWorkStillValid.
+	 */
+	public release(cellCtrl: CellCtrl): boolean {
+		if (this.byKey.get(cellCtrl.key) !== cellCtrl) return false;
+		this.byKey.delete(cellCtrl.key);
+		cellCtrl.lifecycle.destroyed = true;
+		const rowKeys = this.keysByRowId.get(cellCtrl.rowId);
+		rowKeys?.delete(cellCtrl.key);
+		if (rowKeys?.size === 0) this.keysByRowId.delete(cellCtrl.rowId);
+		const columnKeys = this.keysByColumnInstanceId.get(cellCtrl.columnInstanceId);
+		columnKeys?.delete(cellCtrl.key);
+		if (columnKeys?.size === 0) this.keysByColumnInstanceId.delete(cellCtrl.columnInstanceId);
+		return true;
+	}
+
+	/** Controllers currently owned by the store. */
+	public size(): number {
+		return this.byKey.size;
+	}
+
+	/** Controllers currently owned for one row. */
+	public sizeForRow(rowId: string): number {
+		return this.keysByRowId.get(rowId)?.size ?? 0;
+	}
+
 	public destroyRow(rowId: string): void {
 		const keys = this.keysByRowId.get(rowId);
 		if (!keys) return;
@@ -64,6 +93,7 @@ export class CellCtrlStore<TRowData = unknown> {
 			const cellCtrl = this.byKey.get(key);
 			if (!cellCtrl) continue;
 			this.byKey.delete(key);
+			cellCtrl.lifecycle.destroyed = true;
 			const columnKeys = this.keysByColumnInstanceId.get(cellCtrl.columnInstanceId);
 			columnKeys?.delete(key);
 			if (columnKeys?.size === 0) this.keysByColumnInstanceId.delete(cellCtrl.columnInstanceId);

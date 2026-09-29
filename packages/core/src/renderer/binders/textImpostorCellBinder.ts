@@ -1,8 +1,13 @@
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
 import { isHtmlSnapshotPresentation } from '../scrollPresentationMode.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	recordDispatchWrite,
+	stampMountedVersions,
+	getCellRendererLifecycle,
+} from './binderShared.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
 
 /**
  * scrollPresentation: 'text-impostor' — the explicit, always-on text/chip stand-in via
@@ -14,7 +19,7 @@ import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.
 export function applyTextImpostorCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
-	const lifecycle = createCellRendererLifecycle(deps);
+	const lifecycle = getCellRendererLifecycle(deps);
 
 	if (presentation.textImpostorSource === 'fallback') {
 		if (runtime.mount && isHtmlSnapshotPresentation(runtime.mount.col)) deps.incrementHtmlSnapshotMissesDuringScroll?.();
