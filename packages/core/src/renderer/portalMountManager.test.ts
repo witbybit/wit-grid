@@ -727,3 +727,45 @@ describe('PortalMountManager', () => {
 		});
 	});
 });
+
+describe('PortalMountManager – cancelDeferredMount', () => {
+	const mountFor = (container: HTMLElement) => ({
+		cellKey: 'r1:name',
+		container,
+		rowSlotId: 'slot-0',
+		slotGeneration: 0,
+		value: 'A',
+		node: {} as never,
+		col: { field: 'name', header: 'Name' },
+		isEditing: false,
+		isLoading: false,
+	});
+
+	it('drops a mount queued during scroll so it never lands after the cell is released', () => {
+		const manager = new PortalMountManager();
+		const rs = makeScrollingRuntimeState();
+		manager.setRuntimeState(rs);
+		const mount = vi.fn();
+		manager.onMountCellContent = mount;
+		const container = document.createElement('div');
+
+		manager.mountCell(mountFor(container));
+		expect(manager.getActiveIdentity('r1:name')).toBeUndefined();
+		expect(manager.cancelDeferredMount('r1:name')).toBe(true);
+
+		rs.transitionTo('idle');
+		manager.flushDeferred();
+		expect(mount).not.toHaveBeenCalled();
+		expect(manager.getStats().cells).toBe(0);
+	});
+
+	it('leaves really-mounted cells alone', () => {
+		const manager = new PortalMountManager();
+		manager.setRuntimeState(makeIdleRuntimeState());
+		manager.onMountCellContent = vi.fn();
+		manager.mountCell(mountFor(document.createElement('div')));
+
+		expect(manager.getActiveIdentity('r1:name')).toBeDefined();
+		expect(manager.cancelDeferredMount('r1:name')).toBe(false);
+	});
+});

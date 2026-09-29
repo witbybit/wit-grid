@@ -222,6 +222,9 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 				// Runtime owns scroll-frame phase transition. The onScrollFrame callback
 				// must not call transitionTo('scroll-frame') or transitionTo('post-scroll').
 				if (rs && !rs.isDestroyed()) {
+					// A scroll frame owed while idle (a request that skipped markScrolling) opens a scroll
+					// session first; idle -> scroll-frame is not a legal transition.
+					if (rs.phase === 'idle') rs.transitionTo('scroll-pending');
 					rs.transitionTo('scroll-frame');
 				}
 				try {
@@ -306,17 +309,20 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		const changeIds = Object.freeze([...this.pendingPaintChangeIds]);
 		this.pendingPaintChangeIds.clear();
 		const rs = this.runtimeState;
-		if (rs) {
-			if (rs.isDestroyed()) {
-				this.onFault?.('FrameCoordinator: paint frame after destruction');
-				return;
-			}
-			rs.transitionTo('paint-frame');
+		if (rs?.isDestroyed()) {
+			this.onFault?.('FrameCoordinator: paint frame after destruction');
+			return;
 		}
+		// A paint can be owed while a scroll session is open (scroll-pending / post-scroll). It runs
+		// inside that session instead of taking a paint-frame phase: entering paint-frame is illegal
+		// there, and returning to idle afterwards would silently drop the scroll session, so its
+		// scroll-end work (deferred portal mounts, the scrolling class) would never run.
+		const ownsPhase = !rs || rs.phase === 'idle';
+		if (rs && ownsPhase) rs.transitionTo('paint-frame');
 		try {
 			this.onPaintFrame(changeIds);
 		} finally {
-			if (rs && !rs.isDestroyed()) {
+			if (rs && ownsPhase && !rs.isDestroyed()) {
 				rs.transitionTo('idle');
 			}
 		}

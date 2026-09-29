@@ -398,7 +398,12 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			rowRenderer: this.rowRenderer,
 			scrollEngine: this.scrollEngine,
 			renderStats: this.renderStats,
-			requestScrollFrame: () => this.frameCoordinator.requestScrollFrame(),
+			// Programmatic scroll (scrollCellIntoView/scrollRowIntoView) opens a scroll session like a
+			// user scroll does, so the owed frame never runs from idle.
+			requestScrollFrame: () => {
+				this.scrollCoordinator.markScrolling();
+				this.frameCoordinator.requestScrollFrame();
+			},
 		});
 		const paintState: RenderPaintCoordinatorState = {
 			pendingTransition: this._pendingTransition,

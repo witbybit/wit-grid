@@ -381,6 +381,8 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		const isDeferred = forceDeferred ?? this.deps.stateHost.runtimeState.isScrolling();
 		const activeIdentity = this.deps.portalMountManager.getActiveIdentity(cellKey);
 		if (!activeIdentity) {
+			// Mounted during scroll but still queued: there is nothing to unmount yet, just cancel it.
+			if (this.deps.portalMountManager.cancelDeferredMount(cellKey)) return;
 			reportRendererFault(
 				this.deps.engine,
 				'release-cell-portal-without-identity',

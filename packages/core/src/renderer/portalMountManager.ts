@@ -308,6 +308,18 @@ export class PortalMountManager<TRowData = unknown> {
 		this.mountCellReal(mount);
 	}
 
+	/**
+	 * Cancels a mount that was deferred during scroll and has not run yet. Such a cell has no
+	 * active identity (identity is recorded when the mount really runs), so releasing it must drop
+	 * the queued mount instead of unmounting — otherwise the stale mount would still land later.
+	 */
+	public cancelDeferredMount(cellKey: string): boolean {
+		if (this.activeIdentityByKey.has(cellKey) || !this.deferredCellMounts.delete(cellKey)) return false;
+		this.deferredNewCellMounts.delete(cellKey);
+		this.mountedCells.delete(cellKey);
+		return true;
+	}
+
 	public mountCellImmediately(mount: GridCellContentMount<TRowData>): void {
 		this.mountedCells.set(mount.cellKey, mount.container);
 		this.deferredCellReleases.delete(mount.cellKey);

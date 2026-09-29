@@ -61,6 +61,7 @@ function makeDeps(stateHost: RowRendererRuntimeStateHost<unknown>): RowRendererR
 			releaseCellForScroll: vi.fn(),
 			releaseCell: vi.fn(),
 			getActiveIdentity: vi.fn(() => ({ rowSlotId: 'slot-0', slotGeneration: 1 })),
+			cancelDeferredMount: vi.fn(() => false),
 		} as any,
 		getViewportContainer: () => null,
 		selectionPaint: {} as any,
@@ -186,6 +187,19 @@ describe('RowRendererRuntimeBridge – releaseCellPortal', () => {
 
 		expect(deps.portalMountManager.releaseCell).not.toHaveBeenCalled();
 		expect((deps.engine as any).runtimeFaults.report).toHaveBeenCalledOnce();
+	});
+
+	it('cancels a mount still queued from scroll instead of reporting a missing identity', () => {
+		const { bridge, deps } = makeBridge();
+		const cell = cellWithKey('cell-queued');
+		(deps.portalMountManager.getActiveIdentity as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+		(deps.portalMountManager.cancelDeferredMount as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+		bridge.releaseCellPortal(cell);
+
+		expect(deps.portalMountManager.cancelDeferredMount).toHaveBeenCalledWith('cell-queued');
+		expect(deps.portalMountManager.releaseCell).not.toHaveBeenCalled();
+		expect((deps.engine as any).runtimeFaults.report).not.toHaveBeenCalled();
 	});
 });
 

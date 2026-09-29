@@ -918,3 +918,52 @@ describe('DefaultFrameCoordinator – post-scroll durability (Plan 096)', () => 
 		expect(onPostScrollWork).not.toHaveBeenCalled();
 	});
 });
+
+describe('DefaultFrameCoordinator – paint owed during an open scroll session', () => {
+	function makeManualScheduler() {
+		const frames: Array<() => void> = [];
+		const scheduler: GridScheduler = {
+			...makeSyncScheduler(),
+			raf: (cb) => {
+				frames.push(cb);
+				return frames.length;
+			},
+		};
+		const runFrame = () => frames.shift()?.();
+		return { scheduler, runFrame };
+	}
+
+	it('runs the paint inside post-scroll without faulting or dropping the scroll session', () => {
+		const faults: string[] = [];
+		const rs = new RenderRuntimeState((msg) => faults.push(msg));
+		const onScrollEnd = vi.fn();
+		const onPaintFrame = vi.fn();
+		const { scheduler, runFrame } = makeManualScheduler();
+		const coordinator = new DefaultFrameCoordinator(makeBaseDeps({ gridScheduler: scheduler, runtimeState: rs, onPaintFrame, onScrollEnd }));
+
+		rs.transitionTo('scroll-pending');
+		coordinator.requestScrollFrame();
+		coordinator.requestPaintFrame();
+		runFrame(); // scroll frame -> post-scroll, then the owed paint
+
+		expect(onPaintFrame).toHaveBeenCalledTimes(1);
+		expect(rs.phase).toBe('post-scroll');
+		expect(faults).toEqual([]);
+
+		for (let i = 0; i < 5 && rs.isScrolling(); i++) runFrame();
+		expect(rs.phase).toBe('idle');
+		expect(onScrollEnd).toHaveBeenCalledTimes(1);
+		expect(faults).toEqual([]);
+	});
+
+	it('opens a scroll session for a scroll frame owed while idle instead of faulting', () => {
+		const faults: string[] = [];
+		const rs = new RenderRuntimeState((msg) => faults.push(msg));
+		const coordinator = new DefaultFrameCoordinator(makeBaseDeps({ runtimeState: rs }));
+
+		coordinator.requestScrollFrame();
+
+		expect(faults).toEqual([]);
+		expect(rs.isScrolling() || rs.phase === 'idle').toBe(true);
+	});
+});
