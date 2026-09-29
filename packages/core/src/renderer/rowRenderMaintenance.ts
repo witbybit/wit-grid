@@ -8,7 +8,7 @@ import type { RenderWindow } from './renderWindow.js';
 import type { RowSlot } from './rowSlot.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
 import type { SelectionPaintManager } from './selectionPaintManager.js';
-import { compileColumnTopology } from './columnTopology.js';
+import { getMemoizedColumnTopology } from './columnTopology.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 
@@ -61,8 +61,12 @@ export interface DecorateDirtyCellsAfterScrollResult {
  * lane changes deterministic without introducing a new queue owner.
  */
 export function sortDirtyCellsForRepair(cells: HTMLDivElement[], getPriority: (cell: HTMLDivElement) => number): void {
+	if (cells.length < 2) return;
+	// Priority is evaluated once per cell, not twice per comparison (O(n) vs O(n log n) calls).
+	const priorities = new Map<HTMLDivElement, number>();
+	for (const cell of cells) priorities.set(cell, getPriority(cell));
 	cells.sort((a, b) => {
-		const priorityDelta = getPriority(b) - getPriority(a);
+		const priorityDelta = priorities.get(b)! - priorities.get(a)!;
 		if (priorityDelta !== 0) return priorityDelta;
 		const aSlot = (a as unknown as { __cellSlot?: { rowIndex?: number; colIndex?: number; cellInstanceId?: string } }).__cellSlot;
 		const bSlot = (b as unknown as { __cellSlot?: { rowIndex?: number; colIndex?: number; cellInstanceId?: string } }).__cellSlot;
@@ -72,6 +76,76 @@ export function sortDirtyCellsForRepair(cells: HTMLDivElement[], getPriority: (c
 		if (colDelta !== 0) return colDelta;
 		return (aSlot?.cellInstanceId ?? '').localeCompare(bSlot?.cellInstanceId ?? '');
 	});
+}
+
+type DirtyCellSlotIdentity = { rowIndex?: number; colIndex?: number; rowId?: string; columnInstanceId?: string };
+
+interface DirtyRepairQueueKey {
+	rowStart: number;
+	rowEnd: number;
+	colStart: number;
+	colEnd: number;
+	focusedCell: unknown;
+	activeEdit: unknown;
+	plan: unknown;
+	rowModel: unknown;
+}
+
+/**
+ * Persistent repair order for one dirty set. Post-scroll repair runs in many small idle chunks;
+ * re-bucketing and re-sorting the whole dirty set per chunk made a full repair O(n² log n). The
+ * queue is reused while every input to the priority and tie-break order is unchanged (visible
+ * ranges, focus/edit pointers, column plan, row model, dirty-set membership and each queued
+ * cell's slot identity), so a reused queue yields exactly the order a fresh sort would. Any
+ * mismatch (a new scroll epoch moves the ranges, a cell is added, a slot rebinds) re-sorts.
+ */
+interface DirtyRepairQueue extends DirtyRepairQueueKey {
+	cells: HTMLDivElement[];
+	rowIndexes: (number | undefined)[];
+	colIndexes: (number | undefined)[];
+	rowIds: (string | undefined)[];
+	columnInstanceIds: (string | undefined)[];
+}
+
+const dirtyRepairQueues = new WeakMap<Set<HTMLDivElement>, DirtyRepairQueue>();
+
+function getCellSlotIdentity(cell: HTMLDivElement): DirtyCellSlotIdentity | undefined {
+	return (cell as unknown as { __cellSlot?: DirtyCellSlotIdentity }).__cellSlot;
+}
+
+function isDirtyRepairQueueCurrent(
+	queue: DirtyRepairQueue | undefined,
+	dirtyCells: Set<HTMLDivElement>,
+	key: DirtyRepairQueueKey
+): queue is DirtyRepairQueue {
+	if (
+		!queue ||
+		queue.cells.length !== dirtyCells.size ||
+		queue.rowStart !== key.rowStart ||
+		queue.rowEnd !== key.rowEnd ||
+		queue.colStart !== key.colStart ||
+		queue.colEnd !== key.colEnd ||
+		queue.focusedCell !== key.focusedCell ||
+		queue.activeEdit !== key.activeEdit ||
+		queue.plan !== key.plan ||
+		queue.rowModel !== key.rowModel
+	) {
+		return false;
+	}
+	for (let i = 0; i < queue.cells.length; i++) {
+		const cell = queue.cells[i];
+		if (!dirtyCells.has(cell)) return false;
+		const cs = getCellSlotIdentity(cell);
+		if (
+			cs?.rowIndex !== queue.rowIndexes[i] ||
+			cs?.colIndex !== queue.colIndexes[i] ||
+			cs?.rowId !== queue.rowIds[i] ||
+			cs?.columnInstanceId !== queue.columnInstanceIds[i]
+		) {
+			return false;
+		}
+	}
+	return true;
 }
 
 function classifyDirtyCellLane<TRowData>(cell: HTMLDivElement, columns: readonly ColumnDef<TRowData>[]): Exclude<PostScrollRepairLane, 'all'> {
@@ -116,7 +190,7 @@ export function repaintInvalidatedRows<TRowData>(deps: RowRenderMaintenanceDeps<
 	const interaction = readInteractionState(state);
 	const columns = deps.engine.columns.getDisplayedColumns();
 	const plan = deps.engine.columns.getCompiledPlan();
-	const columnTopology = compileColumnTopology(plan);
+	const columnTopology = getMemoizedColumnTopology(plan);
 	const colCount = columns.length;
 	const pinRightBaseLeft = plan.pinRightBaseLeft;
 
@@ -161,7 +235,7 @@ export function repaintInvalidatedCells<TRowData>(deps: RowRenderMaintenanceDeps
 	const interaction = readInteractionState(state);
 	const columns = deps.engine.columns.getDisplayedColumns();
 	const plan = deps.engine.columns.getCompiledPlan();
-	const columnTopology = compileColumnTopology(plan);
+	const columnTopology = getMemoizedColumnTopology(plan);
 	const pinRightBaseLeft = plan.pinRightBaseLeft;
 
 	for (const [rowId, colFields] of frame.cellsByRowId) {
@@ -250,7 +324,7 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 	const interaction = readInteractionState(state);
 	const columns = deps.engine.columns.getDisplayedColumns();
 	const plan = deps.engine.columns.getCompiledPlan();
-	const columnTopology = compileColumnTopology(plan);
+	const columnTopology = getMemoizedColumnTopology(plan);
 	const colCount = columns.length;
 	const pinRightBaseLeft = plan.pinRightBaseLeft;
 
@@ -288,80 +362,117 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 		return 4 - normDist * 0.01;
 	};
 
-	const [b0, b1, b2, b3] = deps.dirtyBuckets;
-	b0.length = 0;
-	b1.length = 0;
-	b2.length = 0;
-	b3.length = 0;
-	for (const cell of deps.dirtyCellsAfterScroll) {
-		const p = getCellPriority(cell);
-		if (p >= 6) b0.push(cell);
-		else if (p >= 5) b1.push(cell);
-		else if (p > 1) b2.push(cell);
-		else b3.push(cell);
-	}
-	for (const bucket of deps.dirtyBuckets) sortDirtyCellsForRepair(bucket, getCellPriority);
-
-	let processed = 0;
-	for (let bi = 0; bi < 4 && processed < maxCells; bi++) {
-		const bucket = deps.dirtyBuckets[bi];
-		for (let i = 0; i < bucket.length; i++) {
-			if (processed >= maxCells) break;
-			const cell = bucket[i];
-			if (lane !== 'all' && classifyDirtyCellLane(cell, columns) !== lane) continue;
-			deps.dirtyCellsAfterScroll.delete(cell);
-			const cs = (
-				cell as unknown as {
-					__cellSlot?: {
-						rowIndex: number;
-						colField?: string;
-						colIndex: number;
-						element: HTMLDivElement;
-					};
-				}
-			).__cellSlot;
-			if (!cs || cs.rowIndex < 0 || !cs.colField) continue;
-
-			const rowIndex = cs.rowIndex;
-			const visualRow = rowModel.getVisualRow(rowIndex);
-			const colIndex = cs.colIndex;
-
-			if (visualRow?.kind === 'data' && colIndex >= 0) {
-				const slot = deps.activeRows.get(rowIndex);
-				if (!slot) continue;
-				const cellSlot = slot.getCellForCol(colIndex);
-				if (!cellSlot || cellSlot.element !== cell) continue;
-
-				const laneCol = columns[colIndex] as InternalColumnDef<TRowData> | undefined;
-				const lane = (laneCol ? columnTopology.byColumnId.get(laneCol.instanceId) : undefined)?.lane ?? 'center';
-				deps.bindCellFull({
-					cellSlot,
-					slotId: slot.id,
-					slotGeneration: slot.generation,
-					node: visualRow.node,
-					rowIndex,
-					colIndex,
-					col: columns[colIndex],
-					lane,
-					pinRightBaseLeft,
-					plan,
-					state,
-					isScrollFrameActive: false,
-					phase: 'scroll-idle',
-				});
-				deps.incrementPostScrollDirtyCellsDecorated();
-				processed++;
-			} else if (visualRow?.kind === 'loading' && colIndex >= 0) {
-				const slot = deps.activeRows.get(rowIndex);
-				if (!slot) continue;
-				const cellSlot = slot.getCellForCol(colIndex);
-				if (!cellSlot || cellSlot.element !== cell) continue;
-
-				deps.cellRenderer.ensureLoadingSkeleton(cell);
-				deps.incrementPostScrollDirtyCellsDecorated();
-				processed++;
-			}
+	const queueKey: DirtyRepairQueueKey = {
+		rowStart: rowRange.startIdx,
+		rowEnd: rowRange.endIdx,
+		colStart: colRange.startIdx,
+		colEnd: colRange.endIdx,
+		focusedCell,
+		activeEdit,
+		plan,
+		rowModel,
+	};
+	let queue = dirtyRepairQueues.get(deps.dirtyCellsAfterScroll);
+	if (!isDirtyRepairQueueCurrent(queue, deps.dirtyCellsAfterScroll, queueKey)) {
+		const [b0, b1, b2, b3] = deps.dirtyBuckets;
+		b0.length = 0;
+		b1.length = 0;
+		b2.length = 0;
+		b3.length = 0;
+		for (const cell of deps.dirtyCellsAfterScroll) {
+			const p = getCellPriority(cell);
+			if (p >= 6) b0.push(cell);
+			else if (p >= 5) b1.push(cell);
+			else if (p > 1) b2.push(cell);
+			else b3.push(cell);
 		}
+		for (const bucket of deps.dirtyBuckets) sortDirtyCellsForRepair(bucket, getCellPriority);
+		queue = { ...queueKey, cells: [], rowIndexes: [], colIndexes: [], rowIds: [], columnInstanceIds: [] };
+		for (const bucket of deps.dirtyBuckets) {
+			for (const cell of bucket) queue.cells.push(cell);
+			bucket.length = 0;
+		}
+		dirtyRepairQueues.set(deps.dirtyCellsAfterScroll, queue);
+	}
+
+	// Walk the queue in priority order, compacting survivors (unprocessed cells, other-lane cells)
+	// to the front so the queue keeps mirroring the dirty set for the next chunk.
+	const queued = queue.cells;
+	let kept = 0;
+	let processed = 0;
+	for (let i = 0; i < queued.length; i++) {
+		const cell = queued[i];
+		if (!deps.dirtyCellsAfterScroll.has(cell)) continue;
+		if (processed >= maxCells || (lane !== 'all' && classifyDirtyCellLane(cell, columns) !== lane)) {
+			queued[kept++] = cell;
+			continue;
+		}
+		deps.dirtyCellsAfterScroll.delete(cell);
+		const cs = (
+			cell as unknown as {
+				__cellSlot?: {
+					rowIndex: number;
+					colField?: string;
+					colIndex: number;
+					element: HTMLDivElement;
+				};
+			}
+		).__cellSlot;
+		if (!cs || cs.rowIndex < 0 || !cs.colField) continue;
+
+		const rowIndex = cs.rowIndex;
+		const visualRow = rowModel.getVisualRow(rowIndex);
+		const colIndex = cs.colIndex;
+
+		if (visualRow?.kind === 'data' && colIndex >= 0) {
+			const slot = deps.activeRows.get(rowIndex);
+			if (!slot) continue;
+			const cellSlot = slot.getCellForCol(colIndex);
+			if (!cellSlot || cellSlot.element !== cell) continue;
+
+			const laneCol = columns[colIndex] as InternalColumnDef<TRowData> | undefined;
+			const lane = (laneCol ? columnTopology.byColumnId.get(laneCol.instanceId) : undefined)?.lane ?? 'center';
+			deps.bindCellFull({
+				cellSlot,
+				slotId: slot.id,
+				slotGeneration: slot.generation,
+				node: visualRow.node,
+				rowIndex,
+				colIndex,
+				col: columns[colIndex],
+				lane,
+				pinRightBaseLeft,
+				plan,
+				state,
+				isScrollFrameActive: false,
+				phase: 'scroll-idle',
+			});
+			deps.incrementPostScrollDirtyCellsDecorated();
+			processed++;
+		} else if (visualRow?.kind === 'loading' && colIndex >= 0) {
+			const slot = deps.activeRows.get(rowIndex);
+			if (!slot) continue;
+			const cellSlot = slot.getCellForCol(colIndex);
+			if (!cellSlot || cellSlot.element !== cell) continue;
+
+			deps.cellRenderer.ensureLoadingSkeleton(cell);
+			deps.incrementPostScrollDirtyCellsDecorated();
+			processed++;
+		}
+	}
+	queued.length = kept;
+	// Snapshot the survivors' slot identity after binding so the next chunk can prove the order
+	// is still exactly what a fresh sort would produce.
+	queue.rowIndexes.length = kept;
+	queue.colIndexes.length = kept;
+	queue.rowIds.length = kept;
+	queue.columnInstanceIds.length = kept;
+	for (let i = 0; i < kept; i++) {
+		const cs = getCellSlotIdentity(queued[i]);
+		queue.rowIndexes[i] = cs?.rowIndex;
+		queue.colIndexes[i] = cs?.colIndex;
+		queue.rowIds[i] = cs?.rowId;
+		queue.columnInstanceIds[i] = cs?.columnInstanceId;
 	}
 
 	const remaining = deps.dirtyCellsAfterScroll.size;
@@ -372,6 +483,7 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 		else remainingMotion++;
 	}
 	if (remaining === 0) {
+		dirtyRepairQueues.delete(deps.dirtyCellsAfterScroll);
 		for (const r of deps.dirtyRowsAfterScroll) {
 			const slot = deps.activeRows.get(r);
 			const visualRow = rowModel.getVisualRow(r);

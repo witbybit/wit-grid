@@ -13,6 +13,7 @@ export class ScrollEngine<TRowData = unknown> {
 	private engine: GridEngine<TRowData>;
 	private scrollContainer: HTMLElement | null = null;
 	private onScrollCallback: ((scrollTop: number, scrollLeft: number, timestamp?: number) => void) | null = null;
+	private onScrollEndCallback: (() => void) | null = null;
 
 	private scrollEndTimer: any = null;
 	// Feature-detected once in bind() — the per-event `in` checks showed up in profiles.
@@ -30,12 +31,19 @@ export class ScrollEngine<TRowData = unknown> {
 	}
 
 	/**
-	 * Bind the scroll engine to the scrollable viewport container.
+	 * Bind the scroll engine to the scrollable viewport container. `onScrollEnd` fires on the
+	 * browser's native `scrollend` only; without native support the frame coordinator's
+	 * time-based quiet detection ends the scroll instead.
 	 */
-	public bind(scrollContainer: HTMLElement, onScroll: (scrollTop: number, scrollLeft: number, timestamp?: number) => void): void {
+	public bind(
+		scrollContainer: HTMLElement,
+		onScroll: (scrollTop: number, scrollLeft: number, timestamp?: number) => void,
+		onScrollEnd?: () => void
+	): void {
 		this.unbind();
 		this.scrollContainer = scrollContainer;
 		this.onScrollCallback = onScroll;
+		this.onScrollEndCallback = onScrollEnd ?? null;
 
 		this.lastScrollTop = scrollContainer.scrollTop;
 		this.lastScrollLeft = scrollContainer.scrollLeft;
@@ -49,7 +57,7 @@ export class ScrollEngine<TRowData = unknown> {
 		// Bind native scrollend event if supported by the browser
 		this.supportsScrollEnd = typeof window !== 'undefined' && ('onscrollend' in window || 'onscrollend' in HTMLElement.prototype);
 		if (this.supportsScrollEnd) {
-			scrollContainer.addEventListener('scrollend', this.handleScrollEnd);
+			scrollContainer.addEventListener('scrollend', this.handleNativeScrollEnd);
 		}
 	}
 
@@ -63,10 +71,11 @@ export class ScrollEngine<TRowData = unknown> {
 		}
 		if (this.scrollContainer) {
 			this.scrollContainer.removeEventListener('scroll', this.handleScroll);
-			this.scrollContainer.removeEventListener('scrollend', this.handleScrollEnd);
+			this.scrollContainer.removeEventListener('scrollend', this.handleNativeScrollEnd);
 			this.scrollContainer = null;
 		}
 		this.onScrollCallback = null;
+		this.onScrollEndCallback = null;
 	}
 
 	/**
@@ -92,7 +101,8 @@ export class ScrollEngine<TRowData = unknown> {
 		this.lastScrollLeft = scrollLeft;
 		this.lastTimestamp = now;
 
-		// Fallback scroll-stop detection for browsers without native 'scrollend'
+		// Velocity settle for browsers without native 'scrollend'. Scroll-end itself is detected by
+		// the frame coordinator's time-based quiet window, not by this timer.
 		if (!this.supportsScrollEnd) {
 			if (this.scrollEndTimer) {
 				clearTimeout(this.scrollEndTimer);
@@ -121,6 +131,16 @@ export class ScrollEngine<TRowData = unknown> {
 		if (this.onScrollCallback && this.scrollContainer) {
 			this.onScrollCallback(this.scrollContainer.scrollTop, this.scrollContainer.scrollLeft);
 		}
+	};
+
+	/**
+	 * Native `scrollend`. Routing it through onScroll alone was a no-op — the position is
+	 * unchanged, so the viewport bails before anything reacts — which left scroll-end to the
+	 * quiet-frame fallback. Signal scroll-end explicitly after the settle bookkeeping.
+	 */
+	private handleNativeScrollEnd = (): void => {
+		this.handleScrollEnd();
+		this.onScrollEndCallback?.();
 	};
 
 	/**

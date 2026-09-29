@@ -1,9 +1,10 @@
 import type { GridEngine } from '../engine/GridEngine.js';
 import { computeRenderWindow, type RenderWindow, type StickyGroupStackItem } from './renderWindow.js';
 import type { InternalColumnDef } from '../columnDef.js';
-import { compileColumnTopology, type CompiledColumnTopology } from './columnTopology.js';
+import { getMemoizedColumnTopology, type CompiledColumnTopology } from './columnTopology.js';
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
 import { summarizeAnalysisState } from '../analysis/analysisState.js';
+import type { InternalGridState } from '../state/GridState.js';
 
 export const LEAF_HEADER_HEIGHT = 40;
 export const GROUP_PANEL_HEIGHT = 42;
@@ -128,6 +129,16 @@ export interface GridLayoutPlan {
 	columnTopology: CompiledColumnTopology;
 }
 
+/**
+ * Rounds a translate offset to the nearest device pixel so per-frame repositioned chrome
+ * (selection overlay, pinned rows, sticky group rows) does not shimmer across sub-pixel
+ * positions while scrolling. Falls back to CSS pixels when there is no window.
+ */
+export function snapToDevicePixel(value: number): number {
+	const dpr = typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+	return Math.round(value * dpr) / dpr;
+}
+
 export function getRightPinnedLaneScreenLeft(layoutPlan: GridLayoutPlan): number {
 	return layoutPlan.viewport.clientWidth - layoutPlan.columns.lanes.right.width;
 }
@@ -214,6 +225,60 @@ function buildHeaderBands<TRowData>(
 	return bands;
 }
 
+/**
+ * Structural (scroll-invariant) half of the layout plan: topology, header bands and the header
+ * heights derived from them. Rebuilding it costs O(columns) plus one `canMoveColumn` call per
+ * column, so it is memoized per compiled plan and only rebuilt when the plan, the grid state
+ * object (immutable; replaced on every commit) or the leaf header height changes. Scroll frames
+ * change none of these, so they reuse the cached bands and topology by reference.
+ */
+interface StaticLayoutEntry {
+	state: object;
+	leafHeaderHeight: number;
+	columnTopology: CompiledColumnTopology;
+	headerBands: HeaderBandLayout[];
+}
+
+const staticLayoutCache = new WeakMap<object, StaticLayoutEntry>();
+
+function getStaticLayout<TRowData>(
+	columnPlan: ReturnType<GridEngine<TRowData>['columns']['getCompiledPlan']>,
+	state: InternalGridState<TRowData>,
+	leafHeaderHeight: number
+): StaticLayoutEntry {
+	const cached = staticLayoutCache.get(columnPlan);
+	if (cached && cached.state === state && cached.leafHeaderHeight === leafHeaderHeight && cached.columnTopology.version === columnPlan.version) {
+		return cached;
+	}
+	const columnTopology = getMemoizedColumnTopology(columnPlan);
+	const headerBands = buildHeaderBands(
+		columnTopology,
+		columnPlan.displayedColumns,
+		leafHeaderHeight,
+		state.enableColumnReorder ?? true,
+		state.defaultColWidth
+	);
+	const entry: StaticLayoutEntry = { state, leafHeaderHeight, columnTopology, headerBands };
+	staticLayoutCache.set(columnPlan, entry);
+	return entry;
+}
+
+// Single-entry cache: the analysis summary walks the query tree, and filter/query models are
+// immutable references, so identity equality is an exact hit test.
+const UNSET_ANALYSIS_MODEL = {};
+let lastAnalysisFilterModel: unknown = UNSET_ANALYSIS_MODEL;
+let lastAnalysisQueryModel: unknown = UNSET_ANALYSIS_MODEL;
+let lastAnalysisActiveItems = 0;
+
+function getActiveAnalysisItemCount(state: InternalGridState<unknown>): number {
+	if (state.filterModel !== lastAnalysisFilterModel || state.queryModel !== lastAnalysisQueryModel) {
+		lastAnalysisFilterModel = state.filterModel;
+		lastAnalysisQueryModel = state.queryModel;
+		lastAnalysisActiveItems = summarizeAnalysisState(state.filterModel, state.queryModel).totalActiveItems;
+	}
+	return lastAnalysisActiveItems;
+}
+
 export function computeGridLayoutPlan<TRowData>(
 	engine: GridEngine<TRowData>,
 	renderWindow?: RenderWindow,
@@ -229,8 +294,8 @@ export function computeGridLayoutPlan<TRowData>(
 	const totalColumnsWidth = columnPlan.totalWidth;
 	const contentWidth = Math.max(totalColumnsWidth, viewportWidth);
 	const groupPanelHeight = state.showGroupPanel ? GROUP_PANEL_HEIGHT : 0;
-	const analysis = summarizeAnalysisState(state.filterModel, state.queryModel);
-	const filterChipBarHeight = state.showFilterChipBar && analysis.totalActiveItems > 0 ? FILTER_CHIP_BAR_HEIGHT : 0;
+	const filterChipBarHeight =
+		state.showFilterChipBar && getActiveAnalysisItemCount(state as InternalGridState<unknown>) > 0 ? FILTER_CHIP_BAR_HEIGHT : 0;
 	const leafHeaderHeight = leafHeaderHeightPx !== undefined && leafHeaderHeightPx > 0 ? leafHeaderHeightPx : LEAF_HEADER_HEIGHT;
 	const pinLeftCount = Math.min(engine.viewport.pinLeftColumns, rw.colCount);
 	const pinRightCount = Math.min(engine.viewport.pinRightColumns, Math.max(0, rw.colCount - pinLeftCount));
@@ -241,15 +306,7 @@ export function computeGridLayoutPlan<TRowData>(
 			? totalColumnsWidth - (engine.geometry.colLefts[firstRightPinColIdx] || totalColumnsWidth)
 			: 0;
 
-	const columnTopology = compileColumnTopology(columnPlan);
-
-	const headerBands = buildHeaderBands(
-		columnTopology,
-		columnPlan.displayedColumns,
-		leafHeaderHeight,
-		state.enableColumnReorder ?? true,
-		state.defaultColWidth
-	);
+	const { columnTopology, headerBands } = getStaticLayout(columnPlan, state, leafHeaderHeight);
 
 	// totalHeaderHeight = sum of all band heights (group bands + leaf band)
 	const lastBand = headerBands[headerBands.length - 1];

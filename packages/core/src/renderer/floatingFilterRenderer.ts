@@ -41,9 +41,22 @@ function debounce(fn: (...args: unknown[]) => void, ms: number): (...args: unkno
 const DROPDOWN_ID = 'og-floating-set-dropdown';
 const OP_MENU_ID = 'og-floating-op-menu';
 
+// Menus this module opened. syncScrollLeft closes menus on every horizontal scroll frame, so it
+// uses these refs instead of two document.getElementById lookups per frame. Both menus are only
+// ever created below (which records them here); a ref that was removed elsewhere is detached, and
+// removing a detached node is a no-op.
+let openDropdownEl: HTMLElement | null = null;
+let openOpMenuEl: HTMLElement | null = null;
+
 function closeOpenMenus(): void {
-	document.getElementById(DROPDOWN_ID)?.remove();
-	document.getElementById(OP_MENU_ID)?.remove();
+	if (openDropdownEl) {
+		openDropdownEl.remove();
+		openDropdownEl = null;
+	}
+	if (openOpMenuEl) {
+		openOpMenuEl.remove();
+		openOpMenuEl = null;
+	}
 }
 
 // ── Main class ───────────────────────────────────────────────────────────────
@@ -404,6 +417,7 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 
 		const menu = document.createElement('div');
 		menu.id = OP_MENU_ID;
+		openOpMenuEl = menu;
 		const rect = anchor.getBoundingClientRect();
 		menu.style.cssText = [
 			'position:fixed',
@@ -598,6 +612,7 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 
 		const dropdown = document.createElement('div');
 		dropdown.id = DROPDOWN_ID;
+		openDropdownEl = dropdown;
 		(dropdown as any).__cell = cell;
 		dropdown.style.cssText = [
 			'position:fixed',

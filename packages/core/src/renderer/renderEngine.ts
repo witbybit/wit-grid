@@ -233,6 +233,9 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			onFault: (msg) => engine.runtimeFaults.report({ source: 'renderer', operation: 'frame-reentry', error: new Error(msg) }),
 			runtimeState: this.runtimeState,
 			gridScheduler: defaultGridScheduler,
+			// Time-based fallback for browsers without native scrollend: a fixed frame count
+			// ends the gesture after ~12ms on 240Hz displays, i.e. mid-gesture.
+			scrollEndQuietMs: 100,
 		});
 
 		this.viewportRenderer = new ViewportRenderer<TRowData>(engine, this.geometryController);
@@ -452,7 +455,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			scrollViewport.addEventListener('mouseleave', this.onRowMouseLeave);
 			scrollViewport.addEventListener('click', this.onViewportInteractionClick);
 			scrollViewport.addEventListener('mousedown', this.onViewportInteractionMouseDown);
-			this.scrollEngine.bind(scrollViewport, this.onScroll);
+			this.scrollEngine.bind(scrollViewport, this.onScroll, this.onNativeScrollEnd);
 		}
 
 		if (this.viewportRenderer.headerLayer && this.viewportRenderer.headerLeftLayer && this.viewportRenderer.headerRightLayer) {
@@ -575,6 +578,10 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	 */
 	private onScroll = (scrollTop: number, scrollLeft: number, timestamp?: number): void => {
 		this.scrollCoordinator.onScroll(scrollTop, scrollLeft, timestamp);
+	};
+
+	private onNativeScrollEnd = (): void => {
+		this.frameCoordinator.notifyScrollEnd();
 	};
 
 	private clearPostScrollDecorationTimer(): void {
