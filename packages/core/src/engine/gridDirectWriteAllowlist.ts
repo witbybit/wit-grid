@@ -27,7 +27,7 @@ export const GRID_DIRECT_WRITE_ALLOWLIST = [
 		justification: 'Cell notifications emit renderer-local invalidations after data mutations.',
 	},
 	{
-		file: 'renderer/RenderInvalidationCoordinator.ts',
+		file: 'renderer/renderPaintPipeline.ts',
 		kind: 'renderer-local-consumer',
 		justification:
 			'Renderer-only listeners coordinate paint timing, scroll alignment, and local geometry caches after commit-owned invalidations are declared.',

@@ -134,5 +134,4 @@ export function isOverscanLiveCell(
 export function recordDispatchWrite<TRowData>(input: DispatchCellPresentationInput<TRowData>, didWrite: boolean): void {
 	if (input.phase !== 'scroll') return;
 	if (didWrite) input.deps.incrementCurrentScrollCellsWritten();
-	input.deps.incrementCellsBoundDuringScroll();
 }

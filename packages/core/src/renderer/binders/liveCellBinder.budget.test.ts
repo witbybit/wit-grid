@@ -46,7 +46,6 @@ function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: strin
 		markCellDirtyAfterScroll: vi.fn(),
 		releaseCellPortal: vi.fn(),
 		incrementStyleHookCallsDuringScroll: vi.fn(),
-		incrementCellsBoundDuringScroll: vi.fn(),
 		incrementCurrentScrollCellsWritten: vi.fn(),
 		incrementForceLiveMountsDuringScroll: vi.fn(),
 		incrementLiveReactMountsDuringScroll: vi.fn(),

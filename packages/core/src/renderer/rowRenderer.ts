@@ -114,7 +114,7 @@ export class RowRenderer<TRowData = unknown> {
 		});
 	}
 
-	// Stable-slot virtualization counters — reset per scroll frame by renderScrollCoordinator.
+	// Stable-slot virtualization counters — reset per scroll frame by RenderScrollPipeline.
 	public slotStats: SlotRuntimeStats = {
 		rowSlotCount: 0,
 		cellSlotCount: 0,

@@ -9,7 +9,7 @@ import type { ColumnDef, GridStyleRule } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
 import type { GridRowNode } from '../publicRowNode.js';
 import type { RowLoadState } from '../rowModel.js';
-import type { RenderStats } from '../renderer/renderOrchestrator.js';
+import type { RenderStats } from '../renderer/renderTelemetry.js';
 import type { PersistenceStatus, PersistedGridState } from '../persistence/statePersistence.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
 import type { CsvExportOptions } from '../export/csvExport.js';

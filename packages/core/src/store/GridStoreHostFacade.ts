@@ -1,6 +1,6 @@
 import type { GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import type { RuntimeFault, RuntimeFaultInput } from '../diagnostics/RuntimeFaultReporter.js';
-import type { RenderStats } from '../renderer/renderOrchestrator.js';
+import type { RenderStats } from '../renderer/renderTelemetry.js';
 import type { BuiltInThemeName, ThemeTokens } from '../renderer/themes.js';
 import type { RuntimePortBinding, RuntimePortBindResult, GridRuntimePorts } from '../engine/rendererPorts.js';
 

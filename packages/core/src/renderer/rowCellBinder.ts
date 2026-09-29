@@ -113,7 +113,6 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 		portalKey?: string
 	) => void;
 	incrementStyleHookCallsDuringScroll: () => void;
-	incrementCellsBoundDuringScroll: () => void;
 	incrementCurrentScrollCellsWritten: () => void;
 	incrementFullCellBinds?: () => void;
 	incrementGeometryOnlyCellBinds?: () => void;

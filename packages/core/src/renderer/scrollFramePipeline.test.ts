@@ -5,7 +5,7 @@ import { ClientRowModelController } from '../rowModel.js';
 import { computeGridLayoutPlan } from './layoutPlan.js';
 import { RenderEngine } from './renderEngine.js';
 import { RenderRuntimeState } from './renderRuntimeState.js';
-import { RenderScrollCoordinator, type RenderScrollCoordinatorState } from './renderScrollCoordinator.js';
+import { RenderScrollPipeline } from './renderScrollPipeline.js';
 import { DefaultFrameCoordinator } from './frameCoordinator.js';
 import type { GridIdleDeadline, GridScheduler } from './gridScheduler.js';
 import { ScrollEngine } from './scrollEngine.js';
@@ -131,30 +131,18 @@ describe('deadline-aware post-scroll decoration budgets', () => {
 			left--;
 			return { processed: options.maxCells, remaining: left, remainingMotion: left, remainingFidelity: 0 };
 		});
-		const state = {
-			postScrollDecorationScheduled: false,
-			postScrollDecorationTimer: null,
-			postScrollDecorationGeneration: 0,
-			postScrollFidelityScheduled: false,
-			postScrollFidelityTimer: null,
-			postScrollFidelityGeneration: 0,
-			fidelityEpoch: 0,
-			postScrollDecorationBudget: 32,
-			postScrollFidelityBudget: 12,
-		} as RenderScrollCoordinatorState;
 		const renderStats = {
-			postScrollDecorationChunks: 0,
 			postScrollMotionChunks: 0,
 			postScrollFidelityChunks: 0,
-			maxCellsDecoratedInOneChunk: 0,
 			maxMotionCellsDecoratedInOneChunk: 0,
 			maxFidelityCellsDecoratedInOneChunk: 0,
 			cellsDecoratedAfterScroll: 0,
 			motionCellsDecoratedAfterScroll: 0,
 			fidelityCellsDecoratedAfterScroll: 0,
 		};
-		const coordinator = new RenderScrollCoordinator(
+		const coordinator = new RenderScrollPipeline(
 			{
+				engine: { rowVersions: new Map(), columns: { getCompiledPlan: () => ({}) } },
 				runtimeState,
 				gridScheduler: {
 					idle: (callback: (deadline?: GridIdleDeadline) => void) => {
@@ -167,7 +155,7 @@ describe('deadline-aware post-scroll decoration budgets', () => {
 				portalMountManager: { beginCellReleaseTransaction: vi.fn(), endCellReleaseTransaction: vi.fn() },
 				renderStats,
 			} as any,
-			state
+			{ postScrollDecorationBudget: 32, postScrollFidelityBudget: 12 }
 		);
 		return { coordinator, callbacks, decorateDirtyCellsAfterScroll, renderStats };
 	}

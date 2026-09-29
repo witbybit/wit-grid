@@ -71,7 +71,6 @@ export interface RowRendererRuntimeArgs<TRowData = unknown> {
 	clearProgrammaticScrollCell: () => void;
 	setDeferredFocusCell: (cell: HTMLDivElement) => void;
 	incrementStyleHookCallsDuringScroll: () => void;
-	incrementCellsBoundDuringScroll: () => void;
 	incrementCurrentScrollCellsVisited: () => void;
 	incrementCurrentScrollCellsPatched: () => void;
 	incrementCurrentScrollCellsWritten: () => void;
@@ -164,11 +163,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			incrementStyleHookCallsDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) this.deps.stateHost.renderStats.styleHookCallsDuringScroll++;
 			},
-			incrementCellsBoundDuringScroll: () => {
-				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.cellsBoundDuringScroll = (this.deps.stateHost.renderStats.cellsBoundDuringScroll || 0) + 1;
-				}
-			},
 			incrementCurrentScrollCellsVisited: () => {
 				this.deps.stateHost.currentScrollCellsVisited++;
 			},
@@ -203,7 +197,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			markCellDirtyAfterScroll: this.runtimeArgs.markCellDirtyAfterScroll,
 			releaseCellPortal: this.runtimeArgs.releaseCellPortal,
 			incrementStyleHookCallsDuringScroll: this.runtimeArgs.incrementStyleHookCallsDuringScroll,
-			incrementCellsBoundDuringScroll: this.runtimeArgs.incrementCellsBoundDuringScroll,
 			incrementCurrentScrollCellsWritten: this.runtimeArgs.incrementCurrentScrollCellsWritten,
 			incrementFullCellBinds: () => {
 				if (this.deps.stateHost.renderStats) this.deps.stateHost.renderStats.fullCellBinds++;

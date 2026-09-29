@@ -1,5 +1,5 @@
-import type { RenderStats } from '../renderer/renderOrchestrator.js';
-import { createEmptyRenderStats } from '../renderer/renderOrchestrator.js';
+import type { RenderStats } from '../renderer/renderTelemetry.js';
+import { createEmptyRenderStats } from '../renderer/renderTelemetry.js';
 import type { ThemeTokens, BuiltInThemeName } from '../renderer/themes.js';
 import { DARK_THEME } from '../renderer/themes.js';
 

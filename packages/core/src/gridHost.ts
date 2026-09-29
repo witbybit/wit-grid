@@ -1,5 +1,5 @@
 import { RenderEngine } from './renderer/renderEngine.js';
-import type { RenderStats } from './renderer/renderOrchestrator.js';
+import type { RenderStats } from './renderer/renderTelemetry.js';
 import type {
 	GridCellContentMount,
 	GridCellContentUnmount,

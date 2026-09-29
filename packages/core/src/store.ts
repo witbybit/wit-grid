@@ -32,7 +32,7 @@ import { createClientRowModelRuntime, createInfiniteRowModelRuntime, createServe
 import type { GridRuntimePorts, RuntimePortBinding, RuntimePortBindResult } from './engine/rendererPorts.js';
 import { HEADLESS_PORTS } from './engine/rendererPorts.js';
 import { type GridInstrumentation, NOOP_INSTRUMENTATION } from './diagnostics/GridInstrumentation.js';
-import type { RenderStats } from './renderer/renderOrchestrator.js';
+import type { RenderStats } from './renderer/renderTelemetry.js';
 import type { GridRowNode } from './publicRowNode.js';
 import type { AggregationDef } from './rows/stages/aggregateStage.js';
 import { exportToCsv, type CsvExportOptions } from './export/csvExport.js';
