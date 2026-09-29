@@ -6,11 +6,12 @@ import type { RowCellBinderDeps } from '../rowCellBinder.js';
 import type { RowNode } from '../../rowNode.js';
 import type { ViewportPlan } from '../viewportPlanner.js';
 import type { CellSlot } from '../cellSlot.js';
-import { applyPrimitiveCellPresentation } from './primitiveCellBinder.js';
+import type { CellCtrlPresentationState } from '../controllers/CellCtrl.js';
+import { applyTextCellPresentation } from './textCellBinder.js';
 import { applyLiveCellPresentation } from './liveCellBinder.js';
-import { applyFreezeCellPresentation } from './freezeCellBinder.js';
-import { applyTextImpostorCellPresentation } from './textImpostorCellBinder.js';
-import { applyHtmlSnapshotCellPresentation } from './htmlSnapshotCellBinder.js';
+import { applySnapshotCellPresentation } from './snapshotCellBinder.js';
+import { applyCheckboxCellPresentation } from './checkboxCellBinder.js';
+import { getCellRendererLifecycle } from './binderShared.js';
 
 export interface CellBindGeometry {
 	rowIndex: number;
@@ -56,46 +57,78 @@ export interface DispatchCellPresentationInput<TRowData> {
 }
 
 /**
+ * The four render states a cell can be in. Every presentation kind (a descriptive label the
+ * resolver and telemetry use) belongs to exactly one:
+ *  - text:     writes a string or placeholder; holds no portal.
+ *  - live:     a portal (React) or DOM renderer mounted and updating.
+ *  - snapshot: the last rendered content kept without a live update (frozen portal, html clone).
+ *  - checkbox: the row-selection checkbox.
+ */
+export type CellRenderState = 'text' | 'live' | 'snapshot' | 'checkbox';
+
+const RENDER_STATE: Record<CellCtrlPresentationState['kind'], CellRenderState> = {
+	buffered: 'text',
+	primitive: 'text',
+	loading: 'text',
+	shell: 'text',
+	'text-impostor': 'text',
+	'html-pending': 'text',
+	'live-renderer': 'live',
+	'frozen-portal': 'snapshot',
+	'html-snapshot': 'snapshot',
+	'checkbox-selector': 'checkbox',
+};
+
+export function getCellRenderState(kind: CellCtrlPresentationState['kind']): CellRenderState {
+	return RENDER_STATE[kind];
+}
+
+/** The portal key the next presentation keeps mounted in this cell, if any. */
+function portalKeptBy(presentation: CellCtrlPresentationState): string | undefined {
+	switch (presentation.kind) {
+		case 'live-renderer':
+		case 'frozen-portal':
+			return presentation.portalKey;
+		case 'buffered':
+			// Off-screen buffered cells may preserve an already-rendered portal as-is.
+			return presentation.contentMode === 'portal' ? presentation.portalKey : undefined;
+		default:
+			return undefined;
+	}
+}
+
+/**
  * Dispatch only. Presentation authority lives on CellCtrl; binders receive the controller and apply
  * its already-resolved state onto the physical CellSlot.
+ *
+ * Owns the one render-state transition that can leak: leaving a portal. Whatever portal the cell
+ * really holds (the portal registry's view of its host, else the slot's own record) is released
+ * exactly once here unless the next presentation keeps that same portal; binders never release.
  */
 export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { cellSlot, cellCtrl, deps } = input;
-	const existing = cellSlot.renderer;
 	const nextPresentation = cellCtrl.presentationState;
 
-	if (existing instanceof PortalRendererHandle) {
-		const nextPortalKey =
-			nextPresentation.kind === 'live-renderer' || nextPresentation.kind === 'frozen-portal' ? nextPresentation.portalKey : undefined;
-
-		if (!nextPortalKey || existing.portalKey !== nextPortalKey) {
-			deps.releaseCellPortal(cellSlot.element, false, 'invalidated', existing.portalKey);
-			// Scroll binds never reassign the handle, so drop it here: otherwise every later bind
-			// (each scroll frame, then the settling full bind) releases the same portal again, and
-			// once the deferred release has run that repeat finds no identity and reports a fault.
-			cellSlot.renderer = null;
-		}
+	const host = deps.getCellPortalHost(cellSlot.element);
+	const existing = cellSlot.renderer;
+	const heldPortalKey =
+		(host ? deps.portalMountManager.getMountedKeyForContainer?.(host) : undefined) ??
+		(existing instanceof PortalRendererHandle ? existing.portalKey : undefined) ??
+		cellSlot.lastPortalKey;
+	if (heldPortalKey && portalKeptBy(nextPresentation) !== heldPortalKey) {
+		getCellRendererLifecycle(deps).release({ cellCtrl, reason: 'invalidated', cellElement: cellSlot.element, portalKey: heldPortalKey });
+		// Scroll binds never reassign the handle; a stale one would re-request this release later.
+		if (existing instanceof PortalRendererHandle) cellSlot.renderer = null;
 	}
 
-	switch (nextPresentation.kind) {
-		case 'buffered':
-		case 'primitive':
-		case 'loading':
-			return applyPrimitiveCellPresentation(input);
-
-		case 'live-renderer':
+	switch (RENDER_STATE[nextPresentation.kind]) {
+		case 'text':
+			return applyTextCellPresentation(input);
+		case 'live':
 			return applyLiveCellPresentation(input);
-
-		case 'checkbox-selector':
-		case 'frozen-portal':
-		case 'shell':
-			return applyFreezeCellPresentation(input);
-
-		case 'text-impostor':
-			return applyTextImpostorCellPresentation(input);
-
-		case 'html-snapshot':
-		case 'html-pending':
-			return applyHtmlSnapshotCellPresentation(input);
+		case 'snapshot':
+			return applySnapshotCellPresentation(input);
+		case 'checkbox':
+			return applyCheckboxCellPresentation(input);
 	}
 }

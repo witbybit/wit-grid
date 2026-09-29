@@ -133,7 +133,6 @@ export type ScrollCellPresentation =
 			contentMode: CellContentMode;
 			formattedValue: string;
 			portalKey: string | undefined;
-			releaseStalePortal: boolean;
 			title: string | null;
 			validationError: string | undefined;
 			recordVersionsFrom: CellDisplaySnapshot | undefined;
@@ -144,7 +143,6 @@ export type ScrollCellPresentation =
 			contentMode: CellContentMode;
 			formattedValue: string;
 			markDirty: boolean;
-			releaseStalePortal: boolean;
 			title: string | null;
 			validationError: string | undefined;
 			recordVersionsFrom: CellDisplaySnapshot | undefined;
@@ -164,7 +162,6 @@ export type ScrollCellPresentation =
 			kind: 'html-snapshot';
 			className: string;
 			frozenHtml: string;
-			releaseStalePortal: boolean;
 			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -174,7 +171,6 @@ export type ScrollCellPresentation =
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -189,7 +185,6 @@ export type ScrollCellPresentation =
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -201,7 +196,6 @@ export type ScrollCellPresentation =
 			 * than raw text, per the html-snapshot contract. */
 			kind: 'html-pending';
 			className: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -216,7 +210,6 @@ export type ScrollCellPresentation =
 			kind: 'live-renderer';
 			className: string;
 			portalCellKey: string;
-			releasePriorPortal: boolean;
 			isEditing: boolean;
 			isFocused: boolean;
 			forceLiveInteractive: boolean;
@@ -229,7 +222,6 @@ export type ScrollCellPresentation =
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -246,7 +238,6 @@ export type ScrollCellPresentation =
 			kind: 'live-renderer';
 			className: string;
 			portalCellKey: string;
-			releasePriorPortal: boolean;
 			isEditing: boolean;
 			isFocused: boolean;
 			forceLiveInteractive: true;
@@ -350,7 +341,6 @@ export function resolveScrollCellPresentation<TRowData>(
 					? primitiveSnapshot.formattedValue
 					: '',
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
-			releaseStalePortal: !canReuseSnapshotPortal && !!cellSlot.lastPortalKey,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
 			recordVersionsFrom: snapshot,
@@ -388,7 +378,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			contentMode,
 			formattedValue,
 			markDirty,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
 			recordVersionsFrom: snapshot,
@@ -417,7 +406,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			kind: 'live-renderer',
 			className: cellClassName,
 			portalCellKey,
-			releasePriorPortal: !!cellSlot.lastPortalKey && cellSlot.lastPortalKey !== portalCellKey,
 			isEditing,
 			isFocused,
 			forceLiveInteractive: false,
@@ -451,7 +439,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			contentMode: syntheticMode,
 			formattedValue: cheapValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
@@ -517,13 +504,11 @@ export function resolveScrollCellPresentation<TRowData>(
 				deps.getRowHeight(rowIndex),
 				deps.getColWidth(colIndex)
 			);
-			const releaseStalePortal = !!cellSlot.lastPortalKey;
 			if (frozenHtml) {
 				return {
 					kind: 'html-snapshot',
 					className: cellClassName,
 					frozenHtml: frozenHtml.html,
-					releaseStalePortal,
 					recordVersionsFrom: portalImpostorSnapshot,
 					title: portalImpostorSnapshot.title || null,
 					validationError: portalImpostorSnapshot.validationError,
@@ -535,7 +520,6 @@ export function resolveScrollCellPresentation<TRowData>(
 					className: cellClassName,
 					contentMode: portalImpostorSnapshot.contentMode,
 					formattedValue: portalImpostorSnapshot.formattedValue,
-					releaseStalePortal,
 					recordVersionsFrom: portalImpostorSnapshot,
 					title: portalImpostorSnapshot.title || null,
 					validationError: portalImpostorSnapshot.validationError,
@@ -545,7 +529,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			return {
 				kind: 'html-pending',
 				className: cellClassName,
-				releaseStalePortal,
 				recordVersions: portalImpostorSnapshot,
 				title: portalImpostorSnapshot.title || null,
 				validationError: portalImpostorSnapshot.validationError,
@@ -556,7 +539,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			contentMode: portalImpostorSnapshot.contentMode,
 			formattedValue: portalImpostorSnapshot.formattedValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersionsFrom: portalImpostorSnapshot,
 			title: portalImpostorSnapshot.title || null,
 			validationError: portalImpostorSnapshot.validationError,
@@ -584,13 +566,11 @@ export function resolveScrollCellPresentation<TRowData>(
 				deps.getRowHeight(rowIndex),
 				deps.getColWidth(colIndex)
 			);
-			const releaseStalePortal = !!cellSlot.lastPortalKey;
 			if (frozenHtml) {
 				return {
 					kind: 'html-snapshot',
 					className: cellClassName,
 					frozenHtml: frozenHtml.html,
-					releaseStalePortal,
 					recordVersionsFrom: snapshot ?? versionsFromCtx(),
 					title: snapshot?.title || null,
 					validationError: snapshot?.validationError,
@@ -605,7 +585,6 @@ export function resolveScrollCellPresentation<TRowData>(
 					className: cellClassName,
 					contentMode: cheapValue !== '' ? 'fallback' : 'empty',
 					formattedValue: cheapValue,
-					releaseStalePortal,
 					recordVersionsFrom: snapshot ?? versionsFromCtx(),
 					title: snapshot?.title || null,
 					validationError: snapshot?.validationError,
@@ -615,7 +594,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			return {
 				kind: 'html-pending',
 				className: cellClassName,
-				releaseStalePortal,
 				recordVersions: snapshot ?? versionsFromCtx(),
 				title: snapshot?.title || null,
 				validationError: snapshot?.validationError,
@@ -630,7 +608,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			contentMode: syntheticMode,
 			formattedValue: cheapValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
@@ -675,7 +652,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			kind: 'live-renderer',
 			className: cellClassName,
 			portalCellKey,
-			releasePriorPortal: !!cellSlot.lastPortalKey && cellSlot.lastPortalKey !== portalCellKey,
 			isEditing,
 			isFocused,
 			forceLiveInteractive: true,
@@ -699,7 +675,6 @@ export function resolveScrollCellPresentation<TRowData>(
 		className: cellClassName,
 		contentMode: fallbackSyntheticMode,
 		formattedValue: fallbackCheapValue,
-		releaseStalePortal: !!cellSlot.lastPortalKey,
 		recordVersions: snapshot ?? {
 			rowVersion: input.rowVersion,
 			globalVersion: ctx.globalVersion,

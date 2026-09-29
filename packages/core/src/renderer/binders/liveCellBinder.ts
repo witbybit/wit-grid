@@ -62,7 +62,6 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 
 	if (presentation.forceLiveInteractive) {
 		if (input.phase === 'scroll') deps.incrementForceLiveMountsDuringScroll?.();
-		if (presentation.releaseStalePortal) lifecycle.release({ cellCtrl, reason: 'scrolled-out', cellElement: cellSlot.element });
 		if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 		const ensuredPortalHost = deps.ensureCellPortalHost(cellSlot.element);
 		lifecycle.mountLive({
@@ -134,7 +133,6 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		else deps.incrementLiveReactUpdatesDuringScroll?.();
 		if (isOverscanLiveExecution(input)) deps.incrementLiveReactOverscanMountsDuringScroll?.();
 	}
-	if (presentation.releaseStalePortal) lifecycle.release({ cellCtrl, reason: 'scrolled-out', cellElement: cellSlot.element });
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 	const ensuredPortalHost = deps.ensureCellPortalHost(cellSlot.element);
 	const token = {

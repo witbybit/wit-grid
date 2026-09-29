@@ -36,7 +36,6 @@ export interface CellCtrlPresentationState {
 	formattedValue?: string;
 	portalKey?: string;
 	html?: string;
-	releaseStalePortal: boolean;
 	requiresFidelity: boolean;
 	markDirty?: boolean;
 	isEditing?: boolean;
@@ -207,7 +206,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			kind: 'primitive',
 			className: '',
 			title: null,
-			releaseStalePortal: false,
 			requiresFidelity: false,
 			freshness,
 			formattedValue: '',

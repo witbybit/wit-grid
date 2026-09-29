@@ -234,7 +234,7 @@ export class CellSlot<TRowData = unknown> {
 	/** Horizontal-retention recency stamp (see cellSlotRetention.ts); larger = touched more recently. */
 	public retentionStamp = 0;
 
-	/** Cached row-selector checkbox (checkbox-selection columns) — see freezeCellBinder.ts. */
+	/** Cached row-selector checkbox (checkbox-selection columns) — see checkboxCellBinder.ts. */
 
 	public rowCheckbox: HTMLInputElement | null = null;
 

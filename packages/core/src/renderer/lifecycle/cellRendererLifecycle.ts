@@ -58,7 +58,8 @@ export interface CellRendererLifecycle<TRowData = unknown> {
 		};
 	}): void;
 	freeze(input: { cellCtrl: CellCtrl; host: HTMLElement }): void;
-	release(input: { cellCtrl: CellCtrl; reason: RendererReleaseReason; cellElement?: HTMLDivElement }): void;
+	/** `portalKey` names the portal to release when it differs from the cell's current binding key. */
+	release(input: { cellCtrl: CellCtrl; reason: RendererReleaseReason; cellElement?: HTMLDivElement; portalKey?: string }): void;
 	captureHtml(input: {
 		cellCtrl: CellCtrl;
 		host: HTMLElement;
@@ -151,8 +152,8 @@ export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TR
 			cellCtrl.rendererState.mode = 'frozen';
 			cellCtrl.rendererState.mountedHost = host;
 		},
-		release({ cellCtrl, reason, cellElement }) {
-			if (cellElement) deps.releaseCellPortal(cellElement, false, reason);
+		release({ cellCtrl, reason, cellElement, portalKey }) {
+			if (cellElement) deps.releaseCellPortal(cellElement, false, reason, portalKey);
 			cellCtrl.rendererState.mountedHost = undefined;
 			cellCtrl.rendererState.mountedSlotInstanceId = undefined;
 			cellCtrl.rendererState.mode = 'none';

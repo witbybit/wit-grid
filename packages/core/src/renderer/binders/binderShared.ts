@@ -25,10 +25,8 @@ export function getCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TRowD
 }
 
 /**
- * Shared helpers used by every presentation-mode binder (primitiveCellBinder.ts, liveCellBinder.ts,
- * freezeCellBinder.ts, textImpostorCellBinder.ts, htmlSnapshotCellBinder.ts). Promoted out of
- * rowCellBinder.ts's former applyScrollCellPresentation closure/top-level scope — byte-for-byte
- * identical bodies, just given a shared home so the 5 binder files can all reach them.
+ * Shared helpers used by every render-state binder (textCellBinder.ts, liveCellBinder.ts,
+ * snapshotCellBinder.ts, checkboxCellBinder.ts); see CellRenderState in cellPresentationDispatcher.ts.
  */
 
 export function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {

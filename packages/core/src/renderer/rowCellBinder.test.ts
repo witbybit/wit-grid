@@ -3231,7 +3231,7 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 		});
 
 		// The stale row-A portal must be released, not frozen in place for row B.
-		expect(releaseCellPortal).toHaveBeenCalledWith(cellSlot.element, false, 'invalidated');
+		expect(releaseCellPortal).toHaveBeenCalledWith(cellSlot.element, false, 'invalidated', expect.any(String));
 		// The slot must land on a deterministic placeholder (empty, since no cheap value is
 		// available either) rather than continuing to display row A's live portal content.
 		expect(cellSlot.lastContentMode).not.toBe('portal');

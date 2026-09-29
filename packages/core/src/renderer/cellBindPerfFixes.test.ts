@@ -14,7 +14,7 @@ import { createCellCtrl } from './controllers/CellCtrl.js';
 import { resolveScrollCellPresentation, type ScrollCellPresentationDeps, type ScrollCellPresentationInput } from './scrollCellPresentation.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import { resolveRowPresentation } from './rowPresentationResolver.js';
-import { applyHtmlSnapshotCellPresentation } from './binders/htmlSnapshotCellBinder.js';
+import { applySnapshotCellPresentation as applyHtmlSnapshotCellPresentation } from './binders/snapshotCellBinder.js';
 import { isOverscanLiveCell } from './binders/binderShared.js';
 import { createCellDisplaySnapshot, CellDisplaySnapshotStore, MAX_CELL_DISPLAY_SNAPSHOT_CAPACITY } from './cellDisplaySnapshot.js';
 import { DataModel } from '../models/DataModel.js';
@@ -211,7 +211,7 @@ describe('scroll presentation fixes', () => {
 		expect(presentation.kind).not.toBe('frozen-portal');
 		expect(presentation.kind).toBe('shell');
 		if (presentation.kind !== 'shell') throw new Error('unreachable');
-		expect(presentation.releaseStalePortal).toBe(true);
+		// A shell keeps no portal, so the dispatcher releases row A's portal (see cellPresentationDispatcher.test.ts).
 		expect(presentation.formattedValue).toBe('new row');
 	});
 
@@ -498,7 +498,6 @@ describe('DOM write reductions', () => {
 			kind: 'html-snapshot',
 			className: 'og-cell',
 			html: '<b>frozen</b>',
-			releaseStalePortal: false,
 			requiresFidelity: true,
 			freshness: cellCtrl.presentationState.freshness,
 		};

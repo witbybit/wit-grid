@@ -106,12 +106,6 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	state.className = presentation.className;
 	state.title = title;
 	state.validationError = validationError;
-	state.releaseStalePortal =
-		'releaseStalePortal' in presentation
-			? presentation.releaseStalePortal
-			: 'releasePriorPortal' in presentation
-				? presentation.releasePriorPortal
-				: false;
 	state.requiresFidelity =
 		presentation.kind === 'primitive' ||
 		presentation.kind === 'frozen-portal' ||
@@ -196,7 +190,6 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
 		className: context.className,
 		title: context.title,
 		validationError: context.validationError,
-		releaseStalePortal: false,
 		requiresFidelity: false,
 		freshness: context.freshness,
 		contentMode: context.contentMode,
