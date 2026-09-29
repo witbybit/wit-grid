@@ -200,6 +200,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 
 		this.unregisterActive(instance);
 		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
+		if (instance.cellKey !== params.cellKey) this.onCellKeyRetired?.(instance.cellKey);
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.value = params.value;
@@ -256,6 +257,13 @@ export class DomCellRendererManager<TRowData = unknown> {
 		}
 	}
 
+	/**
+	 * Fired when an instance stops representing a cell key: it was destroyed (including warm-cache
+	 * eviction) or rebound to a different key. PortalMountManager uses it to forget that key's
+	 * portal record, which a warm-parked instance otherwise keeps forever.
+	 */
+	public onCellKeyRetired?: (cellKey: string) => void;
+
 	private destroyInstance(instance: DomRendererInstance<TRowData>): void {
 		try {
 			instance.handle.destroy?.();
@@ -263,6 +271,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 		delete instance.container.dataset.rendererKey;
 		delete instance.container.dataset.cellKey;
 		instance.container.remove();
+		this.onCellKeyRetired?.(instance.cellKey);
 	}
 
 	private removeSiblingContainers(rendererKey: string, parentContainer: HTMLElement, activeContainer: HTMLElement): void {

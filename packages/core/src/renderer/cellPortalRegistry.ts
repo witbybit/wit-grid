@@ -175,6 +175,24 @@ export class CellPortalRegistry<TRowData = unknown> {
 		return identity;
 	}
 
+	/**
+	 * The renderer behind `cellKey` was destroyed or now serves another key (warm-cache eviction or
+	 * reuse). A record that is still wanted, or has a mount or release waiting, is live and kept;
+	 * otherwise its lingering identity is dropped and the record is forgotten.
+	 */
+	public forgetRetired(cellKey: string): void {
+		const record = this.records.get(cellKey);
+		if (!record || record.wanted || record.pendingMount || record.pendingRelease) return;
+		record.identity = undefined;
+		this.setEdit(record, false);
+		this.settle(record);
+	}
+
+	/** Number of cell portal records currently tracked. */
+	public getRecordCount(): number {
+		return this.records.size;
+	}
+
 	/** Mounted edit portals other than `keepKey`. */
 	public editKeysExcept(keepKey: string): string[] {
 		if (this.editKeys.size === 0 || (this.editKeys.size === 1 && this.editKeys.has(keepKey))) return [];

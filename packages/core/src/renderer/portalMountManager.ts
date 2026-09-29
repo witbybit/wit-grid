@@ -103,6 +103,9 @@ export class PortalMountManager<TRowData = unknown> {
 			this.onUnmountCellContent?.(unmount);
 		};
 		this.domCellRendererManager = new DomCellRendererManager<TRowData>(engine);
+		const forgetRetired = (cellKey: string) => this.cells.forgetRetired(cellKey);
+		this.customRendererManager.onCellKeyRetired = forgetRetired;
+		this.domCellRendererManager.onCellKeyRetired = forgetRetired;
 	}
 
 	public setPhysicalRowSlotIdResolver(resolver: (rowIndex: number) => string | undefined): void {
@@ -685,6 +688,8 @@ export class PortalMountManager<TRowData = unknown> {
 	/** Live ownership gauges for deterministic long-session diagnostics. */
 	public getOwnershipSnapshot(): Readonly<{
 		activeCells: number;
+		/** Every cell portal record, wanted or not (a warm-parked renderer's key included). */
+		trackedCellPortals: number;
 		activeRows: number;
 		activeMenus: number;
 		deferredCellMounts: number;
@@ -694,6 +699,7 @@ export class PortalMountManager<TRowData = unknown> {
 	}> {
 		return Object.freeze({
 			activeCells: this.cells.getWantedCount(),
+			trackedCellPortals: this.cells.getRecordCount(),
 			activeRows: this.mountedRows.size,
 			activeMenus: this.mountedMenus.size,
 			deferredCellMounts: this.cells.getPendingMountCount(),

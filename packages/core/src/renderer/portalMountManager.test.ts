@@ -802,3 +802,42 @@ describe('PortalMountManager – row-anchored key moving slots inside a release 
 		expect(manager.getActiveIdentity(base.cellKey)?.rowSlotId).toBe('slot-5');
 	});
 });
+
+describe('PortalMountManager – warm-cache eviction forgets the portal record', () => {
+	it('drops the record of a warm-parked renderer once the warm cache evicts it', () => {
+		const manager = new PortalMountManager();
+		const rs = makeIdleRuntimeState();
+		manager.setRuntimeState(rs);
+		manager.onMountCellContent = vi.fn();
+		manager.onUnmountCellContent = vi.fn();
+		manager.customRendererManager.setLimits(1, 0);
+		const col = { field: 'name', header: 'Name', cellRenderer: () => null };
+		const park = (n: number) => {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const cellKey = `C${n}:name`;
+			manager.mountCell({
+				cellKey,
+				container,
+				rowSlotId: `slot-${n}`,
+				slotGeneration: 1,
+				cellInstanceId: `ci${n}`,
+				value: n,
+				node: { id: `r${n}` } as never,
+				col,
+				isEditing: false,
+				isLoading: false,
+			});
+			rs.transitionTo('scroll-pending');
+			manager.releaseCellForScroll({ cellKey, container, flushSync: false, rowSlotId: `slot-${n}`, slotGeneration: 1 });
+			rs.transitionTo('idle');
+		};
+
+		park(1);
+		expect(manager.getOwnershipSnapshot().trackedCellPortals).toBe(1); // parked warm, identity kept
+		park(2); // warm cache holds 1: parking #2 evicts #1
+		park(3);
+		expect(manager.getOwnershipSnapshot().trackedCellPortals).toBeLessThanOrEqual(1);
+		expect(manager.checkCellPortalInvariants()).toEqual([]);
+	});
+});

@@ -72,6 +72,12 @@ export interface CustomRendererStats {
 export class CustomRendererManager<TRowData = unknown> {
 	public onMountCellContent?: (mount: GridCellContentMount<TRowData>) => void;
 	public onUnmountCellContent?: (unmount: GridCellContentUnmount) => void;
+	/**
+	 * Fired when an instance stops representing a cell key: it was destroyed (including warm-cache
+	 * eviction) or rebound to a different key. PortalMountManager uses it to forget that key's
+	 * portal record, which a warm-parked instance otherwise keeps forever.
+	 */
+	public onCellKeyRetired?: (cellKey: string) => void;
 
 	private activeRenderersByCellKey = new Map<string, RendererInstance<TRowData>>();
 	private activeRenderersByRendererKey = new Map<string, RendererInstance<TRowData>>();
@@ -432,6 +438,7 @@ export class CustomRendererManager<TRowData = unknown> {
 
 		this.unregisterActive(instance);
 		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
+		if (instance.cellKey !== params.cellKey) this.onCellKeyRetired?.(instance.cellKey);
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.rowSlotId = params.rowSlotId;
@@ -530,6 +537,7 @@ export class CustomRendererManager<TRowData = unknown> {
 		delete instance.container.dataset.rendererKey;
 		delete instance.container.dataset.cellKey;
 		instance.container.remove();
+		this.onCellKeyRetired?.(instance.cellKey);
 	}
 
 	private pruneWarmCache(): void {
