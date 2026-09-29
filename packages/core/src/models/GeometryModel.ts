@@ -32,22 +32,6 @@ export class GeometryModel {
 		}
 	}
 
-	public updateRowHeight(rowId: string, height: number): void {
-		const rowIdx = Number(rowId);
-		if (Number.isInteger(rowIdx) && rowIdx >= 0 && rowIdx < this.rowCount) {
-			this.rowHeights[rowIdx] = height;
-		}
-		this.invalidateRows([rowId]);
-	}
-
-	public updateColumnWidth(colId: string, width: number): void {
-		const colIdx = Number(colId);
-		if (Number.isInteger(colIdx) && colIdx >= 0 && colIdx < this.colCount) {
-			this.colWidths[colIdx] = width;
-		}
-		this.invalidateColumns([colId]);
-	}
-
 	public recomputeIfNeeded(): boolean {
 		const changed = this.allInvalid || this.invalidRows.size > 0 || this.invalidColumns.size > 0;
 		this.allInvalid = false;
@@ -74,22 +58,61 @@ export class GeometryModel {
 		}
 	}
 
-	public updateRows(heights: number[], defaultRowHeight: number): void {
-		const len = heights.length;
-		if (len > this.rowCapacity) {
-			this.rowCapacity = Math.max(len, this.rowCapacity * 2);
-			this.rowHeights = new Float64Array(this.rowCapacity);
-			this.rowTops = new Float64Array(this.rowCapacity);
-		}
-		this.rowCount = len;
+	/** Convenience wrapper over {@link syncRows} for callers that already hold a height list. */
+	public updateRows(heights: readonly number[], defaultRowHeight: number): void {
+		this.syncRows(heights.length, (i) => (heights[i] !== undefined ? heights[i] : defaultRowHeight));
+	}
 
-		let top = 0;
-		for (let i = 0; i < len; i++) {
-			const h = heights[i] !== undefined ? heights[i] : defaultRowHeight;
-			this.rowHeights[i] = h;
-			this.rowTops[i] = top;
-			top += h;
+	/**
+	 * Brings row geometry in line with `count` rows whose heights are read by `readHeight`.
+	 *
+	 * Heights are written straight into the typed arrays (no intermediate list) and only
+	 * rows whose height actually differs are written. Prefix sums are recomputed from the
+	 * first changed index onward, so an unchanged sync costs one read pass and zero writes,
+	 * and a single-row resize near the bottom touches only the rows below it.
+	 *
+	 * `fromIndex` lets a caller that knows rows before it are unchanged (e.g. a live
+	 * reorder that reports its first moved index) skip reading them entirely.
+	 *
+	 * Returns the first index whose top/height changed, or -1 when nothing changed.
+	 */
+	public syncRows(count: number, readHeight: (index: number) => number, fromIndex = 0): number {
+		const prevCount = this.rowCount;
+		if (count > this.rowCapacity) {
+			const nextCapacity = Math.max(count, this.rowCapacity * 2);
+			const nextHeights = new Float64Array(nextCapacity);
+			const nextTops = new Float64Array(nextCapacity);
+			// Keep the still-valid prefix so the incremental prefix-sum pass below stays correct.
+			nextHeights.set(this.rowHeights.subarray(0, prevCount));
+			nextTops.set(this.rowTops.subarray(0, prevCount));
+			this.rowCapacity = nextCapacity;
+			this.rowHeights = nextHeights;
+			this.rowTops = nextTops;
 		}
+		this.rowCount = count;
+
+		const heights = this.rowHeights;
+		let firstChanged = -1;
+		const start = Math.max(0, Math.min(fromIndex, prevCount, count));
+		for (let i = start; i < count; i++) {
+			const h = readHeight(i);
+			if (i >= prevCount || heights[i] !== h) {
+				heights[i] = h;
+				if (firstChanged < 0) firstChanged = i;
+			}
+		}
+		if (firstChanged < 0) {
+			// Pure truncation keeps every surviving top valid; only the count changed.
+			return count !== prevCount ? count : -1;
+		}
+
+		const tops = this.rowTops;
+		let top = firstChanged > 0 ? tops[firstChanged - 1] + heights[firstChanged - 1] : 0;
+		for (let i = firstChanged; i < count; i++) {
+			tops[i] = top;
+			top += heights[i];
+		}
+		return firstChanged;
 	}
 
 	public getRowTop(rowIdx: number, defaultRowHeight: number): number {

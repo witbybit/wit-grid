@@ -33,7 +33,10 @@ export interface RenderPaintCoordinatorDeps<TRowData = unknown> {
 	recycleViewport: (isScrollFrameActive: boolean, ctx?: ScrollRenderContext<TRowData>, precomputedWindow?: RenderWindow) => void;
 	syncLayoutPlan: (renderWindow?: RenderWindow) => GridLayoutPlan;
 	updateCachedGeometryBoundsFromState: (defaultColWidth: number, defaultRowHeight: number) => void;
+	/** Runs after a full paint: measure every bound row (auto row height). */
 	onAfterViewportPaint?: () => void;
+	/** Runs after a non-full paint flush: measure only newly bound, not-yet-measured rows. */
+	onAfterIncrementalPaint?: () => void;
 }
 
 export class RenderPaintCoordinator<TRowData = unknown> {
@@ -55,6 +58,7 @@ export class RenderPaintCoordinator<TRowData = unknown> {
 		if (notScrolling && (frame.reasons.includes('sort') || frame.reasons.includes('group expansion') || frame.reasons.includes('detail'))) {
 			this.state.pendingTransition = true;
 		}
+		this.applyPendingScrollAnchor(notScrolling);
 		this.deps.portalMountManager.beginCellReleaseTransaction();
 		try {
 			this.deps.orchestrator.flush(frame);
@@ -62,6 +66,9 @@ export class RenderPaintCoordinator<TRowData = unknown> {
 			this.deps.portalMountManager.endCellReleaseTransaction();
 		}
 		this.deps.rowRenderer.syncInteractionAccessibility();
+		// A full frame already measured inside fullPaintInternal. All DOM writes for this
+		// flush are done, so the measurement reads below batch after them (one layout).
+		if (!frame.full) this.deps.onAfterIncrementalPaint?.();
 		// Play the armed transition once the slots hold their NEW positions. A `full` frame
 		// (e.g. sort) is handled inside `fullPaintInternal`, which consumes the flag — so this
 		// only fires for the `viewport` path (group/tree/detail expansion → invalidateViewport),
@@ -81,6 +88,25 @@ export class RenderPaintCoordinator<TRowData = unknown> {
 			this.deps.portalMountManager.endCellReleaseTransaction();
 		}
 	};
+
+	/**
+	 * Scroll anchoring: when rows above the first visible row changed height, the projection
+	 * pipeline recorded the resulting shift. Apply it to scrollTop before this flush paints the
+	 * new row positions, so visible content stays put within the same frame. The scroll
+	 * extent is synced first so the browser does not clamp the corrected position. Stale
+	 * corrections (the user scrolled since) are dropped by consumeScrollAnchor.
+	 */
+	private applyPendingScrollAnchor(notScrolling: boolean): void {
+		const scrollViewport = this.deps.viewportRenderer.scrollViewport;
+		if (!scrollViewport) return;
+		const currentTop = scrollViewport.scrollTop;
+		const delta = this.deps.engine.viewport.consumeScrollAnchor(currentTop);
+		if (!notScrolling || delta === 0 || currentTop <= 0) return;
+		this.deps.syncLayoutPlan();
+		scrollViewport.scrollTop = Math.max(0, currentTop + delta);
+		// Read back: the browser may clamp. Keep the engine in step without faking scroll velocity.
+		this.deps.engine.viewport.applyAnchoredScrollTop(scrollViewport.scrollTop);
+	}
 
 	public refreshRendererEpochs(): void {
 		const state = this.deps.engine.stateManager.getState();

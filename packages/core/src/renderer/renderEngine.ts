@@ -114,6 +114,11 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	private readonly postScrollFidelityBudget = 12;
 
 	private autoRowHeightEnabled = false;
+	/** Auto-height: row id → row version it was last measured at (bounded; cleared on layout change). */
+	private readonly measuredRowVersions = new Map<string, number>();
+	private measuredRowPlan: unknown = null;
+	private measuredRowColWindowKey = '';
+	private static readonly MAX_MEASURED_ROW_STAMPS = 20_000;
 	private readonly scrollPrewarmBudget = 48;
 	private readonly scrollPrewarmRowPadding = 2;
 	private readonly scrollPrewarmColPadding = 2;
@@ -229,7 +234,12 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 					engine.flightRecorder.finishExecutingFrame(frameToken, 'post-scroll');
 				}
 			},
-			onScrollEnd: () => this.scrollCoordinator.finishScrolling(),
+			onScrollEnd: () => {
+				this.scrollCoordinator.finishScrolling();
+				// Rows bound by scroll frames were never measured (no reads mid-scroll): measure
+				// the newly bound ones once, now that the runtime is idle.
+				this.measureAndUpdateRowHeights(true);
+			},
 			onFault: (msg) => engine.runtimeFaults.report({ source: 'renderer', operation: 'frame-reentry', error: new Error(msg) }),
 			runtimeState: this.runtimeState,
 			gridScheduler: defaultGridScheduler,
@@ -411,6 +421,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				updateCachedGeometryBoundsFromState: (defaultColWidth, defaultRowHeight) =>
 					this.updateCachedGeometryBoundsFromState(defaultColWidth, defaultRowHeight),
 				onAfterViewportPaint: () => this.measureAndUpdateRowHeights(),
+				onAfterIncrementalPaint: () => this.measureAndUpdateRowHeights(true),
 			},
 			paintState
 		);
@@ -598,13 +609,32 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.autoRowHeightEnabled = enabled;
 	}
 
-	private measureAndUpdateRowHeights(): void {
+	/**
+	 * Auto row height. `onlyUnmeasured` (viewport paints, scroll end) skips rows already
+	 * measured at their current row version under the current column layout/window, so the
+	 * per-cell scrollHeight reads stay bounded to rows that newly entered the viewport.
+	 * A full paint (`onlyUnmeasured = false`) re-measures every bound row, as before.
+	 * Never runs inside a scroll frame; callers invoke it after all paint writes.
+	 */
+	private measureAndUpdateRowHeights(onlyUnmeasured = false): void {
 		if (!this.autoRowHeightEnabled) return;
 		if (!this.engine.getRowModel()) return;
+		if (this.runtimeState.phase === 'scroll-frame') return;
 
 		const state = this.engine.stateManager.getState();
 		const slots = this.rowRenderer.rowSlotPool?.getSlots() ?? [];
 		const measuredHeights = new Map<string, number>();
+
+		// Column layout or the rendered column window changes cell wrapping: re-measure then.
+		const plan = this.engine.columns.getCompiledPlan();
+		const win = this.rowRenderer.currentWindow;
+		const colWindowKey = win ? `${win.colStart}:${win.colEnd}` : '';
+		const stamps = this.measuredRowVersions;
+		if (plan !== this.measuredRowPlan || colWindowKey !== this.measuredRowColWindowKey || stamps.size > RenderEngine.MAX_MEASURED_ROW_STAMPS) {
+			stamps.clear();
+			this.measuredRowPlan = plan;
+			this.measuredRowColWindowKey = colWindowKey;
+		}
 
 		for (const slot of slots) {
 			if (slot.rowKind !== 'data') continue;
@@ -612,6 +642,9 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			if (!visualRowId.startsWith('row:')) continue;
 
 			const rawRowId = decodeURIComponent(visualRowId.slice(4));
+			const rowVersion = this.engine.rowVersions.get(rawRowId) ?? 0;
+			if (onlyUnmeasured && stamps.get(rawRowId) === rowVersion) continue;
+			stamps.set(rawRowId, rowVersion);
 			// Cells typically use h-full (height:100%) so the row's own scrollHeight
 			// reflects only its explicit height. Instead, take the maximum scrollHeight
 			// across all cells — a cell whose content overflows its h-full container will

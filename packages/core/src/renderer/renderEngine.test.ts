@@ -716,7 +716,7 @@ describe('RenderEngine', () => {
 			resizedEvents++;
 		});
 		const stateCommits = vi.spyOn(store.engine.stateManager, 'commitState');
-		const projectionGeometryRebuilds = vi.spyOn(store.engine.geometry, 'updateRows');
+		const projectionGeometryRebuilds = vi.spyOn(store.engine.geometry, 'syncRows');
 
 		// Drive one measurement delivery directly: work assertions use commits/rebuilds, never time.
 		(renderer as unknown as { measureAndUpdateRowHeights(): void }).measureAndUpdateRowHeights();

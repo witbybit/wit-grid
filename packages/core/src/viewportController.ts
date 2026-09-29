@@ -114,7 +114,9 @@ export class ViewportController<TRowData = unknown> {
 	 * incorporating left/right pinned offsets and predictive overscan.
 	 */
 	public getVisibleColumnRange(): ViewportRange {
-		return this.engine.viewport.getVisibleColumnRange(this.engine.stateManager.getState().columns.length);
+		// Displayed (visible, ordered) columns: hidden columns have no geometry, so counting
+		// state.columns over-extends the range past the last displayed column.
+		return this.engine.viewport.getVisibleColumnRange(this.engine.columns.getDisplayedColumnCount());
 	}
 
 	/**

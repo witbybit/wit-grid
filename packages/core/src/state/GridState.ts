@@ -94,6 +94,8 @@ export interface GridModelState<TRowData = unknown> {
 	 * Default: 2. Finance grids with narrow columns (80–120 px) benefit from at least 2.
 	 */
 	colBuffer?: number;
+	/** Minimum pixel width of off-screen columns pre-rendered on the leading (scroll-direction) edge. */
+	colOverscanPx?: number;
 	runtimeLimits?: {
 		maxRenderedRows?: number;
 		maxRenderedCells?: number;
