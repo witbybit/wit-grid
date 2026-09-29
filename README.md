@@ -208,7 +208,7 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
 		if (visualRow.kind !== 'group') return null;
 
-		const expanded = visualRow.expanded;
+		const expanded = visualRow.hierarchy.expanded;
 		const handleToggle = (e: React.MouseEvent) => {
 			e.stopPropagation();
 			api.toggleGroupExpanded(visualRow.id);
@@ -218,7 +218,7 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 			<div
 				className='flex items-center justify-between px-4 h-full bg-slate-900 border-b border-slate-800 cursor-pointer'
 				onClick={handleToggle}
-				style={{ paddingLeft: `${visualRow.depth * 20 + 10}px` }}
+				style={{ paddingLeft: `${visualRow.hierarchy.level * 20 + 10}px` }}
 			>
 				<div className='flex items-center gap-2'>
 					<span>{expanded ? '▼' : '▶'}</span>
@@ -226,7 +226,7 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 					<span className='text-white font-semibold text-xs'>{String(visualRow.key)}</span>
 				</div>
 				<span className='text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-2 py-0.5 rounded-full font-bold'>
-					{visualRow.childCount} employees
+					{visualRow.hierarchy.leafCount} employees
 				</span>
 			</div>
 		);

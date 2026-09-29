@@ -276,8 +276,8 @@ export const PortalCell = memo(PortalCellInner) as typeof PortalCellInner;
 
 function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
 	if (visualRow.kind !== 'group') return null;
-	const expanded = visualRow.expanded;
-	const depth = visualRow.depth;
+	const expanded = visualRow.hierarchy.expanded;
+	const depth = visualRow.hierarchy.level;
 
 	// Memoize getSnapshot to cache selectedRowIds and avoid infinite loops
 	const selRowIdUpdateGenRef = useRef(0);
@@ -349,9 +349,9 @@ function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { 
 			<span className={`og-group-row-toggle ${expanded ? 'og-group-row-toggle-expanded' : ''}`}>▶</span>
 			<span className='og-group-row-label-prefix'>{visualRow.field}:</span>
 			<span className='og-group-row-value'>{String(visualRow.key)}</span>
-			<span className='og-group-count'>{visualRow.leafCount ?? visualRow.childCount} rows</span>
-			{visualRow.aggregateValues &&
-				Object.entries(visualRow.aggregateValues)
+			<span className='og-group-count'>{visualRow.hierarchy.leafCount ?? visualRow.hierarchy.childCount} rows</span>
+			{visualRow.aggregates &&
+				Object.entries(visualRow.aggregates)
 					.slice(0, 3)
 					.map(([field, value]) =>
 						value != null ? (
@@ -374,9 +374,9 @@ function DefaultDetailRowRendererInner<TRowData = unknown>({ visualRow }: { visu
 
 export const DefaultDetailRowRenderer = memo(DefaultDetailRowRendererInner) as typeof DefaultDetailRowRendererInner;
 
-function DefaultFooterRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'footer') return null;
-	const agg = visualRow.aggregateValues;
+function DefaultTotalRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
+	if (visualRow.kind !== 'total') return null;
+	const agg = visualRow.aggregates;
 	return (
 		<div
 			style={{
@@ -408,7 +408,7 @@ function DefaultFooterRowRendererInner<TRowData = unknown>({ visualRow }: { visu
 	);
 }
 
-export const DefaultFooterRowRenderer = memo(DefaultFooterRowRendererInner) as typeof DefaultFooterRowRendererInner;
+export const DefaultTotalRowRenderer = memo(DefaultTotalRowRendererInner) as typeof DefaultTotalRowRendererInner;
 
 function DefaultFailedRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
 	if (visualRow.kind !== 'failed') return null;

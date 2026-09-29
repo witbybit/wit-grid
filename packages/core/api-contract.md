@@ -6,8 +6,8 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `1a83099f9e29a2bf0ffd96648c31b74f070de4d6a43314865e3ecd61b5f7e565`
-Exports (284):
+Declaration SHA-256: `c125d3181a28cbc43332dd1f162907f85b289357224706784f6e19ed15186caa`
+Exports (286):
 
 - `ActiveEditState` — type
 - `AggregationDef` — type
@@ -93,7 +93,6 @@ Exports (284):
 - `FilterSelectOption` — type
 - `FilterSurface` — type
 - `FloatingFilterRendererParams` — type
-- `FooterVisualRow` — type
 - `FrameMetrics` — type
 - `getBuiltInTheme` — value
 - `getCellPointerColumnKey` — value
@@ -242,6 +241,7 @@ Exports (284):
 - `ResolveServerSideRowCountStateInput` — type
 - `RowCountKind` — type
 - `RowDataTransaction` — type
+- `RowHierarchy` — type
 - `RowLoadState` — type
 - `RowModelConfig` — type
 - `RowModelType` — type
@@ -286,6 +286,8 @@ Exports (284):
 - `themeToCSSVariables` — value
 - `ThemeTokens` — type
 - `TooltipParams` — type
+- `TotalPlacement` — type
+- `TotalVisualRow` — type
 - `validateSchemaVersion` — value
 - `ValueFormatterParams` — type
 - `ValueGetterParams` — type
@@ -296,7 +298,7 @@ Exports (284):
 
 ## `./experimental` — experimental
 
-Declaration SHA-256: `1bea93da80449863a3ea6e588d46548ddd5f7db1f640e451682bf6ba3e874b18`
+Declaration SHA-256: `00b195437e6f43b10eff0e61e176725ec8d9dd8c0185263535046e6d887e7114`
 Exports (47):
 
 - `canEditCell` — value
@@ -342,9 +344,9 @@ Exports (47):
 - `stopFlightRecorder` — value
 - `toDataVisualRowId` — value
 - `toDetailVisualRowId` — value
-- `toFooterVisualRowId` — value
 - `toGroupVisualRowId` — value
 - `toLoadingVisualRowId` — value
+- `toTotalVisualRowId` — value
 - `validateGridReplayTrace` — value
 
 ## `./internal` — adapter-only

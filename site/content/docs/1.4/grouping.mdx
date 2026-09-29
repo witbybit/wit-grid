@@ -37,8 +37,8 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
 		if (visualRow.kind !== 'group') return null;
 		return (
-			<div onClick={() => api.toggleGroupExpanded(visualRow.id)} style={{ paddingLeft: visualRow.depth * 20 + 10 }}>
-				{visualRow.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.childCount})
+			<div onClick={() => api.toggleGroupExpanded(visualRow.id)} style={{ paddingLeft: visualRow.hierarchy.level * 20 + 10 }}>
+				{visualRow.hierarchy.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.hierarchy.leafCount})
 			</div>
 		);
 	}, []);
@@ -60,7 +60,7 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	`api.toggleGroupExpanded(visualRow.id)`, or drive it from outside the renderer with `api.expandAllGroups()` / `api.collapseAllGroups()`.
 </Callout>
 
-Group footers can be enabled with `initialState.showGroupFooter: true`, and rendered with `footerRowRenderer`.
+Group total rows can be enabled with `initialState.showGroupFooter: true`, and rendered with `totalRowRenderer`.
 
 ## Tree data
 

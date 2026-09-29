@@ -146,12 +146,11 @@ describe('PortalMountManager', () => {
 			id: 'group:dept:A',
 			field: 'dept',
 			key: 'A',
-			depth: 0,
-			expanded: false,
-			childCount: 2,
+			hierarchy: { level: 0, parentId: null, hasChildren: true, expanded: false, childCount: 2, leafCount: 2, posInSet: 1, setSize: 1 },
+			aggregates: {},
 			height: 40,
 		};
-		const expanded = { ...collapsed, expanded: true };
+		const expanded = { ...collapsed, hierarchy: { ...collapsed.hierarchy, expanded: true } };
 
 		manager.mountRow({ rowKey: collapsed.id, container, visualRow: collapsed });
 		manager.mountRow({ rowKey: collapsed.id, container, visualRow: collapsed });
@@ -159,6 +158,32 @@ describe('PortalMountManager', () => {
 
 		expect(mountRow).toHaveBeenCalledTimes(2);
 		expect(mountRow.mock.calls[1][0].visualRow).toBe(expanded);
+	});
+
+	it('re-renders a group row when only its aggregates change', () => {
+		const manager = new PortalMountManager();
+		const mountRow = vi.fn();
+		manager.onMountRowContent = mountRow;
+		const container = document.createElement('div');
+		const hierarchy = { level: 0, parentId: null, hasChildren: true, expanded: true, childCount: 2, leafCount: 2, posInSet: 1, setSize: 1 };
+		const before = {
+			kind: 'group' as const,
+			id: 'group:dept=A',
+			groupId: 'group:dept=A',
+			field: 'dept',
+			key: 'A',
+			keyString: 'A',
+			path: [],
+			hierarchy,
+			aggregates: { revenue: 100 },
+		};
+		// A new pipeline run rebuilds the aggregates object: equal values must not remount...
+		manager.mountRow({ rowKey: before.id, container, visualRow: before });
+		manager.mountRow({ rowKey: before.id, container, visualRow: { ...before, aggregates: { revenue: 100 } } });
+		expect(mountRow).toHaveBeenCalledTimes(1);
+		// ...but a changed value must, or a live total never updates on screen.
+		manager.mountRow({ rowKey: before.id, container, visualRow: { ...before, aggregates: { revenue: 150 } } });
+		expect(mountRow).toHaveBeenCalledTimes(2);
 	});
 
 	it('defers cell portal mounts while scrolling and drops transient cells before flush', () => {

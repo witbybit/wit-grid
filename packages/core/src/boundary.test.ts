@@ -162,9 +162,9 @@ describe('Public/internal boundary', () => {
 				'parseVisualRowId',
 				'toDataVisualRowId',
 				'toDetailVisualRowId',
-				'toFooterVisualRowId',
 				'toGroupVisualRowId',
 				'toLoadingVisualRowId',
+				'toTotalVisualRowId',
 			]) {
 				expect((publicApi as Record<string, unknown>)[name], `${name} must not be in public entry`).toBeUndefined();
 			}
@@ -214,9 +214,9 @@ describe('Public/internal boundary', () => {
 				'stopFlightRecorder',
 				'toDataVisualRowId',
 				'toDetailVisualRowId',
-				'toFooterVisualRowId',
 				'toGroupVisualRowId',
 				'toLoadingVisualRowId',
+				'toTotalVisualRowId',
 				'validateGridReplayTrace',
 			]);
 		});

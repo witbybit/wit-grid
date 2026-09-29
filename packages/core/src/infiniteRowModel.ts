@@ -22,7 +22,7 @@ import type {
 import type { RowSelectionScope } from './api/GridApi.js';
 import { RowNode } from './rowNode.js';
 import { toDataVisualRowId, toFailedVisualRowId, toLoadingVisualRowId } from './rows/visualRowIds.js';
-import type { VisualRow } from './visualRow.js';
+import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import { createAsyncRowModelQuerySnapshot } from './asyncRowModelQuerySnapshot.js';
 import { createInfiniteBlockScopeId } from './asyncRowModelRequestIdentity.js';
 
@@ -617,7 +617,7 @@ export class InfiniteRowModelController<TData = unknown>
 				id: toDataVisualRowId(committedNode.id),
 				rowId: committedNode.id,
 				node: committedNode,
-				depth: 0,
+				hierarchy: FLAT_HIERARCHY,
 			};
 		}
 		const state = this.getRowLoadState(rowIndex);
@@ -630,7 +630,7 @@ export class InfiniteRowModelController<TData = unknown>
 				id: toDataVisualRowId(node.id),
 				rowId: node.id,
 				node,
-				depth: 0,
+				hierarchy: FLAT_HIERARCHY,
 			};
 		}
 		if (state.kind === 'failed') {
@@ -640,6 +640,7 @@ export class InfiniteRowModelController<TData = unknown>
 				rowIndex,
 				error: state.error,
 				retryable: state.retryable,
+				hierarchy: FLAT_HIERARCHY,
 				editable: false,
 			};
 		}
@@ -648,6 +649,7 @@ export class InfiniteRowModelController<TData = unknown>
 				kind: 'loading',
 				id: toLoadingVisualRowId(rowIndex),
 				rowIndex,
+				hierarchy: FLAT_HIERARCHY,
 				editable: false,
 			};
 		}

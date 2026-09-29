@@ -29,13 +29,13 @@ function buildGroups(nodes: RowNode<Row>[], groupField = 'category') {
 }
 
 describe('aggregateStage', () => {
-	it('empty aggDefs is a no-op — aggregateValues stays empty', () => {
+	it('empty aggDefs is a no-op — aggregates stays empty', () => {
 		const nodes = [makeNode('1', { amount: 100 }), makeNode('2', { amount: 200 })];
 		const { roots } = buildGroups(nodes);
 		aggregateStage(roots, [], makeContext());
 		roots.forEach((r) => {
 			if (r.kind === 'group') {
-				expect(r.aggregateValues).toEqual({});
+				expect(r.aggregates).toEqual({});
 			}
 		});
 	});
@@ -52,8 +52,8 @@ describe('aggregateStage', () => {
 
 		const groupA = roots.find((r) => r.kind === 'group' && r.keyString === 'A');
 		const groupB = roots.find((r) => r.kind === 'group' && r.keyString === 'B');
-		expect(groupA?.kind === 'group' && groupA.aggregateValues['amount']).toBe(30);
-		expect(groupB?.kind === 'group' && groupB.aggregateValues['amount']).toBe(5);
+		expect(groupA?.kind === 'group' && groupA.aggregates['amount']).toBe(30);
+		expect(groupB?.kind === 'group' && groupB.aggregates['amount']).toBe(5);
 	});
 
 	it('count aggregation counts leaf nodes per group', () => {
@@ -69,8 +69,8 @@ describe('aggregateStage', () => {
 
 		const groupA = roots.find((r) => r.kind === 'group' && r.keyString === 'A');
 		const groupB = roots.find((r) => r.kind === 'group' && r.keyString === 'B');
-		expect(groupA?.kind === 'group' && groupA.aggregateValues['amount']).toBe(3);
-		expect(groupB?.kind === 'group' && groupB.aggregateValues['amount']).toBe(1);
+		expect(groupA?.kind === 'group' && groupA.aggregates['amount']).toBe(3);
+		expect(groupB?.kind === 'group' && groupB.aggregates['amount']).toBe(1);
 	});
 
 	it('avg aggregation computes the mean', () => {
@@ -82,7 +82,7 @@ describe('aggregateStage', () => {
 		const { roots, ctx } = buildGroups(nodes);
 		aggregateStage(roots, [{ field: 'amount', aggFunc: 'avg' }], ctx);
 		const groupA = roots[0];
-		expect(groupA.kind === 'group' && groupA.aggregateValues['amount']).toBe(20);
+		expect(groupA.kind === 'group' && groupA.aggregates['amount']).toBe(20);
 	});
 
 	it('min picks the smallest value', () => {
@@ -93,7 +93,7 @@ describe('aggregateStage', () => {
 		];
 		const { roots, ctx } = buildGroups(nodes);
 		aggregateStage(roots, [{ field: 'amount', aggFunc: 'min' }], ctx);
-		expect((roots[0] as any).aggregateValues['amount']).toBe(3);
+		expect((roots[0] as any).aggregates['amount']).toBe(3);
 	});
 
 	it('max picks the largest value', () => {
@@ -104,7 +104,7 @@ describe('aggregateStage', () => {
 		];
 		const { roots, ctx } = buildGroups(nodes);
 		aggregateStage(roots, [{ field: 'amount', aggFunc: 'max' }], ctx);
-		expect((roots[0] as any).aggregateValues['amount']).toBe(50);
+		expect((roots[0] as any).aggregates['amount']).toBe(50);
 	});
 
 	it('non-numeric values are excluded from sum/avg/min/max, leaving undefined when all are non-numeric', () => {
@@ -121,7 +121,7 @@ describe('aggregateStage', () => {
 		);
 		const roots = groupStage(nodes, [{ colId: 'category' }], ctx);
 		aggregateStage(roots, [{ field: 'amount', aggFunc: 'sum' }], ctx);
-		expect((roots[0] as any).aggregateValues['amount']).toBeUndefined();
+		expect((roots[0] as any).aggregates['amount']).toBeUndefined();
 	});
 
 	it('custom function aggregation receives leaf RowNodes and returns its value', () => {
@@ -141,7 +141,7 @@ describe('aggregateStage', () => {
 			],
 			ctx
 		);
-		expect((roots[0] as any).aggregateValues['amount']).toBe(200);
+		expect((roots[0] as any).aggregates['amount']).toBe(200);
 		expect(seenLeafNodes[0]).not.toBeInstanceOf(RowNode);
 		expect(seenLeafNodes[0]).toMatchObject({ id: '1', data: { id: '1', category: 'A', amount: 10, label: '' } });
 		expect(typeof (seenLeafNodes[0] as { getValue?: unknown }).getValue).toBe('function');
@@ -176,7 +176,7 @@ describe('aggregateStage', () => {
 			)
 		);
 
-		const values = (roots[0] as any).aggregateValues;
+		const values = (roots[0] as any).aggregates;
 		expect(values.amount).toBe(35);
 		expect(values.amountAvg).toBe(35 / 3);
 		expect(values.amountMin).toBe(5);
@@ -196,7 +196,7 @@ describe('aggregateStage', () => {
 			ctx
 		);
 
-		const values = (roots[0] as any).aggregateValues;
+		const values = (roots[0] as any).aggregates;
 		expect(values.amount).toBe(30);
 		expect(values.label).toBe('1,2');
 	});
@@ -219,7 +219,7 @@ describe('aggregateStage', () => {
 			],
 			ctx
 		);
-		expect((roots[0] as any).aggregateValues['amount']).toBeUndefined();
+		expect((roots[0] as any).aggregates['amount']).toBeUndefined();
 		expect(reportFault).toHaveBeenCalledWith('custom-aggregation', error, { field: 'amount' });
 	});
 
@@ -238,7 +238,49 @@ describe('aggregateStage', () => {
 		const groupA = roots.find((r) => r.kind === 'group' && r.keyString === 'A');
 		const groupB = roots.find((r) => r.kind === 'group' && r.keyString === 'B');
 		// Outer groups should aggregate all descendants
-		expect(groupA?.kind === 'group' && groupA.aggregateValues['amount']).toBe(30);
-		expect(groupB?.kind === 'group' && groupB.aggregateValues['amount']).toBe(20);
+		expect(groupA?.kind === 'group' && groupA.aggregates['amount']).toBe(30);
+		expect(groupB?.kind === 'group' && groupB.aggregates['amount']).toBe(20);
+	});
+});
+
+describe('aggregateStage — grand total and tree parents', () => {
+	it('returns the grand total: the aggregate of every leaf row', () => {
+		const nodes = [
+			makeNode('1', { category: 'A', amount: 10 }),
+			makeNode('2', { category: 'B', amount: 20 }),
+			makeNode('3', { category: 'B', amount: 30 }),
+		];
+		const { roots, ctx } = buildGroups(nodes);
+		const grand = aggregateStage(roots, [{ field: 'amount', aggFunc: 'sum' }, { field: 'amount', aggFunc: 'count' } as AggregationDef<Row>], ctx);
+		expect(grand.amount).toBe(3); // the later 'count' def wins for the same field
+		const sumOnly = aggregateStage(roots, [{ field: 'amount', aggFunc: 'sum' }], ctx);
+		expect(sumOnly.amount).toBe(60);
+	});
+
+	it('aggregates a tree parent over its descendants, not its own value', () => {
+		const parent = makeNode('p', { amount: 1000 });
+		const child = makeNode('c', { amount: 5 });
+		const grandchild = makeNode('g', { amount: 7 });
+		const roots = [
+			{
+				kind: 'data' as const,
+				rowId: 'p',
+				node: parent,
+				depth: 0,
+				children: [
+					{
+						kind: 'data' as const,
+						rowId: 'c',
+						node: child,
+						depth: 1,
+						children: [{ kind: 'data' as const, rowId: 'g', node: grandchild, depth: 2 }],
+					},
+				],
+			},
+		];
+		const grand = aggregateStage(roots, [{ field: 'amount', aggFunc: 'sum' }], makeContext());
+		expect(roots[0].aggregates).toEqual({ amount: 7 }); // only the leaf beneath contributes
+		expect(roots[0].children[0].aggregates).toEqual({ amount: 7 });
+		expect(grand).toEqual({ amount: 7 });
 	});
 });

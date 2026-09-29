@@ -17,7 +17,7 @@ export {
 	parseVisualRowId,
 	toDataVisualRowId,
 	toDetailVisualRowId,
-	toFooterVisualRowId,
+	toTotalVisualRowId,
 	toGroupVisualRowId,
 	toLoadingVisualRowId,
 } from './rows/visualRowIds.js';

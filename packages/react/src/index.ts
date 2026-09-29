@@ -91,7 +91,7 @@ export type {
 	DataVisualRow,
 	GroupVisualRow,
 	DetailVisualRow,
-	FooterVisualRow,
+	TotalVisualRow,
 	LoadingVisualRow,
 	FailedVisualRow,
 	PlaceholderVisualRow,

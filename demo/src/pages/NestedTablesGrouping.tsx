@@ -152,7 +152,7 @@ const RatingStarsRenderer = ({ value }: CellRendererProps<EmployeeRow>) => {
 // Custom Tree node name renderer with indent and folder/file icon!
 const TreeNameRenderer = ({ value, row, rowId, api }: CellRendererProps<FileNodeRow>) => {
 	const visualRow = api.rows().getVisualRowById(rowId);
-	const depth = visualRow && 'depth' in visualRow ? visualRow.depth : 0;
+	const depth = visualRow && 'depth' in visualRow ? visualRow.hierarchy.level : 0;
 
 	const isFolder = row.type === 'folder';
 	const isExpanded = api.isGroupExpanded(rowId);
@@ -377,8 +377,8 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 	// Custom Group row renderer
 	const handleGroupRowRender = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
 		if (visualRow.kind !== 'group') return null;
-		const expanded = visualRow.expanded;
-		const depth = visualRow.depth;
+		const expanded = visualRow.hierarchy.expanded;
+		const depth = visualRow.hierarchy.level;
 
 		const handleToggle = (e: React.MouseEvent) => {
 			e.stopPropagation();
@@ -402,7 +402,7 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 					<span className='text-slate-200 text-xs font-bold'>{String(visualRow.key)}</span>
 				</div>
 				<span className='text-[9px] font-bold text-purple-400 bg-purple-950/40 border border-purple-900/50 px-2 py-0.5 rounded-full shadow-sm'>
-					{visualRow.childCount} employees
+					{visualRow.hierarchy.childCount} employees
 				</span>
 			</div>
 		);

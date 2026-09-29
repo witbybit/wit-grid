@@ -165,7 +165,7 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 					loadState: { kind: 'loaded', rowId: row.groupId },
 					selectable: row.selectable !== false,
 					expandable: true,
-					expanded: row.expanded,
+					expanded: row.hierarchy.expanded,
 					editable: false,
 				});
 			case 'detail':

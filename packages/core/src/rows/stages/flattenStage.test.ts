@@ -144,7 +144,7 @@ describe('flattenStage', () => {
 		expect(result[1].height).toBe(200);
 	});
 
-	it('includeFooter adds a footer row after the leaf children of a group', () => {
+	it('a bottom group total follows the group content', () => {
 		const nodes = [makeNode('1', { category: 'A' }), makeNode('2', { category: 'A' })];
 		const ctx = makeContext();
 		const roots = groupStage(nodes, [{ colId: 'category' }], ctx);
@@ -152,11 +152,12 @@ describe('flattenStage', () => {
 		const result = flattenStage(roots, {
 			...DEFAULT_CONFIG,
 			expandedGroupIds: new Set([groupId]),
-			includeFooter: true,
+			totals: { groups: 'bottom' },
 		});
-		// group row + 2 data rows + footer
+		// group row + 2 data rows + total
 		expect(result).toHaveLength(4);
-		expect(result[3].kind).toBe('footer');
+		expect(result[3]).toMatchObject({ kind: 'total', scope: 'group', groupId, placement: 'bottom' });
+		expect(result[3].hierarchy).toMatchObject({ level: 1, parentId: groupId, posInSet: 0 });
 	});
 
 	it('defaultGroupsExpanded expands all groups without explicit IDs in expandedGroupIds', () => {
@@ -169,14 +170,34 @@ describe('flattenStage', () => {
 		expect(result.filter((r) => r.kind === 'data')).toHaveLength(2);
 	});
 
-	it('output data row kind, rowId, and depth match input tree node', () => {
-		const nodes = [makeNode('r1'), makeNode('r2')];
-		const roots = nodes.map((n, i) => ({ kind: 'data' as const, rowId: n.id, node: n, depth: i }));
-		const result = flattenStage(roots, DEFAULT_CONFIG);
-		expect(result[0].kind).toBe('data');
-		expect((result[0] as any).rowId).toBe('r1');
-		expect(result[0].depth).toBe(0);
-		expect(result[1].depth).toBe(1);
+	it('derives each row level and sibling position from the tree it flattens', () => {
+		const [p, c1, c2] = [makeNode('p'), makeNode('c1'), makeNode('c2')];
+		const roots = [
+			{
+				kind: 'data' as const,
+				rowId: 'p',
+				node: p,
+				depth: 0,
+				children: [
+					{ kind: 'data' as const, rowId: 'c1', node: c1, depth: 1 },
+					{ kind: 'data' as const, rowId: 'c2', node: c2, depth: 1 },
+				],
+			},
+		];
+		const result = flattenStage(roots, { ...DEFAULT_CONFIG, expandedTreeRowIds: new Set(['p']) });
+		expect(result.map((r) => (r as any).rowId)).toEqual(['p', 'c1', 'c2']);
+		expect(result[0].hierarchy).toMatchObject({
+			level: 0,
+			parentId: null,
+			hasChildren: true,
+			expanded: true,
+			childCount: 2,
+			leafCount: 2,
+			posInSet: 1,
+			setSize: 1,
+		});
+		expect(result[1].hierarchy).toMatchObject({ level: 1, parentId: 'row:p', hasChildren: false, posInSet: 1, setSize: 2 });
+		expect(result[2].hierarchy).toMatchObject({ level: 1, parentId: 'row:p', posInSet: 2, setSize: 2 });
 	});
 
 	it('tree data expands child rows when expandedTreeRowIds contains parent id', () => {
@@ -201,5 +222,64 @@ describe('flattenStage', () => {
 		const result = flattenStage(roots, DEFAULT_CONFIG); // no expanded ids
 		expect(result).toHaveLength(1);
 		expect((result[0] as any).rowId).toBe('parent');
+	});
+});
+
+describe('flattenStage — totals and hierarchy', () => {
+	function nested() {
+		const nodes = [
+			makeNode('1', { category: 'A', parentId: 'x' }),
+			makeNode('2', { category: 'A', parentId: 'y' }),
+			makeNode('3', { category: 'B', parentId: 'x' }),
+		];
+		const ctx = createRowPipelineContext<Row>(
+			[
+				{ field: 'category', header: 'category' },
+				{ field: 'parentId', header: 'parentId' },
+			],
+			{ groups: new Set(), treeRows: new Set(), details: new Set() }
+		);
+		return groupStage(nodes, [{ colId: 'category' }, { colId: 'parentId' }], ctx);
+	}
+
+	it('gives groups direct child counts, leaf counts and sibling positions', () => {
+		const result = flattenStage(nested(), { ...DEFAULT_CONFIG, defaultGroupsExpanded: true });
+		const a = result.find((r) => r.kind === 'group' && r.keyString === 'A')!;
+		expect(a.hierarchy).toMatchObject({ level: 0, childCount: 2, leafCount: 2, hasChildren: true, expanded: true, posInSet: 1, setSize: 2 });
+		const ax = result.find((r) => r.kind === 'group' && r.id.endsWith('/parentId=x') && r.id.includes('category=A'))!;
+		expect(ax.hierarchy).toMatchObject({ level: 1, parentId: a.id, childCount: 1, leafCount: 1, posInSet: 1, setSize: 2 });
+	});
+
+	it('places totals per level, top or bottom, only inside expanded groups', () => {
+		const result = flattenStage(nested(), {
+			...DEFAULT_CONFIG,
+			defaultGroupsExpanded: true,
+			totals: { groups: (level) => (level === 0 ? 'top' : 'bottom') },
+		});
+		const a = result.findIndex((r) => r.kind === 'group' && r.keyString === 'A');
+		expect(result[a + 1]).toMatchObject({ kind: 'total', placement: 'top', groupId: result[a].id });
+		const innerTotals = result.filter((r) => r.kind === 'total' && r.placement === 'bottom');
+		expect(innerTotals.length).toBe(3); // one per level-1 group
+
+		const collapsed = flattenStage(nested(), { ...DEFAULT_CONFIG, totals: { groups: 'bottom' } });
+		expect(collapsed.some((r) => r.kind === 'total')).toBe(false); // collapsed groups show their aggregates themselves
+	});
+
+	it('adds a grand total at the top or bottom', () => {
+		const top = flattenStage(nested(), { ...DEFAULT_CONFIG, totals: { grand: 'top' }, grandAggregates: { amount: 3 } });
+		expect(top[0]).toMatchObject({ kind: 'total', scope: 'grand', groupId: null, placement: 'top', aggregates: { amount: 3 } });
+		const bottom = flattenStage(nested(), { ...DEFAULT_CONFIG, totals: { grand: 'bottom' } });
+		expect(bottom[bottom.length - 1]).toMatchObject({ kind: 'total', scope: 'grand', placement: 'bottom' });
+	});
+
+	it('records sticky candidates in row order, outer group first', () => {
+		const meta = new Map<number, number>();
+		const result = flattenStage(nested(), { ...DEFAULT_CONFIG, defaultGroupsExpanded: true, totals: { groups: 'bottom' } }, meta);
+		const order = [...meta.keys()];
+		expect(order).toEqual([...order].sort((x, y) => x - y));
+		const a = result.findIndex((r) => r.kind === 'group' && r.keyString === 'A');
+		// The outer group's boundary is its last content row, before its own bottom total.
+		const aTotal = result.findIndex((r) => r.kind === 'total' && r.groupId === result[a].id);
+		expect(meta.get(a)).toBe(aTotal - 1);
 	});
 });

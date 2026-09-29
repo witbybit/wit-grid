@@ -303,7 +303,7 @@ describe('ClientRowModelController', () => {
 
 		const group = result.visualRows[0];
 		expect(group?.kind).toBe('group');
-		expect(group?.kind === 'group' ? group.aggregateValues?.doubleAmount : undefined).toBe(24);
+		expect(group?.kind === 'group' ? group.aggregates?.doubleAmount : undefined).toBe(24);
 	});
 
 	it('filters grouped rows without changing group counts or labels', () => {
@@ -333,7 +333,7 @@ describe('ClientRowModelController', () => {
 		const groups = rows.filter((row) => row?.kind === 'group');
 		const dataRows = rows.filter((row) => row?.kind === 'data');
 
-		expect(groups.map((row) => (row?.kind === 'group' ? [row.keyString, row.childCount] : null))).toEqual([
+		expect(groups.map((row) => (row?.kind === 'group' ? [row.keyString, row.hierarchy.childCount] : null))).toEqual([
 			['A', 1],
 			['B', 1],
 		]);
@@ -459,7 +459,7 @@ describe('ClientRowModelController', () => {
 		expect(controller.getVisualRow(0)?.id).toBe('row:p');
 		expect(controller.getVisualRow(1)?.kind).toBe('data');
 		expect(controller.getVisualRow(1)?.id).toBe('row:c');
-		expect(controller.getVisualRow(1)?.depth).toBe(1);
+		expect(controller.getVisualRow(1)?.hierarchy.level).toBe(1);
 	});
 
 	it('hides tree children when a parent data row is collapsed', () => {
@@ -810,7 +810,7 @@ describe('GroupRowMeta', () => {
 		const meta = ctrl.getGroupMeta(groupId);
 		expect(meta!.visibleDescendantRowIds).toEqual(['1', '2']);
 		const footerRow = ctrl.getVisualRow(meta!.lastChildIndex);
-		expect(footerRow?.kind).toBe('footer');
+		expect(footerRow?.kind).toBe('total');
 	});
 });
 
@@ -1505,7 +1505,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		for (let i = 0; i < count; i++) {
 			const row = controller.getVisualRow(i);
 			if (row?.kind === 'group' && row.id === groupId) {
-				return row.aggregateValues ?? {};
+				return row.aggregates ?? {};
 			}
 		}
 		return null;

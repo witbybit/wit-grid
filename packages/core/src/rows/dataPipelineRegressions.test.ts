@@ -202,12 +202,12 @@ describe('tree/group stages', () => {
 					children: leafs,
 					childCount: leafs.length,
 					leafCount: leafs.length,
-					aggregateValues: {},
+					aggregates: {},
 				},
 			],
 			childCount: leafs.length,
 			leafCount: leafs.length,
-			aggregateValues: {},
+			aggregates: {},
 		};
 		const context = createRowPipelineContext([{ field: 'v', header: 'V' }], { groups: new Set(), treeRows: new Set(), details: new Set() });
 		expect(() =>
@@ -220,7 +220,7 @@ describe('tree/group stages', () => {
 				context
 			)
 		).not.toThrow();
-		expect(group.aggregateValues).toEqual({ v: 200_000, count: 200_000 });
+		expect(group.aggregates).toEqual({ v: 200_000, count: 200_000 });
 	});
 
 	it('honours GroupDef.comparator and keeps the default group order without one', () => {

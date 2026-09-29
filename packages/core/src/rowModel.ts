@@ -15,7 +15,7 @@ import type { PageWindow } from './rows/pageModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
 import { toDataVisualRowId } from './rows/visualRowIds.js';
-import type { VisualRow } from './visualRow.js';
+import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import {
 	type FilterModel,
 	type QuickFilterModel,
@@ -469,7 +469,7 @@ export function asStickyGroupMetaCapableVisualRowModel(rowModel: VisualRowModel<
 export interface GroupRowMeta {
 	groupId: string;
 	visualIndex: number;
-	depth: number;
+	level: number;
 	parentGroupId: string | null;
 	/** Index of the first child visual row (group or data), or -1 if collapsed. */
 	firstChildIndex: number;
@@ -484,7 +484,7 @@ export interface GroupRowMeta {
 	leafCount: number;
 	childCount: number;
 	expanded: boolean;
-	aggregateValues?: Record<string, unknown>;
+	aggregates: Record<string, unknown>;
 }
 
 // ── Filter preparation ────────────────────────────────────────────────────────
@@ -1503,7 +1503,7 @@ export class ClientRowModelController<TData = unknown>
 					id: toDataVisualRowId(node.id),
 					rowId: node.id,
 					node,
-					depth: 0,
+					hierarchy: FLAT_HIERARCHY,
 					height: explicitHeight !== undefined ? explicitHeight : state.defaultRowHeight,
 					selectable: true,
 					editable: true,

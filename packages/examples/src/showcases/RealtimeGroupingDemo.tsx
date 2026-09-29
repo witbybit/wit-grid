@@ -146,7 +146,7 @@ const ROWS = generateRows(500);
 
 function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesRow>; api: GridApi<SalesRow> }) {
 	const isExpanded = api.isGroupExpanded(visualRow.groupId);
-	const agg = visualRow.aggregateValues;
+	const agg = visualRow.aggregates;
 
 	return (
 		<div
@@ -154,7 +154,7 @@ function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesR
 				display: 'flex',
 				alignItems: 'center',
 				height: '100%',
-				paddingLeft: 12 + visualRow.depth * 18,
+				paddingLeft: 12 + visualRow.hierarchy.level * 18,
 				paddingRight: 12,
 				gap: 8,
 				cursor: 'pointer',
@@ -169,7 +169,7 @@ function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesR
 					width: 3,
 					height: 22,
 					borderRadius: 999,
-					background: visualRow.depth === 0 ? '#8b5cf6' : '#3b82f6',
+					background: visualRow.hierarchy.level === 0 ? '#8b5cf6' : '#3b82f6',
 					opacity: 0.9,
 					flexShrink: 0,
 				}}
@@ -241,7 +241,7 @@ function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesR
 					flexShrink: 0,
 				}}
 			>
-				{visualRow.leafCount} rows
+				{visualRow.hierarchy.leafCount} rows
 			</span>
 
 			{/* Aggregate chips */}

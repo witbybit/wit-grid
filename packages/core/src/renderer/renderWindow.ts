@@ -433,11 +433,11 @@ export function computeRenderWindowInto<TRowData>(engine: GridEngine<TRowData>, 
 	if (state.enableStickyGroupRows && rowCount > 0) {
 		const stickyMeta = getStickyGroupMeta(rowModel);
 		if (stickyMeta && stickyMeta.size > 0) {
-			// stickyMeta is built during the DFS flatten, so group indices — and therefore
-			// group tops — ascend in iteration order. That allows two cuts vs scanning every
-			// group per frame: break once groupTop >= visibleTop (no later group can be
-			// sticky), and when a subtree ends above the viewport, binary-search past all
-			// groups inside it instead of visiting them.
+			// The pipeline records groups in row order (a group before the groups it contains), so
+			// group indices — and therefore group tops — ascend in iteration order. That allows two
+			// cuts vs scanning every group per frame: break once groupTop >= visibleTop (no later
+			// group can be sticky), and when a subtree ends above the viewport, binary-search past
+			// all groups inside it instead of visiting them.
 			const meta = getStickyMetaArrays(stickyMeta);
 			const groupIdxs = meta.idx;
 			const lastIdxs = meta.last;
@@ -447,6 +447,11 @@ export function computeRenderWindowInto<TRowData>(engine: GridEngine<TRowData>, 
 			while (i < n) {
 				const groupIdx = groupIdxs[i];
 				if (groupIdx >= rowCount) break; // ascending — all later are out of range too
+				if (groupIdx < pinTopRows) {
+					// A pinned top row is always in view already; sticking it would draw it twice.
+					i++;
+					continue;
+				}
 				const groupTop = engine.geometry.getRowTop(groupIdx, defaultRowHeight);
 				if (groupTop >= visibleTop) break; // ascending tops — nothing later can be sticky
 				const lastDescIdx = lastIdxs[i];
@@ -465,7 +470,7 @@ export function computeRenderWindowInto<TRowData>(engine: GridEngine<TRowData>, 
 						stickyGroupStack.push({
 							groupId: visualRow.groupId,
 							visualIndex: groupIdx,
-							depth: visualRow.depth,
+							depth: visualRow.hierarchy.level,
 							top: stickyTop,
 							height: rowHeight,
 							lastDescendantIndex: lastDescIdx,

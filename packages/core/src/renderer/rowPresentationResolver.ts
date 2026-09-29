@@ -7,13 +7,13 @@ import { type CompiledStyleRules, evaluateDetailRowStyleRules, evaluateGroupRowS
 import type { SelectionPaintManager } from './selectionPaintManager.js';
 
 // Precomputed base class strings for non-data row kinds — avoids string concat per row per frame.
-const ROW_KIND_BASE: Record<string, string> = {
+const ROW_KIND_BASE: Record<Exclude<VisualRow['kind'], 'data'>, string> = {
 	loading: 'og-row og-row-loading',
 	failed: 'og-row og-row-failed',
 	placeholder: 'og-row og-row-placeholder',
 	group: 'og-row og-row-group',
 	detail: 'og-row og-row-detail',
-	footer: 'og-row og-row-footer',
+	total: 'og-row og-row-total',
 };
 
 export interface RowPresentationResolverDeps<TRowData = unknown> {
@@ -80,7 +80,7 @@ export function resolveRowPresentation<TRowData>(
 		shouldDeferWarmRowVisualRefresh,
 	} = input;
 
-	let rowClassName = ROW_KIND_BASE[visualRow.kind] ?? 'og-row';
+	let rowClassName = visualRow.kind === 'data' ? 'og-row' : ROW_KIND_BASE[visualRow.kind];
 	let markDirtyAfterScroll = false;
 
 	if (visualRow.kind === 'group') {

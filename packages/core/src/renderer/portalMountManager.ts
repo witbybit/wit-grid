@@ -8,7 +8,7 @@ import type {
 } from './IGridRenderer.js';
 import type { InternalColumnDef, DomCellRenderer } from '../columnDef.js';
 import { getColumnInstanceIdentity, isDomCellRenderer } from '../columnDef.js';
-import type { VisualRow } from '../visualRow.js';
+import type { RowHierarchy, VisualRow } from '../visualRow.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { RenderRuntimeState } from './renderRuntimeState.js';
 import { CustomRendererManager, type ReleaseReason } from './customRendererManager.js';
@@ -28,14 +28,42 @@ import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.
 import { readInteractionState } from '../interaction/interactionState.js';
 import { CellPortalRegistry, type CellPortalPhysicalIdentity } from './cellPortalRegistry.js';
 
+function isSameHierarchy(a: RowHierarchy, b: RowHierarchy): boolean {
+	return (
+		a === b ||
+		(a.level === b.level &&
+			a.parentId === b.parentId &&
+			a.hasChildren === b.hasChildren &&
+			a.expanded === b.expanded &&
+			a.childCount === b.childCount &&
+			a.leafCount === b.leafCount &&
+			a.posInSet === b.posInSet &&
+			a.setSize === b.setSize)
+	);
+}
+
+/** Aggregates are rebuilt on every pipeline run, so compare by value (shallowly). */
+function isSameAggregates(a: Record<string, unknown> | undefined, b: Record<string, unknown> | undefined): boolean {
+	if (a === b) return true;
+	if (!a || !b) return false;
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	for (const key of keys) if (!Object.is(a[key], b[key])) return false;
+	return true;
+}
+
 function isVisualRowEqual<TRowData>(a: VisualRow<TRowData> | undefined, b: VisualRow<TRowData> | undefined): boolean {
 	if (a === b) return true;
 	if (!a || !b) return false;
 	if (a.kind !== b.kind) return false;
 	if (a.id !== b.id) return false;
+	if (!isSameHierarchy(a.hierarchy, b.hierarchy)) return false;
 
 	if (a.kind === 'group' && b.kind === 'group') {
-		return a.field === b.field && a.key === b.key && a.expanded === b.expanded && a.depth === b.depth && a.childCount === b.childCount;
+		return a.field === b.field && a.key === b.key && isSameAggregates(a.aggregates, b.aggregates);
+	}
+	if (a.kind === 'total' && b.kind === 'total') {
+		return a.scope === b.scope && a.groupId === b.groupId && a.placement === b.placement && isSameAggregates(a.aggregates, b.aggregates);
 	}
 	if (a.kind === 'detail' && b.kind === 'detail') {
 		return a.parentId === b.parentId && a.parentRowId === b.parentRowId && a.height === b.height;
@@ -50,10 +78,7 @@ function isVisualRowEqual<TRowData>(a: VisualRow<TRowData> | undefined, b: Visua
 		return a.rowIndex === b.rowIndex && a.reason === b.reason;
 	}
 	if (a.kind === 'data' && b.kind === 'data') {
-		return a.rowId === b.rowId && a.node === b.node && a.depth === b.depth;
-	}
-	if (a.kind === 'footer' && b.kind === 'footer') {
-		return a.parentGroupId === b.parentGroupId && a.depth === b.depth;
+		return a.rowId === b.rowId && a.node === b.node && isSameAggregates(a.aggregates, b.aggregates);
 	}
 	return false;
 }

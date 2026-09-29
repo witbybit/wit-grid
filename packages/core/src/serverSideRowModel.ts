@@ -21,7 +21,7 @@ import { GridEventName } from './api/GridEvents.js';
 import type { RowSelectionScope } from './api/GridApi.js';
 import { RowNode } from './rowNode.js';
 import { toDataVisualRowId, toFailedVisualRowId, toGroupVisualRowId, toLoadingVisualRowId, type GroupPathItem } from './rows/visualRowIds.js';
-import type { VisualRow } from './visualRow.js';
+import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import { createServerSideRouteKey, isRootServerSideRoute, normalizeServerSideRoute } from './serverSideRoute.js';
 
 function toErrorMessage(error: unknown): string {
@@ -585,10 +585,17 @@ export class ServerSideRowModelController<TRowData = unknown>
 					key: groupMetadata.groupKey,
 					keyString: groupMetadata.groupKey,
 					path,
-					depth: path.length,
-					expanded: this.expandedGroupIds.has(groupId),
-					childCount: this.getKnownChildStoreRowCount(groupMetadata.route),
-					leafCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+					hierarchy: {
+						level: Math.max(0, path.length - 1),
+						parentId: path.length > 1 ? toGroupVisualRowId(path.slice(0, -1)) : null,
+						hasChildren: true,
+						expanded: this.expandedGroupIds.has(groupId),
+						childCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+						leafCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+						posInSet: 0,
+						setSize: 0,
+					},
+					aggregates: {},
 					selectable: true,
 					editable: false,
 				};
@@ -598,11 +605,12 @@ export class ServerSideRowModelController<TRowData = unknown>
 				id: toDataVisualRowId(node.id),
 				rowId: node.id,
 				node,
-				depth: 0,
+				hierarchy: FLAT_HIERARCHY,
 			};
 		}
 		const state = this.getRowLoadState(index);
-		if (state.kind === 'loading') return { kind: 'loading', id: toLoadingVisualRowId(index), rowIndex: index, editable: false };
+		if (state.kind === 'loading')
+			return { kind: 'loading', id: toLoadingVisualRowId(index), rowIndex: index, hierarchy: FLAT_HIERARCHY, editable: false };
 		if (state.kind === 'failed') {
 			return {
 				kind: 'failed',
@@ -610,6 +618,7 @@ export class ServerSideRowModelController<TRowData = unknown>
 				rowIndex: index,
 				error: state.error,
 				retryable: state.retryable,
+				hierarchy: FLAT_HIERARCHY,
 				editable: false,
 			};
 		}

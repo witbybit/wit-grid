@@ -85,7 +85,7 @@ export {
 	canFocusVisualRow,
 	isDataCellSelectable,
 } from './visualRow.js';
-export type { DataVisualRow, GroupVisualRow, DetailVisualRow, FooterVisualRow, LoadingVisualRow, VisualRow } from './visualRow.js';
+export type { DataVisualRow, GroupVisualRow, DetailVisualRow, TotalVisualRow, LoadingVisualRow, VisualRow, RowHierarchy } from './visualRow.js';
 
 export type { PersistenceStatus };
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';

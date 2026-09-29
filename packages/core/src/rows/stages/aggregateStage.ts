@@ -7,16 +7,27 @@ export interface AggregationDef<TData = unknown> {
 	aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count' | ((nodes: GridRowDataRef<TData>[]) => unknown);
 }
 
-export function aggregateStage<TData>(roots: RowTreeNode<TData>[], aggDefs: AggregationDef<TData>[], context: RowPipelineContext<TData>): void {
-	if (aggDefs.length === 0) return;
+/**
+ * Computes aggregates for every group and every tree parent, and returns the grand total (the
+ * aggregates of all rows). Only leaf data rows contribute values: a group's or tree parent's
+ * aggregate covers its descendants, not the parent row's own data — the parent's value is the
+ * aggregate, as in a folder whose size is the sum of what it holds.
+ */
+export function aggregateStage<TData>(
+	roots: RowTreeNode<TData>[],
+	aggDefs: AggregationDef<TData>[],
+	context: RowPipelineContext<TData>
+): Record<string, unknown> {
+	if (aggDefs.length === 0) return {};
 
 	const needsLeafNodes = aggDefs.some((def) => typeof def.aggFunc === 'function');
+	// Values are gathered once per field, however many built-in definitions read that field.
+	const statFields = [...new Set(aggDefs.filter((def) => typeof def.aggFunc !== 'function').map((def) => def.field))];
 	// One shared DFS-ordered accumulator: a subtree's leaves are a contiguous tail of it.
 	const leafAccumulator: GridRowDataRef<TData>[] | null = needsLeafNodes ? [] : null;
-	for (const root of roots) {
-		aggregateNodeRecursively(root, aggDefs, context, null, leafAccumulator);
-		if (leafAccumulator) leafAccumulator.length = 0;
-	}
+	const grandStats = new Map<string, NumericStats>();
+	for (const root of roots) aggregateNodeRecursively(root, aggDefs, statFields, context, grandStats, leafAccumulator);
+	return computeAggregates(aggDefs, grandStats, leafAccumulator ?? undefined, context);
 }
 
 interface NumericStats {
@@ -66,98 +77,82 @@ function getStats(statsByField: Map<string, NumericStats>, field: string): Numer
 }
 
 /**
- * Folds `node`'s subtree into `parentStats` (null at a root). Plain leaves add straight into the
- * parent's stats — only nodes with children allocate their own stats map — and leaf refs are
- * appended to the shared DFS accumulator (no per-level array copies or argument spreads).
+ * Folds `node`'s subtree into `parentStats`. Plain leaves add straight into the parent's stats —
+ * only nodes with children allocate their own stats map — and leaf refs are appended to the shared
+ * DFS accumulator (no per-level array copies or argument spreads).
  */
 function aggregateNodeRecursively<TData>(
 	node: RowTreeNode<TData>,
 	aggDefs: AggregationDef<TData>[],
+	statFields: string[],
 	context: RowPipelineContext<TData>,
-	parentStats: Map<string, NumericStats> | null,
+	parentStats: Map<string, NumericStats>,
 	leafAccumulator: GridRowDataRef<TData>[] | null
 ): void {
 	const children = node.children;
-	const hasChildren = node.kind === 'group' || (children !== undefined && children.length > 0);
+	const isLeaf = node.kind === 'data' && (children === undefined || children.length === 0);
 
-	if (node.kind === 'data') {
+	if (isLeaf) {
 		if (leafAccumulator) leafAccumulator.push(createGridRowDataRef(node.node.id, node.node.data));
-		if (!hasChildren) {
-			if (parentStats) {
-				for (const def of aggDefs) {
-					if (typeof def.aggFunc !== 'function') {
-						addNodeValue(getStats(parentStats, def.field), node.node, def.field, context);
-					}
-				}
-			}
-			return;
-		}
+		for (const field of statFields) addNodeValue(getStats(parentStats, field), node.node, field, context);
+		return;
 	}
 
-	const leafStart = leafAccumulator ? leafAccumulator.length - (node.kind === 'data' ? 1 : 0) : 0;
+	const leafStart = leafAccumulator ? leafAccumulator.length : 0;
 	const statsByField = new Map<string, NumericStats>();
-	if (node.kind === 'data') {
-		for (const def of aggDefs) {
-			if (typeof def.aggFunc !== 'function') {
-				addNodeValue(getStats(statsByField, def.field), node.node, def.field, context);
-			}
-		}
-	}
-
 	for (const child of children ?? []) {
-		aggregateNodeRecursively(child, aggDefs, context, statsByField, leafAccumulator);
+		aggregateNodeRecursively(child, aggDefs, statFields, context, statsByField, leafAccumulator);
 	}
+	for (const [field, stats] of statsByField) mergeStats(getStats(parentStats, field), stats);
 
-	if (parentStats) {
-		for (const [field, stats] of statsByField) {
-			mergeStats(getStats(parentStats, field), stats);
-		}
-	}
+	node.aggregates = computeAggregates(aggDefs, statsByField, leafAccumulator ? leafAccumulator.slice(leafStart) : undefined, context);
+}
 
-	if (node.kind === 'data') return;
-
-	const leafNodes = leafAccumulator ? leafAccumulator.slice(leafStart) : undefined;
-	const aggregateValues: Record<string, unknown> = {};
-
+function computeAggregates<TData>(
+	aggDefs: AggregationDef<TData>[],
+	statsByField: Map<string, NumericStats>,
+	leafNodes: GridRowDataRef<TData>[] | undefined,
+	context: RowPipelineContext<TData>
+): Record<string, unknown> {
+	const aggregates: Record<string, unknown> = {};
 	for (const def of aggDefs) {
 		const { field, aggFunc } = def;
 
 		if (typeof aggFunc === 'function') {
 			try {
-				aggregateValues[field] = aggFunc(leafNodes ?? []);
+				aggregates[field] = aggFunc(leafNodes ?? []);
 			} catch (e) {
 				context.reportFault?.('custom-aggregation', e, { field });
-				aggregateValues[field] = undefined;
+				aggregates[field] = undefined;
 			}
 			continue;
 		}
 
 		if (aggFunc === 'count') {
-			aggregateValues[field] = statsByField.get(field)?.totalCount ?? 0;
+			aggregates[field] = statsByField.get(field)?.totalCount ?? 0;
 			continue;
 		}
 
 		const stats = statsByField.get(field);
 		if (!stats || stats.numericCount === 0) {
-			aggregateValues[field] = undefined;
+			aggregates[field] = undefined;
 			continue;
 		}
 
 		switch (aggFunc) {
 			case 'sum':
-				aggregateValues[field] = stats.sum;
+				aggregates[field] = stats.sum;
 				break;
 			case 'avg':
-				aggregateValues[field] = stats.sum / stats.numericCount;
+				aggregates[field] = stats.sum / stats.numericCount;
 				break;
 			case 'min':
-				aggregateValues[field] = stats.min;
+				aggregates[field] = stats.min;
 				break;
 			case 'max':
-				aggregateValues[field] = stats.max;
+				aggregates[field] = stats.max;
 				break;
 		}
 	}
-
-	node.aggregateValues = aggregateValues;
+	return aggregates;
 }

@@ -9,6 +9,8 @@ export type RowTreeNode<TData = unknown> =
 			node: RowNode<TData>;
 			depth: number;
 			children?: RowTreeNode<TData>[];
+			/** Tree parents, when aggregation is configured: the aggregate of their descendants. */
+			aggregates?: Record<string, unknown>;
 	  }
 	| {
 			kind: 'group';
@@ -19,9 +21,11 @@ export type RowTreeNode<TData = unknown> =
 			depth: number;
 			path: GroupPathItem[];
 			children: RowTreeNode<TData>[];
+			/** Direct children. */
 			childCount: number;
+			/** Data rows beneath. */
 			leafCount: number;
-			aggregateValues: Record<string, unknown>;
+			aggregates: Record<string, unknown>;
 	  };
 
 export interface RowPipelineExpansion {

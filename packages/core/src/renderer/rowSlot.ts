@@ -1,5 +1,6 @@
 import { CellSlot, toPx } from './cellSlot.js';
 import type { ColumnInstanceId } from '../columnDef.js';
+import type { VisualRow } from '../visualRow.js';
 
 export const rowSlotWriteStats = {
 	rowClassWrites: 0,
@@ -19,7 +20,7 @@ export class RowSlot<TRowData = unknown> {
 
 	public visualIndex = -1;
 	public visualRowId = '';
-	public rowKind: 'data' | 'group' | 'detail' | 'loading' | 'failed' | 'placeholder' | 'footer' | '' = '';
+	public rowKind: VisualRow['kind'] | '' = '';
 	public rowTop = -1;
 	public rowHeight = -1;
 
@@ -118,7 +119,7 @@ export class RowSlot<TRowData = unknown> {
 	public update(
 		visualIndex: number,
 		visualRowId: string,
-		rowKind: 'data' | 'group' | 'detail' | 'loading' | 'failed' | 'placeholder' | 'footer',
+		rowKind: VisualRow['kind'],
 		rowTop: number,
 		rowHeight: number,
 		className: string

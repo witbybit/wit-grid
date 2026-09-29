@@ -42,7 +42,7 @@ export interface GridViewProps<TRowData = unknown> {
 	};
 	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
-	footerRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
 	enableChart?: boolean;
 	autoRowHeight?: boolean;
@@ -71,7 +71,7 @@ export function GridView<TRowData = unknown>({
 	navigationOptions = {},
 	groupRowRenderer,
 	detailRowRenderer,
-	footerRowRenderer,
+	totalRowRenderer,
 	sidebar,
 	enableChart = false,
 	autoRowHeight,
@@ -327,7 +327,7 @@ export function GridView<TRowData = unknown>({
 				api={api}
 				groupRowRenderer={groupRowRenderer}
 				detailRowRenderer={detailRowRenderer}
-				footerRowRenderer={footerRowRenderer}
+				totalRowRenderer={totalRowRenderer}
 			/>
 		</div>
 	);

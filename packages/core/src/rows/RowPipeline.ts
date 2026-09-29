@@ -4,13 +4,13 @@ import { applyClientFilterOnly, applyClientSortAndFilter } from '../rowModel.js'
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import { applyQueryModelFilter } from '../query/evaluateQueryModel.js';
 import { RowNode } from '../rowNode.js';
-import type { VisualRow } from '../visualRow.js';
+import { FLAT_HIERARCHY, type VisualRow } from '../visualRow.js';
 import { createRowPipelineContext } from './pipelineContext.js';
 import { groupStage } from './stages/groupStage.js';
 import { treeStage } from './stages/treeStage.js';
 import { sortTreeStage } from './stages/sortTreeStage.js';
 import { aggregateStage, type AggregationDef } from './stages/aggregateStage.js';
-import { flattenStage } from './stages/flattenStage.js';
+import { flattenStage, type TotalsConfig } from './stages/flattenStage.js';
 import type { RowTreeNode } from './stages/types.js';
 import { toDataVisualRowId, toGroupVisualRowId } from './visualRowIds.js';
 import { computePageWindow, type PageWindow } from './pageModel.js';
@@ -59,6 +59,8 @@ export interface RowPipelineInput<TData = unknown> {
 	rowModelConfig?: RowModelConfig<TData>;
 	getParentId?: (data: TData) => string | null | undefined;
 	aggDefs?: AggregationDef<TData>[];
+	/** Where total rows go. Defaults to a bottom total per group when grouping.includeFooter is set. */
+	totals?: TotalsConfig;
 	expandedGroupIds: Set<string>;
 	expandedTreeRowIds?: Set<string>;
 	expandedDetailRowIds: Set<string>;
@@ -174,7 +176,7 @@ export class RowPipeline<TData = unknown> {
 						id: toDataVisualRowId(node.id),
 						rowId: node.id,
 						node,
-						depth: 0,
+						hierarchy: FLAT_HIERARCHY,
 						height: explicitHeight !== undefined ? explicitHeight : defaultRowHeight,
 						selectable: true,
 						editable: true,
@@ -198,9 +200,7 @@ export class RowPipeline<TData = unknown> {
 			sortTreeStage(roots, sortModel, columns, groupDefs);
 		}
 
-		if (roots && aggDefs && aggDefs.length > 0) {
-			aggregateStage(roots, aggDefs, context);
-		}
+		const grandAggregates = roots && aggDefs && aggDefs.length > 0 ? aggregateStage(roots, aggDefs, context) : undefined;
 
 		const stickyGroupMeta = new Map<number, number>();
 		visualRows ??= flattenStage(
@@ -219,7 +219,8 @@ export class RowPipeline<TData = unknown> {
 				detailRenderer,
 				defaultGroupsExpanded: groupingConfig?.defaultExpanded,
 				defaultTreeRowsExpanded: treeConfig?.defaultExpanded,
-				includeFooter: groupingConfig?.includeFooter,
+				totals: input.totals ?? (groupingConfig?.includeFooter ? { groups: 'bottom' } : undefined),
+				grandAggregates,
 			},
 			stickyGroupMeta
 		);
@@ -398,33 +399,34 @@ export class RowPipeline<TData = unknown> {
 }
 
 /**
- * Rebuild `stickyGroupMeta` (expanded-group visual index → last descendant index) from a
- * flat visual-row array. Used after a pagination slice, where flattenStage's original
- * meta holds stale full-array indices.
- *
- * Faithful to flattenStage: a group's sticky boundary is its last *content* descendant,
- * which sits before the group's footer. Footers (and sibling/shallower groups) share or
- * undercut the group's depth, so the first row at depth <= the group's depth terminates
- * the descendant range — the row just before it is the boundary.
+ * Rebuild `stickyGroupMeta` (expanded-group visual index → last content index) from a flat
+ * visual-row array, in row order. Used after a pagination slice, where flattenStage's meta holds
+ * full-array indices. Faithful to flattenStage: a group's content ends at the first row at its
+ * level or shallower, or at its own bottom total.
  */
 function rebuildStickyGroupMeta<TData>(visualRows: VisualRow<TData>[], out: Map<number, number>): void {
 	out.clear();
-	const stack: Array<{ idx: number; depth: number }> = [];
+	const stack: Array<{ idx: number; level: number; groupId: string }> = [];
+	const close = (group: { idx: number }, last: number) => {
+		if (last > group.idx) out.set(group.idx, last);
+		else out.delete(group.idx);
+	};
 	for (let i = 0; i < visualRows.length; i++) {
 		const row = visualRows[i];
-		const depth = 'depth' in row ? ((row as { depth?: number }).depth ?? 0) : 0;
-		while (stack.length > 0 && depth <= stack[stack.length - 1].depth) {
-			const g = stack.pop()!;
-			if (i - 1 > g.idx) out.set(g.idx, i - 1);
+		const level = row.hierarchy.level;
+		while (stack.length > 0) {
+			const top = stack[stack.length - 1];
+			const endsTop = level <= top.level || (row.kind === 'total' && row.placement === 'bottom' && row.groupId === top.groupId);
+			if (!endsTop) break;
+			close(stack.pop()!, i - 1);
 		}
-		if (row.kind === 'group' && row.expanded) {
-			stack.push({ idx: i, depth });
+		if (row.kind === 'group' && row.hierarchy.expanded) {
+			// Created before the entries of the groups it contains, so the map iterates in row order.
+			out.set(i, i);
+			stack.push({ idx: i, level, groupId: row.groupId });
 		}
 	}
-	while (stack.length > 0) {
-		const g = stack.pop()!;
-		if (visualRows.length - 1 > g.idx) out.set(g.idx, visualRows.length - 1);
-	}
+	while (stack.length > 0) close(stack.pop()!, visualRows.length - 1);
 }
 
 function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
@@ -439,7 +441,7 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 		const row = visualRows[i];
 		if (row.kind === 'group') {
 			// Close groups on the stack that are at same or deeper depth than this new group.
-			while (stack.length > 0 && stack[stack.length - 1].depth >= row.depth) {
+			while (stack.length > 0 && stack[stack.length - 1].level >= row.hierarchy.level) {
 				const closing = stack.pop()!;
 				if (closing.firstChildIndex !== -1) closing.lastChildIndex = i - 1;
 			}
@@ -447,23 +449,23 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 			const meta: GroupRowMeta = {
 				groupId: row.groupId,
 				visualIndex: i,
-				depth: row.depth,
+				level: row.hierarchy.level,
 				parentGroupId,
-				firstChildIndex: row.expanded ? i + 1 : -1,
-				lastChildIndex: row.expanded ? visualRows.length - 1 : -1,
+				firstChildIndex: row.hierarchy.expanded ? i + 1 : -1,
+				lastChildIndex: row.hierarchy.expanded ? visualRows.length - 1 : -1,
 				firstLeafIndex: -1,
 				lastLeafIndex: -1,
 				visibleDescendantRowIds: [],
 				childGroupIds: [],
-				leafCount: row.leafCount ?? 0,
-				childCount: row.childCount ?? 0,
-				expanded: row.expanded,
-				aggregateValues: row.aggregateValues,
+				leafCount: row.hierarchy.leafCount,
+				childCount: row.hierarchy.childCount,
+				expanded: row.hierarchy.expanded,
+				aggregates: row.aggregates,
 			};
 			if (parentGroupId !== null) byId.get(parentGroupId)?.childGroupIds.push(row.groupId);
 			byId.set(row.groupId, meta);
 			byVisualIndex.set(i, meta);
-			if (row.expanded) stack.push(meta);
+			if (row.hierarchy.expanded) stack.push(meta);
 		} else if (row.kind === 'data') {
 			for (const group of stack) {
 				group.visibleDescendantRowIds.push(row.rowId);

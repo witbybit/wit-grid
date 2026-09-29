@@ -1,3 +1,4 @@
+import { FLAT_HIERARCHY } from './visualRow.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	createServerSideGetRowsRequest,
@@ -378,7 +379,7 @@ describe('ServerSideRowModelController', () => {
 			id: 'group:region=EMEA',
 			groupId: 'group:region=EMEA',
 			keyString: 'EMEA',
-			expanded: false,
+			hierarchy: { level: 0, parentId: null, hasChildren: true, expanded: false },
 		});
 
 		const refresh = controller.toggleGroupExpanded('group:region=EMEA');
@@ -659,6 +660,7 @@ describe('ServerSideRowModelController', () => {
 			kind: 'loading',
 			id: 'loading:0',
 			rowIndex: 0,
+			hierarchy: FLAT_HIERARCHY,
 			editable: false,
 		});
 		expect(controller.getRowLoadState(0)).toEqual({ kind: 'loading', reason: 'server-side-block' });
@@ -700,6 +702,7 @@ describe('ServerSideRowModelController', () => {
 			kind: 'loading',
 			id: 'loading:5',
 			rowIndex: 5,
+			hierarchy: FLAT_HIERARCHY,
 			editable: false,
 		});
 

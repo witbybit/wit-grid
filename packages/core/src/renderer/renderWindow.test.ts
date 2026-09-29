@@ -520,3 +520,53 @@ describe('column virtualization', () => {
 		store.destroy();
 	});
 });
+
+describe('sticky group headers with nested groups', () => {
+	function makeNestedGrid(pagination?: { pageSize: number }) {
+		type Row = { id: string; region: string; category: string };
+		const rows: Row[] = [];
+		for (const region of ['Americas', 'EMEA']) {
+			for (const category of ['Cloud', 'Hardware', 'Software']) {
+				for (let i = 0; i < 10; i++) rows.push({ id: `${region}-${category}-${i}`, region, category });
+			}
+		}
+		const store = new GridStore<Row>({
+			getRowId: (row) => row.id,
+			columns: [
+				{ field: 'region', header: 'Region' },
+				{ field: 'category', header: 'Category' },
+			],
+			defaultRowHeight: 40,
+			groupRowHeight: 40,
+			enableStickyGroupRows: true,
+			...(pagination ? { pagination: { pageSize: pagination.pageSize, page: 0 } } : {}),
+			rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'region' }, { colId: 'category' }], defaultExpanded: true } },
+		});
+		new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
+		store.setViewportSize(500, 200);
+		return store;
+	}
+
+	const stackAt = (store: ReturnType<typeof makeNestedGrid>, scrollTop: number) => {
+		store.setScrollPosition(scrollTop, 0);
+		const rowModel = store.engine.getRowModel()!;
+		return (computeRenderWindow(store.engine).stickyGroupStack ?? []).map((item) => {
+			const row = rowModel.getVisualRow(item.visualIndex);
+			return row?.kind === 'group' ? row.keyString : '?';
+		});
+	};
+
+	it.each([
+		['unpaginated', undefined],
+		['paginated', { pageSize: 1000 }],
+	] as const)('%s: keeps the outer group stuck above the current inner group for the whole outer group', (_label, pagination) => {
+		const store = makeNestedGrid(pagination);
+		// Rows: Americas(0), Cloud(1), 10 rows, Hardware(12), 10 rows, Software(23), 10 rows, EMEA(34)...
+		expect(stackAt(store, 5 * 40)).toEqual(['Americas', 'Cloud']);
+		// Past the first sub-group (the old bug: the stack emptied here) and into the second.
+		expect(stackAt(store, 15 * 40)).toEqual(['Americas', 'Hardware']);
+		expect(stackAt(store, 26 * 40)).toEqual(['Americas', 'Software']);
+		// Into the next outer group.
+		expect(stackAt(store, 37 * 40)).toEqual(['EMEA', 'Cloud']);
+	});
+});
