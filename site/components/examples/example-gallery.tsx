@@ -270,8 +270,8 @@ export function ExampleGallery() {
 					<h2 className='mt-1 text-xl font-bold tracking-tight text-fd-foreground sm:text-2xl'>Examples</h2>
 				</div>
 				<p className='max-w-xl text-sm leading-6 text-fd-muted-foreground'>
-					Every example is a running instance of <code className='text-xs'>@eregister/wit-grid-examples</code> — the same package the
-					demo app imports from. Pick one, then flip to <span className='font-semibold text-fd-foreground'>Source</span>.
+					Every example is a running instance of <code className='text-xs'>@eregister/wit-grid-examples</code> — the same package the demo
+					app imports from. Pick one, then flip to <span className='font-semibold text-fd-foreground'>Source</span>.
 				</p>
 			</div>
 
@@ -347,7 +347,12 @@ export function ExampleGallery() {
 
 			{isFullscreen && selected && Preview && typeof document !== 'undefined'
 				? (createPortal(
-						<div className='wg-example-fullscreen-overlay' role='dialog' aria-modal='true' aria-label={`${selected.title} — fullscreen preview`}>
+						<div
+							className='wg-example-fullscreen-overlay'
+							role='dialog'
+							aria-modal='true'
+							aria-label={`${selected.title} — fullscreen preview`}
+						>
 							<PreviewStage
 								Preview={Preview}
 								theme={stageTheme}

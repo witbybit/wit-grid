@@ -557,7 +557,10 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 			// A getter/formula value that is not cached yet stays unformatted, as in the scroll bind path.
 			const formatterInput = shouldPrimeDisplayValue ? (primedValue ?? cachedValue) : rawValue;
 			const snapshotText =
-				col.valueFormatter && !isImpostorEligible && visualRow.node.data !== null && (!shouldPrimeDisplayValue || formatterInput !== undefined)
+				col.valueFormatter &&
+				!isImpostorEligible &&
+				visualRow.node.data !== null &&
+				(!shouldPrimeDisplayValue || formatterInput !== undefined)
 					? formatPrewarmValue(col, formatterInput, visualRow.node)
 					: displayValue;
 			const snapshotContentKind = isImpostorEligible && snapshotText !== '' ? 'impostor' : snapshotText !== '' ? 'text' : 'empty';

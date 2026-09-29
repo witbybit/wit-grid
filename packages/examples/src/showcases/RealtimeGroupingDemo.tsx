@@ -387,7 +387,11 @@ function RealtimeGroupingDemoInner({
 					pinLeftColumns={1}
 					enableContextMenu={true}
 					groupRowRenderer={(props) => <GroupRowRenderer visualRow={props.visualRow as GroupVisualRow<SalesRow>} api={props.api} />}
-					sidebar={compact ? undefined : { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }}
+					sidebar={
+						compact
+							? undefined
+							: { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }
+					}
 					onGridReady={onGridReady}
 				/>
 			</div>

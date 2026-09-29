@@ -343,9 +343,12 @@ describe('approach-band prewarm snapshots', () => {
 			return idleCallbacks.length;
 		};
 		win.cancelIdleCallback = () => {};
-		const { store, controller } = makeStore({}, {
-			valueFormatter: ({ value }: { value: unknown }) => `$${Number(value).toFixed(2)}`,
-		});
+		const { store, controller } = makeStore(
+			{},
+			{
+				valueFormatter: ({ value }: { value: unknown }) => `$${Number(value).toFixed(2)}`,
+			}
+		);
 		const container = makeContainer(160);
 		const renderer = new RenderEngine(store.engine, store);
 		try {

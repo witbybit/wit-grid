@@ -486,27 +486,27 @@ export default function DataIntegrityLab({ compact = false }: Props = {}) {
 
 				{/* Activity log */}
 				{!compact && (
-				<div className='w-52 shrink-0 rounded-xl border border-slate-800/60 bg-slate-900/30 flex flex-col overflow-hidden'>
-					<div className='flex items-center justify-between px-3 py-2 border-b border-slate-800/60'>
-						<span className='text-[9px] font-extrabold uppercase tracking-widest text-slate-500'>Activity Log</span>
-						{log.length > 0 && (
-							<button onClick={() => setLog([])} className='text-[9px] text-slate-600 hover:text-slate-400'>
-								Clear
-							</button>
-						)}
+					<div className='w-52 shrink-0 rounded-xl border border-slate-800/60 bg-slate-900/30 flex flex-col overflow-hidden'>
+						<div className='flex items-center justify-between px-3 py-2 border-b border-slate-800/60'>
+							<span className='text-[9px] font-extrabold uppercase tracking-widest text-slate-500'>Activity Log</span>
+							{log.length > 0 && (
+								<button onClick={() => setLog([])} className='text-[9px] text-slate-600 hover:text-slate-400'>
+									Clear
+								</button>
+							)}
+						</div>
+						<div className='flex-1 overflow-y-auto flex flex-col-reverse p-2 gap-1'>
+							{log.length === 0 ? (
+								<p className='text-[9px] text-slate-700 text-center mt-4'>No activity yet</p>
+							) : (
+								log.map((msg, i) => (
+									<div key={i} className='text-[9px] text-slate-400 font-mono leading-tight'>
+										{msg}
+									</div>
+								))
+							)}
+						</div>
 					</div>
-					<div className='flex-1 overflow-y-auto flex flex-col-reverse p-2 gap-1'>
-						{log.length === 0 ? (
-							<p className='text-[9px] text-slate-700 text-center mt-4'>No activity yet</p>
-						) : (
-							log.map((msg, i) => (
-								<div key={i} className='text-[9px] text-slate-400 font-mono leading-tight'>
-									{msg}
-								</div>
-							))
-						)}
-					</div>
-				</div>
 				)}
 			</div>
 		</div>
