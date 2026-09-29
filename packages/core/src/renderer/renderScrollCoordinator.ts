@@ -1,4 +1,4 @@
-import { type GridScheduler } from './gridScheduler.js';
+import { type GridIdleDeadline, type GridScheduler } from './gridScheduler.js';
 import {
 	applyRenderWindowRuntimeLimits,
 	computeRenderWindowInto,
@@ -8,7 +8,7 @@ import {
 } from './renderWindow.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import { GridMetric } from '../diagnostics/GridInstrumentation.js';
-import type { GridLayoutPlan } from './layoutPlan.js';
+import { snapToDevicePixel, type GridLayoutPlan } from './layoutPlan.js';
 import type { OverlayRenderer } from './overlayRenderer.js';
 import type { PortalMountManager } from './portalMountManager.js';
 import type { FrameCoordinator } from './frameCoordinator.js';
@@ -30,6 +30,20 @@ import { getColumnInstanceIdentity, type ColumnDef, type ColumnInstanceId } from
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 import { asCapableRowModel } from '../rowModel.js';
+import type { RowNode } from '../rowNode.js';
+
+/** Headroom left in an idle slice before deadline-aware repair stops starting new batches. */
+const POST_SCROLL_DEADLINE_MARGIN_MS = 2;
+/** Upper bound on extra deadline-driven batches per idle slice (on top of the fixed-count floor). */
+const POST_SCROLL_MAX_EXTRA_BATCHES = 8;
+
+/**
+ * Mirrors rowCellBinder's (module-private) applyValueFormatter, with the same params shape, for
+ * idle prewarm snapshots of columns that declare a valueFormatter.
+ */
+function formatPrewarmValue<TRowData>(col: ColumnDef<TRowData>, value: unknown, node: RowNode<TRowData>): string {
+	return col.valueFormatter!({ value, rowData: node.data as TRowData, colDef: col, rowId: node.id });
+}
 
 function isCellSelected(rowIndex: number, colIndex: number, selectionBounds: GridCellRangeBounds | null | undefined): boolean {
 	return (
@@ -536,8 +550,18 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 								value: rawValue ?? displayValue,
 							})
 					: null;
-			const snapshotContentKind = isImpostorEligible && displayValue !== '' ? 'impostor' : displayValue !== '' ? 'text' : 'empty';
-			const snapshotContentMode = isImpostorEligible && displayValue !== '' ? 'fallback' : displayValue !== '' ? 'text' : 'empty';
+			// The snapshot's text is painted verbatim during scroll, so it must be the formatted text a
+			// full bind would store — otherwise formatted columns flash raw values ("1234.5") until
+			// post-scroll repair lands ("$1,234.50"). Plain fields format the raw value (the idle full
+			// bind path); getter/formula fields format the cached display value (the scroll bind path).
+			// A getter/formula value that is not cached yet stays unformatted, as in the scroll bind path.
+			const formatterInput = shouldPrimeDisplayValue ? (primedValue ?? cachedValue) : rawValue;
+			const snapshotText =
+				col.valueFormatter && !isImpostorEligible && visualRow.node.data !== null && (!shouldPrimeDisplayValue || formatterInput !== undefined)
+					? formatPrewarmValue(col, formatterInput, visualRow.node)
+					: displayValue;
+			const snapshotContentKind = isImpostorEligible && snapshotText !== '' ? 'impostor' : snapshotText !== '' ? 'text' : 'empty';
+			const snapshotContentMode = isImpostorEligible && snapshotText !== '' ? 'fallback' : snapshotText !== '' ? 'text' : 'empty';
 			this.deps.engine.cellDisplaySnapshots.set(
 				createCellDisplaySnapshot({
 					rowId,
@@ -554,7 +578,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 					decorationClassName: decorationMetadata.classNameSuffix,
 					contentKind: snapshotContentKind,
 					contentMode: snapshotContentMode,
-					formattedValue: displayValue,
+					formattedValue: snapshotText,
 					title: mergeCellSnapshotTitle(tooltipText, decorationMetadata.insightTitle),
 					validationError: decorationMetadata.validationError,
 				})
@@ -574,12 +598,52 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 		}
 	}
 
+	/**
+	 * Runs one lane of post-scroll repair inside an idle slice. The configured budget is the floor:
+	 * one batch always runs, exactly as before. When the scheduler hands us a real idle deadline
+	 * (not a timeout-forced run), further batches run while the slice still has time left, so a
+	 * quiet page settles in far fewer idle round-trips while a busy one keeps the fixed cap.
+	 */
+	private decorateLaneWithinDeadline(
+		lane: 'motion' | 'fidelity',
+		budget: number,
+		deadline?: GridIdleDeadline
+	): { remaining: number; processed: number; remainingMotion: number; remainingFidelity: number } {
+		this.deps.portalMountManager.beginCellReleaseTransaction();
+		try {
+			let result = this.deps.rowRenderer.decorateDirtyCellsAfterScroll({ maxCells: budget, lane });
+			let processed = result.processed;
+			let laneRemaining = lane === 'motion' ? result.remainingMotion : result.remainingFidelity;
+			// Bounded: at most POST_SCROLL_MAX_EXTRA_BATCHES extra batches, and only while the lane's
+			// backlog strictly shrinks (a bind that re-dirties cells must not spin the slice).
+			for (
+				let extra = 0;
+				extra < POST_SCROLL_MAX_EXTRA_BATCHES &&
+				deadline &&
+				!deadline.didTimeout &&
+				result.processed > 0 &&
+				laneRemaining > 0 &&
+				deadline.timeRemaining() > POST_SCROLL_DEADLINE_MARGIN_MS;
+				extra++
+			) {
+				result = this.deps.rowRenderer.decorateDirtyCellsAfterScroll({ maxCells: budget, lane });
+				processed += result.processed;
+				const nextRemaining = lane === 'motion' ? result.remainingMotion : result.remainingFidelity;
+				if (nextRemaining >= laneRemaining) break;
+				laneRemaining = nextRemaining;
+			}
+			return processed === result.processed ? result : { ...result, processed };
+		} finally {
+			this.deps.portalMountManager.endCellReleaseTransaction();
+		}
+	}
+
 	public scheduleBudgetedDecoration(): void {
 		if (this.state.postScrollDecorationScheduled) return;
 		this.state.postScrollDecorationScheduled = true;
 		const generation = ++this.state.postScrollDecorationGeneration;
 		const scrollEpoch = this.deps.runtimeState.scrollEpoch;
-		this.state.postScrollDecorationTimer = this.deps.gridScheduler.idle(() => {
+		this.state.postScrollDecorationTimer = this.deps.gridScheduler.idle((deadline) => {
 			if (this.state.postScrollDecorationGeneration !== generation || !this.deps.runtimeState.isScrollEpochCurrent(scrollEpoch)) {
 				return;
 			}
@@ -590,13 +654,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 			}
 			this.deps.renderStats.postScrollDecorationChunks++;
 			this.deps.renderStats.postScrollMotionChunks++;
-			this.deps.portalMountManager.beginCellReleaseTransaction();
-			let result;
-			try {
-				result = this.deps.rowRenderer.decorateDirtyCellsAfterScroll({ maxCells: this.state.postScrollDecorationBudget, lane: 'motion' });
-			} finally {
-				this.deps.portalMountManager.endCellReleaseTransaction();
-			}
+			const result = this.decorateLaneWithinDeadline('motion', this.state.postScrollDecorationBudget, deadline);
 			if (result.processed > this.deps.renderStats.maxCellsDecoratedInOneChunk) {
 				this.deps.renderStats.maxCellsDecoratedInOneChunk = result.processed;
 			}
@@ -614,16 +672,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 				// do not remain as impostors for an extra idle-to-idle gap.
 				this.deps.renderStats.postScrollDecorationChunks++;
 				this.deps.renderStats.postScrollFidelityChunks++;
-				this.deps.portalMountManager.beginCellReleaseTransaction();
-				let fidelityResult;
-				try {
-					fidelityResult = this.deps.rowRenderer.decorateDirtyCellsAfterScroll({
-						maxCells: this.state.postScrollFidelityBudget,
-						lane: 'fidelity',
-					});
-				} finally {
-					this.deps.portalMountManager.endCellReleaseTransaction();
-				}
+				const fidelityResult = this.decorateLaneWithinDeadline('fidelity', this.state.postScrollFidelityBudget, deadline);
 				if (fidelityResult.processed > this.deps.renderStats.maxCellsDecoratedInOneChunk) {
 					this.deps.renderStats.maxCellsDecoratedInOneChunk = fidelityResult.processed;
 				}
@@ -645,7 +694,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 		const generation = ++this.state.postScrollFidelityGeneration;
 		const scrollEpoch = this.deps.runtimeState.scrollEpoch;
 		this.state.fidelityEpoch = scrollEpoch;
-		this.state.postScrollFidelityTimer = this.deps.gridScheduler.idle(() => {
+		this.state.postScrollFidelityTimer = this.deps.gridScheduler.idle((deadline) => {
 			if (this.state.postScrollFidelityGeneration !== generation || !this.deps.runtimeState.isScrollEpochCurrent(scrollEpoch)) {
 				return;
 			}
@@ -658,13 +707,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 			}
 			this.deps.renderStats.postScrollDecorationChunks++;
 			this.deps.renderStats.postScrollFidelityChunks++;
-			this.deps.portalMountManager.beginCellReleaseTransaction();
-			let result;
-			try {
-				result = this.deps.rowRenderer.decorateDirtyCellsAfterScroll({ maxCells: this.state.postScrollFidelityBudget, lane: 'fidelity' });
-			} finally {
-				this.deps.portalMountManager.endCellReleaseTransaction();
-			}
+			const result = this.decorateLaneWithinDeadline('fidelity', this.state.postScrollFidelityBudget, deadline);
 			if (result.processed > this.deps.renderStats.maxCellsDecoratedInOneChunk) {
 				this.deps.renderStats.maxCellsDecoratedInOneChunk = result.processed;
 			}
@@ -705,7 +748,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 			for (let r = 0; r < pinTopRows && r < window.rowCount; r++) {
 				const slot = this.deps.rowRenderer.activeRows.get(r);
 				if (slot) {
-					slot.updatePosition(rowTops[r] + scrollTop);
+					slot.updatePosition(snapToDevicePixel(rowTops[r] + scrollTop));
 				}
 			}
 
@@ -713,7 +756,7 @@ export class RenderScrollCoordinator<TRowData = unknown> {
 				if (r >= pinTopRows) {
 					const slot = this.deps.rowRenderer.activeRows.get(r);
 					if (slot) {
-						slot.updatePosition(scrollTop + viewportHeight - (totalHeight - rowTops[r]));
+						slot.updatePosition(snapToDevicePixel(scrollTop + viewportHeight - (totalHeight - rowTops[r])));
 					}
 				}
 			}

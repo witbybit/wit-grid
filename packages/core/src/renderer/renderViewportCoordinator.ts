@@ -20,13 +20,22 @@ export interface RenderViewportCoordinatorDeps<TRowData = unknown> {
 }
 
 export class RenderViewportCoordinator<TRowData = unknown> {
+	// Theme header height is a CSS length string; parse it once per distinct value rather than
+	// on every scroll frame.
+	private lastThemeLeafHeaderHeight: string | undefined = undefined;
+	private lastLeafHeaderHeightPx: number | undefined = undefined;
+
 	constructor(private readonly deps: RenderViewportCoordinatorDeps<TRowData>) {}
 
 	public syncLayoutPlan(renderWindow?: RenderWindow): GridLayoutPlan {
 		const theme = this.deps.viewportRenderer.getTheme();
-		const themeLhh = theme?.leafHeaderHeight ? parseFloat(theme.leafHeaderHeight) : undefined;
-		const leafHeaderHeightPx = themeLhh && themeLhh > 0 ? themeLhh : undefined;
-		const layoutPlan = computeGridLayoutPlan(this.deps.engine, renderWindow, leafHeaderHeightPx);
+		const themeLeafHeaderHeight = theme?.leafHeaderHeight;
+		if (themeLeafHeaderHeight !== this.lastThemeLeafHeaderHeight) {
+			this.lastThemeLeafHeaderHeight = themeLeafHeaderHeight;
+			const themeLhh = themeLeafHeaderHeight ? parseFloat(themeLeafHeaderHeight) : undefined;
+			this.lastLeafHeaderHeightPx = themeLhh && themeLhh > 0 ? themeLhh : undefined;
+		}
+		const layoutPlan = computeGridLayoutPlan(this.deps.engine, renderWindow, this.lastLeafHeaderHeightPx);
 		this.deps.viewportRenderer.syncLayoutPlan(layoutPlan);
 		return layoutPlan;
 	}
