@@ -42,6 +42,18 @@
 					"signature": "(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null"
 				},
 				{
+					"name": "applyTransactionAsync",
+					"optional": false,
+					"signature": "(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void",
+					"description": "Queues a transaction to apply with others before the next frame, in call order. Independent\ntransactions are applied together as one commit and one render, which suits high-frequency\nfeeds. The callback receives this transaction's own result. Any synchronous write (including\napplyTransaction) applies the queue first, so writes always land in the order they were made."
+				},
+				{
+					"name": "flushAsyncTransactions",
+					"optional": false,
+					"signature": "(): void",
+					"description": "Applies queued applyTransactionAsync transactions immediately."
+				},
+				{
 					"name": "getRowOrder",
 					"optional": false,
 					"signature": "(): string[]"
