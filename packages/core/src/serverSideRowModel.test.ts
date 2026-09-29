@@ -382,9 +382,9 @@ describe('ServerSideRowModelController', () => {
 			hierarchy: { level: 0, parentId: null, hasChildren: true, expanded: false },
 		});
 
-		const refresh = controller.toggleGroupExpanded('group:region=EMEA');
+		const refresh = controller.setExpanded('group:region=EMEA', true);
 		expect(refresh).toMatchObject({ changed: true, reason: 'expansion', groupId: 'group:region=EMEA' });
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(true);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(true);
 		expect(getRows).toHaveBeenCalledTimes(2);
 
 		await flushAsync();
@@ -446,7 +446,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		await flushAsync();
 
 		controller.refreshServerSide({ route: ['region', 'EMEA'] });
@@ -467,7 +467,7 @@ describe('ServerSideRowModelController', () => {
 			}),
 		]);
 		expect(controller.getBlockSnapshots()).toEqual([expect.objectContaining({ storeId: '', blockIndex: 0, state: 'loaded' })]);
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(false);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(false);
 
 		controller.dispose();
 		store.destroy();
@@ -508,7 +508,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		expect(getRows).toHaveBeenCalledTimes(2);
 
 		controller.purgeServerSide({ route: ['region', 'EMEA'] });
@@ -565,7 +565,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		controller.refreshServerSide({ route: ['region', 'EMEA', 'country', 'DE'] });
 		await flushAsync();
 
@@ -585,7 +585,7 @@ describe('ServerSideRowModelController', () => {
 			}),
 		]);
 		expect(controller.getBlockSnapshots()).toEqual([expect.objectContaining({ storeId: '', blockIndex: 0, state: 'loaded' })]);
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(false);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(false);
 
 		controller.dispose();
 		store.destroy();

@@ -90,6 +90,13 @@ import { RowCtrlStore } from '../renderer/controllers/RowCtrlStore.js';
 import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
 import { mapRowsUpdatedDispatchPayload, type PublicRowNodeDispatchDeps } from './publicRowNodeDispatch.js';
 import { GridFlightRecorder } from '../diagnostics/GridFlightRecorder.js';
+import {
+	freezeAggregationConfig,
+	freezeDetailConfig,
+	freezeGroupingConfig,
+	freezeTreeDataConfig,
+	isGroupingActive,
+} from '../rows/hierarchyConfig.js';
 import { RenderRequestCoordinator } from './RenderRequestCoordinator.js';
 
 export type ManagedRowDragBlockReason =
@@ -377,7 +384,7 @@ export class GridEngine<TRowData = unknown> {
 			getState: () => this.stateManager.getState(),
 			isRowSelected: (rowIndex) => this.selection.isRowSelected(rowIndex),
 			isRowLoading: (rowId) => this.data.isRowLoading(rowId),
-			isDetailExpanded: (rowId) => asRowExpansionStateReadableModel(this.rowModel)?.isDetailExpanded(rowId) ?? false,
+			isDetailOpen: (rowId) => asRowExpansionStateReadableModel(this.rowModel)?.isDetailOpen(rowId) ?? false,
 			selectRows: (rowIds, options) => {
 				if (options?.mode === 'replace') this.replaceRowIds(rowIds, 'api');
 				else this.selectRowIds(rowIds, 'api');
@@ -450,21 +457,16 @@ export class GridEngine<TRowData = unknown> {
 			styleRules: config.styleRules,
 
 			// Tree / Grouping / Master-Detail State
-			groupBy: config.groupBy,
-			getParentId: config.getParentId,
-			masterDetailEnabled: config.masterDetailEnabled,
-			groupRowHeight: config.groupRowHeight,
-			detailRowHeight: config.detailRowHeight,
-			detailRenderer: config.detailRenderer,
-			rowModelConfig: config.rowModelConfig,
-			showGroupFooter: config.showGroupFooter,
-			enableStickyGroupRows: config.enableStickyGroupRows,
+			grouping: freezeGroupingConfig(config.grouping),
+			treeData: freezeTreeDataConfig(config.treeData),
+			aggregation: freezeAggregationConfig(config.aggregation),
+			detail: freezeDetailConfig(config.detail),
 			showGroupPanel: config.showGroupPanel,
 			showFilterChipBar: config.showFilterChipBar,
 			showFloatingFilters: config.showFloatingFilters,
 			showStatusBar: config.showStatusBar,
 			pagination: config.pagination,
-			expansion: config.expansion ?? { groups: {}, treeRows: {}, details: {} },
+			expansion: config.expansion ?? { rows: {}, details: {} },
 			rowOverscanPx: config.rowOverscanPx ?? 400,
 			colBuffer: config.colBuffer ?? 2,
 			colOverscanPx: config.colOverscanPx,
@@ -590,7 +592,8 @@ export class GridEngine<TRowData = unknown> {
 				getState: () => this.stateManager.getState(),
 				applyChange: (change: import('./GridChangeApplier.js').GridCommit<TRowData>) => this.changeApplier.commit(change),
 			};
-			const modelType = ((config.rowModelConfig as { type?: string } | undefined)?.type ?? 'client') as GridIntegrityRowModelKind;
+			// The provider refines this from the attached row model's capabilities.
+			const modelType: GridIntegrityRowModelKind = 'client';
 			const rowProvider = createGridIntegrityRowProvider<TRowData>({
 				getRowModel: () => this.rowModel,
 				getState: () => this.stateManager.getState(),
@@ -749,14 +752,14 @@ export class GridEngine<TRowData = unknown> {
 				message: 'Managed row drag is blocked while filters are active.',
 			};
 		}
-		if ((state.groupBy?.length ?? 0) > 0) {
+		if (isGroupingActive(state.grouping)) {
 			return {
 				allowed: false,
 				reason: 'group-active',
 				message: 'Managed row drag is blocked while grouping is active.',
 			};
 		}
-		if (state.getParentId) {
+		if (state.treeData) {
 			return {
 				allowed: false,
 				reason: 'tree-active',
@@ -905,15 +908,15 @@ export class GridEngine<TRowData = unknown> {
 			getVisualIndexByRowId: (targetRowId) => this.rowModel?.getVisualIndexByRowId(targetRowId) ?? null,
 			getVisualRowCount: () => this.rowModel?.getVisualRowCount() ?? 0,
 			getSelectedRowIds: () => this.stateManager.getState().selectedRowIds,
-			isGroupExpanded: (groupId) => asRowExpansionStateReadableModel(this.rowModel)?.isGroupExpanded(groupId) ?? false,
-			isDetailExpanded: (targetRowId) => asRowExpansionStateReadableModel(this.rowModel)?.isDetailExpanded(targetRowId) ?? false,
+			isExpanded: (id) => asRowExpansionStateReadableModel(this.rowModel)?.isExpanded(id) ?? false,
+			isDetailOpen: (targetRowId) => asRowExpansionStateReadableModel(this.rowModel)?.isDetailOpen(targetRowId) ?? false,
 			selectRows: (rowIds, options) => (options?.mode === 'replace' ? this.replaceRowIds(rowIds, 'api') : this.selectRowIds(rowIds, 'api')),
 			deselectRows: (rowIds) => this.deselectRowIds(rowIds, 'api'),
 			scrollToRow: () => {},
 			setCellValue: (targetRowId, field, value) => this.setCellValue(targetRowId, field, value),
 			batchCellValues: (updates) => this.batchCellValues(updates as import('../api/GridApi.js').BatchCellValueUpdate[], 'api'),
-			toggleGroupExpanded: (groupId) => this.groupingFeature.toggleGroupExpanded(groupId),
-			toggleDetailExpanded: (rowId) => this.groupingFeature.toggleDetailExpanded(rowId),
+			setExpanded: (id, expanded) => this.groupingFeature.setExpanded(id, expanded),
+			setDetailOpen: (rowId, open) => this.groupingFeature.setDetailOpen(rowId, open),
 			refreshRows: () => this.rowModel?.refresh(),
 			retryRowLoad: (rowIndex, loadState) => {
 				if (loadState.kind !== 'failed' || rowIndex == null || !this.rowModel) {
@@ -1107,8 +1110,8 @@ export class GridEngine<TRowData = unknown> {
 		});
 	}
 
-	public setGroupBy(colIds: string[]): void {
-		this.groupingFeature.setGroupBy(colIds);
+	public setGroupBy(by: ReadonlyArray<string | import('../rows/hierarchyConfig.js').GroupDef<TRowData>>): void {
+		this.groupingFeature.setGroupBy(by);
 	}
 	public addGroupBy(colId: string, atIndex?: number): void {
 		this.groupingFeature.addGroupBy(colId, atIndex);
@@ -1121,15 +1124,6 @@ export class GridEngine<TRowData = unknown> {
 	}
 	public setShowGroupPanel(enabled: boolean): void {
 		this.groupingFeature.setShowGroupPanel(enabled);
-	}
-	public setAggDefs(defs: import('../rows/stages/aggregateStage.js').AggregationDef<TRowData>[]): void {
-		this.groupingFeature.setAggDefs(defs);
-	}
-	public setShowGroupFooter(enabled: boolean): void {
-		this.groupingFeature.setShowGroupFooter(enabled);
-	}
-	public setStickyGroupRows(enabled: boolean): void {
-		this.groupingFeature.setStickyGroupRows(enabled);
 	}
 	public setCellValue(rowId: string, colField: string, value: unknown, undoable = true): GridWriteResult {
 		const validationFailure = this.validateWriteProposalSync([{ rowId, colField, proposedValue: value }], 'api');

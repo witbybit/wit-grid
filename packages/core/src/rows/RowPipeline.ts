@@ -9,42 +9,21 @@ import { createRowPipelineContext } from './pipelineContext.js';
 import { groupStage } from './stages/groupStage.js';
 import { treeStage } from './stages/treeStage.js';
 import { sortTreeStage } from './stages/sortTreeStage.js';
-import { aggregateStage, type AggregationDef } from './stages/aggregateStage.js';
-import { flattenStage, type TotalsConfig } from './stages/flattenStage.js';
+import { aggregateStage } from './stages/aggregateStage.js';
+import { flattenStage } from './stages/flattenStage.js';
+import {
+	normalizeGroupDefs,
+	type AggregationConfig,
+	type DetailConfig,
+	type ExpansionState,
+	type GroupingConfig,
+	type TreeDataConfig,
+} from './hierarchyConfig.js';
 import type { RowTreeNode } from './stages/types.js';
-import { toDataVisualRowId, toGroupVisualRowId } from './visualRowIds.js';
+import { toDataVisualRowId } from './visualRowIds.js';
 import { computePageWindow, type PageWindow } from './pageModel.js';
 
-export interface GroupDef<TData = unknown> {
-	colId: string;
-	keyCreator?: (params: { value: unknown; row: TData; rowId: string }) => string;
-	comparator?: (a: unknown, b: unknown) => number;
-}
-
-export interface RowModelConfig<TData = unknown> {
-	type: 'client' | 'server';
-	grouping?: {
-		model: GroupDef<TData>[];
-		defaultExpanded?: boolean;
-		expandedGroupIds?: Record<string, true>;
-		includeFooter?: boolean;
-	};
-	treeData?: {
-		enabled: boolean;
-		getParentId: (row: TData) => string | null | undefined;
-		/** Source fields read by getParentId. When declared, only changes to these fields trigger tree restructuring. */
-		getParentIdDependencies?: string[];
-		defaultExpanded?: boolean;
-		expandedRowIds?: Record<string, true>;
-		filterMode?: 'strict' | 'includeAncestors' | 'includeDescendants';
-	};
-	masterDetail?: {
-		enabled: boolean;
-		expandedRowIds?: Record<string, true>;
-		getDetailHeight?: (params: { row: TData; rowId: string }) => number;
-		defaultDetailHeight?: number;
-	};
-}
+export type { GroupDef } from './hierarchyConfig.js';
 
 export interface RowPipelineInput<TData = unknown> {
 	nodes: RowNode<TData>[];
@@ -54,26 +33,17 @@ export interface RowPipelineInput<TData = unknown> {
 	quickFilterModel?: QuickFilterModel | null;
 	queryModel?: GridQueryModel | null;
 
-	// Tree / Group / Detail configs
-	groupBy?: string[];
-	rowModelConfig?: RowModelConfig<TData>;
-	getParentId?: (data: TData) => string | null | undefined;
-	aggDefs?: AggregationDef<TData>[];
-	/** Where total rows go. Defaults to a bottom total per group when grouping.includeFooter is set. */
-	totals?: TotalsConfig;
-	expandedGroupIds: Set<string>;
-	expandedTreeRowIds?: Set<string>;
-	expandedDetailRowIds: Set<string>;
+	// Hierarchy: each is absent when unused.
+	grouping?: GroupingConfig<TData>;
+	treeData?: TreeDataConfig<TData>;
+	aggregation?: AggregationConfig<TData>;
+	detail?: DetailConfig<TData>;
+	expansion: ExpansionState;
 
 	// Heights
 	defaultRowHeight: number;
 	rowHeightsRecord: Record<string, number>;
 	getRowHeight?: (row: TData, rowId: string) => number | undefined;
-	groupRowHeight?: number;
-	detailRowHeight?: number;
-	getDetailHeight?: (params: { row: TData; rowId: string }) => number;
-	masterDetailEnabled?: boolean;
-	detailRenderer?: unknown;
 	reportFault?: (operation: string, error: unknown, context?: Record<string, unknown>) => void;
 
 	// Client pagination. When set, the final flattened visual rows are sliced to this page
@@ -96,6 +66,8 @@ export interface RowPipelineOutput<TData = unknown> {
 	groupMetaByVisualIndex: Map<number, GroupRowMeta>;
 	/** Present when client pagination is active — the slice applied to the visual rows. */
 	pageWindow?: PageWindow;
+	/** The full row tree (collapsed subtrees included) when rows are grouped, tree-shaped or aggregated. */
+	roots: RowTreeNode<TData>[] | null;
 	version: number;
 	stats: {
 		totalDataRows: number;
@@ -119,38 +91,20 @@ export class RowPipeline<TData = unknown> {
 			filterModel,
 			quickFilterModel,
 			queryModel,
-			groupBy,
-			rowModelConfig,
-			getParentId,
-			aggDefs = [],
-			expandedGroupIds,
-			expandedTreeRowIds = new Set<string>(),
-			expandedDetailRowIds,
+			grouping,
+			treeData,
+			aggregation,
+			detail,
+			expansion,
 			defaultRowHeight,
 			rowHeightsRecord,
 			getRowHeight,
-			groupRowHeight,
-			detailRowHeight,
-			getDetailHeight,
-			masterDetailEnabled,
-			detailRenderer,
 			reportFault,
 		} = input;
 
-		const groupingConfig = rowModelConfig?.grouping;
-		const treeConfig = rowModelConfig?.treeData?.enabled ? rowModelConfig.treeData : undefined;
-		const detailConfig = rowModelConfig?.masterDetail;
-		const groupDefs: GroupDef<TData>[] = groupingConfig?.model ?? (groupBy ?? []).map((colId) => ({ colId }));
-		const effectiveGetParentId = treeConfig?.getParentId ?? getParentId;
-		const context = createRowPipelineContext(
-			columns,
-			{
-				groups: new Set([...expandedGroupIds, ...Object.keys(groupingConfig?.expandedGroupIds ?? {})]),
-				treeRows: new Set([...expandedTreeRowIds, ...Object.keys(treeConfig?.expandedRowIds ?? {})]),
-				details: new Set([...expandedDetailRowIds, ...Object.keys(detailConfig?.expandedRowIds ?? {})]),
-			},
-			reportFault
-		);
+		const groupDefs = normalizeGroupDefs(grouping?.by);
+		const aggDefs = aggregation?.defs ?? [];
+		const context = createRowPipelineContext(columns, reportFault);
 
 		let roots: RowTreeNode<TData>[] | null = null;
 		let visualRows: VisualRow<TData>[] | null = null;
@@ -158,9 +112,9 @@ export class RowPipeline<TData = unknown> {
 		if (groupDefs.length > 0) {
 			const filteredNodes = applyQueryModelFilter(applyClientFilterOnly(nodes, columns, filterModel, quickFilterModel), columns, queryModel);
 			roots = groupStage(filteredNodes, groupDefs, context);
-		} else if (effectiveGetParentId) {
-			const treeRoots = treeStage(nodes, effectiveGetParentId);
-			const treeFiltered = this.filterTree(treeRoots, columns, filterModel, quickFilterModel, treeConfig?.filterMode ?? 'includeAncestors');
+		} else if (treeData) {
+			const treeRoots = treeStage(nodes, treeData.getParentId);
+			const treeFiltered = this.filterTree(treeRoots, columns, filterModel, quickFilterModel, treeData.filterMode ?? 'includeAncestors');
 			roots = queryModel ? this.filterTreeByQuery(treeFiltered, columns, queryModel) : treeFiltered;
 		} else {
 			const filteredNodes = applyQueryModelFilter(
@@ -168,7 +122,7 @@ export class RowPipeline<TData = unknown> {
 				columns,
 				queryModel
 			);
-			if (!detailConfig?.enabled && !masterDetailEnabled && aggDefs.length === 0) {
+			if (!detail && aggDefs.length === 0) {
 				visualRows = filteredNodes.map((node) => {
 					const explicitHeight = rowHeightsRecord[node.id] ?? getRowHeight?.(node.data, node.id);
 					return {
@@ -192,34 +146,29 @@ export class RowPipeline<TData = unknown> {
 			}
 		}
 
-		if (
-			roots &&
-			(groupDefs.length > 0 || effectiveGetParentId) &&
-			((sortModel && sortModel.length > 0) || groupDefs.some((def) => def.comparator))
-		) {
+		if (roots && (groupDefs.length > 0 || treeData) && ((sortModel && sortModel.length > 0) || groupDefs.some((def) => def.comparator))) {
 			sortTreeStage(roots, sortModel, columns, groupDefs);
 		}
 
-		const grandAggregates = roots && aggDefs && aggDefs.length > 0 ? aggregateStage(roots, aggDefs, context) : undefined;
+		const grandAggregates =
+			roots && aggDefs.length > 0
+				? aggregateStage(roots, aggDefs, context, { aggregateTreeParents: treeData?.aggregateParents ?? true })
+				: undefined;
 
 		const stickyGroupMeta = new Map<number, number>();
 		visualRows ??= flattenStage(
 			roots ?? [],
 			{
-				expandedGroupIds: context.expansion.groups,
-				expandedTreeRowIds: context.expansion.treeRows,
-				expandedDetailRowIds: context.expansion.details,
+				expansion,
+				groupDefaultExpanded: grouping?.defaultExpanded,
+				treeDefaultExpanded: treeData?.defaultExpanded,
 				defaultRowHeight,
 				rowHeightsRecord,
 				getRowHeight,
-				groupRowHeight,
-				detailRowHeight: detailConfig?.defaultDetailHeight ?? detailRowHeight,
-				getDetailHeight: detailConfig?.getDetailHeight ?? getDetailHeight,
-				masterDetailEnabled: detailConfig?.enabled ?? masterDetailEnabled,
-				detailRenderer,
-				defaultGroupsExpanded: groupingConfig?.defaultExpanded,
-				defaultTreeRowsExpanded: treeConfig?.defaultExpanded,
-				totals: input.totals ?? (groupingConfig?.includeFooter ? { groups: 'bottom' } : undefined),
+				groupRowHeight: grouping?.rowHeight,
+				detail,
+				// Totals belong to grouping; a grand total without grouping still makes sense.
+				totals: grouping?.totals,
 				grandAggregates,
 			},
 			stickyGroupMeta
@@ -286,6 +235,7 @@ export class RowPipeline<TData = unknown> {
 			groupMeta,
 			groupMetaByVisualIndex,
 			pageWindow,
+			roots,
 			version: ++this.version,
 			stats: {
 				totalDataRows: nodes.length,
@@ -295,55 +245,6 @@ export class RowPipeline<TData = unknown> {
 				loadingRowCount,
 			},
 		};
-	}
-
-	public collectAllExpansionIds(
-		input: Pick<RowPipelineInput<TData>, 'nodes' | 'columns' | 'groupBy' | 'rowModelConfig' | 'filterModel' | 'quickFilterModel' | 'queryModel'>
-	): { groupIds: string[]; treeRowIds: string[] } {
-		const { nodes, columns, groupBy, rowModelConfig, filterModel, quickFilterModel, queryModel } = input;
-		const groupingConfig = rowModelConfig?.grouping;
-		const groupDefs: GroupDef<TData>[] = groupingConfig?.model ?? (groupBy ?? []).map((colId) => ({ colId }));
-		const filteredNodes = applyQueryModelFilter(applyClientFilterOnly(nodes, columns, filterModel, quickFilterModel), columns, queryModel);
-		const context = createRowPipelineContext(columns, { groups: new Set(), treeRows: new Set(), details: new Set() });
-		const groupIds: string[] = [];
-		const treeRowIds: string[] = [];
-
-		if (groupDefs.length > 0) {
-			const roots = groupStage(filteredNodes, groupDefs, context);
-			const collectGroups = (nodes: RowTreeNode<TData>[]) => {
-				for (const node of nodes) {
-					if (node.kind === 'group') {
-						groupIds.push(toGroupVisualRowId(node.path));
-						collectGroups(node.children);
-					}
-				}
-			};
-			collectGroups(roots);
-		}
-
-		const treeConfig = rowModelConfig?.treeData?.enabled ? rowModelConfig.treeData : undefined;
-		if (treeConfig?.getParentId) {
-			const roots = treeStage(filteredNodes, treeConfig.getParentId);
-			const collectTreeRows = (nodes: RowTreeNode<TData>[]) => {
-				for (const node of nodes) {
-					if (node.kind === 'data' && node.children && node.children.length > 0) {
-						treeRowIds.push(node.rowId);
-					}
-					if (node.kind === 'data' && node.children) {
-						collectTreeRows(node.children);
-					}
-				}
-			};
-			collectTreeRows(roots);
-		}
-
-		return { groupIds, treeRowIds };
-	}
-
-	public collectAllGroupIds(
-		input: Pick<RowPipelineInput<TData>, 'nodes' | 'columns' | 'groupBy' | 'rowModelConfig' | 'filterModel' | 'quickFilterModel' | 'queryModel'>
-	): string[] {
-		return this.collectAllExpansionIds(input).groupIds;
 	}
 
 	private filterTreeByQuery<TData>(roots: RowTreeNode<TData>[], columns: ColumnDef<TData>[], queryModel: GridQueryModel): RowTreeNode<TData>[] {

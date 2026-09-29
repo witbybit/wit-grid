@@ -76,7 +76,7 @@ describe('InvalidationManager', () => {
 		manager.invalidateGroup('group:region:Americas', 'groupBy');
 		manager.invalidateRowRange(12, 4, 'viewport');
 		manager.invalidateRowRange(4, 12, 'viewport');
-		manager.invalidateColumn('revenue', 'aggDefs');
+		manager.invalidateColumn('revenue', 'aggregation');
 
 		const frame = manager.consume();
 
@@ -86,7 +86,7 @@ describe('InvalidationManager', () => {
 		expect(frame.invalidations).toEqual([
 			{ kind: 'group', groupId: 'group:region:Americas', reason: 'groupBy' },
 			{ kind: 'row-range', startIndex: 4, endIndex: 12, reason: 'viewport' },
-			{ kind: 'column', colId: 'revenue', reason: 'aggDefs' },
+			{ kind: 'column', colId: 'revenue', reason: 'aggregation' },
 		]);
 	});
 

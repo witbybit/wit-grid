@@ -47,7 +47,6 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	dataIntegrity?: import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>;
 	/** Grid-level capability rules. Control which actions are allowed per cell, column, or row. */
 	capabilities?: GridCapabilitiesConfig<TRowData>;
-	detailRowHeight?: number;
 	/** Enable the core pagination bar (and, in client mode, page-window row slicing). */
 	pagination?: boolean | GridPaginationConfig;
 	rowSelection?: RowSelectionMode | RowSelectionOptions;
@@ -95,7 +94,6 @@ function normalizePagination(pagination: boolean | GridPaginationConfig | undefi
 function createInitialState<TRowData>(
 	base: GridCommonProps<TRowData>,
 	extras: {
-		detailRowHeight?: number;
 		pagination: { pageSize: number; initialPage: number } | null;
 		showStatusBar?: boolean;
 		showFilterChipBar?: boolean;
@@ -112,7 +110,6 @@ function createInitialState<TRowData>(
 		rendererOptions,
 		...initialState,
 	};
-	if (extras.detailRowHeight != null) merged.detailRowHeight = extras.detailRowHeight;
 	// Pagination + status bar are core concerns; the adapter just seeds the config.
 	if (extras.pagination) merged.pagination = { pageSize: extras.pagination.pageSize, page: extras.pagination.initialPage };
 	if (extras.showStatusBar) merged.showStatusBar = true;
@@ -133,7 +130,6 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	const {
 		rowModelType,
 		onGridReady,
-		detailRowHeight,
 		columns,
 		columnTypes,
 		styleRules,
@@ -188,7 +184,6 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		rendererOptions,
 		dataIntegrity,
 		capabilities,
-		detailRowHeight,
 		pagination,
 		rowSelection,
 		showStatusBar,
@@ -214,7 +209,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				columnTypes,
 				styleRules,
 			},
-			{ detailRowHeight, pagination: paginationConfig, showStatusBar, showFilterChipBar, showFloatingFilters, rowDragMode }
+			{ pagination: paginationConfig, showStatusBar, showFilterChipBar, showFloatingFilters, rowDragMode }
 		);
 
 		if (rowModelType === 'infinite') {
@@ -326,7 +321,6 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 			['rendererOptions', initialOnlyProps.rendererOptions, rendererOptions],
 			['dataIntegrity', initialOnlyProps.dataIntegrity, dataIntegrity],
 			['capabilities', initialOnlyProps.capabilities, capabilities],
-			['detailRowHeight', initialOnlyProps.detailRowHeight, detailRowHeight],
 			['pagination', initialOnlyProps.pagination, pagination],
 			['rowSelection', initialOnlyProps.rowSelection, rowSelection],
 			['showStatusBar', initialOnlyProps.showStatusBar, showStatusBar],
@@ -353,7 +347,6 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		rendererOptions,
 		dataIntegrity,
 		capabilities,
-		detailRowHeight,
 		pagination,
 		rowSelection,
 		showStatusBar,

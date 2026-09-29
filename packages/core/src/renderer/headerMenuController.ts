@@ -1,3 +1,4 @@
+import { groupByColIds } from '../rows/hierarchyConfig.js';
 import { defaultGridScheduler } from './gridScheduler.js';
 import type { PortalMountManager } from './portalMountManager.js';
 import type { GridEngine } from '../engine/GridEngine.js';
@@ -258,7 +259,7 @@ export class HeaderMenuController<TRowData = unknown> {
 			}
 
 			if (isGroupable) {
-				const groupBy = state.groupBy || [];
+				const groupBy = groupByColIds(state.grouping);
 				const isGrouped = groupBy.includes(colField);
 				const groupBtn = document.createElement('div');
 				groupBtn.className = 'og-popover-item';

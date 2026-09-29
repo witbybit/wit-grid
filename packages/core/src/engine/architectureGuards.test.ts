@@ -999,8 +999,10 @@ describe('Architecture guardrails', () => {
 	});
 
 	it('treeData options expose getParentIdDependencies (Plan 082)', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'rows', 'RowPipeline.ts'), 'utf-8');
-		expect(content).toContain('getParentIdDependencies');
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'rows', 'hierarchyConfig.ts'), 'utf-8');
+		const treeDataConfig = content.match(/export interface TreeDataConfig<[^>]*>\s*\{[\s\S]*?\n\}/)?.[0];
+		expect(treeDataConfig, 'TreeDataConfig interface not found in rows/hierarchyConfig.ts').toBeDefined();
+		expect(treeDataConfig).toMatch(/getParentIdDependencies\?:\s*string\[\]/);
 	});
 
 	it('incremental index maintenance uses reindexFrom and preserves Map identity (Plan 083)', () => {

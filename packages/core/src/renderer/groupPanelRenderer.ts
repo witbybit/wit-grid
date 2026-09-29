@@ -1,3 +1,4 @@
+import { groupByColIds } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import { GridEventName } from '../api/GridEvents.js';
 
@@ -58,7 +59,7 @@ export class GroupPanelRenderer<TRowData = unknown> {
 
 	public render(): void {
 		if (!this.panel) return;
-		const groupBy = this.engine.stateManager.getState().groupBy ?? [];
+		const groupBy = groupByColIds(this.engine.stateManager.getState().grouping);
 		this.panel.innerHTML = '';
 		this.panel.dataset.groupCount = String(groupBy.length);
 
@@ -254,7 +255,7 @@ export class GroupPanelRenderer<TRowData = unknown> {
 	/** Compute the groupBy insertion index from a pointer position over the panel. */
 	private computeDropIndex(e: MouseEvent, excludeColId?: string): number {
 		if (!this.panel) return -1;
-		const groupBy = this.engine.stateManager.getState().groupBy ?? [];
+		const groupBy = groupByColIds(this.engine.stateManager.getState().grouping);
 		const chips = Array.from(this.panel.querySelectorAll<HTMLElement>('.og-group-chip'));
 		if (chips.length === 0) return 0;
 

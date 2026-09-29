@@ -1231,14 +1231,8 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			],
 			columns: [{ field: 'name', header: 'Name', width: 120 }],
 			initialState: {
-				rowModelConfig: {
-					type: 'client',
-					masterDetail: {
-						enabled: true,
-						expandedRowIds: { p1: true },
-						defaultDetailHeight: 120,
-					},
-				},
+				detail: { height: 120 },
+				expansion: { rows: {}, details: { p1: true } },
 			},
 		});
 		const childGrid = createTestGrid<TestRow>({
@@ -1297,8 +1291,7 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			],
 			columns: [{ field: 'name', header: 'Name', width: 120 }],
 			initialState: {
-				masterDetailEnabled: true,
-				detailRowHeight: 120,
+				detail: { height: 120 },
 			},
 		});
 
@@ -1319,8 +1312,8 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		);
 
 		act(() => {
-			grid.api.toggleDetailExpanded('p1');
-			grid.api.toggleDetailExpanded('p2');
+			grid.api.toggleDetailOpen('p1');
+			grid.api.toggleDetailOpen('p2');
 		});
 
 		await waitFor(() => {
@@ -1356,8 +1349,7 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			],
 			columns: [{ field: 'name', header: 'Name', width: 120 }],
 			initialState: {
-				masterDetailEnabled: true,
-				detailRowHeight: 120,
+				detail: { height: 120 },
 				sortModel: [{ colId: 'name', sort: 'asc' }],
 			},
 		});
@@ -1379,9 +1371,9 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		);
 
 		act(() => {
-			grid.api.toggleDetailExpanded('p1');
-			grid.api.toggleDetailExpanded('p2');
-			grid.api.toggleDetailExpanded('p4');
+			grid.api.toggleDetailOpen('p1');
+			grid.api.toggleDetailOpen('p2');
+			grid.api.toggleDetailOpen('p4');
 		});
 
 		await waitFor(() => {
@@ -1419,8 +1411,7 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			],
 			columns: [{ field: 'name', header: 'Name', width: 120 }],
 			initialState: {
-				masterDetailEnabled: true,
-				detailRowHeight: 120,
+				detail: { height: 120 },
 			},
 		});
 
@@ -1441,13 +1432,13 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		);
 
 		act(() => {
-			grid.api.toggleDetailExpanded('p1');
+			grid.api.toggleDetailOpen('p1');
 		});
 
 		await screen.findByTestId('detail-p1');
 
 		act(() => {
-			grid.api.toggleDetailExpanded('p1');
+			grid.api.toggleDetailOpen('p1');
 		});
 
 		await waitFor(() => {
@@ -1811,14 +1802,8 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			],
 			columns: [{ field: 'name', header: 'Name', width: 120 }],
 			initialState: {
-				rowModelConfig: {
-					type: 'client',
-					masterDetail: {
-						enabled: true,
-						expandedRowIds: { p1: true },
-						defaultDetailHeight: 120,
-					},
-				},
+				detail: { height: 120 },
+				expansion: { rows: {}, details: { p1: true } },
 			},
 		});
 		const childGrid = createTestGrid<TestRow>({
@@ -1922,8 +1907,7 @@ describe('React Adapter (v2 API and Architecture)', () => {
 					},
 				],
 				initialState: {
-					masterDetailEnabled: true,
-					detailRowHeight: 120,
+					detail: { height: 120 },
 				},
 			});
 
@@ -1948,7 +1932,7 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			});
 
 			act(() => {
-				grid.api.toggleDetailExpanded('p1');
+				grid.api.toggleDetailOpen('p1');
 			});
 
 			await screen.findByTestId(`detail-portal-${cycle}`);

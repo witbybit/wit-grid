@@ -52,7 +52,7 @@ initialState: {
 	treeData?: {
 		getParentId: (row) => string | null | undefined;
 		column: string;                                  // field shown in the hierarchy column
-		defaultExpanded?: boolean | number | ((row) => boolean);
+		defaultExpanded?: boolean | number | ((row: TreeRowInfo) => boolean);
 		filterMode?: 'strict' | 'includeAncestors' | 'includeDescendants';
 		aggregateParents?: boolean;                      // default true when aggregation is configured
 		selectDescendants?: boolean;                     // default false
@@ -70,6 +70,15 @@ type TotalPlacement = 'top' | 'bottom' | false;
 
 `groupBy`, `showGroupFooter`, `getParentId`, `masterDetailEnabled`, `groupRowHeight`, `detailRowHeight`,
 `detailRenderer`, `enableStickyGroupRows` and `rowModelConfig` are removed.
+
+Implemented in phase 1 (`rows/hierarchyConfig.ts`): `grouping.{by, defaultExpanded, totals, stickyHeaders,
+rowHeight}`, `treeData.{getParentId, getParentIdDependencies, defaultExpanded, filterMode, aggregateParents}`,
+`aggregation.defs`, `detail.{isMaster, height, renderer}`. The rest land with the phase that renders them:
+`display` and `hierarchyColumn` (2–3), `detail.height: 'auto'` and `RowRendererSpec` (4), `selectDescendants` (6),
+`sortGroupsByAggregate` (later). Configs enter state as frozen copies, so the state snapshot shares them by
+reference without exposing writable grid state. Grouping wins when both `grouping.by` and `treeData` are set.
+Persistence stores `grouping: { by, totals, stickyHeaders }` (schema v3) and restores it over the configured
+grouping, keeping configured `GroupDef`s.
 
 ### Visual rows
 
@@ -95,14 +104,19 @@ plus a grand total. Group and total rows carry `aggregates: Record<colId, unknow
 ### Aggregation
 
 `AggregationDef { colId, aggFunc: 'sum' | 'avg' | 'min' | 'max' | 'count' | 'distinctCount' | 'first' | 'last' |
-((ctx: AggregateContext) => unknown) }`. Values are read through the column's value getter everywhere. Tree
-parents aggregate their subtree (`aggregateParents`). Custom functions get `{ values, rows, level, groupKey }`.
+((ctx: AggregateContext) => unknown) }`. Values are read through the column's value getter everywhere; only leaf
+rows contribute, so a parent's aggregate covers its descendants. Tree parents aggregate their subtree
+(`aggregateParents`). Custom functions get `{ colId, values, rows, scope: 'group' | 'tree' | 'grand', level, key }`
+(`level` -1 for the grand total). `first` / `last` follow row order after sorting.
 
 ### Expansion
 
-One source of truth: explicit per-row overrides on top of the default.
-`state.expansion: Record<visualRowId, boolean>`, where a missing id means "use `defaultExpanded`". So a default
-open group can be closed, and `expandAll({ maxLevel })` / `collapseAll()` just write overrides.
+One source of truth: explicit per-row overrides on top of a default.
+`state.expansion = { rows: Record<visualRowId, boolean>, details: Record<rowId, true>, base?: boolean | number }`.
+A missing id uses `base` when set, otherwise `defaultExpanded`, so a default-open group can be closed.
+`expandAll({ maxLevel })` / `collapseAll()` set `base` and clear `rows` — O(1) however large the tree. Tree rows
+are keyed by their data visual id (`row:…`), groups by `group:…`. Changing grouping levels drops only `group:`
+overrides. `expansionChanged { target, id, expanded }` reports every change.
 
 API: `setExpanded(id, open)`, `toggleExpanded(id)`, `isExpanded(id)`, `expandAll(options?)`, `collapseAll()`,
 `setDetailOpen(rowId, open)`, `isDetailOpen(rowId)`. Works for groups and tree rows alike.

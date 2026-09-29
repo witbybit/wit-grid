@@ -45,23 +45,23 @@ Two shape differences that trip people up on the first pass:
 
 ## Column definitions
 
-| AG Grid                                 | Wit Grid                                      | Notes                                                                                                 |
-| --------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `field`                                 | `field`                                       | Same. Dot paths for nested data work the same way.                                                    |
-| `headerName`                            | `header`                                      | Renamed.                                                                                              |
-| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`             | Same.                                                                                                 |
-| `sortable`                              | `sortable`                                    | Same.                                                                                                 |
-| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`    | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
-| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`   | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api).          |
-| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`   | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form.        |
-| `cellEditor`                            | `cellEditor`                                  | Same idea — a component, not a class.                                                                 |
-| `valueGetter`                           | `valueGetter`                                 | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                                  |
-| `valueFormatter`                        | `valueFormatter`                              | Same idea.                                                                                            |
-| `valueSetter`                           | `valueSetter`                                 | Return `false` to reject a commit (same convention as AG Grid).                                       |
-| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                   | Same.                                                                                                 |
-| `checkboxSelection`                     | `checkboxSelection`                           | Same.                                                                                                 |
-| `rowGroup: true` (per column)           | `initialState.groupBy: string[]` (grid-level) | **Different model** — see [Grouping](#row-grouping--aggregation) below.                               |
-| `aggFunc` (per column)                  | `initialState.aggDefs` (grid-level)           | Same built-in names (`sum`/`avg`/`min`/`max`/`count`), different location.                            |
+| AG Grid                                 | Wit Grid                                     | Notes                                                                                                 |
+| --------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `field`                                 | `field`                                      | Same. Dot paths for nested data work the same way.                                                    |
+| `headerName`                            | `header`                                     | Renamed.                                                                                              |
+| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`            | Same.                                                                                                 |
+| `sortable`                              | `sortable`                                   | Same.                                                                                                 |
+| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`   | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
+| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`  | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api).          |
+| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`  | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form.        |
+| `cellEditor`                            | `cellEditor`                                 | Same idea — a component, not a class.                                                                 |
+| `valueGetter`                           | `valueGetter`                                | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                                  |
+| `valueFormatter`                        | `valueFormatter`                             | Same idea.                                                                                            |
+| `valueSetter`                           | `valueSetter`                                | Return `false` to reject a commit (same convention as AG Grid).                                       |
+| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                  | Same.                                                                                                 |
+| `checkboxSelection`                     | `checkboxSelection`                          | Same.                                                                                                 |
+| `rowGroup: true` (per column)           | `initialState.grouping.by` (grid-level)      | **Different model** — see [Grouping](#row-grouping--aggregation) below.                               |
+| `aggFunc` (per column)                  | `initialState.aggregation.defs` (grid-level) | Same built-in names (`sum`/`avg`/`min`/`max`/`count`/`first`/`last`), different location.             |
 
 See the full column shape in [Columns](/docs/next/columns).
 
@@ -98,7 +98,7 @@ both **on the grid**, in `initialState` — the column stays a plain column defi
     		rows={rows}
     		columns={columns}
     		getRowId={(row) => row.id}
-    		initialState={{ groupBy: ['department'], aggDefs: [{ field: 'salary', aggFunc: 'sum' }] }}
+    		initialState={{ grouping: { by: ['department'] }, aggregation: { defs: [{ colId: 'salary', aggFunc: 'sum' }] } }}
     	/>;
     	```
     </Tab>
@@ -107,7 +107,7 @@ both **on the grid**, in `initialState` — the column stays a plain column defi
 
 Grouping renders through a `groupRowRenderer` you supply, not an auto-generated group column — see
 [Grouping & Tree Data](/docs/next/grouping) for the full renderer contract and toggling API
-(`api.toggleGroupExpanded`, `api.expandAllGroups`).
+(`api.toggleExpanded`, `api.expandAll`).
 
 ## Row models
 
@@ -164,11 +164,12 @@ full request/response shape, including the server row model's route-aware reques
 
 The mental model is the same — a nested grid under an expandable row — and the prop names are nearly identical:
 
-| AG Grid              | Wit Grid                                 |
-| -------------------- | ---------------------------------------- |
-| `masterDetail: true` | `initialState.masterDetailEnabled: true` |
-| `detailCellRenderer` | `detailRowRenderer`                      |
-| `detailRowHeight`    | `detailRowHeight`                        |
+| AG Grid              | Wit Grid                  |
+| -------------------- | ------------------------- |
+| `masterDetail: true` | `initialState.detail: {}` |
+| `isRowMaster`        | `detail.isMaster`         |
+| `detailCellRenderer` | `detailRowRenderer`       |
+| `detailRowHeight`    | `detail.height`           |
 
 See [Master-Detail](/docs/next/master-detail) for the full renderer signature — Wit Grid's detail renderer
 receives `{ visualRow, api }`, where the nested grid is a fully independent `<Grid>` instance you render yourself

@@ -57,9 +57,9 @@ function generateRows(count: number): SalesRow[] {
 // ── Aggregation definitions ───────────────────────────────────────────────────
 
 const AGG_DEFS: AggregationDef<SalesRow>[] = [
-	{ field: 'revenue', aggFunc: 'sum' },
-	{ field: 'units', aggFunc: 'sum' },
-	{ field: 'margin', aggFunc: 'avg' },
+	{ colId: 'revenue', aggFunc: 'sum' },
+	{ colId: 'units', aggFunc: 'sum' },
+	{ colId: 'margin', aggFunc: 'avg' },
 ];
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ const ROWS = generateRows(500);
 // ── Group row renderer ────────────────────────────────────────────────────────
 
 function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesRow>; api: GridApi<SalesRow> }) {
-	const isExpanded = api.isGroupExpanded(visualRow.groupId);
+	const isExpanded = visualRow.hierarchy.expanded;
 	const agg = visualRow.aggregates;
 
 	return (
@@ -162,7 +162,7 @@ function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesR
 				background: 'linear-gradient(90deg, rgba(124,58,237,0.16), rgba(37,99,235,0.08) 42%, rgba(15,23,42,0.02))',
 				boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
 			}}
-			onClick={() => api.toggleGroupExpanded(visualRow.groupId)}
+			onClick={() => api.toggleExpanded(visualRow.id)}
 		>
 			<span
 				style={{
@@ -287,10 +287,10 @@ function aggChip(color: string): React.CSSProperties {
 function Toolbar({ api, showPanel, onTogglePanel }: { api: GridApi<SalesRow> | null; showPanel: boolean; onTogglePanel: () => void }) {
 	return (
 		<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-			<ToolBtn onClick={() => api?.expandAllGroups()} title='Expand all groups'>
+			<ToolBtn onClick={() => api?.expandAll()} title='Expand all groups'>
 				Expand All
 			</ToolBtn>
-			<ToolBtn onClick={() => api?.collapseAllGroups()} title='Collapse all groups'>
+			<ToolBtn onClick={() => api?.collapseAll()} title='Collapse all groups'>
 				Collapse All
 			</ToolBtn>
 			<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />
@@ -346,7 +346,6 @@ function RealtimeGroupingDemoInner({
 	useEffect(() => {
 		if (!api) return;
 		api.setRows(ROWS);
-		api.setAggDefs(AGG_DEFS);
 	}, [api]);
 
 	useEffect(() => {
@@ -378,10 +377,8 @@ function RealtimeGroupingDemoInner({
 					rows={ROWS}
 					persistence='wit-grid-sales-demo'
 					initialState={{
-						groupBy: ['region', 'category'],
-						groupRowHeight: 44,
-						showGroupFooter: true,
-						enableStickyGroupRows: true,
+						grouping: { by: ['region', 'category'], rowHeight: 44, totals: { groups: 'bottom' }, stickyHeaders: true },
+						aggregation: { defs: AGG_DEFS },
 						showGroupPanel: true,
 					}}
 					pinLeftColumns={1}

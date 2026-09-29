@@ -1,3 +1,4 @@
+import type { AggregationConfig, DetailConfig, ExpansionState, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 import type { ColumnDef, GridStyleRule, GridRendererOptions } from '../columnDef.js';
 import type { ActiveEditState, GridCellPointer, GridSelectionState, RowSelectionOptions } from '../api/GridApi.js';
 import type { BuiltInThemeName, ThemeTokens } from '../renderer/themes.js';
@@ -38,26 +39,17 @@ export interface GridEngineConfig<TRowData = unknown> {
 	/** Unified Data Integrity pipeline configuration. */
 	dataIntegrity?: GridDataIntegrityConfig<TRowData>;
 
-	// Tree / Grouping / Master-Detail State Configuration
-	groupBy?: string[];
-	getParentId?: (row: TRowData) => string | null | undefined;
-	masterDetailEnabled?: boolean;
-	groupRowHeight?: number;
-	detailRowHeight?: number;
-	detailRenderer?: unknown;
-	rowModelConfig?: import('../rowModel.js').RowModelConfig<TRowData>;
-	showGroupFooter?: boolean;
-	enableStickyGroupRows?: boolean;
+	// Hierarchy: grouping, tree data, aggregation, master-detail
+	grouping?: GroupingConfig<TRowData>;
+	treeData?: TreeDataConfig<TRowData>;
+	aggregation?: AggregationConfig<TRowData>;
+	detail?: DetailConfig<TRowData>;
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
 	showFloatingFilters?: boolean;
 	showStatusBar?: boolean;
 	pagination?: { pageSize: number; page?: number };
-	expansion?: {
-		groups: Record<string, true>;
-		treeRows: Record<string, true>;
-		details: Record<string, true>;
-	};
+	expansion?: ExpansionState;
 	/**
 	 * Pixel height of the pre-render buffer above and below the visible viewport.
 	 * The grid renders all rows that overlap [visibleTop - rowOverscanPx, visibleBottom + rowOverscanPx],

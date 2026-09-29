@@ -11,6 +11,7 @@ import type {
 	RowModelRefreshResult,
 	RowModelWriteResult,
 	RowRangeLoadState,
+	ExpandAllOptions,
 	RowExpansionCapableModel,
 	RowExpansionStateReadableModel,
 	ServerSideControllableRowModel,
@@ -625,27 +626,38 @@ export class ServerSideRowModelController<TRowData = unknown>
 		return null;
 	}
 
-	public toggleGroupExpanded(groupId: string): RowModelRefreshResult {
-		const metadata = this.groupMetadataByGroupId.get(groupId) ?? this.groupMetadataByRowId.get(groupId);
-		if (!metadata?.expandable) return { changed: false };
-		const actualGroupId = this.groupMetadataByGroupId.has(groupId) ? groupId : toGroupVisualRowId(this.toGroupPath(metadata));
-		const previousRowCount = this.getVisualRowCount();
-		if (this.expandedGroupIds.has(actualGroupId)) {
-			this.expandedGroupIds.delete(actualGroupId);
-			this.publishServerSideState();
-			return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId: actualGroupId };
-		}
-		this.expandedGroupIds.add(actualGroupId);
-		const store = this.getOrCreateChildStore(metadata.route);
-		this.loadChildBlock(store, 0, false);
-		this.publishServerSideState();
-		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId: actualGroupId };
+	private resolveGroupId(id: string): { groupId: string; metadata: ServerSideGroupMetadata } | null {
+		const byGroupId = this.groupMetadataByGroupId.get(id);
+		if (byGroupId) return { groupId: id, metadata: byGroupId };
+		const byRowId = this.groupMetadataByRowId.get(id);
+		return byRowId ? { groupId: toGroupVisualRowId(this.toGroupPath(byRowId)), metadata: byRowId } : null;
 	}
 
-	public expandAllGroups(): RowModelRefreshResult {
+	public setExpanded(id: string, expanded: boolean): RowModelRefreshResult {
+		const resolved = this.resolveGroupId(id);
+		if (!resolved?.metadata.expandable || this.expandedGroupIds.has(resolved.groupId) === expanded) return { changed: false };
+		const { groupId, metadata } = resolved;
+		const previousRowCount = this.getVisualRowCount();
+		if (expanded) {
+			this.expandedGroupIds.add(groupId);
+			this.loadChildBlock(this.getOrCreateChildStore(metadata.route), 0, false);
+		} else {
+			this.expandedGroupIds.delete(groupId);
+		}
+		this.publishServerSideState();
+		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId };
+	}
+
+	/** Expands the groups the server has described so far (children load as they open). */
+	public expandAll(options?: ExpandAllOptions): RowModelRefreshResult {
 		const previousRowCount = this.getVisualRowCount();
 		let changed = false;
 		for (const [groupId, metadata] of this.groupMetadataByGroupId) {
+			const level = Math.max(0, this.toGroupPath(metadata).length - 1);
+			if (options?.maxLevel !== undefined && level > options.maxLevel) {
+				changed = this.expandedGroupIds.delete(groupId) || changed;
+				continue;
+			}
 			if (!metadata.expandable || this.expandedGroupIds.has(groupId)) continue;
 			this.expandedGroupIds.add(groupId);
 			this.loadChildBlock(this.getOrCreateChildStore(metadata.route), 0, false);
@@ -655,7 +667,7 @@ export class ServerSideRowModelController<TRowData = unknown>
 		return { changed, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount() };
 	}
 
-	public collapseAllGroups(): RowModelRefreshResult {
+	public collapseAll(): RowModelRefreshResult {
 		if (this.expandedGroupIds.size === 0) return { changed: false };
 		const previousRowCount = this.getVisualRowCount();
 		this.expandedGroupIds.clear();
@@ -663,17 +675,16 @@ export class ServerSideRowModelController<TRowData = unknown>
 		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount() };
 	}
 
-	public toggleDetailExpanded(_rowId: string): RowModelRefreshResult {
+	public setDetailOpen(_rowId: string, _open: boolean): RowModelRefreshResult {
 		return { changed: false };
 	}
 
-	public isGroupExpanded(groupId: string): boolean {
-		const metadata = this.groupMetadataByGroupId.get(groupId) ?? this.groupMetadataByRowId.get(groupId);
-		const actualGroupId = metadata && !this.groupMetadataByGroupId.has(groupId) ? toGroupVisualRowId(this.toGroupPath(metadata)) : groupId;
-		return this.expandedGroupIds.has(actualGroupId);
+	public isExpanded(id: string): boolean {
+		const resolved = this.resolveGroupId(id);
+		return this.expandedGroupIds.has(resolved?.groupId ?? id);
 	}
 
-	public isDetailExpanded(_rowId: string): boolean {
+	public isDetailOpen(_rowId: string): boolean {
 		return false;
 	}
 

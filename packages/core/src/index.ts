@@ -171,7 +171,6 @@ export type {
 	NumberFilterOperator,
 	DateFilterOperator,
 	GroupDef,
-	RowModelConfig,
 	SortModel,
 } from './rowModel.js';
 export type {

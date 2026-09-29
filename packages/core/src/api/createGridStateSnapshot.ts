@@ -79,10 +79,12 @@ export function createGridStateSnapshot<TRowData>(state: InternalGridState<TRowD
 		themeName: state.themeName,
 		sidebarOpenPanel: state.sidebarOpenPanel,
 		chartOpen: state.chartOpen,
-		groupBy: state.groupBy ? Object.freeze(state.groupBy.slice()) : undefined,
-		showGroupFooter: state.showGroupFooter,
-		enableStickyGroupRows: state.enableStickyGroupRows,
-		masterDetailEnabled: state.masterDetailEnabled,
+		// Hierarchy configs are replaced, never mutated, on change: sharing the reference keeps
+		// selectors over them stable across unrelated snapshot rebuilds.
+		grouping: state.grouping,
+		treeData: state.treeData,
+		aggregation: state.aggregation,
+		detail: state.detail,
 		globalVersion: state.globalVersion,
 	});
 }

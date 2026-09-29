@@ -8,7 +8,10 @@ import { createGridRowDataRef } from './publicRowRef.js';
 import { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
-import { RowPipeline, type RowModelConfig, type RowPipelineOutput } from './rows/RowPipeline.js';
+import { RowPipeline, type RowPipelineInput, type RowPipelineOutput } from './rows/RowPipeline.js';
+import { groupByColIds, isGroupingActive } from './rows/hierarchyConfig.js';
+import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
+import type { RowTreeNode } from './rows/stages/types.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
 import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
@@ -106,7 +109,17 @@ type ClientRowModelTransactionSnapshot<TData> = RowModelTransactionSnapshot<TDat
 	};
 };
 
-export type { GroupDef, RowModelConfig } from './rows/RowPipeline.js';
+export type { GroupDef } from './rows/RowPipeline.js';
+
+/** True when the visual rows include anything besides flat data rows (groups, tree rows, details, totals). */
+function hasHierarchyRows(state: {
+	grouping?: { by: readonly unknown[] };
+	treeData?: unknown;
+	detail?: unknown;
+	aggregation?: { defs: readonly unknown[] };
+}): boolean {
+	return (state.grouping?.by.length ?? 0) > 0 || !!state.treeData || !!state.detail || (state.aggregation?.defs.length ?? 0) > 0;
+}
 export type { AggregationDef } from './rows/stages/aggregateStage.js';
 
 // ── Row model capability types ────────────────────────────────────────────────
@@ -238,16 +251,22 @@ export interface RowModelRefreshResult {
 	groupId?: string;
 }
 
+export interface ExpandAllOptions {
+	/** Open levels up to and including this one (0 = outermost) and close deeper ones. Default: every level. */
+	maxLevel?: number;
+}
+
+/** Expansion for groups and tree rows (by visual row id) and detail rows (by row id). */
 export interface RowExpansionCapableModel<TRowData = unknown> {
-	expandAllGroups(): RowModelRefreshResult | void;
-	collapseAllGroups(): RowModelRefreshResult | void;
-	toggleGroupExpanded(groupId: string): RowModelRefreshResult | void;
-	toggleDetailExpanded(rowId: string): RowModelRefreshResult | void;
+	setExpanded(id: string, expanded: boolean): RowModelRefreshResult | void;
+	expandAll(options?: ExpandAllOptions): RowModelRefreshResult | void;
+	collapseAll(): RowModelRefreshResult | void;
+	setDetailOpen(rowId: string, open: boolean): RowModelRefreshResult | void;
 }
 
 export interface RowExpansionStateReadableModel {
-	isGroupExpanded(groupId: string): boolean;
-	isDetailExpanded(rowId: string): boolean;
+	isExpanded(id: string): boolean;
+	isDetailOpen(rowId: string): boolean;
 }
 
 export interface DataRowCountModel {
@@ -413,13 +432,13 @@ function hasFunctions(value: unknown, names: readonly string[]): boolean {
 }
 
 export function asRowExpansionCapableModel<TRowData = unknown>(rowModel: RowModel<TRowData> | null): RowExpansionCapableModel<TRowData> | null {
-	return hasFunctions(rowModel, ['expandAllGroups', 'collapseAllGroups', 'toggleGroupExpanded', 'toggleDetailExpanded'])
+	return hasFunctions(rowModel, ['setExpanded', 'expandAll', 'collapseAll', 'setDetailOpen'])
 		? (rowModel as unknown as RowExpansionCapableModel<TRowData>)
 		: null;
 }
 
 export function asRowExpansionStateReadableModel(rowModel: RowModel<unknown> | null): RowExpansionStateReadableModel | null {
-	return hasFunctions(rowModel, ['isGroupExpanded', 'isDetailExpanded']) ? (rowModel as unknown as RowExpansionStateReadableModel) : null;
+	return hasFunctions(rowModel, ['isExpanded', 'isDetailOpen']) ? (rowModel as unknown as RowExpansionStateReadableModel) : null;
 }
 
 export function asDataRowCountModel(rowModel: RowModel<unknown> | null): DataRowCountModel | null {
@@ -1001,6 +1020,7 @@ export class ClientRowModelController<TData = unknown>
 	private _groupMeta = new Map<string, GroupRowMeta>();
 	private _groupMetaByVisualIndex = new Map<number, GroupRowMeta>();
 	private _pageWindow: PageWindow | null = null;
+	private _roots: RowTreeNode<TData>[] | null = null;
 
 	public getStickyGroupMeta = (): Map<number, number> => this._stickyGroupMeta;
 	public getPageWindow = (): PageWindow | null => this._pageWindow;
@@ -1013,70 +1033,58 @@ export class ClientRowModelController<TData = unknown>
 		return CLIENT_CAPABILITIES;
 	}
 
-	public toggleGroupExpanded = (groupId: string): RowModelRefreshResult => {
-		const expansion = this.runtime.getState().expansion;
-		if (groupId.startsWith('group:')) {
-			const groups = { ...expansion.groups };
-			if (groups[groupId]) {
-				delete groups[groupId];
-			} else {
-				groups[groupId] = true;
-			}
-			this.runtime.updateExpansion(() => ({ ...expansion, groups }));
-		} else {
-			const treeRows = { ...expansion.treeRows };
-			if (treeRows[groupId]) {
-				delete treeRows[groupId];
-			} else {
-				treeRows[groupId] = true;
-			}
-			this.runtime.updateExpansion(() => ({ ...expansion, treeRows }));
-		}
-		return this.refresh('expansion', groupId);
+	public isExpanded = (id: string): boolean => {
+		const index = this.visualRowIdToIndex.get(id);
+		const row = index === undefined ? undefined : this.visualRows[index];
+		if (row) return row.hierarchy.expanded;
+		// Not displayed (under a collapsed ancestor, filtered out or on another page).
+		const state = this.runtime.getState();
+		const found = this._roots ? findTreeNode(this._roots, id) : null;
+		if (!found) return state.expansion.rows[id] ?? false;
+		return resolveNodeExpanded(found.node, found.level, {
+			expansion: state.expansion,
+			groupDefaultExpanded: state.grouping?.defaultExpanded,
+			treeDefaultExpanded: state.treeData?.defaultExpanded,
+		});
 	};
 
-	public toggleDetailExpanded = (rowId: string): RowModelRefreshResult => {
-		const expansion = this.runtime.getState().expansion;
-		const details = { ...expansion.details };
-		if (details[rowId]) {
-			delete details[rowId];
-		} else {
-			details[rowId] = true;
-		}
-		this.runtime.updateExpansion(() => ({ ...expansion, details }));
-		return this.refresh('detail');
+	public setExpanded = (id: string, expanded: boolean): RowModelRefreshResult => {
+		if (this.isExpanded(id) === expanded) return { changed: false };
+		this.runtime.updateExpansion((expansion) => ({ ...expansion, rows: { ...expansion.rows, [id]: expanded } }));
+		return this.refresh('expansion', id);
 	};
 
-	public isGroupExpanded = (groupId: string): boolean => {
-		const expansion = this.runtime.getState().expansion;
-		return groupId.startsWith('group:') ? !!expansion.groups[groupId] : !!expansion.treeRows[groupId];
+	/** `base` replaces every explicit choice, so this is O(1) however many rows the tree holds. */
+	public expandAll = (options?: ExpandAllOptions): RowModelRefreshResult => {
+		const base = options?.maxLevel === undefined ? true : Math.max(0, options.maxLevel + 1);
+		this.runtime.updateExpansion((expansion) => ({ ...expansion, base, rows: {} }));
+		return this.refresh('expansion');
 	};
 
-	public isDetailExpanded = (rowId: string): boolean => {
+	public collapseAll = (): RowModelRefreshResult => {
+		this.runtime.updateExpansion((expansion) => ({ ...expansion, base: false, rows: {} }));
+		return this.refresh('expansion');
+	};
+
+	public isDetailOpen = (rowId: string): boolean => {
 		return !!this.runtime.getState().expansion.details[rowId];
 	};
 
-	public expandAllGroups = (): RowModelRefreshResult => {
+	public setDetailOpen = (rowId: string, open: boolean): RowModelRefreshResult => {
 		const state = this.runtime.getState();
-		const expansionIds = this.pipeline.collectAllExpansionIds({
-			nodes: this.dataStore.getAllNodes(),
-			columns: state.columns,
-			groupBy: state.groupBy,
-			rowModelConfig: state.rowModelConfig,
-			filterModel: state.filterModel,
-			quickFilterModel: state.quickFilterModel,
+		if (this.isDetailOpen(rowId) === open) return { changed: false };
+		if (open) {
+			const detail = state.detail;
+			const node = this.dataStore.getNode(rowId);
+			if (!detail || !node || (detail.isMaster && !detail.isMaster(node.data, rowId))) return { changed: false };
+		}
+		this.runtime.updateExpansion((expansion) => {
+			const details = { ...expansion.details };
+			if (open) details[rowId] = true;
+			else delete details[rowId];
+			return { ...expansion, details };
 		});
-		const groups: Record<string, true> = {};
-		for (const id of expansionIds.groupIds) groups[id] = true;
-		const treeRows: Record<string, true> = {};
-		for (const id of expansionIds.treeRowIds) treeRows[id] = true;
-		this.runtime.updateExpansion((expansion) => ({ ...expansion, groups, treeRows }));
-		return this.refresh('expansion');
-	};
-
-	public collapseAllGroups = (): RowModelRefreshResult => {
-		this.runtime.updateExpansion((expansion) => ({ ...expansion, groups: {}, treeRows: {} }));
-		return this.refresh('expansion');
+		return this.refresh('detail');
 	};
 
 	constructor(runtime: ClientRowModelRuntime<TData>, options: ClientRowModelOptions<TData>) {
@@ -1120,16 +1128,14 @@ export class ClientRowModelController<TData = unknown>
 			this.runtime.addEventListener(GridEventName.queryModelChanged, () => {
 				this.refresh();
 			}),
-			this.runtime.addEventListener(GridEventName.groupByChanged, () => {
-				this.rebuildDependencyRegistry();
-				this.refresh();
-			}),
-			this.runtime.addEventListener(GridEventName.aggDefsChanged, () => {
-				this.rebuildDependencyRegistry();
-				this.refresh();
-			}),
-			this.runtime.addEventListener(GridEventName.showGroupFooterChanged, () => this.refresh()),
-			this.runtime.addEventListener(GridEventName.enableStickyGroupRowsChanged, () => this.refresh()),
+			// Every hierarchy configuration change: grouping (its levels included), tree data, aggregation, detail.
+			...[GridEventName.groupingChanged, GridEventName.treeDataChanged, GridEventName.aggregationChanged, GridEventName.detailChanged].map(
+				(event) =>
+					this.runtime.addEventListener(event, () => {
+						this.rebuildDependencyRegistry();
+						this.refresh();
+					})
+			),
 			// Client pagination page change → re-run the pipeline with the new page window.
 			this.runtime.addEventListener(GridEventName.paginationChanged, () => this.refresh('flatten'))
 		);
@@ -1150,10 +1156,10 @@ export class ClientRowModelController<TData = unknown>
 			sortModel: state.sortModel,
 			filterModel: state.filterModel,
 			quickFilterModel: state.quickFilterModel,
-			groupBy: state.groupBy,
-			aggDefs: state.aggDefs,
-			hasTreeParent: !!state.getParentId,
-			treeParentDependencies: state.rowModelConfig?.treeData?.getParentIdDependencies,
+			groupBy: groupByColIds(state.grouping),
+			aggDefs: state.aggregation?.defs,
+			hasTreeParent: !!state.treeData,
+			treeParentDependencies: state.treeData?.getParentIdDependencies,
 		});
 	}
 
@@ -1169,7 +1175,7 @@ export class ClientRowModelController<TData = unknown>
 	 */
 	private filterMembershipChanged(changedNodes: RowNode<TData>[]): boolean {
 		const state = this.runtime.getState();
-		if (state.groupBy?.length || state.rowModelConfig?.treeData?.enabled) return true;
+		if (isGroupingActive(state.grouping) || state.treeData) return true;
 		const preparedFilters = prepareFilters(state.columns, state.filterModel, state.quickFilterModel);
 		for (const node of changedNodes) {
 			const wasVisible = this.rowIdToVisualIndex.has(node.id);
@@ -1216,9 +1222,7 @@ export class ClientRowModelController<TData = unknown>
 	 */
 	private relocateSortedRows(changedNodes: RowNode<TData>[]): number | null {
 		const state = this.runtime.getState();
-		if (state.groupBy?.length) return null;
-		if (state.rowModelConfig?.treeData?.enabled) return null;
-		if (state.rowModelConfig?.masterDetail?.enabled) return null;
+		if (hasHierarchyRows(state)) return null;
 		if (!state.sortModel || state.sortModel.length === 0) return null;
 		if (this._pageWindow !== null) return null;
 
@@ -1457,9 +1461,7 @@ export class ClientRowModelController<TData = unknown>
 	 */
 	private tryIncrementalTransaction(added: RowNode<TData>[], removed: RowNode<TData>[]): number | null {
 		const state = this.runtime.getState();
-		if (state.groupBy?.length) return null;
-		if (state.rowModelConfig?.treeData?.enabled) return null;
-		if (state.rowModelConfig?.masterDetail?.enabled) return null;
+		if (hasHierarchyRows(state)) return null;
 		if (this._pageWindow !== null) return null;
 		if (added.length + removed.length > ClientRowModelController.INCREMENTAL_TX_LIMIT) return null;
 
@@ -1692,48 +1694,7 @@ export class ClientRowModelController<TData = unknown>
 				}
 				return ids;
 			}
-			const expansion = state.expansion;
-			const rowModelConfig: RowModelConfig<TData> | undefined =
-				state.rowModelConfig ??
-				(state.groupBy?.length || state.getParentId || state.masterDetailEnabled
-					? {
-							type: 'client',
-							grouping: state.groupBy?.length
-								? { model: state.groupBy.map((colId) => ({ colId })), includeFooter: !!state.showGroupFooter }
-								: undefined,
-							treeData: state.getParentId ? { enabled: true, getParentId: state.getParentId } : undefined,
-							masterDetail: state.masterDetailEnabled
-								? {
-										enabled: true,
-										expandedRowIds: expansion.details,
-										defaultDetailHeight: state.detailRowHeight,
-									}
-								: undefined,
-						}
-					: undefined);
-			const result = this.pipeline.run({
-				nodes: this.dataStore.getAllNodes(),
-				columns: state.columns,
-				sortModel: state.sortModel,
-				filterModel: state.filterModel,
-				quickFilterModel: state.quickFilterModel,
-				queryModel: state.queryModel,
-				groupBy: state.groupBy,
-				rowModelConfig,
-				getParentId: state.getParentId,
-				aggDefs: state.aggDefs ?? [],
-				expandedGroupIds: new Set(Object.keys(expansion.groups)),
-				expandedTreeRowIds: new Set(Object.keys(expansion.treeRows)),
-				expandedDetailRowIds: new Set(Object.keys(expansion.details)),
-				defaultRowHeight: state.defaultRowHeight,
-				rowHeightsRecord: state.rowHeights,
-				getRowHeight: this.getRowHeight,
-				groupRowHeight: state.groupRowHeight,
-				detailRowHeight: state.detailRowHeight,
-				masterDetailEnabled: state.masterDetailEnabled,
-				detailRenderer: state.detailRenderer,
-				reportFault: this.runtime.reportRowPipelineFault,
-			});
+			const result = this.pipeline.run(this.buildPipelineInput(state, false));
 			return result.visualRows.flatMap((row) => (row.kind === 'data' ? [row.rowId] : []));
 		}
 		const ids: string[] = [];
@@ -1743,56 +1704,34 @@ export class ClientRowModelController<TData = unknown>
 		return ids;
 	};
 
-	public refresh(reason?: RowRefreshReason, groupId?: string): RowModelRefreshResult {
-		const state = this.runtime.getState();
-		const previousRows = this.visualRows;
-
-		const expansion = state.expansion;
-		const rowModelConfig: RowModelConfig<TData> | undefined =
-			state.rowModelConfig ??
-			(state.groupBy?.length || state.getParentId || state.masterDetailEnabled
-				? {
-						type: 'client',
-						grouping: state.groupBy?.length
-							? { model: state.groupBy.map((colId) => ({ colId })), includeFooter: !!state.showGroupFooter }
-							: undefined,
-						treeData: state.getParentId ? { enabled: true, getParentId: state.getParentId } : undefined,
-						masterDetail: state.masterDetailEnabled
-							? {
-									enabled: true,
-									expandedRowIds: expansion.details,
-									defaultDetailHeight: state.detailRowHeight,
-								}
-							: undefined,
-					}
-				: undefined);
-
-		const result = this.pipeline.run({
+	private buildPipelineInput(state: ReturnType<ClientRowModelRuntime<TData>['getState']>, paginate: boolean): RowPipelineInput<TData> {
+		return {
 			nodes: this.dataStore.getAllNodes(),
 			columns: state.columns,
 			sortModel: state.sortModel,
 			filterModel: state.filterModel,
 			quickFilterModel: state.quickFilterModel,
 			queryModel: state.queryModel,
-			groupBy: state.groupBy,
-			rowModelConfig,
-			getParentId: state.getParentId,
-			aggDefs: state.aggDefs ?? [],
-			expandedGroupIds: new Set(Object.keys(expansion.groups)),
-			expandedTreeRowIds: new Set(Object.keys(expansion.treeRows)),
-			expandedDetailRowIds: new Set(Object.keys(expansion.details)),
+			grouping: state.grouping,
+			treeData: state.treeData,
+			aggregation: state.aggregation,
+			detail: state.detail,
+			expansion: state.expansion,
 			defaultRowHeight: state.defaultRowHeight,
 			rowHeightsRecord: state.rowHeights,
 			getRowHeight: this.getRowHeight,
-			groupRowHeight: state.groupRowHeight,
-			detailRowHeight: state.detailRowHeight,
-			masterDetailEnabled: state.masterDetailEnabled,
-			detailRenderer: state.detailRenderer,
 			reportFault: this.runtime.reportRowPipelineFault,
 			// Client pagination: slice happens inside the pipeline so every derived
 			// map/meta/geometry stays page-consistent. Undefined → full list.
-			pagination: state.pagination ? { pageSize: state.pagination.pageSize, page: state.pagination.page ?? 0 } : undefined,
-		});
+			pagination: paginate && state.pagination ? { pageSize: state.pagination.pageSize, page: state.pagination.page ?? 0 } : undefined,
+		};
+	}
+
+	public refresh(reason?: RowRefreshReason, groupId?: string): RowModelRefreshResult {
+		const state = this.runtime.getState();
+		const previousRows = this.visualRows;
+
+		const result = this.pipeline.run(this.buildPipelineInput(state, true));
 		const { visualRows } = result;
 		const refreshResult = describeVisualRowDiff(previousRows, visualRows, reason, groupId);
 
@@ -1805,6 +1744,7 @@ export class ClientRowModelController<TData = unknown>
 		this._stickyGroupMeta = result.stickyGroupMeta;
 		this._groupMeta = result.groupMeta;
 		this._groupMetaByVisualIndex = result.groupMetaByVisualIndex;
+		this._roots = result.roots;
 		this.dataRowCount = result.stats.totalDataRows;
 
 		this.runtime.bumpGlobalVersion();

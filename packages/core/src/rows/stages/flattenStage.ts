@@ -1,27 +1,27 @@
 import type { RowHierarchy, TotalPlacement, VisualRow } from '../../visualRow.js';
+import {
+	resolveDefaultExpanded,
+	type DefaultExpanded,
+	type DetailConfig,
+	type ExpansionState,
+	type GroupInfo,
+	type TotalsConfig,
+	type TreeRowInfo,
+} from '../hierarchyConfig.js';
 import { toDataVisualRowId, toDetailVisualRowId, toTotalVisualRowId } from '../visualRowIds.js';
 import type { RowTreeNode } from './types.js';
 
-/** Where total rows go: per grouping level (0 = outermost), and for the whole grid. */
-export interface TotalsConfig {
-	groups?: TotalPlacement | false | ((level: number) => TotalPlacement | false);
-	grand?: TotalPlacement | false;
-}
-
 export interface FlattenConfig<TData = unknown> {
-	expandedGroupIds: Set<string>;
-	expandedTreeRowIds: Set<string>;
-	expandedDetailRowIds: Set<string>;
+	expansion: ExpansionState;
+	groupDefaultExpanded?: DefaultExpanded<GroupInfo>;
+	treeDefaultExpanded?: DefaultExpanded<TreeRowInfo<TData>>;
 	defaultRowHeight: number;
 	rowHeightsRecord: Record<string, number>;
 	getRowHeight?: (row: TData, rowId: string) => number | undefined;
+	/** Height of group and total rows. */
 	groupRowHeight?: number;
-	detailRowHeight?: number;
-	getDetailHeight?: (params: { row: TData; rowId: string }) => number;
-	masterDetailEnabled?: boolean;
-	detailRenderer?: unknown;
-	defaultGroupsExpanded?: boolean;
-	defaultTreeRowsExpanded?: boolean;
+	/** Present when rows can open a detail. */
+	detail?: DetailConfig<TData>;
 	totals?: TotalsConfig;
 	/** Aggregates of every row, for the grand total. */
 	grandAggregates?: Record<string, unknown>;
@@ -57,6 +57,52 @@ export function flattenStage<TData>(
 	for (let i = 0; i < roots.length; i++) flattenNode(roots[i], state, null, 0, i + 1, roots.length);
 	if (grand === 'bottom') pushGrandTotal(state);
 	return result;
+}
+
+type ExpansionConfig<TData> = Pick<FlattenConfig<TData>, 'expansion' | 'groupDefaultExpanded' | 'treeDefaultExpanded'>;
+
+/** A group's or tree row's expansion: its explicit override, else `expansion.base`, else the configured default. */
+export function resolveNodeExpanded<TData>(node: RowTreeNode<TData>, level: number, config: ExpansionConfig<TData>): boolean {
+	const { expansion } = config;
+	if (node.kind === 'group') {
+		return (
+			expansion.rows[node.id] ??
+			resolveDefaultExpanded(expansion.base ?? config.groupDefaultExpanded, level, () => ({
+				id: node.id,
+				level,
+				field: node.field,
+				key: node.key,
+				keyString: node.keyString,
+				path: node.path,
+				leafCount: node.leafCount,
+			}))
+		);
+	}
+	const id = toDataVisualRowId(node.rowId);
+	return (
+		expansion.rows[id] ??
+		resolveDefaultExpanded(expansion.base ?? config.treeDefaultExpanded, level, () => ({
+			id,
+			rowId: node.rowId,
+			row: node.node.data,
+			level,
+			childCount: node.children?.length ?? 0,
+		}))
+	);
+}
+
+/** Finds a group (`group:…`) or tree row (`row:…`) anywhere in the tree, collapsed subtrees included. */
+export function findTreeNode<TData>(roots: RowTreeNode<TData>[], visualRowId: string): { node: RowTreeNode<TData>; level: number } | null {
+	const stack: Array<{ node: RowTreeNode<TData>; level: number }> = [];
+	for (let i = roots.length - 1; i >= 0; i--) stack.push({ node: roots[i], level: 0 });
+	while (stack.length > 0) {
+		const entry = stack.pop()!;
+		const { node, level } = entry;
+		if (node.kind === 'group' ? node.id === visualRowId : toDataVisualRowId(node.rowId) === visualRowId) return entry;
+		const children = node.children;
+		if (children) for (let i = children.length - 1; i >= 0; i--) stack.push({ node: children[i], level: level + 1 });
+	}
+	return null;
 }
 
 function groupTotalPlacement(totals: TotalsConfig | undefined, level: number): TotalPlacement | false {
@@ -108,7 +154,7 @@ function flattenNode<TData>(
 		const explicitHeight = config.rowHeightsRecord[rowId] ?? config.getRowHeight?.(node.node.data, rowId);
 		const children = node.children;
 		const hasChildren = !!children && children.length > 0;
-		const expanded = hasChildren && (config.defaultTreeRowsExpanded || config.expandedTreeRowIds.has(rowId));
+		const expanded = hasChildren && resolveNodeExpanded(node, level, config);
 		result.push({
 			kind: 'data',
 			id,
@@ -134,7 +180,8 @@ function flattenNode<TData>(
 			for (let i = 0; i < children!.length; i++) flattenNode(children![i], state, id, level + 1, i + 1, children!.length);
 		}
 
-		if (config.masterDetailEnabled && config.expandedDetailRowIds.has(rowId)) {
+		const detail = config.detail;
+		if (detail && config.expansion.details[rowId] && (!detail.isMaster || detail.isMaster(node.node.data, rowId))) {
 			result.push({
 				kind: 'detail',
 				id: toDetailVisualRowId(rowId),
@@ -150,14 +197,14 @@ function flattenNode<TData>(
 					posInSet: 0,
 					setSize: 0,
 				},
-				height: config.getDetailHeight?.({ row: node.node.data, rowId }) ?? config.detailRowHeight ?? 200,
-				render: config.detailRenderer,
+				height: typeof detail.height === 'function' ? detail.height({ row: node.node.data, rowId }) : (detail.height ?? 200),
+				render: detail.renderer,
 			});
 		}
 		return;
 	}
 
-	const expanded = config.defaultGroupsExpanded || config.expandedGroupIds.has(node.id);
+	const expanded = resolveNodeExpanded(node, level, config);
 	const groupRowIdx = result.length;
 	const hierarchy: RowHierarchy = {
 		level,

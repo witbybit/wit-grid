@@ -294,13 +294,10 @@ describe('Budget: grouped and aggregated viewport churn stays off the row pipeli
 				{ field: 'status', header: 'Status', width: 100 },
 				{ field: 'category', header: 'Category', width: 100, enableRowGroup: true },
 			],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'category' }], defaultExpanded: true },
-			},
+			grouping: { by: ['category'], defaultExpanded: true },
 		});
 		store.setInstrumentation(inst);
-		store.setAggDefs([{ field: 'value', aggFunc: 'sum' }]);
+		store.setAggregation([{ colId: 'value', aggFunc: 'sum' }]);
 		const controller = new ClientRowModelController<BudgetRow>(store.getClientRowModelRuntime(), {
 			rows: makeRows(20_000),
 			columns: store.getState().columns,

@@ -152,20 +152,20 @@ const RatingStarsRenderer = ({ value }: CellRendererProps<EmployeeRow>) => {
 // Custom Tree node name renderer with indent and folder/file icon!
 const TreeNameRenderer = ({ value, row, rowId, api }: CellRendererProps<FileNodeRow>) => {
 	const visualRow = api.rows().getVisualRowById(rowId);
-	const depth = visualRow && 'depth' in visualRow ? visualRow.hierarchy.level : 0;
+	const depth = visualRow ? visualRow.hierarchy.level : 0;
 
 	const isFolder = row.type === 'folder';
-	const isExpanded = api.isGroupExpanded(rowId);
+	const isExpanded = visualRow?.hierarchy.expanded ?? false;
 	let Icon = File;
 	if (isFolder) {
 		Icon = Folder;
 	}
 
 	const handleToggle = (e: React.MouseEvent) => {
-		if (!isFolder) return;
+		if (!isFolder || !visualRow) return;
 		e.stopPropagation();
 		const start = performance.now();
-		api.toggleGroupExpanded(rowId);
+		api.toggleExpanded(visualRow.id);
 		LatencyProfiler.record(performance.now() - start);
 	};
 
@@ -192,11 +192,11 @@ const TreeNameRenderer = ({ value, row, rowId, api }: CellRendererProps<FileNode
 
 // Custom detail toggle button in the master grid!
 const DetailToggleRenderer = ({ rowId, api }: CellRendererProps<OrderRow>) => {
-	const isExpanded = api.isDetailExpanded(rowId);
+	const isExpanded = api.isDetailOpen(rowId);
 
 	const handleToggle = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		api.toggleDetailExpanded(rowId);
+		api.toggleDetailOpen(rowId);
 	};
 
 	return (
@@ -367,8 +367,7 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 
 	const groupInitialState = useMemo(
 		() => ({
-			groupBy: ['department'],
-			groupRowHeight: 42,
+			grouping: { by: ['department'], rowHeight: 42 },
 			styleRules: [{ kind: 'groupRow', rowClass: 'border-l-[3px] border-purple-500 bg-purple-950/5' }],
 		}),
 		[]
@@ -383,7 +382,7 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 		const handleToggle = (e: React.MouseEvent) => {
 			e.stopPropagation();
 			const start = performance.now();
-			api.toggleGroupExpanded(visualRow.id);
+			api.toggleExpanded(visualRow.id);
 			LatencyProfiler.record(performance.now() - start);
 		};
 
@@ -441,21 +440,8 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 
 	const treeInitialState = useMemo(
 		() => ({
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row: FileNodeRow) => row.parentId,
-				},
-			},
-			expansion: {
-				groups: {},
-				treeRows: treeRows.reduce<Record<string, true>>((acc, row) => {
-					if (row.type === 'folder') acc[row.id] = true;
-					return acc;
-				}, {}),
-				details: {},
-			},
+			// Every folder starts open; closing one records an override.
+			treeData: { getParentId: (row: FileNodeRow) => row.parentId, defaultExpanded: true },
 			styleRules: [
 				{
 					kind: 'row',
@@ -482,8 +468,7 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 
 	const masterInitialState = useMemo(
 		() => ({
-			masterDetailEnabled: true,
-			detailRowHeight: 220,
+			detail: { height: 220 },
 		}),
 		[]
 	);

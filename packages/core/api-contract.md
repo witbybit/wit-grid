@@ -6,8 +6,8 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `c125d3181a28cbc43332dd1f162907f85b289357224706784f6e19ed15186caa`
-Exports (286):
+Declaration SHA-256: `f9211313b231fdd1f87819cb3c2c51865abae6b63d2a1f1fd849ff2d80fdc6ea`
+Exports (285):
 
 - `ActiveEditState` — type
 - `AggregationDef` — type
@@ -243,7 +243,6 @@ Exports (286):
 - `RowDataTransaction` — type
 - `RowHierarchy` — type
 - `RowLoadState` — type
-- `RowModelConfig` — type
 - `RowModelType` — type
 - `RowModelViewportAccess` — type
 - `RowNodeKind` — type

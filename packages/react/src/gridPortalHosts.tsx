@@ -318,7 +318,7 @@ function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { 
 
 	const handleToggle = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		api.toggleGroupExpanded(visualRow.id);
+		api.toggleExpanded(visualRow.id);
 	};
 
 	const handleGroupSelection = (e: React.MouseEvent<HTMLInputElement>) => {

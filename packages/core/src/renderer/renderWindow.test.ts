@@ -229,15 +229,7 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 				{ field: 'product', header: 'Product' },
 			],
 			defaultRowHeight: 40,
-			groupRowHeight: 40,
-			enableStickyGroupRows: true,
-			rowModelConfig: {
-				type: 'client',
-				grouping: {
-					model: [{ colId: 'category' }, { colId: 'product' }],
-					defaultExpanded: true,
-				},
-			},
+			grouping: { by: ['category', 'product'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -326,15 +318,7 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 				{ field: 'product', header: 'Product' },
 			],
 			defaultRowHeight: 40,
-			groupRowHeight: 40,
-			enableStickyGroupRows: true,
-			rowModelConfig: {
-				type: 'client',
-				grouping: {
-					model: [{ colId: 'category' }],
-					defaultExpanded: true,
-				},
-			},
+			grouping: { by: ['category'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -384,7 +368,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer,
-			rowModelConfig: { type: 'client' },
 		});
 		return { store, columns };
 	}
@@ -473,7 +456,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer: 1,
-			rowModelConfig: { type: 'client' },
 		});
 		store.setViewportPins({ left: 2, right: 2 });
 		store.setViewportSize(500, 400);
@@ -502,7 +484,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer: 0,
-			rowModelConfig: { type: 'client' },
 		});
 		store.setViewportPins({ left: 1, right: 1 });
 		store.setViewportSize(300, 400); // 300px shows ~3 center columns
@@ -537,10 +518,8 @@ describe('sticky group headers with nested groups', () => {
 				{ field: 'category', header: 'Category' },
 			],
 			defaultRowHeight: 40,
-			groupRowHeight: 40,
-			enableStickyGroupRows: true,
+			grouping: { by: ['region', 'category'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
 			...(pagination ? { pagination: { pageSize: pagination.pageSize, page: 0 } } : {}),
-			rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'region' }, { colId: 'category' }], defaultExpanded: true } },
 		});
 		new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
 		store.setViewportSize(500, 200);

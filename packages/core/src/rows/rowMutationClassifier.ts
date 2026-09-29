@@ -139,7 +139,7 @@ export class RowDependencyRegistry<TData = unknown> {
 		}
 
 		this.aggregationFields.clear();
-		for (const agg of aggDefs ?? []) this.aggregationFields.add(agg.field);
+		for (const agg of aggDefs ?? []) this.aggregationFields.add(agg.colId);
 
 		this.formulaFields.clear();
 		for (const col of columns) {

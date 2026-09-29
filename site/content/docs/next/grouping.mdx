@@ -5,12 +5,13 @@ icon: FolderTree
 ---
 
 Row grouping organizes flat rows into an expandable folder-like structure based on identical column values.
-Tree data instead nests rows using an explicit parent-child relationship. Both are driven by `initialState` and
-both render through a custom `groupRowRenderer`.
+Tree data instead nests rows using an explicit parent-child relationship. Both are configured in `initialState`
+(`grouping`, `treeData`, `aggregation`), and every row carries a `hierarchy` block — `level`, `parentId`,
+`hasChildren`, `expanded`, `childCount`, `leafCount`, `posInSet`, `setSize` — so renderers never reconstruct it.
 
 ## Row grouping
 
-Set `groupBy` to the fields to fold rows by, and `aggDefs` to compute summary metrics for each group:
+Set `grouping.by` to the columns to fold rows by, and `aggregation.defs` to compute summary values for each group:
 
 ```tsx
 import { useCallback, useMemo } from 'react';
@@ -37,8 +38,9 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
 		if (visualRow.kind !== 'group') return null;
 		return (
-			<div onClick={() => api.toggleGroupExpanded(visualRow.id)} style={{ paddingLeft: visualRow.hierarchy.level * 20 + 10 }}>
-				{visualRow.hierarchy.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.hierarchy.leafCount})
+			<div onClick={() => api.toggleExpanded(visualRow.id)} style={{ paddingLeft: visualRow.hierarchy.level * 20 + 10 }}>
+				{visualRow.hierarchy.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.hierarchy.leafCount}) · total{' '}
+				{String(visualRow.aggregates.salary ?? '')}
 			</div>
 		);
 	}, []);
@@ -48,25 +50,31 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 			rows={data}
 			columns={columns}
 			getRowId={(row) => row.id}
-			initialState={{ groupBy: ['department'], groupRowHeight: 42 }}
+			initialState={{
+				grouping: { by: ['department'], rowHeight: 42, defaultExpanded: 1 },
+				aggregation: { defs: [{ colId: 'salary', aggFunc: 'sum' }] },
+			}}
 			groupRowRenderer={groupRowRenderer}
 		/>
 	);
 }
 ```
 
-<Callout title='Group toggling' type='info'>
-	`visualRow.kind === 'group'` rows carry `field`, `key`, `depth`, `childCount`, and `expanded`. Toggle expansion with
-	`api.toggleGroupExpanded(visualRow.id)`, or drive it from outside the renderer with `api.expandAllGroups()` / `api.collapseAllGroups()`.
+<Callout title='Expansion' type='info'>
+	Group rows carry `field`, `key`, `path`, `aggregates` and their `hierarchy`. Expansion is keyed by visual row id: `api.setExpanded(id, open)`,
+	`api.toggleExpanded(id)`, `api.isExpanded(id)`. `api.expandAll({maxLevel})` and `api.collapseAll()` replace individual choices.
+	`grouping.defaultExpanded` takes `true`, a number of open levels, or a predicate over the group — and a default-open group can still be closed.
 </Callout>
 
-Group total rows can be enabled with `initialState.showGroupFooter: true`, and rendered with `totalRowRenderer`.
+Total rows are configured with `grouping.totals`: `groups` places a total row at the `'top'` or `'bottom'` of every
+group (or per level, with a function of the level), and `grand` adds one total over every row. They render with
+`totalRowRenderer`. Built-in aggregations are `sum`, `avg`, `min`, `max`, `count`, `distinctCount`, `first` and
+`last`; a custom `aggFunc` receives `{ colId, values, rows, scope, level, key }`.
 
 ## Tree data
 
-For parent-child hierarchies (file trees, org charts, bill of materials), set `getParentId` instead of `groupBy`.
-Indentation isn't computed by the grid for you — walk the row's own `parentId` chain to derive its depth, and use
-that inside a cell renderer:
+For parent-child hierarchies (file trees, org charts, bill of materials), set `treeData.getParentId`. Each row's
+`hierarchy` gives its level and whether it has children, so a cell renderer can indent it and toggle it:
 
 ```tsx
 import { useMemo } from 'react';
@@ -79,48 +87,40 @@ interface FileNode {
 	size?: string;
 }
 
-function depthOf(nodeId: string, byId: Map<string, FileNode>): number {
-	let depth = 0;
-	let current = byId.get(nodeId);
-	while (current?.parentId) {
-		depth += 1;
-		current = byId.get(current.parentId);
-	}
-	return depth;
-}
-
-function createTreeNameRenderer(byId: Map<string, FileNode>) {
-	return function TreeNameRenderer({ value, row }: CellRendererProps<FileNode>) {
-		const depth = depthOf(row.id, byId);
-		const hasChildren = [...byId.values()].some((node) => node.parentId === row.id);
-		return (
-			<div style={{ paddingLeft: depth * 20 }}>
-				{hasChildren ? '📁' : '📄'} {String(value)}
-			</div>
-		);
-	};
+function TreeNameRenderer({ value, rowId, api }: CellRendererProps<FileNode>) {
+	const visualRow = api.rows().getVisualRowById(rowId);
+	if (!visualRow) return null;
+	const { level, hasChildren, expanded } = visualRow.hierarchy;
+	return (
+		<div style={{ paddingLeft: level * 20 }} onClick={() => hasChildren && api.toggleExpanded(visualRow.id)}>
+			{hasChildren ? (expanded ? '📂' : '📁') : '📄'} {String(value)}
+		</div>
+	);
 }
 
 export function FileDirectoryGrid({ nodes }: { nodes: FileNode[] }) {
-	const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
-	const TreeNameRenderer = useMemo(() => createTreeNameRenderer(byId), [byId]);
 	const columns = useMemo<ColumnDef<FileNode>[]>(
 		() => [
 			{ field: 'name', header: 'Node Path / Name', width: 300, renderer: { kind: 'react', component: TreeNameRenderer } },
 			{ field: 'size', header: 'Capacity Size', width: 120 },
 		],
-		[TreeNameRenderer]
+		[]
 	);
 
 	return (
-		<Grid rows={nodes} columns={columns} getRowId={(row) => row.id} initialState={{ getParentId: (row) => row.parentId, groupRowHeight: 38 }} />
+		<Grid
+			rows={nodes}
+			columns={columns}
+			getRowId={(row) => row.id}
+			initialState={{ treeData: { getParentId: (row) => row.parentId, defaultExpanded: true } }}
+		/>
 	);
 }
 ```
 
-`groupBy` and `getParentId` are mutually exclusive strategies for the same underlying grouped row model — use
-`groupBy` when groups come from repeated column values, `getParentId` when the hierarchy is already explicit in
-the data.
+Use `grouping` when groups come from repeated column values, and `treeData` when the hierarchy is already explicit
+in the data; when both are set, grouping wins. With aggregation configured, tree parents carry the aggregate of
+their descendants (`treeData.aggregateParents`, default on).
 
-See [Events](/docs/next/events) for the `groupByChanged`, `groupColumnAdded/Removed/Moved`, and
-`aggDefsChanged` events emitted as grouping state changes.
+See [Events](/docs/next/events) for `groupingChanged`, `groupByChanged`, `groupColumnAdded/Removed/Moved`,
+`aggregationChanged`, `treeDataChanged` and `expansionChanged`.

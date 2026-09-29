@@ -209,13 +209,13 @@ describe('tree/group stages', () => {
 			leafCount: leafs.length,
 			aggregates: {},
 		};
-		const context = createRowPipelineContext([{ field: 'v', header: 'V' }], { groups: new Set(), treeRows: new Set(), details: new Set() });
+		const context = createRowPipelineContext([{ field: 'v', header: 'V' }]);
 		expect(() =>
 			aggregateStage(
 				[group],
 				[
-					{ field: 'v', aggFunc: 'sum' },
-					{ field: 'count', aggFunc: (refs) => refs.length },
+					{ colId: 'v', aggFunc: 'sum' },
+					{ colId: 'count', aggFunc: ({ rows }) => rows.length },
 				],
 				context
 			)
@@ -233,11 +233,9 @@ describe('tree/group stages', () => {
 					columns: [{ field: 'g', header: 'G' }],
 					sortModel: null,
 					filterModel: null,
-					rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'g', comparator }] } },
-					aggDefs: [],
-					expandedGroupIds: new Set(),
-					expandedTreeRowIds: new Set(),
-					expandedDetailRowIds: new Set(),
+					grouping: { by: [{ colId: 'g', comparator }] },
+					aggregation: { defs: [] },
+					expansion: { rows: {}, details: {} },
 					defaultRowHeight: 30,
 					rowHeightsRecord: {},
 				})

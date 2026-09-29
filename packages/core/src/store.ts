@@ -129,6 +129,8 @@ import type {
 	GridStateSnapshot,
 } from './api/GridApi.js';
 import { createGridStateSnapshot } from './api/createGridStateSnapshot.js';
+import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from './rows/hierarchyConfig.js';
+import type { ExpandAllOptions } from './rowModel.js';
 import type { InternalGridState, GridInitialState, ColumnState, RowModelType } from './state/GridState.js';
 import type { GridEventPayloadMap, GridEventListener } from './api/GridEvents.js';
 import { GridEventName } from './api/GridEvents.js';
@@ -218,15 +220,10 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			loading: initialState.loading,
 			loadingSkeletonCount: initialState.loadingSkeletonCount,
 			styleRules: initialState.styleRules,
-			groupBy: initialState.groupBy,
-			getParentId: initialState.getParentId,
-			masterDetailEnabled: initialState.masterDetailEnabled,
-			groupRowHeight: initialState.groupRowHeight,
-			detailRowHeight: initialState.detailRowHeight,
-			detailRenderer: initialState.detailRenderer,
-			rowModelConfig: initialState.rowModelConfig,
-			showGroupFooter: initialState.showGroupFooter,
-			enableStickyGroupRows: initialState.enableStickyGroupRows,
+			grouping: initialState.grouping,
+			treeData: initialState.treeData,
+			aggregation: initialState.aggregation,
+			detail: initialState.detail,
 			showGroupPanel: initialState.showGroupPanel,
 			showFilterChipBar: initialState.showFilterChipBar,
 			showFloatingFilters: initialState.showFloatingFilters,
@@ -284,15 +281,15 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			getCellValue: (rowId, colField) => this.getCellValue(rowId, colField),
 			getSelectedRowIds: () => this.getSelectedRowIds(),
 			isRowNodeSelected: (rowId) => this.isRowNodeSelected(rowId),
-			isGroupExpanded: (groupId) => this.isGroupExpanded(groupId),
-			isDetailExpanded: (rowId) => this.isDetailExpanded(rowId),
+			isExpanded: (id) => this.isExpanded(id),
+			isDetailOpen: (rowId) => this.isDetailOpen(rowId),
 			selectRows: (rowIds, options) => this.selectRows(rowIds, options),
 			deselectRows: (rowIds) => this.deselectRows(rowIds),
 			scrollToRow: (rowId, options) => this.scrollToRow(rowId, options),
 			setCellValue: (rowId, colField, value) => this.setCellValue(rowId, colField, value),
 			batchCellValues: (updates, source) => this.engine.batchCellValues(updates, source),
-			toggleGroupExpanded: (groupId) => this.toggleGroupExpanded(groupId),
-			toggleDetailExpanded: (rowId) => this.toggleDetailExpanded(rowId),
+			setExpanded: (id, expanded) => this.setExpanded(id, expanded),
+			setDetailOpen: (rowId, open) => this.setDetailOpen(rowId, open),
 			refreshRows: () => this.refreshRows(),
 			retryRowLoad: (rowIndex, loadState) => {
 				if (loadState.kind !== 'failed') return { status: 'rejected', reason: 'Row retry is only available for failed rows.' };
@@ -587,13 +584,21 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return evaluateQueryModel(queryModel, node, ctx);
 	};
 
-	public setGroupBy = (colIds: string[]): void => {
-		this.engine.setGroupBy(colIds);
+	public getGrouping = (): GroupingConfig<TRowData> | undefined => this.engine.groupingFeature.getGrouping();
+
+	public setGrouping = (grouping: GroupingConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setGrouping(grouping);
 	};
 
-	public getGroupBy = (): string[] => {
-		return this.state.groupBy ?? [];
+	public updateGrouping = (patch: Partial<GroupingConfig<TRowData>>): void => {
+		this.engine.groupingFeature.updateGrouping(patch);
 	};
+
+	public setGroupBy = (by: ReadonlyArray<string | GroupDef<TRowData>>): void => {
+		this.engine.setGroupBy(by);
+	};
+
+	public getGroupBy = (): string[] => this.engine.groupingFeature.getGroupBy();
 
 	public addGroupBy = (colId: string, atIndex?: number): void => {
 		this.engine.addGroupBy(colId, atIndex);
@@ -607,29 +612,51 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		this.engine.moveGroupBy(colId, toIndex);
 	};
 
-	public setAggDefs = (defs: AggregationDef<TRowData>[]): void => {
-		this.engine.setAggDefs(defs);
+	public getTreeData = (): TreeDataConfig<TRowData> | undefined => this.engine.groupingFeature.getTreeData();
+
+	public setTreeData = (treeData: TreeDataConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setTreeData(treeData);
 	};
 
-	public getAggDefs = (): AggregationDef<TRowData>[] => {
-		return this.state.aggDefs ?? [];
+	public getAggregation = (): AggregationDef<TRowData>[] => this.engine.groupingFeature.getAggregation();
+
+	public setAggregation = (defs: AggregationDef<TRowData>[]): void => {
+		this.engine.groupingFeature.setAggregation(defs);
 	};
 
-	public expandAllGroups = (): void => {
-		this.engine.groupingFeature.expandAllGroups();
+	public getDetail = (): DetailConfig<TRowData> | undefined => this.engine.groupingFeature.getDetail();
+
+	public setDetail = (detail: DetailConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setDetail(detail);
 	};
 
-	public collapseAllGroups = (): void => {
-		this.engine.groupingFeature.collapseAllGroups();
+	public setExpanded = (id: string, expanded: boolean): void => {
+		this.engine.groupingFeature.setExpanded(id, expanded);
 	};
 
-	public setShowGroupFooter = (enabled: boolean): void => {
-		this.engine.setShowGroupFooter(enabled);
+	public toggleExpanded = (id: string): void => {
+		this.engine.groupingFeature.toggleExpanded(id);
 	};
 
-	public setStickyGroupRows = (enabled: boolean): void => {
-		this.engine.setStickyGroupRows(enabled);
+	public isExpanded = (id: string): boolean => this.engine.groupingFeature.isExpanded(id);
+
+	public expandAll = (options?: ExpandAllOptions): void => {
+		this.engine.groupingFeature.expandAll(options);
 	};
+
+	public collapseAll = (): void => {
+		this.engine.groupingFeature.collapseAll();
+	};
+
+	public setDetailOpen = (rowId: string, open: boolean): void => {
+		this.engine.groupingFeature.setDetailOpen(rowId, open);
+	};
+
+	public toggleDetailOpen = (rowId: string): void => {
+		this.engine.groupingFeature.toggleDetailOpen(rowId);
+	};
+
+	public isDetailOpen = (rowId: string): boolean => this.engine.groupingFeature.isDetailOpen(rowId);
 
 	public setShowGroupPanel = (enabled: boolean): void => {
 		this.engine.setShowGroupPanel(enabled);
@@ -710,22 +737,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public setStyleRules = (styleRules: GridStyleRule<TRowData>[] | undefined): void => {
 		this.engine.setStyleRules(styleRules);
-	};
-
-	public toggleGroupExpanded = (groupId: string): void => {
-		this.engine.groupingFeature.toggleGroupExpanded(groupId);
-	};
-
-	public toggleDetailExpanded = (rowId: string): void => {
-		this.engine.groupingFeature.toggleDetailExpanded(rowId);
-	};
-
-	public isGroupExpanded = (groupId: string): boolean => {
-		return this.getExpansionStateReadableRowModel()?.isGroupExpanded(groupId) ?? false;
-	};
-
-	public isDetailExpanded = (rowId: string): boolean => {
-		return this.getExpansionStateReadableRowModel()?.isDetailExpanded(rowId) ?? false;
 	};
 
 	public getVisualRow = (index: number): VisualRow<TRowData> | null => {

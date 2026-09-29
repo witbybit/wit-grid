@@ -430,7 +430,7 @@ export function computeRenderWindowInto<TRowData>(engine: GridEngine<TRowData>, 
 	const stickyGroupStack = target.stickyGroupStack ?? (target.stickyGroupStack = []);
 	stickyGroupStack.length = 0;
 
-	if (state.enableStickyGroupRows && rowCount > 0) {
+	if (state.grouping?.stickyHeaders && rowCount > 0) {
 		const stickyMeta = getStickyGroupMeta(rowModel);
 		if (stickyMeta && stickyMeta.size > 0) {
 			// The pipeline records groups in row order (a group before the groups it contains), so

@@ -160,7 +160,7 @@ describe('RenderEngine', () => {
 		// A toggle changes state.expansion (→ captureSnapshot, sync) and invalidates the
 		// viewport with reason 'group expansion'. Running the gated flush then plays it.
 		animateMock.mockClear();
-		store.engine.groupingFeature.toggleGroupExpanded('group:category=A');
+		store.engine.groupingFeature.toggleExpanded('group:category=A');
 		(renderer as unknown as { flushPaint: () => void }).flushPaint();
 
 		expect(animateMock).toHaveBeenCalled();
@@ -2914,11 +2914,9 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`row-${index}`, true])),
 			},
 		});
@@ -2988,11 +2986,9 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: { 'row-0': true },
 			},
 		});
@@ -3054,12 +3050,10 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			styleRules: [{ kind: 'detailRow', rowClass: 'custom-detail-row' }],
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`row-${index}`, true])),
 			},
 		});
@@ -3106,11 +3100,9 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: {
 					'row-0': true,
 					'row-1': true,
@@ -4312,8 +4304,7 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [{ id: 'row-0', name: 'Row 0' }],
@@ -4345,7 +4336,7 @@ describe('RenderEngine', () => {
 		expect(onMountRow).not.toHaveBeenCalled();
 
 		// Expand the row
-		store.toggleDetailExpanded('row-0');
+		store.toggleDetailOpen('row-0');
 
 		// Wait for render scheduler frame
 		await Promise.resolve();

@@ -102,16 +102,16 @@ describe('Phase 0: gridFeatureEffects characterization', () => {
 	});
 
 	describe('setGroupBy', () => {
-		it('clears expansion.groups', () => {
+		it('clears group expansion overrides', () => {
 			const store = makeStore();
 			// Set some initial expansion state
 			store.engine.stateManager.setState((s) => ({
 				...s,
-				expansion: { groups: { 'group-1': true as const }, treeRows: {}, details: {} },
+				expansion: { rows: { 'group:1': true }, details: {} },
 			}));
 
 			store.setGroupBy(['name']);
-			expect(store.getState().expansion.groups).toEqual({});
+			expect(store.getState().expansion.rows).toEqual({});
 
 			store.destroy();
 		});
@@ -152,43 +152,47 @@ describe('Phase 0: gridFeatureEffects characterization', () => {
 		});
 	});
 
-	describe('setAggDefs', () => {
-		it('updates aggDefs in state', () => {
+	describe('setAggregation', () => {
+		it('updates aggregation in state', () => {
 			const store = makeStore();
 			const ctrl = makeController(store);
 
-			const defs = [{ colField: 'price', type: 'sum' as const }] as any[];
-			store.setAggDefs(defs);
-			expect(store.getState().aggDefs).toEqual(defs);
+			const defs = [{ colId: 'price', aggFunc: 'sum' as const }];
+			store.setAggregation(defs);
+			expect(store.getState().aggregation).toEqual({ defs });
 
 			ctrl.dispose();
 			store.destroy();
 		});
 
-		it('invalidates viewport and overlay', () => {
+		// setAggregation is structural by design (was viewport + overlay only for setAggDefs).
+		it('invalidates geometry, viewport, headers and overlay', () => {
 			const store = makeStore();
 			const engine = (store as any).engine;
 
 			const spyApply = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
 
-			store.setAggDefs([] as any[]);
+			store.setAggregation([]);
 
 			expect(spyApply).toHaveBeenCalled();
 			const plan = spyApply.mock.calls[0][0];
+			expect(plan.geometry).toBe(true);
 			expect(plan.viewport).toBe(true);
+			expect(plan.headers).toBe(true);
 			expect(plan.overlay).toBe(true);
 
 			store.destroy();
 		});
 
-		it('emits aggDefsChanged event', () => {
+		it('emits aggregationChanged event', () => {
 			const store = makeStore();
 			const listener = vi.fn();
-			store.addEventListener(GridEventName.aggDefsChanged, listener);
+			store.addEventListener(GridEventName.aggregationChanged, listener);
 
-			store.setAggDefs([] as any[]);
+			store.setAggregation([]);
 
 			expect(listener).toHaveBeenCalledOnce();
+			expect(listener).toHaveBeenCalledWith(expect.objectContaining({ payload: { defs: [] } }));
 
 			store.destroy();
 		});

@@ -31,7 +31,7 @@ export function sortTreeStage<TData>(
 	}
 	if (!activeSort && comparatorByField.size === 0) return;
 
-	const context = createRowPipelineContext(columns, { groups: new Set(), treeRows: new Set(), details: new Set() });
+	const context = createRowPipelineContext(columns);
 	const descByField = new Map<string, boolean>();
 	for (const sortItem of activeSort ?? []) {
 		if (!descByField.has(sortItem.colId)) descByField.set(sortItem.colId, sortItem.sort === 'desc');

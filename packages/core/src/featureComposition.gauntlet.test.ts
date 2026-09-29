@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GridEventName } from './api/GridEvents.js';
 import { ClientRowModelController } from './rowModel.js';
 import { GridStore } from './store.js';
+import { toDataVisualRowId } from './rows/visualRowIds.js';
 import { RenderEngine } from './renderer/renderEngine.js';
 import { RuntimeFaultReporter } from './diagnostics/RuntimeFaultReporter.js';
 
@@ -127,7 +128,7 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		});
 		expect(eastGroup?.kind).toBe('group');
 
-		store.toggleGroupExpanded(eastGroup!.groupId);
+		store.toggleExpanded(eastGroup!.groupId);
 		const expandFrame = store.engine.invalidation.consume();
 		expect(expandFrame.full).toBe(false);
 		expect(expandFrame.viewport).toBe(true);
@@ -368,17 +369,12 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 				{ field: 'status', header: 'Status', width: 120, pinned: 'right' },
 			],
 			pinnedColumns: { left: 1, right: 1 },
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row) => row.parentId ?? null,
-					getParentIdDependencies: ['parentId'],
-				},
+			treeData: {
+				getParentId: (row) => row.parentId ?? null,
+				getParentIdDependencies: ['parentId'],
 			},
 			expansion: {
-				groups: {},
-				treeRows: { root: true, other: true },
+				rows: { [toDataVisualRowId('root')]: true, [toDataVisualRowId('other')]: true },
 				details: {},
 			},
 		});
@@ -412,12 +408,12 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'child-b', colField: 'name' }));
 
 		store.selectCell({ rowId: 'other', colField: 'name' });
-		store.toggleGroupExpanded('other');
+		store.toggleExpanded(toDataVisualRowId('other'));
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'other', colField: 'name' }));
 		expect(store.getSelectedRowIds()).toEqual(['child-b']);
 		expect(store.getVisualIndexByRowId('child-b')).toBeNull();
 
-		store.toggleGroupExpanded('other');
+		store.toggleExpanded(toDataVisualRowId('other'));
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'other', colField: 'name' }));
 		expect(store.getSelectedRowIds()).toEqual(['child-b']);
 		expect(store.getVisualIndexByRowId('child-b')).toBeGreaterThan(store.getVisualIndexByRowId('other'));
@@ -444,14 +440,11 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 				{ field: 'score', header: 'Score', width: 120 },
 				{ field: 'status', header: 'Status', width: 120 },
 			],
-			groupBy: ['team'],
-			enableStickyGroupRows: true,
-			masterDetailEnabled: true,
-			detailRowHeight: 120,
+			grouping: { by: ['team'], stickyHeaders: true },
+			detail: { height: 120 },
 			pinnedColumns: { left: 1, right: 1 },
 			expansion: {
-				groups: { 'group:team=East': true, 'group:team=West': true },
-				treeRows: {},
+				rows: { 'group:team=East': true, 'group:team=West': true },
 				details: { 'row-12': true },
 			},
 			defaultRowHeight: 40,

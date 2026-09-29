@@ -1,4 +1,13 @@
-import type { FilterModel, QuickFilterModel, SortModel, AggregationDef, RowModelCapability, RowModelCapabilities } from '../rowModel.js';
+import type {
+	FilterModel,
+	QuickFilterModel,
+	SortModel,
+	AggregationDef,
+	ExpandAllOptions,
+	RowModelCapability,
+	RowModelCapabilities,
+} from '../rowModel.js';
+import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
 import type { RuntimePortBinding, RuntimePortBindResult, GridRuntimePorts } from '../engine/rendererPorts.js';
@@ -146,24 +155,40 @@ export interface GridStructureApi<TRowData = unknown> {
 	getColumnDistinctValues(colField: string): (string | number | null)[];
 	getColumnDistinctValueSummary(colField: string): GridDistinctValueSummary;
 	setStyleRules(styleRules: GridStyleRule<TRowData>[] | undefined): void;
-	setGroupBy(colIds: string[]): void;
+	/** The grouping configuration, or undefined when none is set. */
+	getGrouping(): GroupingConfig<TRowData> | undefined;
+	/** Replaces the grouping configuration. Changing the levels resets group expansion. */
+	setGrouping(grouping: GroupingConfig<TRowData> | undefined): void;
+	/** Merges into the grouping configuration (creating one with no levels if absent). */
+	updateGrouping(patch: Partial<GroupingConfig<TRowData>>): void;
+	/** Sets the grouping levels. Existing levels keep their GroupDef (keyCreator, comparator). */
+	setGroupBy(by: ReadonlyArray<string | GroupDef<TRowData>>): void;
+	/** Column ids of the grouping levels, outermost first. */
 	getGroupBy(): string[];
 	addGroupBy(colId: string, atIndex?: number): void;
 	removeGroupBy(colId: string): void;
 	moveGroupBy(colId: string, toIndex: number): void;
-	setAggDefs(defs: AggregationDef<TRowData>[]): void;
-	getAggDefs(): AggregationDef<TRowData>[];
-	expandAllGroups(): void;
-	collapseAllGroups(): void;
-	setShowGroupFooter(enabled: boolean): void;
-	setStickyGroupRows(enabled: boolean): void;
+	getTreeData(): TreeDataConfig<TRowData> | undefined;
+	setTreeData(treeData: TreeDataConfig<TRowData> | undefined): void;
+	getAggregation(): AggregationDef<TRowData>[];
+	setAggregation(defs: AggregationDef<TRowData>[]): void;
+	getDetail(): DetailConfig<TRowData> | undefined;
+	setDetail(detail: DetailConfig<TRowData> | undefined): void;
+	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). */
+	setExpanded(id: string, expanded: boolean): void;
+	toggleExpanded(id: string): void;
+	isExpanded(id: string): boolean;
+	/** Opens every group and tree row, or only levels up to `maxLevel` (closing deeper ones). Replaces individual choices. */
+	expandAll(options?: ExpandAllOptions): void;
+	/** Closes every group and tree row. Replaces individual choices. */
+	collapseAll(): void;
+	/** Opens or closes a row's detail, by row id. Rows `detail.isMaster` rejects never open. */
+	setDetailOpen(rowId: string, open: boolean): void;
+	toggleDetailOpen(rowId: string): void;
+	isDetailOpen(rowId: string): boolean;
 	setShowGroupPanel(enabled: boolean): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;
-	toggleGroupExpanded(groupId: string): void;
-	toggleDetailExpanded(rowId: string): void;
-	isGroupExpanded(groupId: string): boolean;
-	isDetailExpanded(rowId: string): boolean;
 	getVisibleColumnRange(): { colStart: number; colEnd: number; total: number };
 	getColumnState(): ColumnState[];
 	applyColumnState(states: ColumnState[], opts?: { applyOrder?: boolean }): void;

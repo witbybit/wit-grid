@@ -62,9 +62,7 @@ describe('statePersistence', () => {
 				filterModel: { age: { type: 'number', operator: 'gt', value: 18 } },
 				queryModel: QUERY_MODEL,
 				themeName: 'light',
-				groupBy: ['age'],
-				showGroupFooter: true,
-				enableStickyGroupRows: false,
+				grouping: { by: ['age'], totals: { groups: 'bottom' }, stickyHeaders: false },
 				pinnedColumns: { left: 1, right: 0 },
 				selection: null,
 				selectedRowIds: ['123'],
@@ -81,9 +79,7 @@ describe('statePersistence', () => {
 					filterModel: { age: { type: 'number', operator: 'gt', value: 18 } },
 					queryModel: QUERY_MODEL,
 					themeName: 'light',
-					groupBy: ['age'],
-					showGroupFooter: true,
-					enableStickyGroupRows: false,
+					grouping: { by: ['age'], totals: { groups: 'bottom' }, stickyHeaders: false },
 					pinnedColumns: { left: 1, right: 0 },
 				},
 			});
@@ -132,9 +128,7 @@ describe('statePersistence', () => {
 				filterModel: { name: { type: 'text', operator: 'contains', value: 'Alice' } },
 				queryModel: QUERY_MODEL,
 				themeName: 'light',
-				groupBy: ['age', 'invalidCol'],
-				showGroupFooter: true,
-				enableStickyGroupRows: true,
+				grouping: { by: ['age', 'invalidCol'], totals: { groups: 'bottom' }, stickyHeaders: true },
 				pinnedColumns: { left: 2, right: 1 },
 			});
 			const initial: Partial<GridInitialState> = {
@@ -151,9 +145,7 @@ describe('statePersistence', () => {
 			expect(result.filterModel).toEqual({ name: { type: 'text', operator: 'contains', value: 'Alice' } });
 			expect(result.queryModel).toEqual(QUERY_MODEL);
 			expect(result.themeName).toBe('light');
-			expect(result.groupBy).toEqual(['age']);
-			expect(result.showGroupFooter).toBe(true);
-			expect(result.enableStickyGroupRows).toBe(true);
+			expect(result.grouping).toEqual({ by: ['age'], totals: { groups: 'bottom' }, stickyHeaders: true });
 			expect(result.pinnedColumns).toEqual({ left: 2, right: 1 });
 		});
 
@@ -197,7 +189,7 @@ describe('statePersistence', () => {
 
 		it('saves and loads the versioned persisted envelope', () => {
 			const adapter = createLocalStorageAdapter('test-key');
-			const testState = wrapState({ themeName: 'light', showGroupFooter: true });
+			const testState = wrapState({ themeName: 'light', grouping: { by: [], totals: { groups: 'bottom' } } });
 
 			adapter.save(testState);
 
@@ -363,9 +355,7 @@ describe('statePersistence', () => {
 				columnWidths: {},
 				sortModel: null,
 				filterModel: null,
-				groupBy: [],
-				showGroupFooter: false,
-				enableStickyGroupRows: false,
+				grouping: undefined,
 				pinnedColumns: { left: 0, right: 0 },
 				...partial,
 			}) as InternalGridState;
@@ -384,9 +374,7 @@ describe('statePersistence', () => {
 				filterModel: { id: { type: 'text', operator: 'equals', value: '1' } },
 				queryModel: QUERY_MODEL,
 				themeName: 'light',
-				groupBy: ['name'],
-				showGroupFooter: true,
-				enableStickyGroupRows: false,
+				grouping: { by: ['name'], totals: { groups: 'bottom' }, stickyHeaders: false },
 				pinnedColumns: { left: 1, right: 0 },
 			});
 
@@ -401,9 +389,58 @@ describe('statePersistence', () => {
 			expect(stateMutation.sortModel).toEqual([{ colId: 'id', sort: 'asc' }]);
 			expect(stateMutation.queryModel).toEqual(QUERY_MODEL);
 			expect(stateMutation.themeName).toBe('light');
-			expect(stateMutation.groupBy).toContain('name');
-			expect(stateMutation.showGroupFooter).toBe(true);
+			expect(stateMutation.grouping).toEqual({ by: ['name'], totals: { groups: 'bottom' }, stickyHeaders: false });
 			expect(stateMutation.pinnedColumns).toEqual({ left: 1, right: 0 });
+		});
+
+		it('round-trips grouping { by, totals, stickyHeaders }, keeping configured GroupDefs and dropping removed columns', () => {
+			const keyCreator = ({ value }: { value: unknown }) => String(value).toUpperCase();
+			const comparator = (a: unknown, b: unknown) => String(b).localeCompare(String(a));
+			const before = makeCurrent({
+				columns: [
+					{ field: 'id', header: 'ID', width: 100 },
+					{ field: 'name', header: 'Name', width: 150 },
+					{ field: 'region', header: 'Region', width: 150 },
+				],
+				grouping: {
+					by: ['region', { colId: 'name', keyCreator, comparator }],
+					totals: { groups: 'top', grand: 'bottom' },
+					stickyHeaders: true,
+					rowHeight: 44,
+				},
+			});
+			const persisted = extractPersistedState(before);
+			// Only the serializable part is persisted: column ids, placements, the sticky flag.
+			expect(persisted.state.grouping).toEqual({ by: ['region', 'name'], totals: { groups: 'top', grand: 'bottom' }, stickyHeaders: true });
+
+			// Restore into a grid whose 'region' column is gone and whose configured 'name' level has a keyCreator.
+			const after = makeCurrent({
+				grouping: { by: [{ colId: 'name', keyCreator, comparator }], defaultExpanded: 1, rowHeight: 44 },
+			});
+			const result = preparePersistedGridStateRestore(JSON.parse(JSON.stringify(persisted)) as PersistedGridState, after);
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			const grouping = result.restore.stateMutation.grouping!;
+			expect(grouping.by).toHaveLength(1);
+			const level = grouping.by[0];
+			expect(typeof level).toBe('object');
+			expect(level).toMatchObject({ colId: 'name' });
+			expect((level as { keyCreator?: unknown }).keyCreator).toBe(keyCreator);
+			expect((level as { comparator?: unknown }).comparator).toBe(comparator);
+			expect(grouping.totals).toEqual({ groups: 'top', grand: 'bottom' });
+			expect(grouping.stickyHeaders).toBe(true);
+			// Configured, unpersisted settings survive.
+			expect(grouping.defaultExpanded).toBe(1);
+			expect(grouping.rowHeight).toBe(44);
+
+			// applyPersistedState merges over the initial grouping the same way.
+			const applied = applyPersistedState(
+				persisted,
+				{ grouping: { by: [{ colId: 'name', keyCreator }] } },
+				after.columns as ColumnDef<unknown>[]
+			)!;
+			expect(applied.grouping?.by).toEqual([{ colId: 'name', keyCreator }]);
+			expect(applied.grouping?.stickyHeaders).toBe(true);
 		});
 
 		it('omits unknown column fields from stateMutation', () => {

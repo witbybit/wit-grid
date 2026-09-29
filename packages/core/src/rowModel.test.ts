@@ -256,10 +256,7 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'category', header: 'Category' }],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'category' }], defaultExpanded: true },
-			},
+			grouping: { by: ['category'], defaultExpanded: true },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -293,10 +290,9 @@ describe('ClientRowModelController', () => {
 			],
 			sortModel: null,
 			filterModel: null,
-			rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'category' }], defaultExpanded: true } },
-			aggDefs: [{ field: 'doubleAmount', aggFunc: 'sum' }],
-			expandedGroupIds: new Set(),
-			expandedDetailRowIds: new Set(),
+			grouping: { by: ['category'], defaultExpanded: true },
+			aggregation: { defs: [{ colId: 'doubleAmount', aggFunc: 'sum' }] },
+			expansion: { rows: {}, details: {} },
 			defaultRowHeight: 40,
 			rowHeightsRecord: {},
 		});
@@ -314,10 +310,7 @@ describe('ClientRowModelController', () => {
 				{ field: 'name', header: 'Name' },
 			],
 			filterModel: { name: { type: 'text', operator: 'contains', value: 'keep' } },
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'category' }], defaultExpanded: true },
-			},
+			grouping: { by: ['category'], defaultExpanded: true },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -344,7 +337,7 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'category', header: 'Category' }],
-			rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'category' }] } },
+			grouping: { by: ['category'] },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -356,8 +349,8 @@ describe('ClientRowModelController', () => {
 		});
 
 		expect(controller.getVisualRowCount()).toBe(1);
-		const result = controller.toggleGroupExpanded('group:category=A');
-		expect(store.getState().expansion.groups['group:category=A']).toBe(true);
+		const result = controller.setExpanded('group:category=A', true);
+		expect(store.getState().expansion.rows['group:category=A']).toBe(true);
 		expect(controller.getVisualRowCount()).toBe(3);
 		expect(result).toMatchObject({
 			changed: true,
@@ -374,7 +367,7 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'category', header: 'Category' }],
-			rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'category' }] } },
+			grouping: { by: ['category'] },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -386,7 +379,7 @@ describe('ClientRowModelController', () => {
 		});
 
 		store.engine.invalidation.consume();
-		store.toggleGroupExpanded('group:category=A');
+		store.toggleExpanded('group:category=A');
 		const frame = store.engine.invalidation.consume();
 
 		expect(frame.groups).toEqual(new Set(['group:category=A']));
@@ -436,14 +429,10 @@ describe('ClientRowModelController', () => {
 			getRowId: (row) => row.id,
 			columns: [{ field: 'name', header: 'Name' }],
 			filterModel: { name: { type: 'text', operator: 'contains', value: 'Child' } },
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row) => row.parentId,
-					defaultExpanded: true,
-					filterMode: 'includeAncestors',
-				},
+			treeData: {
+				getParentId: (row) => row.parentId,
+				defaultExpanded: true,
+				filterMode: 'includeAncestors',
 			},
 		});
 
@@ -466,13 +455,9 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'name', header: 'Name' }],
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row) => row.parentId,
-					defaultExpanded: false,
-				},
+			treeData: {
+				getParentId: (row) => row.parentId,
+				defaultExpanded: false,
 			},
 		});
 
@@ -487,7 +472,7 @@ describe('ClientRowModelController', () => {
 		expect(controller.getVisualRowCount()).toBe(1);
 		expect(controller.getVisualRow(0)?.id).toBe('row:p');
 
-		store.engine.stateManager.setState({ expansion: { ...store.getState().expansion, treeRows: { p: true } } });
+		store.engine.stateManager.setState({ expansion: { ...store.getState().expansion, rows: { [toDataVisualRowId('p')]: true } } });
 		controller.refresh('expansion');
 		expect(controller.getVisualRowCount()).toBe(2);
 		expect(controller.getVisualRow(1)?.id).toBe('row:c');
@@ -497,13 +482,9 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'name', header: 'Name' }],
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row) => row.parentId,
-					defaultExpanded: false,
-				},
+			treeData: {
+				getParentId: (row) => row.parentId,
+				defaultExpanded: false,
 			},
 		});
 
@@ -519,12 +500,13 @@ describe('ClientRowModelController', () => {
 
 		expect(controller.getVisualRowCount()).toBe(1);
 
-		const refresh = controller.expandAllGroups();
+		const refresh = controller.expandAll();
 		expect(refresh.changed).toBe(true);
 		expect(refresh.reason).toBe('expansion');
 		expect(refresh.previousRowCount).toBe(1);
 		expect(refresh.nextRowCount).toBe(4);
-		expect(store.getState().expansion.treeRows).toEqual({ root: true, 'child-a': true });
+		expect(store.getState().expansion.base).toBe(true);
+		expect(store.getState().expansion.rows).toEqual({});
 		expect(controller.getVisualRowCount()).toBe(4);
 
 		controller.dispose();
@@ -535,10 +517,8 @@ describe('ClientRowModelController', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: [{ field: 'name', header: 'Name' }],
-			rowModelConfig: {
-				type: 'client',
-				masterDetail: { enabled: true, expandedRowIds: { '1': true }, defaultDetailHeight: 321 },
-			},
+			detail: { height: 321 },
+			expansion: { rows: {}, details: { '1': true } },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -671,7 +651,11 @@ describe('GroupRowMeta', () => {
 	}
 
 	it('returns null for unknown groupId', () => {
-		const store = new GridStore<GRow>({ getRowId: (r) => r.id, columns: [{ field: 'category', header: 'Category' }], groupBy: ['category'] });
+		const store = new GridStore<GRow>({
+			getRowId: (r) => r.id,
+			columns: [{ field: 'category', header: 'Category' }],
+			grouping: { by: ['category'] },
+		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [{ id: '1', category: 'A' }],
 			columns: store.getState().columns,
@@ -680,7 +664,11 @@ describe('GroupRowMeta', () => {
 	});
 
 	it('collapsed group: firstChildIndex and lastChildIndex are -1, visibleDescendantRowIds is empty', () => {
-		const store = new GridStore<GRow>({ getRowId: (r) => r.id, columns: [{ field: 'category', header: 'Category' }], groupBy: ['category'] });
+		const store = new GridStore<GRow>({
+			getRowId: (r) => r.id,
+			columns: [{ field: 'category', header: 'Category' }],
+			grouping: { by: ['category'] },
+		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
 				{ id: '1', category: 'A' },
@@ -698,7 +686,11 @@ describe('GroupRowMeta', () => {
 	});
 
 	it('expanded group: firstChildIndex, lastChildIndex, and visibleDescendantRowIds are correct', () => {
-		const store = new GridStore<GRow>({ getRowId: (r) => r.id, columns: [{ field: 'category', header: 'Category' }], groupBy: ['category'] });
+		const store = new GridStore<GRow>({
+			getRowId: (r) => r.id,
+			columns: [{ field: 'category', header: 'Category' }],
+			grouping: { by: ['category'] },
+		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
 				{ id: '1', category: 'A' },
@@ -707,7 +699,7 @@ describe('GroupRowMeta', () => {
 			columns: store.getState().columns,
 		});
 		const groupId = groupIdAt(ctrl, 0);
-		store.engine.stateManager.setState({ expansion: { groups: { [groupId]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [groupId]: true }, details: {} } });
 		ctrl.refresh();
 
 		const meta = ctrl.getGroupMeta(groupId);
@@ -720,13 +712,17 @@ describe('GroupRowMeta', () => {
 	});
 
 	it('getGroupMetaByVisualIndex returns same object as getGroupMeta', () => {
-		const store = new GridStore<GRow>({ getRowId: (r) => r.id, columns: [{ field: 'category', header: 'Category' }], groupBy: ['category'] });
+		const store = new GridStore<GRow>({
+			getRowId: (r) => r.id,
+			columns: [{ field: 'category', header: 'Category' }],
+			grouping: { by: ['category'] },
+		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [{ id: '1', category: 'A' }],
 			columns: store.getState().columns,
 		});
 		const groupId = groupIdAt(ctrl, 0);
-		store.engine.stateManager.setState({ expansion: { groups: { [groupId]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [groupId]: true }, details: {} } });
 		ctrl.refresh();
 
 		const byId = ctrl.getGroupMeta(groupId);
@@ -735,7 +731,11 @@ describe('GroupRowMeta', () => {
 	});
 
 	it('multiple sibling groups each have correct descendant ids', () => {
-		const store = new GridStore<GRow>({ getRowId: (r) => r.id, columns: [{ field: 'category', header: 'Category' }], groupBy: ['category'] });
+		const store = new GridStore<GRow>({
+			getRowId: (r) => r.id,
+			columns: [{ field: 'category', header: 'Category' }],
+			grouping: { by: ['category'] },
+		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
 				{ id: '1', category: 'A' },
@@ -746,7 +746,7 @@ describe('GroupRowMeta', () => {
 		});
 		const idA = groupIdAt(ctrl, 0);
 		const idB = groupIdAt(ctrl, 1);
-		store.engine.stateManager.setState({ expansion: { groups: { [idA]: true, [idB]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [idA]: true, [idB]: true }, details: {} } });
 		ctrl.refresh();
 
 		expect(ctrl.getGroupMeta(idA)!.visibleDescendantRowIds).toEqual(['1']);
@@ -764,7 +764,7 @@ describe('GroupRowMeta', () => {
 				{ field: 'category', header: 'Category' },
 				{ field: 'sub', header: 'Sub' },
 			],
-			groupBy: ['category', 'sub'],
+			grouping: { by: ['category', 'sub'] },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -775,10 +775,10 @@ describe('GroupRowMeta', () => {
 		});
 		// Expand outer first to reveal the inner group at index 1
 		const outer = groupIdAt(ctrl, 0);
-		store.engine.stateManager.setState({ expansion: { groups: { [outer]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [outer]: true }, details: {} } });
 		ctrl.refresh();
 		const inner = groupIdAt(ctrl, 1);
-		store.engine.stateManager.setState({ expansion: { groups: { [outer]: true, [inner]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [outer]: true, [inner]: true }, details: {} } });
 		ctrl.refresh();
 
 		const outerMeta = ctrl.getGroupMeta(outer);
@@ -793,8 +793,7 @@ describe('GroupRowMeta', () => {
 		const store = new GridStore<GRow>({
 			getRowId: (r) => r.id,
 			columns: [{ field: 'category', header: 'Category' }],
-			groupBy: ['category'],
-			showGroupFooter: true,
+			grouping: { by: ['category'], totals: { groups: 'bottom' } },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -804,7 +803,7 @@ describe('GroupRowMeta', () => {
 			columns: store.getState().columns,
 		});
 		const groupId = groupIdAt(ctrl, 0);
-		store.engine.stateManager.setState({ expansion: { groups: { [groupId]: true }, treeRows: {}, details: {} } });
+		store.engine.stateManager.setState({ expansion: { rows: { [groupId]: true }, details: {} } });
 		ctrl.refresh();
 
 		const meta = ctrl.getGroupMeta(groupId);
@@ -900,10 +899,7 @@ describe('Phase 068 — filter membership shortcut in updateRows()', () => {
 				{ field: 'name', header: 'Name' },
 			],
 			filterModel: { status: { type: 'text', operator: 'equals', value: 'active' } },
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'status' }], defaultExpanded: true },
-			},
+			grouping: { by: ['status'], defaultExpanded: true },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -1040,10 +1036,7 @@ describe('Phase 068 — sort relocation in updateRows()', () => {
 				{ field: 'price', header: 'Price' },
 			],
 			sortModel: [{ colId: 'price', sort: 'asc' }],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'name' }], defaultExpanded: true },
-			},
+			grouping: { by: ['name'], defaultExpanded: true },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -1231,10 +1224,7 @@ describe('Phase 068 — incremental insert/remove in applyTransaction()', () => 
 				{ field: 'name', header: 'Name' },
 				{ field: 'price', header: 'Price' },
 			],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'name' }], defaultExpanded: true },
-			},
+			grouping: { by: ['name'], defaultExpanded: true },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [{ id: '1', name: 'A', price: 10 }],
@@ -1263,10 +1253,7 @@ describe('row-transaction rollback restores full client row-model identity', () 
 				{ field: 'category', header: 'Category' },
 				{ field: 'profile.name', header: 'Name' },
 			],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'category' }], defaultExpanded: true },
-			},
+			grouping: { by: ['category'], defaultExpanded: true },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -1483,15 +1470,11 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 				{ field: 'salary', header: 'Salary' },
 				{ field: 'bonus', header: 'Bonus' },
 			],
-			rowModelConfig: {
-				type: 'client',
-				grouping: { model: [{ colId: 'category' }], defaultExpanded: expanded },
-			},
+			grouping: { by: ['category'], defaultExpanded: expanded },
 		});
-		// aggDefs must be applied via setAggDefs — GridStore constructor does not forward aggDefs to GridEngine
-		store.setAggDefs([
-			{ field: 'salary', aggFunc: 'sum' },
-			{ field: 'bonus', aggFunc: 'avg' },
+		store.setAggregation([
+			{ colId: 'salary', aggFunc: 'sum' },
+			{ colId: 'bonus', aggFunc: 'avg' },
 		]);
 		const controller = new ClientRowModelController<AggRow>(store.getClientRowModelRuntime(), {
 			rows,

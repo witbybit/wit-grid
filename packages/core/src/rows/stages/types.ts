@@ -1,5 +1,5 @@
 import { RowNode, type ColumnDef } from '../../store.js';
-import type { GroupDef } from '../RowPipeline.js';
+import type { GroupDef } from '../hierarchyConfig.js';
 import type { GroupPathItem } from '../visualRowIds.js';
 
 export type RowTreeNode<TData = unknown> =
@@ -28,16 +28,9 @@ export type RowTreeNode<TData = unknown> =
 			aggregates: Record<string, unknown>;
 	  };
 
-export interface RowPipelineExpansion {
-	groups: Set<string>;
-	treeRows: Set<string>;
-	details: Set<string>;
-}
-
 export interface RowPipelineContext<TData = unknown> {
 	columnsById: Map<string, ColumnDef<TData>>;
 	getValue: (node: RowNode<TData>, colId: string) => unknown;
 	getGroupKey: (node: RowNode<TData>, groupDef: GroupDef<TData>) => { key: unknown; keyString: string };
 	reportFault?: (operation: string, error: unknown, context?: Record<string, unknown>) => void;
-	expansion: RowPipelineExpansion;
 }
