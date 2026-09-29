@@ -134,6 +134,11 @@ export class PortalMountManager<TRowData = unknown> {
 	private deferredCellReleases = new Map<string, GridCellContentUnmount>();
 	/** Tracks the current physical identity for each mounted cellKey. */
 	private activeIdentityByKey = new Map<string, CellPortalPhysicalIdentity>();
+	/**
+	 * Mounted edit-portal keys. Editing is single-cell, so at most one may be live; any other is an
+	 * editor whose release was missed on some bind path (it would stay open as a second editor).
+	 */
+	private readonly editPortalKeys = new Set<string>();
 	private deferredNewCellMounts = new Set<string>();
 	private deferredRowMounts = new Map<string, GridRowContentMount<TRowData>>();
 	private deferredRowReleases = new Map<string, GridRowContentUnmount>();
@@ -186,6 +191,7 @@ export class PortalMountManager<TRowData = unknown> {
 	}
 
 	private mountCellReal(mount: GridCellContentMount<TRowData>): void {
+		if (mount.isEditing) this.releaseSupersededEditPortals(mount.cellKey);
 		this.activeIdentityByKey.set(mount.cellKey, {
 			cellInstanceId: mount.cellInstanceId ?? '',
 			portalHostId: mount.portalHostId ?? '',
@@ -262,9 +268,29 @@ export class PortalMountManager<TRowData = unknown> {
 		});
 	}
 
+	/** Unmounts every live edit portal except `keepKey`: a newly mounted editor supersedes them. */
+	private releaseSupersededEditPortals(keepKey: string): void {
+		if (this.editPortalKeys.size === 0 || (this.editPortalKeys.size === 1 && this.editPortalKeys.has(keepKey))) {
+			this.editPortalKeys.add(keepKey);
+			return;
+		}
+		for (const key of [...this.editPortalKeys]) {
+			if (key === keepKey) continue;
+			this.mountedCells.delete(key);
+			this.deferredCellMounts.delete(key);
+			this.deferredNewCellMounts.delete(key);
+			this.deferredCellReleases.delete(key);
+			this.pendingCellReleases.delete(key);
+			this.engine?.instrumentation.increment(GridMetric.STALE_CELL_OPERATION_REJECTED);
+			this.releaseCellReal(key, 'edited');
+		}
+		this.editPortalKeys.add(keepKey);
+	}
+
 	private releaseCellReal(cellKey: string, reason: ReleaseReason, originalUnmount?: GridCellContentUnmount): void {
 		const activeIdentity = this.activeIdentityByKey.get(cellKey);
 		this.activeIdentityByKey.delete(cellKey);
+		this.editPortalKeys.delete(cellKey);
 		// DOM renderer path — no portal/React involved
 		if (this.domCellRendererManager.releaseByCellKey(cellKey, reason)) return;
 
@@ -662,6 +688,7 @@ export class PortalMountManager<TRowData = unknown> {
 		this.mountedRowVisualRows.clear();
 		this.mountedMenus.clear();
 		this.activeIdentityByKey.clear();
+		this.editPortalKeys.clear();
 	}
 
 	public isCellMounted(cellKey: string): boolean {

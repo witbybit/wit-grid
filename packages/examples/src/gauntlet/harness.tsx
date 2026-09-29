@@ -113,9 +113,10 @@ function checkInvariants(root: HTMLElement): string[] {
 			const describe = Array.from(grid.querySelectorAll<HTMLElement>('.og-cell-editor')).map((el) => {
 				const cell = el.closest<HTMLElement>('.og-cell');
 				const row = el.closest<HTMLElement>('.og-row');
-				return `[cell ${cell?.dataset.rowId}/${cell?.dataset.colField} key=${cell?.dataset.cellKey} rowVis=${row?.style.visibility || '-'} hiddenAncestor=${(() => { for (let n: HTMLElement | null = el; n && n !== grid; n = n.parentElement) { if (n.style.display === 'none' || n.style.visibility === 'hidden') return n.className || n.tagName; } return 'none'; })()} html=${el.outerHTML.slice(0, 90)}]`;
+				return `[cell ${cell?.dataset.rowId}/${cell?.dataset.colField} key=${cell?.dataset.cellKey} mode=${cell?.dataset.contentMode} parent=${el.parentElement?.className} rowVis=${row?.style.visibility || '-'} hiddenAncestor=${(() => { for (let n: HTMLElement | null = el; n && n !== grid; n = n.parentElement) { if (n.style.display === 'none' || n.style.visibility === 'hidden') return n.className || n.tagName; } return 'none'; })()} html=${el.outerHTML.slice(0, 90)}]`;
 			});
-			violations.push(`${editors} cell editors open at once ${describe.join(' ')}`);
+			const owners = ((globalThis as any).__portalStores ?? []).flatMap((st: any) => st.__debugEntries()).filter((e: any) => Array.from(grid.querySelectorAll('.og-cell-editor')).some((ed) => e.container.contains(ed))).map((e: any) => `${e.cellKey} editing=${e.isEditing} phase=${e.phase} scrolling=${e.isScrolling} inDom=${grid.contains(e.container)}`);
+			violations.push(`${editors} cell editors open at once ${describe.join(' ')} OWNERS ${owners.join(' | ')}`);
 		}
 		// One visual row index must never be painted by two row slots in the same lane container.
 		for (const container of Array.from(grid.querySelectorAll<HTMLElement>('.og-rows-container'))) {

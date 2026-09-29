@@ -106,7 +106,12 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	ensureCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement;
 	getCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement | null;
 	markCellDirtyAfterScroll: (cell: HTMLDivElement) => void;
-	releaseCellPortal: (cell: HTMLDivElement, forceDeferred?: boolean, reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated') => void;
+	releaseCellPortal: (
+		cell: HTMLDivElement,
+		forceDeferred?: boolean,
+		reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated',
+		portalKey?: string
+	) => void;
 	incrementStyleHookCallsDuringScroll: () => void;
 	incrementCellsBoundDuringScroll: () => void;
 	incrementCurrentScrollCellsWritten: () => void;

@@ -4,6 +4,7 @@ import type { GridCellClassParams } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
 import type { CellRenderer } from './cellRenderer.js';
 import { CellSlot } from './cellSlot.js';
+import { PortalRendererHandle } from './cellRendererHandle.js';
 import type { FullWidthRowRenderer } from './fullWidthRowRenderer.js';
 import type { InvalidationFrame } from './invalidationManager.js';
 import type { PortalMountManager } from './portalMountManager.js';
@@ -55,7 +56,12 @@ export interface RowRendererRuntimeArgs<TRowData = unknown> {
 	ensureCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement;
 	getCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement | null;
 	markCellDirtyAfterScroll: (cell: HTMLDivElement) => void;
-	releaseCellPortal: (cell: HTMLDivElement, forceDeferred?: boolean, reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated') => void;
+	releaseCellPortal: (
+		cell: HTMLDivElement,
+		forceDeferred?: boolean,
+		reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated',
+		portalKey?: string
+	) => void;
 	applyFocus: (cell: HTMLDivElement) => void;
 	isEditorInteractiveElement: (el: Element | null) => boolean;
 	isScrolling: boolean;
@@ -140,7 +146,7 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			ensureCellPortalHost: (cell) => this.ensureCellPortalHost(cell),
 			getCellPortalHost: (cell) => this.getCellPortalHost(cell),
 			markCellDirtyAfterScroll: (cell) => this.markCellDirtyAfterScroll(cell),
-			releaseCellPortal: (cell, forceDeferred, reason) => this.releaseCellPortal(cell, forceDeferred, reason),
+			releaseCellPortal: (cell, forceDeferred, reason, portalKey) => this.releaseCellPortal(cell, forceDeferred, reason, portalKey),
 			applyFocus: (cell) => this.applyFocus(cell),
 			isEditorInteractiveElement: (el) => this.isEditorInteractiveElement(el),
 			isScrolling: false,
@@ -372,10 +378,14 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	public releaseCellPortal(
 		cell: HTMLDivElement,
 		forceDeferred?: boolean,
-		reason: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated' = 'scrolled-out'
+		reason: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated' = 'scrolled-out',
+		portalKey?: string
 	): void {
 		const cellSlot = CellSlot.fromElement(cell);
-		const cellKey = cellSlot.binding?.cellKey ?? cellSlot.lastPortalKey ?? cell.dataset.cellKey;
+		// Release what the slot actually holds: an edit portal is keyed by row (E…), not by the
+		// slot's current cell binding (C…), so the binding key would miss it and leak the editor.
+		const heldPortalKey = cellSlot.renderer instanceof PortalRendererHandle ? cellSlot.renderer.portalKey : undefined;
+		const cellKey = portalKey ?? heldPortalKey ?? cellSlot.lastPortalKey ?? cellSlot.binding?.cellKey ?? cell.dataset.cellKey;
 		if (!cellKey) return;
 		const container = this.getCellPortalHost(cell) ?? cell;
 		const isDeferred = forceDeferred ?? this.deps.stateHost.runtimeState.isScrolling();
@@ -429,6 +439,8 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 				portalHostId,
 			});
 		}
+		// The slot no longer holds this portal; a stale handle would make the next bind release it again.
+		if (heldPortalKey === cellKey) cellSlot.renderer = null;
 	}
 
 	public applyFocus(cell: HTMLDivElement): void {

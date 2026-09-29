@@ -1,4 +1,5 @@
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
+import { PortalRendererHandle } from '../cellRendererHandle.js';
 import {
 	applyCellAccessibilityState,
 	applyCellTitlesAndValidation,
@@ -7,6 +8,17 @@ import {
 	getCellRendererLifecycle,
 	isOverscanLiveCell,
 } from './binderShared.js';
+
+/**
+ * Scroll binds never run assignRendererHandle, so a portal mounted here must be recorded on the
+ * slot directly; otherwise the next non-portal bind finds no handle, releases nothing, and the
+ * portal (e.g. an editor kept live through scroll) leaks.
+ */
+function recordHeldPortal<TRowData>(cellSlot: DispatchCellPresentationInput<TRowData>['cellSlot'], portalKey: string): void {
+	const held = cellSlot.renderer;
+	if (held instanceof PortalRendererHandle && held.portalKey === portalKey) return;
+	cellSlot.renderer = new PortalRendererHandle<TRowData>(portalKey);
+}
 
 function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<TRowData>): boolean {
 	if (input.phase !== 'scroll' || !input.viewportPlan) return false;
@@ -82,6 +94,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 				isSelected: mountRuntime.isSelected,
 			},
 		});
+		recordHeldPortal(cellSlot, presentation.portalKey!);
 		cellSlot.lastMountedRowVersion = rowVersion;
 		cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
 		applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
@@ -151,6 +164,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	if (isFreshMount)
 		lifecycle.mountLive({ cellCtrl, host: ensuredPortalHost, reason: input.phase === 'full-bind' ? 'full-bind' : 'scroll-live', token, mount });
 	else lifecycle.updateLive({ cellCtrl, host: ensuredPortalHost, reason: input.phase === 'full-bind' ? 'full-bind' : 'scroll-live', token, mount });
+	recordHeldPortal(cellSlot, presentation.portalKey!);
 	cellSlot.lastMountedRowVersion = rowVersion;
 	cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
 	if (input.phase === 'full-bind' && cellCtrl.scrollPresentation === 'html-snapshot') {
