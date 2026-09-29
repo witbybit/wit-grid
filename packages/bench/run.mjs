@@ -127,7 +127,7 @@ async function runOnce(browser, grid, scenario) {
 	if (traceLayouts) {
 		cdp.on('Tracing.dataCollected', ({ value }) => traceEvents.push(...value));
 		await cdp.send('Tracing.start', {
-			categories: 'devtools.timeline,disabled-by-default-devtools.timeline',
+			categories: 'devtools.timeline,disabled-by-default-devtools.timeline,disabled-by-default-devtools.timeline.invalidationTracking',
 			transferMode: 'ReportEvents',
 		});
 	}
@@ -230,6 +230,27 @@ function summarizeLayoutTrace(events) {
 	}
 	let styledElements = 0;
 	for (const e of styles) styledElements += e.args?.elementCount ?? e.args?.endData?.elementCount ?? 0;
+	// Why elements were restyled: Chrome's invalidation tracking, grouped by reason and node.
+	const reasons = {};
+	for (const e of events) {
+		if (e.name !== 'StyleRecalcInvalidationTracking' && e.name !== 'ScheduleStyleInvalidationTracking') continue;
+		const data = e.args?.data ?? {};
+		const what = data.changedClass
+			? `class ${data.changedClass}`
+			: data.changedAttribute
+				? `attr ${data.changedAttribute}`
+				: data.changedPseudo
+					? `pseudo ${data.changedPseudo}`
+					: (data.reason ?? data.extraData ?? '?');
+		const key = `${e.name === 'StyleRecalcInvalidationTracking' ? 'recalc' : 'schedule'}: ${what} @ ${data.nodeName ?? '?'}`;
+		reasons[key] = (reasons[key] ?? 0) + 1;
+	}
+	const topReasons = Object.entries(reasons)
+		.sort((a, b) => b[1] - a[1])
+		.slice(0, 12);
+	if (topReasons.length)
+		process.stdout.write(`  invalidations: ${JSON.stringify(topReasons)}
+`);
 	return {
 		traceLayouts: layouts.length,
 		traceForcedLayouts: forced,

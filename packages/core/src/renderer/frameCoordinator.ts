@@ -79,7 +79,16 @@ export interface FrameCoordinatorDeps {
 	 * for synchronously-firing test schedulers, where no time can pass between frames.
 	 */
 	scrollEndQuietMs?: number;
-	/** Clock for scrollEndQuietMs. Defaults to performance.now(). */
+	/**
+	 * Quiet time (ms since the last requestScrollFrame) a native `scrollend` still needs before the
+	 * scroll ends. Defaults to 50. Every discrete scroll — an instant wheel tick, a scripted
+	 * `scrollTop` assignment — fires its own `scrollend`, so without this a stream of them ended and
+	 * restarted the session between each step (re-running the whole scroll-end path and toggling the
+	 * container's scrolling class, which restyles every row). Ignored for synchronously-firing test
+	 * schedulers, where no time can pass between frames.
+	 */
+	nativeScrollEndQuietMs?: number;
+	/** Clock for the quiet windows. Defaults to performance.now(). */
 	now?: () => number;
 }
 
@@ -99,6 +108,7 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 	private scrollEndQuietCount = 0;
 	private readonly scrollEndQuietThreshold: number;
 	private readonly scrollEndQuietMs: number;
+	private readonly nativeScrollEndQuietMs: number;
 	private readonly now: () => number;
 	private lastScrollRequestAt = 0;
 	/** Native scrollend arrived while a scroll frame was still owed; end right after it. */
@@ -123,6 +133,7 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		this.runtimeState = deps.runtimeState;
 		this.scrollEndQuietThreshold = deps.scrollEndQuietFrames ?? 3;
 		this.scrollEndQuietMs = deps.scrollEndQuietMs ?? 0;
+		this.nativeScrollEndQuietMs = deps.nativeScrollEndQuietMs ?? 50;
 		this.now = deps.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
 	}
 
@@ -130,7 +141,7 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		if (this.destroyed) return;
 		// Movement after a native scrollend belongs to a new gesture.
 		this.scrollEndRequested = false;
-		if (this.scrollEndQuietMs > 0) this.lastScrollRequestAt = this.now();
+		if (this.scrollEndQuietMs > 0 || this.nativeScrollEndQuietMs > 0) this.lastScrollRequestAt = this.now();
 		if (this.pendingScroll) return;
 		this.pendingScroll = true;
 		this.scheduleFrame();
@@ -157,6 +168,14 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		// Runtime transitions to idle before notifying the scroll-end handler.
 		this.runtimeState?.transitionTo('idle');
 		this.onScrollEnd?.();
+	}
+
+	/** A native scrollend was reported: end once a frame and nativeScrollEndQuietMs passed without movement. */
+	private isNativeScrollEndQuiet(syncFrame: boolean): boolean {
+		if (this.nativeScrollEndQuietMs <= 0 || syncFrame) return true;
+		// Same frame cap as the fallback path, for clocks that do not advance between frames.
+		if (this.scrollEndQuietCount >= SCROLL_END_MAX_QUIET_FRAMES) return true;
+		return this.now() - this.lastScrollRequestAt >= this.nativeScrollEndQuietMs;
 	}
 
 	private isScrollQuiet(syncFrame: boolean): boolean {
@@ -239,7 +258,7 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 				// This path fires while the runtime is still in post-scroll (or scroll-pending)
 				// after the last visible scroll frame.
 				this.scrollEndQuietCount++;
-				if (this.scrollEndRequested || this.isScrollQuiet(syncFrame)) {
+				if (this.scrollEndRequested ? this.isNativeScrollEndQuiet(syncFrame) : this.isScrollQuiet(syncFrame)) {
 					this.endScroll();
 				}
 			}

@@ -242,42 +242,53 @@ describe('scroll-end detection', () => {
 		expect(rs.phase).toBe('idle');
 	});
 
-	it('native scrollend ends the scroll on the next frame, without waiting for quiet time', () => {
-		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
+	it('native scrollend ends the scroll once 50ms pass without movement, well before the 100ms fallback', () => {
+		let t = 0;
+		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => t });
 		rs.transitionTo('scroll-pending');
 		coordinator.requestScrollFrame();
 		rafs[0]!();
 		coordinator.notifyScrollEnd();
+		t = 16;
+		rafs[rafs.length - 1]!();
 		expect(onScrollEnd).not.toHaveBeenCalled();
+		t = 50;
 		rafs[rafs.length - 1]!();
 		expect(onScrollEnd).toHaveBeenCalledTimes(1);
 		expect(rs.phase).toBe('idle');
 	});
 
-	it('native scrollend that arrives before the final scroll frame ends the scroll on the frame after it', () => {
-		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
+	it('native scrollend that arrives before the final scroll frame ends the scroll after that frame', () => {
+		let t = 0;
+		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => t });
 		rs.transitionTo('scroll-pending');
 		coordinator.requestScrollFrame();
 		coordinator.notifyScrollEnd();
 		rafs[0]!();
 		expect(onScrollEnd).not.toHaveBeenCalled();
+		t = 60;
 		rafs[rafs.length - 1]!();
 		expect(onScrollEnd).toHaveBeenCalledTimes(1);
 	});
 
-	it('a scripted scroll that fires scrollend every frame keeps one scroll session until it stops', () => {
-		// Programmatic scrollTop assignments fire scrollend as soon as each lands, while the
-		// animation is still moving: the session must not end (and restart) on every frame.
-		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
+	it('a stream of discrete scrolls that each fire scrollend keeps one scroll session until it stops', () => {
+		// Instant wheel ticks and scripted scrollTop assignments each fire scrollend while the scroll
+		// is still going: the session must not end (and restart) between steps.
+		let t = 0;
+		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => t });
 		rs.transitionTo('scroll-pending');
-		for (let frame = 0; frame < 5; frame++) {
+		for (let step = 0; step < 5; step++) {
 			coordinator.requestScrollFrame();
-			coordinator.notifyScrollEnd();
 			rafs[rafs.length - 1]!();
+			coordinator.notifyScrollEnd();
+			t += 16;
+			rafs[rafs.length - 1]!(); // a quiet frame between steps
+			t += 16;
 			expect(onScrollEnd).not.toHaveBeenCalled();
 			expect(rs.isScrolling()).toBe(true);
 		}
-		rafs[rafs.length - 1]!(); // the animation stopped: the next quiet frame confirms the end
+		t += 50; // the stream stopped
+		rafs[rafs.length - 1]!();
 		expect(onScrollEnd).toHaveBeenCalledTimes(1);
 	});
 

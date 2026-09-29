@@ -38,11 +38,17 @@ work of vertical scrolling by about a third. See [Migration Notes](/docs/next/mi
 When `runtimeLimits` bound the rendering window, rows at the bottom and columns on the right of the viewport could
 be left blank. The limit now trims overscan and keeps everything in view.
 
-### Fixed — scripted scrolling kept restarting the scroll session
+### Fixed — scrolling in steps kept restarting the scroll session
 
-A programmatic `scrollTop` assignment fires `scrollend` as soon as it lands, so a scroll animation ended and
-restarted the grid's scroll session on every frame: scroll-end work re-ran each frame and `overscanAdaptive` never
-took effect. The session now ends only when a frame passes with no new movement.
+Each discrete scroll — an instant wheel tick, a scripted `scrollTop` assignment — fires its own `scrollend`, and the
+grid ended its scroll session on each one: the scroll-end work re-ran between steps, every row was restyled twice
+per step, and `overscanAdaptive` never took effect. The session now ends once 50 ms pass without movement after the
+browser reports the end.
+
+### Fixed — header indicators restyled on every horizontal scroll frame
+
+The sort indicator's inline style was rewritten (to the same value) for every visible header cell on every frame of
+a horizontal scroll. Header indicators are now written only when they change.
 
 ### Fixed — `runtimeLimitsClamped` render counter
 

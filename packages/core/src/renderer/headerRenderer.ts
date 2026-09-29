@@ -8,6 +8,11 @@ import { reportRendererFault } from './rendererFaults.js';
 import { compileStyleRules, evaluateHeaderCellStyleRules } from '../styling/styleRules.js';
 import { GridMetric } from '../diagnostics/GridInstrumentation.js';
 
+/** Writes an inline display value only when it differs, so an unchanged header re-sync restyles nothing. */
+function setDisplay(el: HTMLElement | SVGElement, display: string): void {
+	if (el.style.display !== display) el.style.display = display;
+}
+
 export class HeaderRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
 	private readonly columnInteractionsGetter: () => ColumnInteractionController<TRowData>;
@@ -212,29 +217,9 @@ export class HeaderRenderer<TRowData = unknown> {
 				if (cell.isLeaf) {
 					const col = this.engine.columns.getCompiledPlan().displayedColumns[cell.colStart];
 					const menuBtnEl = headerCell.querySelector<HTMLDivElement>('.og-header-menu-button');
-					if (menuBtnEl) {
-						if (cell.checkboxSelection || (col && col.suppressHeaderMenu === true)) {
-							menuBtnEl.style.display = 'none';
-						} else {
-							menuBtnEl.style.display = '';
-						}
-					}
+					if (menuBtnEl) setDisplay(menuBtnEl, cell.checkboxSelection || (col && col.suppressHeaderMenu === true) ? 'none' : '');
 					const resizeEl = headerCell.querySelector<HTMLDivElement>('.og-header-resize-handle');
-					if (resizeEl) {
-						if (cell.checkboxSelection) {
-							resizeEl.style.display = 'none';
-						} else {
-							resizeEl.style.display = '';
-						}
-					}
-					const sortEl = headerCell.querySelector<HTMLDivElement>('.og-header-sort-indicator');
-					if (sortEl) {
-						if (cell.checkboxSelection) {
-							sortEl.style.display = 'none';
-						} else {
-							sortEl.style.display = '';
-						}
-					}
+					if (resizeEl) setDisplay(resizeEl, cell.checkboxSelection ? 'none' : '');
 				}
 
 				if (cell.checkboxSelection) {
@@ -274,24 +259,22 @@ export class HeaderRenderer<TRowData = unknown> {
 				}
 
 				const currentSort = state.sortModel?.find((s) => s.colId === cell.field);
+				// Each indicator's display is decided once and written only when it changes: this runs for
+				// every visible header cell on every horizontal scroll frame, and an inline-style write
+				// (even one that restores the same value) makes the browser restyle the element.
 				const sortIndicator = headerCell.querySelector('.og-header-sort-indicator') as HTMLDivElement | null;
 				if (sortIndicator) {
+					setDisplay(sortIndicator, currentSort && !cell.checkboxSelection ? 'flex' : 'none');
 					if (currentSort) {
-						sortIndicator.style.display = 'flex';
 						const isAsc = currentSort.sort === 'asc';
 						const svgAsc = sortIndicator.querySelector('.og-sort-svg-asc') as SVGElement | null;
 						const svgDesc = sortIndicator.querySelector('.og-sort-svg-desc') as SVGElement | null;
-						if (svgAsc) svgAsc.style.display = isAsc ? 'block' : 'none';
-						if (svgDesc) svgDesc.style.display = isAsc ? 'none' : 'block';
-					} else {
-						sortIndicator.style.display = 'none';
+						if (svgAsc) setDisplay(svgAsc, isAsc ? 'block' : 'none');
+						if (svgDesc) setDisplay(svgDesc, isAsc ? 'none' : 'block');
 					}
 				}
 				const filterIndicator = headerCell.querySelector('.og-header-filter-indicator') as HTMLDivElement | null;
-				if (filterIndicator) {
-					const isFiltered = !!(state.filterModel && state.filterModel[cell.field]);
-					filterIndicator.style.display = isFiltered ? 'flex' : 'none';
-				}
+				if (filterIndicator) setDisplay(filterIndicator, state.filterModel && state.filterModel[cell.field] ? 'flex' : 'none');
 				// ARIA sort state (none unless this column is sorted, and only for sortable columns).
 				const nextSort = currentSort ? (currentSort.sort === 'asc' ? 'ascending' : 'descending') : cell.sortable === false ? null : 'none';
 				if (nextSort === null) headerCell.removeAttribute('aria-sort');
