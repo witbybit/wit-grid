@@ -197,6 +197,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 			instance.cellKey !== params.cellKey;
 
 		this.unregisterActive(instance);
+		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.value = params.value;
@@ -208,8 +209,12 @@ export class DomCellRendererManager<TRowData = unknown> {
 		instance.isFocused = params.isFocused;
 		instance.isSelected = params.isSelected;
 		instance.lastAccessTime = ++this.lruCounter;
-		instance.container.dataset.rendererKey = params.rendererKey;
-		instance.container.dataset.cellKey = params.cellKey;
+		// Attribute writes are DOM mutations (and style-invalidation checks) even with an unchanged
+		// value; a rebind of the same renderer to the same cell must not repeat them.
+		if (keysChanged) {
+			instance.container.dataset.rendererKey = params.rendererKey;
+			instance.container.dataset.cellKey = params.cellKey;
+		}
 
 		if (instance.container.parentElement !== params.parentContainer) {
 			params.parentContainer.appendChild(instance.container);

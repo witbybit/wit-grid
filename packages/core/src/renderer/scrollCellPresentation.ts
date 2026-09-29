@@ -325,13 +325,22 @@ export function resolveScrollCellPresentation<TRowData>(
 		const canReuseSnapshotContent = !!primitiveSnapshot;
 		const canReuseSnapshotPortal =
 			snapshot?.contentMode === 'portal' && hasAuthoritativePortalHostContent(deps, cellSlot, cellSlot.lastPortalKey);
+		// A plain primitive column's text is a direct field read: fill the buffered cell with it rather
+		// than clearing it, so the row enters the viewport already correct. Clearing meant a second
+		// write, a text-node replacement and a content-mode flip (a style recalc) per cell on entry.
+		const directText =
+			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive' && compiledPlan?.mode === 'primitive'
+				? readPrimitiveDisplayText(deps, node, col.field)
+				: undefined;
 		const preservedContentMode: CellContentMode = canReuseSnapshotPortal
 			? 'portal'
 			: canReuseSnapshotContent
 				? primitiveSnapshot.contentMode
-				: rendererKind === 'loading'
-					? 'loading'
-					: 'empty';
+				: directText
+					? 'text'
+					: rendererKind === 'loading'
+						? 'loading'
+						: 'empty';
 		return {
 			kind: 'buffered',
 			className: cellClassName,
@@ -339,7 +348,7 @@ export function resolveScrollCellPresentation<TRowData>(
 			formattedValue:
 				canReuseSnapshotContent && (preservedContentMode === 'text' || preservedContentMode === 'fallback')
 					? primitiveSnapshot.formattedValue
-					: '',
+					: (directText ?? ''),
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,

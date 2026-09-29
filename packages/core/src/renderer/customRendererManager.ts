@@ -431,6 +431,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			instance.portalHostId !== params.portalHostId;
 
 		this.unregisterActive(instance);
+		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.rowSlotId = params.rowSlotId;
@@ -448,8 +449,11 @@ export class CustomRendererManager<TRowData = unknown> {
 		instance.isFocused = params.isFocused;
 		instance.isSelected = params.isSelected;
 		instance.lastAccessTime = Date.now();
-		instance.container.dataset.rendererKey = params.rendererKey;
-		instance.container.dataset.cellKey = params.cellKey;
+		// Attribute writes are DOM mutations even with an unchanged value; skip them on a same-key rebind.
+		if (keysChanged) {
+			instance.container.dataset.rendererKey = params.rendererKey;
+			instance.container.dataset.cellKey = params.cellKey;
+		}
 
 		if (instance.container.parentElement !== params.parentContainer) {
 			params.parentContainer.appendChild(instance.container);

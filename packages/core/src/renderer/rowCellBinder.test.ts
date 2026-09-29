@@ -904,8 +904,10 @@ describe('bindCellDuringScroll', () => {
 		});
 
 		expect(snapshotSet).not.toHaveBeenCalled();
-		expect(cellSlot.lastContentMode).toBe('empty');
-		expect(cellSlot.lastFormattedValue).toBe('');
+		// The text comes from the row itself (a plain primitive field read), not from the warm DOM,
+		// so the buffered cell is already correct when it scrolls into view.
+		expect(cellSlot.lastContentMode).toBe('text');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 		expect(cellSlot.element.title).toBe('');
 		expect(cellSlot.element.dataset.validationError).toBeUndefined();
 	});
