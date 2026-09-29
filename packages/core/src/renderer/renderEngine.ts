@@ -180,6 +180,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				}
 			},
 			onScrollEnd: () => {
+				this.scrollEngine.settleVelocity();
 				this.scrollPipeline.finishScrolling();
 				// Rows bound by scroll frames were never measured (no reads mid-scroll): measure
 				// the newly bound ones once, now that the runtime is idle.

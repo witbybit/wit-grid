@@ -242,23 +242,42 @@ describe('scroll-end detection', () => {
 		expect(rs.phase).toBe('idle');
 	});
 
-	it('native scrollend ends the scroll immediately, without waiting for quiet frames', () => {
+	it('native scrollend ends the scroll on the next frame, without waiting for quiet time', () => {
 		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
 		rs.transitionTo('scroll-pending');
 		coordinator.requestScrollFrame();
 		rafs[0]!();
 		coordinator.notifyScrollEnd();
+		expect(onScrollEnd).not.toHaveBeenCalled();
+		rafs[rafs.length - 1]!();
 		expect(onScrollEnd).toHaveBeenCalledTimes(1);
 		expect(rs.phase).toBe('idle');
 	});
 
-	it('native scrollend that arrives before the final scroll frame ends the scroll right after it', () => {
+	it('native scrollend that arrives before the final scroll frame ends the scroll on the frame after it', () => {
 		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
 		rs.transitionTo('scroll-pending');
 		coordinator.requestScrollFrame();
 		coordinator.notifyScrollEnd();
-		expect(onScrollEnd).not.toHaveBeenCalled();
 		rafs[0]!();
+		expect(onScrollEnd).not.toHaveBeenCalled();
+		rafs[rafs.length - 1]!();
+		expect(onScrollEnd).toHaveBeenCalledTimes(1);
+	});
+
+	it('a scripted scroll that fires scrollend every frame keeps one scroll session until it stops', () => {
+		// Programmatic scrollTop assignments fire scrollend as soon as each lands, while the
+		// animation is still moving: the session must not end (and restart) on every frame.
+		const { rs, onScrollEnd, rafs, coordinator } = makeFrameCoordinator({ scrollEndQuietMs: 100, now: () => 0 });
+		rs.transitionTo('scroll-pending');
+		for (let frame = 0; frame < 5; frame++) {
+			coordinator.requestScrollFrame();
+			coordinator.notifyScrollEnd();
+			rafs[rafs.length - 1]!();
+			expect(onScrollEnd).not.toHaveBeenCalled();
+			expect(rs.isScrolling()).toBe(true);
+		}
+		rafs[rafs.length - 1]!(); // the animation stopped: the next quiet frame confirms the end
 		expect(onScrollEnd).toHaveBeenCalledTimes(1);
 	});
 

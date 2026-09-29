@@ -11,13 +11,42 @@ icon: Clock
 
 ## `next` (unreleased)
 
-No changelog entries yet for the upcoming release. When a change ships, add an entry here in this shape:
+### Added — `applyTransactionAsync`
 
-```md
-### Added / Changed / Fixed — short summary
+Queues row transactions and applies them together before the next frame, in call order. See
+[Row Transactions](/docs/next/transactions).
 
-One or two sentences on what changed and why it matters to someone upgrading.
-```
+### Added — DOM cell renderers receive the grid `api`
+
+`mount()` and `update()` get `api`, the same object React cell renderers receive, so DOM cells can select cells
+and write values.
+
+### Changed — built-in `number`, `date` and `checkbox` cells render without React
+
+The built-in column types use DOM renderers with the same markup and styles. The React components are still
+exported.
+
+### Changed — text cells are lighter, and long values end in an ellipsis
+
+Cell text is laid out as a block, so `text-overflow: ellipsis` now applies (long values were cut off without one).
+Cells of columns without a custom renderer hold their text directly, one element per cell, which cuts the layout
+work of vertical scrolling by about a third. See [Migration Notes](/docs/next/migration-notes) if your CSS targets
+`.og-cell-content`.
+
+### Fixed — rendering limits no longer hide visible rows or columns
+
+When `runtimeLimits` bound the rendering window, rows at the bottom and columns on the right of the viewport could
+be left blank. The limit now trims overscan and keeps everything in view.
+
+### Fixed — scripted scrolling kept restarting the scroll session
+
+A programmatic `scrollTop` assignment fires `scrollend` as soon as it lands, so a scroll animation ended and
+restarted the grid's scroll session on every frame: scroll-end work re-ran each frame and `overscanAdaptive` never
+took effect. The session now ends only when a frame passes with no new movement.
+
+### Fixed — `runtimeLimitsClamped` render counter
+
+It was counted but always reported as 0.
 
 ## Cutting a release
 

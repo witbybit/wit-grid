@@ -197,6 +197,46 @@ because it's about total frame budget across every visible cell:
 	exists to make explicit: more fidelity per frame costs more per frame.
 </Callout>
 
+## The rendering window
+
+The grid renders the rows and columns in view plus a margin around them (overscan), so a scroll step lands on
+cells that are already drawn. Four `<Grid>` props size that margin:
+
+| Prop               | Default | Effect                                                                                                     |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `rowOverscanPx`    | `400`   | Pixels of rows rendered above and below the viewport.                                                      |
+| `colBuffer`        | `2`     | Columns rendered left and right of the viewport.                                                           |
+| `overscanAdaptive` | `false` | Grows the margin on the side the grid is scrolling toward, in proportion to scroll speed.                  |
+| `runtimeLimits`    | —       | Hard caps on rendered rows and cells (`maxRenderedRows`, default 500; `maxRenderedCells`, default 20,000). |
+
+```tsx
+import { Grid } from '@eregister/wit-grid-react';
+
+type Row = { id: string; value: number };
+
+export function FastScrollingGrid({ rows }: { rows: Row[] }) {
+	return (
+		<Grid
+			rows={rows}
+			columns={[{ field: 'value', header: 'Value' }]}
+			getRowId={(row) => row.id}
+			rowOverscanPx={200}
+			overscanAdaptive
+			runtimeLimits={{ maxRenderedRows: 60, maxRenderedCells: 2_000 }}
+		/>
+	);
+}
+```
+
+Scroll from user input is drawn in the same frame it happens. A scroll set from script — `scrollTop` assigned inside
+`requestAnimationFrame`, a scroll animation, an auto-scroll — is drawn one frame later, so each step must land inside
+the margin. If a scripted scroll moves further per frame than `rowOverscanPx`, turn on `overscanAdaptive`, which
+extends the leading edge while the grid is moving and shrinks it again once it stops. It is off by default because it
+renders more rows and cells during fast scrolls.
+
+When `runtimeLimits` bind, the overscan gives way first: rows and columns in view are always kept, and only the
+margin shrinks.
+
 ## Choosing a mode
 
 - Nothing custom on the cell → don't set `scrollPresentation` at all (`primitive`).

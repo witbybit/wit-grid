@@ -113,6 +113,73 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		expect(getRowIndices(limited)).toEqual([0, 1, 2, 3, 18, 19]);
 	});
 
+	it('never drops visible rows to meet the row budget: overscan gives way first', () => {
+		// Scrolling down: 8 overscan rows above the visible 20..34, 2 below. Budget 20.
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowCount: 100,
+				rowStart: 12,
+				rowEnd: 36,
+				visibleRowStart: 20,
+				visibleRowEnd: 34,
+			},
+			{ maxRenderedRows: 20 }
+		);
+		expect(limited.rowStart).toBeLessThanOrEqual(20);
+		expect(limited.rowEnd).toBeGreaterThanOrEqual(34);
+		expect(limited.rowEnd - limited.rowStart + 1).toBe(20);
+		// 5 spare rows: 2 below (all there is), the other 3 above.
+		expect([limited.rowStart, limited.rowEnd]).toEqual([17, 36]);
+	});
+
+	it('never drops visible columns to meet the cell budget', () => {
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowStart: 0,
+				rowEnd: 1,
+				colCount: 60,
+				colStart: 5,
+				colEnd: 40,
+				visibleColStart: 20,
+				visibleColEnd: 30,
+			},
+			{ maxRenderedCells: 30 }
+		);
+		expect(limited.colStart).toBeLessThanOrEqual(20);
+		expect(limited.colEnd).toBeGreaterThanOrEqual(30);
+		expect(limited.colEnd - limited.colStart + 1).toBe(15);
+		expect([limited.colStart, limited.colEnd]).toEqual([18, 32]);
+	});
+
+	it('keeps the start when the visible range alone exceeds the budget', () => {
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowCount: 100,
+				rowStart: 10,
+				rowEnd: 60,
+				visibleRowStart: 15,
+				visibleRowEnd: 55,
+			},
+			{ maxRenderedRows: 10 }
+		);
+		expect([limited.rowStart, limited.rowEnd]).toEqual([15, 24]);
+	});
+
 	it('clamps max rendered cells by reducing center columns only', () => {
 		const limited = applyRenderWindowRuntimeLimits(
 			{

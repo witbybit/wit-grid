@@ -137,18 +137,18 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 	}
 
 	/**
-	 * Native `scrollend`: the browser has settled the gesture, so end the scroll now instead of
-	 * waiting out the quiet-frame fallback. If the final scroll frame is still owed (or a frame is
-	 * running), scroll-end runs right after that frame instead.
+	 * Native `scrollend`: the browser reports that a scroll finished, so the quiet-time fallback
+	 * need not be waited out. It is confirmed on the next frame that brings no new movement rather
+	 * than acted on at once: a programmatic `scrollTop` assignment fires `scrollend` as soon as it
+	 * lands, so a scripted scroll animation (or auto-scroll) produces one per frame while it is still
+	 * moving. Ending the session on each one reset velocity (so adaptive overscan never built up and
+	 * the leading edge went blank) and re-ran the whole scroll-end path every frame. New movement
+	 * (requestScrollFrame) cancels the request; a real gesture ends at most one frame later.
 	 */
 	notifyScrollEnd(): void {
 		if (this.destroyed || !this.runtimeState?.isScrolling()) return;
-		if (this.pendingScroll || this.inFrame) {
-			this.scrollEndRequested = true;
-			this.scheduleFrame();
-			return;
-		}
-		this.endScroll();
+		this.scrollEndRequested = true;
+		this.scheduleFrame();
 	}
 
 	private endScroll(): void {
@@ -233,9 +233,6 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 					if (rs && !rs.isDestroyed()) {
 						rs.transitionTo('post-scroll');
 					}
-				}
-				if (this.scrollEndRequested && rs && !rs.isDestroyed() && rs.isScrolling()) {
-					this.endScroll();
 				}
 			} else if (this.runtimeState?.isScrolling()) {
 				// No new scroll frame arrived — count quiet frames for scroll-end detection.

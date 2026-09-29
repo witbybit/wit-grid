@@ -17,15 +17,28 @@ edited afterward. For a plain list of what shipped in each release (not just bre
 
 ## `next` (unreleased)
 
-Tracks work that will ship in the release after [1.4](/docs/1.4). No breaking changes are queued yet. When one
-lands, add an entry here in this shape:
+Tracks work that will ship in the release after [1.4](/docs/1.4).
 
-```md
-### `<old-api>` renamed to `<new-api>`
+### Text-only cells no longer contain `.og-cell-content`
 
-**Why:** short reason for the change.
-**Before:** \`\`\`tsx ... \`\`\`
-**After:** \`\`\`tsx ... \`\`\`
+**Why:** a cell of a column with no custom renderer only ever shows text, so its content wrapper was one more
+element to style and lay out per cell. Such cells now hold their text directly and carry a `data-text-cell`
+attribute. Cells of columns with a custom renderer, and the row-selection checkbox column, keep the wrapper.
+
+**Before:**
+
+```css
+.my-grid .og-cell-content {
+	font-variant-numeric: tabular-nums;
+}
+```
+
+**After:** style the cell itself; it applies to both kinds of cell.
+
+```css
+.my-grid .og-cell {
+	font-variant-numeric: tabular-nums;
+}
 ```
 
 ## Cutting a release

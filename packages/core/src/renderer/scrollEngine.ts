@@ -139,9 +139,20 @@ export class ScrollEngine<TRowData = unknown> {
 	 * quiet-frame fallback. Signal scroll-end explicitly after the settle bookkeeping.
 	 */
 	private handleNativeScrollEnd = (): void => {
-		this.handleScrollEnd();
+		// Sync the final position, then let the frame coordinator confirm the end. Velocity is reset
+		// only once it does (settleVelocity): a programmatic scroll fires scrollend while still moving.
+		if (this.onScrollCallback && this.scrollContainer) {
+			this.onScrollCallback(this.scrollContainer.scrollTop, this.scrollContainer.scrollLeft);
+		}
 		this.onScrollEndCallback?.();
 	};
+
+	/** The scroll session has ended: velocity, and the adaptive overscan it drives, return to rest. */
+	public settleVelocity(): void {
+		this.velocityY = 0;
+		this.velocityX = 0;
+		this.engine.viewport.resetVelocity();
+	}
 
 	/**
 	 * Retrieve calculated real-time scroll velocity.

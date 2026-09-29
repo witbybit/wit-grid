@@ -213,6 +213,29 @@ export function getColIndices(w: RenderWindow): number[] {
 	return indices;
 }
 
+/**
+ * Trims [start, end] to `budget` items without dropping visible ones while the budget covers them:
+ * overscan is what gives way, split evenly between the two sides, and a side that needs less
+ * hands its share to the other. Trimming from the end instead dropped visible rows at the bottom
+ * (and visible columns on the right) whenever a scroll brought overscan onto the leading side.
+ * Without a visible range (or when the visible range alone exceeds the budget) it keeps `start`.
+ */
+function clampRangeAroundVisible(start: number, end: number, visibleStart: number, visibleEnd: number, budget: number): [number, number] {
+	if (end - start + 1 <= budget) return [start, end];
+	const vs = Math.max(start, visibleStart);
+	const ve = Math.min(end, visibleEnd);
+	if (visibleStart < 0 || visibleEnd < visibleStart || ve < vs) return [start, start + budget - 1];
+	const visibleCount = ve - vs + 1;
+	if (visibleCount >= budget) return [vs, vs + budget - 1];
+	const leftover = budget - visibleCount;
+	const above = vs - start;
+	const below = end - ve;
+	let takeAbove = Math.min(above, Math.floor(leftover / 2));
+	const takeBelow = Math.min(below, leftover - takeAbove);
+	takeAbove = Math.min(above, leftover - takeBelow);
+	return [vs - takeAbove, ve + takeBelow];
+}
+
 export function applyRenderWindowRuntimeLimits(window: RenderWindow, limits?: RenderWindowRuntimeLimits, onClamp?: () => void): RenderWindow {
 	if (limits?.suppressRenderedRangeLimit) return window;
 
@@ -247,9 +270,16 @@ export function applyRenderWindowRuntimeLimits(window: RenderWindow, limits?: Re
 		if (maxRenderedRows > 0) {
 			const pinnedRows = pinTopRows + pinBottomRows;
 			const centerBudget = Math.max(1, maxRenderedRows - pinnedRows);
-			const expectedRowEnd = Math.max(next.rowStart, Math.min(next.rowEnd, next.rowStart + centerBudget - 1));
-			if (expectedRowEnd < next.rowEnd) {
-				next.rowEnd = expectedRowEnd;
+			const [rowStart, rowEnd] = clampRangeAroundVisible(
+				next.rowStart,
+				next.rowEnd,
+				next.visibleRowStart ?? -1,
+				next.visibleRowEnd ?? -1,
+				centerBudget
+			);
+			if (rowStart !== next.rowStart || rowEnd !== next.rowEnd) {
+				next.rowStart = rowStart;
+				next.rowEnd = rowEnd;
 				clamped = true;
 			}
 		}
@@ -272,9 +302,16 @@ export function applyRenderWindowRuntimeLimits(window: RenderWindow, limits?: Re
 			const pinnedCols = pinLeftCols + pinRightCols;
 			const totalColsBudget = Math.max(1, Math.floor(maxRenderedCells / renderedRows));
 			const centerBudget = Math.max(1, totalColsBudget - pinnedCols);
-			const expectedColEnd = Math.max(next.colStart, Math.min(next.colEnd, next.colStart + centerBudget - 1));
-			if (expectedColEnd < next.colEnd) {
-				next.colEnd = expectedColEnd;
+			const [colStart, colEnd] = clampRangeAroundVisible(
+				next.colStart,
+				next.colEnd,
+				next.visibleColStart ?? -1,
+				next.visibleColEnd ?? -1,
+				centerBudget
+			);
+			if (colStart !== next.colStart || colEnd !== next.colEnd) {
+				next.colStart = colStart;
+				next.colEnd = colEnd;
 				clamped = true;
 			}
 		}
