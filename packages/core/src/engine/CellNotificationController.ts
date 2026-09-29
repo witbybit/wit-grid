@@ -15,6 +15,8 @@ export interface CellNotificationControllerDeps<TRowData = unknown> {
 	faultReporter?: RuntimeFaultReporter<TRowData>;
 }
 
+let rowVersionClock = 0;
+
 export class CellNotificationController<TRowData = unknown> {
 	private readonly cellSubscriptions = new Map<string, Set<CellSubscription>>();
 	private readonly colSubscriptions = new Map<string, Set<CellSubscription>>();
@@ -163,9 +165,18 @@ export class CellNotificationController<TRowData = unknown> {
 		this.deps.requestRender('bulk-cell-change');
 	}
 
+	/**
+	 * Row versions come from one monotonic counter rather than per-row increments, so a row id
+	 * whose entry was swept on removal and later re-added can never reproduce a version a
+	 * recycled slot or display snapshot still remembers.
+	 */
+	private bumpRowVersion(rowId: string): void {
+		this.deps.rowVersions.set(rowId, ++rowVersionClock);
+	}
+
 	public publishCommittedCellChanges(changes: Map<string, Set<string>>): void {
 		for (const rowId of changes.keys()) {
-			this.deps.rowVersions.set(rowId, (this.deps.rowVersions.get(rowId) ?? 0) + 1);
+			this.bumpRowVersion(rowId);
 			this.notifyRowSubscribers(rowId);
 		}
 
@@ -180,7 +191,7 @@ export class CellNotificationController<TRowData = unknown> {
 	public notifyCellChange(rowId: string, colField: string, includeRenderInvalidation = true, renderColId?: string): void {
 		// Projection-only cell invalidations (focus/edit overlays) do not mutate the row.
 		if (includeRenderInvalidation) {
-			this.deps.rowVersions.set(rowId, (this.deps.rowVersions.get(rowId) ?? 0) + 1);
+			this.bumpRowVersion(rowId);
 			this.notifyRowSubscribers(rowId);
 		}
 		this.deps.data.clearValueGetterCache(rowId, colField);
