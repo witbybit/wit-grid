@@ -6,13 +6,55 @@ import {
 	VisualRow,
 	type ActiveEditState,
 	type CellRendererPhase,
+	type CellRendererProps,
 	type ImperativeCellHandle,
 	isDomCellRenderer,
 } from '@eregister/wit-grid-core';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { useGridApi } from './hooks.js';
 import { GridAdapterContext } from './gridContext.js';
-import type { PortalCellProps, PortalData, PortalStore } from './gridPortalTypes.js';
+import type { PortalCellProps, PortalData, PortalRowNodeLike, PortalStore } from './gridPortalTypes.js';
+
+// Static inline styles hoisted to module scope so cell renders don't allocate a fresh object each time.
+const FILL_STYLE = { width: '100%', height: '100%' } as const;
+const CELL_FLEX_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center' } as const;
+const CELL_FLEX_RELATIVE_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' } as const;
+const LOADING_CELL_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' } as const;
+const LOADING_SKELETON_STYLE = { height: '16px', width: '80%', borderRadius: '4px' } as const;
+const VALIDATION_ERROR_STYLE = {
+	position: 'absolute',
+	top: '100%',
+	left: 0,
+	right: 0,
+	zIndex: 10,
+	background: 'var(--og-validation-error-bg, #fff0f0)',
+	color: 'var(--og-validation-error-color, #c00)',
+	fontSize: '11px',
+	padding: '2px 6px',
+	border: '1px solid var(--og-validation-error-border, #f5a5a5)',
+	borderTop: 'none',
+	borderRadius: '0 0 4px 4px',
+	whiteSpace: 'nowrap',
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+} as const;
+
+/** Column ids passed to renderers: the user/API `colId` (falling back to `field`) and the instance id. */
+function getRendererColumnIds<TRowData>(col: ColumnDef<TRowData>): { colId: string; columnInstanceId: CellRendererProps['columnInstanceId'] } {
+	return {
+		colId: col.colId ?? col.field,
+		columnInstanceId: 'instanceId' in col ? (col.instanceId as CellRendererProps['columnInstanceId']) : undefined,
+	};
+}
+
+/**
+ * The `formattedValue` renderer prop: the column's `valueFormatter` output, otherwise the value as a
+ * string (`''` for null/undefined), matching the text the grid's default cell renderer shows.
+ */
+function formatCellValue<TRowData>(col: ColumnDef<TRowData>, value: unknown, node: PortalRowNodeLike<TRowData>): string {
+	if (col.valueFormatter) return col.valueFormatter({ value, rowData: node.data, colDef: col, rowId: node.id });
+	return value == null ? '' : String(value);
+}
 
 // ─── ActiveCellEditor ────────────────────────────────────────────────────────
 // Mounted ONLY when a cell is actively being edited. Keeping the activeEdit
@@ -94,7 +136,7 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 		<>
 			{CustomEditor ? (
 				<div
-					style={{ width: '100%', height: '100%' }}
+					style={FILL_STYLE}
 					onMouseDown={(e) => e.stopPropagation()}
 					onDoubleClick={(e) => e.stopPropagation()}
 					onKeyDown={(e) => {
@@ -149,27 +191,7 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 				/>
 			)}
 			{validationError && (
-				<div
-					className='og-cell-validation-error'
-					style={{
-						position: 'absolute',
-						top: '100%',
-						left: 0,
-						right: 0,
-						zIndex: 10,
-						background: 'var(--og-validation-error-bg, #fff0f0)',
-						color: 'var(--og-validation-error-color, #c00)',
-						fontSize: '11px',
-						padding: '2px 6px',
-						border: '1px solid var(--og-validation-error-border, #f5a5a5)',
-						borderTop: 'none',
-						borderRadius: '0 0 4px 4px',
-						whiteSpace: 'nowrap',
-						overflow: 'hidden',
-						textOverflow: 'ellipsis',
-					}}
-					role='alert'
-				>
+				<div className='og-cell-validation-error' style={VALIDATION_ERROR_STYLE} role='alert'>
 					{validationError}
 				</div>
 			)}
@@ -198,8 +220,8 @@ function PortalCellInner<TRowData = unknown>({
 
 	if (isLoading) {
 		return (
-			<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-				<div className='og-cell-loading-skeleton' style={{ height: '16px', width: '80%', borderRadius: '4px' }} />
+			<div style={LOADING_CELL_STYLE}>
+				<div className='og-cell-loading-skeleton' style={LOADING_SKELETON_STYLE} />
 			</div>
 		);
 	}
@@ -212,11 +234,10 @@ function PortalCellInner<TRowData = unknown>({
 		iCol?.cellRenderer && !isDomCellRenderer(iCol.cellRenderer)
 			? (iCol.cellRenderer as unknown as ComponentType<Record<string, unknown>>)
 			: undefined;
-	const colId = col.colId ?? col.field;
-	const columnInstanceId = 'instanceId' in col ? (col.instanceId as string | undefined) : undefined;
+	const { colId, columnInstanceId } = getRendererColumnIds(col);
 
 	return (
-		<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' }}>
+		<div style={CELL_FLEX_RELATIVE_STYLE}>
 			{isEditing ? (
 				<ActiveCellEditor<TRowData>
 					rowId={rowId}
@@ -231,6 +252,7 @@ function PortalCellInner<TRowData = unknown>({
 				createElement(CustomRenderer, {
 					value,
 					computedValue: value,
+					formattedValue: formatCellValue(col, value, node),
 					row: rowData,
 					rowId,
 					colField,
@@ -513,13 +535,16 @@ function ImperativePortalCellWrapperInner<TRowData = unknown>({ cellKey, store }
 		store.registerImperativeUpdater(cellKey, (value, node, col, isEditing, _isLoading, phase, isScrolling, isFocused, isSelected) => {
 			const handle = imperativeRef.current;
 			if (!handle) return false;
+			const { colId, columnInstanceId } = getRendererColumnIds(col);
 			handle.update({
 				value,
 				computedValue: value,
+				formattedValue: formatCellValue(col, value, node),
 				row: node.data as TRowData,
 				rowId: node.id,
 				colField: col.field,
-				colId: col.field,
+				colId,
+				columnInstanceId,
 				isScrolling: isScrolling ?? false,
 				phase: phase ?? 'initial',
 				isFocused: isFocused ?? false,
@@ -544,17 +569,20 @@ function ImperativePortalCellWrapperInner<TRowData = unknown>({ cellKey, store }
 	const rowData = effectiveData.node?.data;
 
 	if (!CustomRenderer || isDomCellRenderer(iColData.cellRenderer) || !rowData) return null;
+	const { colId, columnInstanceId } = getRendererColumnIds(effectiveData.col);
 
 	return (
-		<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
+		<div style={CELL_FLEX_STYLE}>
 			<CustomRenderer
 				ref={imperativeRef as React.Ref<unknown>}
 				value={effectiveData.value}
 				computedValue={effectiveData.value}
+				formattedValue={formatCellValue(effectiveData.col, effectiveData.value, effectiveData.node)}
 				row={rowData as Record<string, unknown>}
 				rowId={effectiveData.node.id}
 				colField={effectiveData.col.field}
-				colId={effectiveData.col.field}
+				colId={colId}
+				columnInstanceId={columnInstanceId}
 				isScrolling={effectiveData.isScrolling ?? false}
 				phase={effectiveData.phase ?? 'initial'}
 				isFocused={effectiveData.isFocused ?? false}

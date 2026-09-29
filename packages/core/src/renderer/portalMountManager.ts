@@ -70,6 +70,11 @@ export interface DeferredPortalFlushOptions {
 	deadline?: { timeRemaining(): number; readonly didTimeout: boolean };
 }
 
+/** Flush budget check — module-level so flushDeferred allocates no closure per call. */
+function isFlushOutOfBudget(budgetUsed: number, maxItems: number, deadline: DeferredPortalFlushOptions['deadline'], processed: number): boolean {
+	return budgetUsed >= maxItems || (deadline !== undefined && processed > 0 && deadline.timeRemaining() <= 0);
+}
+
 export interface DeferredPortalFlushResult {
 	processed: number;
 	remaining: number;
@@ -243,6 +248,7 @@ export class PortalMountManager<TRowData = unknown> {
 			slotGeneration: mount.slotGeneration,
 			cellRowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
 			cellInstanceId: mount.cellInstanceId,
+			portalHostId: mount.portalHostId,
 			parentContainer: mount.container,
 			value: mount.value,
 			node: mount.node,
@@ -279,6 +285,8 @@ export class PortalMountManager<TRowData = unknown> {
 					rowSlotId: activeIdentity.rowSlotId,
 					slotGeneration: activeIdentity.slotGeneration,
 					cellRowBindingGeneration: activeIdentity.cellRowBindingGeneration,
+					cellInstanceId: activeIdentity.cellInstanceId,
+					portalHostId: activeIdentity.portalHostId,
 				});
 			}
 		}
@@ -434,7 +442,6 @@ export class PortalMountManager<TRowData = unknown> {
 		// weight keeps chunk wall-time roughly constant regardless of mix.
 		const COLD_MOUNT_WEIGHT = 3;
 		let budgetUsed = 0;
-		const outOfBudget = (): boolean => budgetUsed >= maxItems || (deadline !== undefined && processed > 0 && deadline.timeRemaining() <= 0);
 
 		const flushState = this.engine?.stateManager.getState();
 		const interaction = flushState ? readInteractionState(flushState) : null;
@@ -450,26 +457,10 @@ export class PortalMountManager<TRowData = unknown> {
 		const rowCenter = (rowRange.startIdx + rowRange.endIdx) / 2;
 		const colCenter = (colRange.startIdx + colRange.endIdx) / 2;
 
-		const getPriority = (mount: GridCellContentMount<TRowData>): number => {
-			const col = mount.col;
-			const node = mount.node;
-			if (doesCanonicalCellPointerMatchColumn(activeEdit, node.id, col)) return 1000;
-			if (doesCanonicalCellPointerMatchColumn(focusedCell, node.id, col)) return 900;
-
-			const rowIndex = mount.rowIndex ?? rowModel?.getVisualIndexByRowId(node.id) ?? -1;
-			const colIndex = mount.colIndex ?? (this.engine ? this.engine.columns.getColumnIndex(col.field) : -1);
-
-			if (rowIndex === -1 || colIndex === -1) return 0;
-
-			const distRow = Math.abs(rowIndex - rowCenter);
-			const distCol = Math.abs(colIndex - colCenter);
-			return 500 - (distRow + distCol);
-		};
-
 		// Iterate Maps directly — deleting the current key during iteration is safe and
 		// avoids an O(remaining) Array.from copy per chunk (O(N²/budget) over the drain).
 		for (const [cellKey, unmount] of this.deferredCellReleases) {
-			if (outOfBudget()) break;
+			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
 			const activeIdentity = this.activeIdentityByKey.get(cellKey);
 			if (activeIdentity !== undefined && !this.isSamePhysicalIdentity(activeIdentity, unmount)) {
 				this.deferredCellReleases.delete(cellKey);
@@ -490,14 +481,14 @@ export class PortalMountManager<TRowData = unknown> {
 		const mb2 = this._mountBuckets[2];
 		mb2.length = 0;
 		for (const mount of this.deferredCellMounts.values()) {
-			const p = getPriority(mount);
+			const p = this.getDeferredMountPriority(mount, activeEdit, focusedCell, rowModel, rowCenter, colCenter);
 			if (p >= 1000) mb0.push(mount);
 			else if (p >= 900) mb1.push(mount);
 			else mb2.push(mount);
 		}
-		for (let bi = 0; bi < 3 && !outOfBudget(); bi++) {
+		for (let bi = 0; bi < 3 && !isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed); bi++) {
 			const bucket = this._mountBuckets[bi];
-			for (let i = 0; i < bucket.length && !outOfBudget(); i++) {
+			for (let i = 0; i < bucket.length && !isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed); i++) {
 				const mount = bucket[i];
 				const isColdMount = this.deferredNewCellMounts.has(mount.cellKey);
 				const activeIdentity = this.activeIdentityByKey.get(mount.cellKey);
@@ -516,14 +507,14 @@ export class PortalMountManager<TRowData = unknown> {
 		}
 
 		for (const [rowKey, unmount] of this.deferredRowReleases) {
-			if (outOfBudget()) break;
+			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
 			this.onUnmountRowContent?.(unmount);
 			this.deferredRowReleases.delete(rowKey);
 			processed++;
 			budgetUsed++;
 		}
 		for (const [rowKey, mount] of this.deferredRowMounts) {
-			if (outOfBudget()) break;
+			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
 			this.onMountRowContent?.(mount);
 			this.deferredRowMounts.delete(rowKey);
 			processed++;
@@ -536,7 +527,7 @@ export class PortalMountManager<TRowData = unknown> {
 			this.stats.maxOpsFlushedInOneChunk = Math.max(this.stats.maxOpsFlushedInOneChunk, processed);
 		}
 		// Delegate warm DOM move budget to CustomRendererManager (it owns hydration policy).
-		if (processed > 0 || this.customRendererManager['pendingWarmMoves'].length > 0) {
+		if (processed > 0 || this.customRendererManager.getPendingWarmMoveCount() > 0) {
 			this.customRendererManager.flushWarmMoveBudget({
 				maxItems: maxItems === Number.POSITIVE_INFINITY ? 16 : Math.max(1, Math.floor(maxItems / 2)),
 			});
@@ -546,6 +537,30 @@ export class PortalMountManager<TRowData = unknown> {
 			this.onFlushCellContent?.({ flushSync: true });
 		}
 		return { processed, remaining };
+	}
+
+	/** Flush priority for a deferred mount — a method rather than a per-flush closure. */
+	private getDeferredMountPriority(
+		mount: GridCellContentMount<TRowData>,
+		activeEdit: Parameters<typeof doesCanonicalCellPointerMatchColumn>[0],
+		focusedCell: Parameters<typeof doesCanonicalCellPointerMatchColumn>[0],
+		rowModel: ReturnType<GridEngine<TRowData>['getRowModel']> | undefined,
+		rowCenter: number,
+		colCenter: number
+	): number {
+		const col = mount.col;
+		const node = mount.node;
+		if (doesCanonicalCellPointerMatchColumn(activeEdit, node.id, col)) return 1000;
+		if (doesCanonicalCellPointerMatchColumn(focusedCell, node.id, col)) return 900;
+
+		const rowIndex = mount.rowIndex ?? rowModel?.getVisualIndexByRowId(node.id) ?? -1;
+		const colIndex = mount.colIndex ?? (this.engine ? this.engine.columns.getColumnIndex(col.field) : -1);
+
+		if (rowIndex === -1 || colIndex === -1) return 0;
+
+		const distRow = Math.abs(rowIndex - rowCenter);
+		const distCol = Math.abs(colIndex - colCenter);
+		return 500 - (distRow + distCol);
 	}
 
 	public mountRow(mount: GridRowContentMount<TRowData>): void {

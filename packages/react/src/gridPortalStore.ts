@@ -214,10 +214,23 @@ export function createPortalStore<TRowData = unknown>() {
 			const fn = imperativeUpdaters.get(cellKey);
 			if (!fn) return false;
 			const existing = portals.get(cellKey);
-			if (!isSamePhysicalIdentity(existing?.physicalIdentity, physicalIdentity)) {
+			if (!isSamePhysicalIdentity(existing?.physicalIdentity, physicalIdentity) || !existing) {
 				return false;
 			}
-			return fn(value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected);
+			if (!fn(value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected)) return false;
+			// Write the payload back in place (no notification, so no React render). The wrapper holds
+			// this same object in state, so any later React render of it — and the mountCell no-op
+			// check — sees the props the renderer is actually showing instead of the mount-time ones.
+			existing.value = value;
+			existing.node = node;
+			existing.col = col;
+			existing.isEditing = isEditing;
+			existing.isLoading = isLoading;
+			existing.phase = phase;
+			existing.isScrolling = isScrolling;
+			existing.isFocused = isFocused;
+			existing.isSelected = isSelected;
+			return true;
 		},
 
 		// ── Cell mounts ──────────────────────────────────────────────────────────

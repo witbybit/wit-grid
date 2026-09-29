@@ -338,6 +338,11 @@ export type { ColumnState, GridCellRangeBounds };
 export interface CellRendererProps<TRowData = unknown, TValue = unknown> {
 	value: TValue;
 	computedValue: TValue;
+	/**
+	 * Display text for `value`: the column's `valueFormatter` output, otherwise `String(value)`
+	 * (`''` for null/undefined). Provided by the React adapter.
+	 */
+	formattedValue?: string;
 	row: TRowData;
 	rowId: string;
 	colField: string;

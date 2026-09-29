@@ -40,8 +40,8 @@ export class DomCellRendererManager<TRowData = unknown> {
 	private activeByKey = new Map<string, DomRendererInstance<TRowData>>();
 	private activeByCellKey = new Map<string, DomRendererInstance<TRowData>>();
 	private activeKeyByParent = new Map<HTMLElement, string>();
+	/** Warm cache in LRU order: Map insertion order, touched via delete+set, evicted from the front. */
 	private warmByKey = new Map<string, DomRendererInstance<TRowData>>();
-	private lruOrder = new Map<string, number>();
 	private lruCounter = 0;
 
 	private maxWarmOverride: number | null = null;
@@ -83,7 +83,6 @@ export class DomCellRendererManager<TRowData = unknown> {
 		instance = this.warmByKey.get(params.rendererKey);
 		if (instance) {
 			this.warmByKey.delete(params.rendererKey);
-			this.lruOrder.delete(params.rendererKey);
 			this.rebindInstance(instance, params);
 			return;
 		}
@@ -160,7 +159,6 @@ export class DomCellRendererManager<TRowData = unknown> {
 		this.activeKeyByParent.clear();
 		for (const instance of this.warmByKey.values()) this.destroyInstance(instance);
 		this.warmByKey.clear();
-		this.lruOrder.clear();
 		this.lruCounter = 0;
 		this.hiddenContainer?.remove();
 		this.hiddenContainer = null;
@@ -175,8 +173,9 @@ export class DomCellRendererManager<TRowData = unknown> {
 				hidden.appendChild(instance.container);
 			}
 			instance.lastAccessTime = ++this.lruCounter;
+			// delete+set moves the key to the back of the Map's insertion order (most recently used).
+			this.warmByKey.delete(instance.rendererKey);
 			this.warmByKey.set(instance.rendererKey, instance);
-			this.lruOrder.set(instance.rendererKey, this.lruCounter);
 			if (!this.engine?.isScrolling) this.pruneWarmCache();
 			return;
 		}
@@ -280,32 +279,16 @@ export class DomCellRendererManager<TRowData = unknown> {
 	}
 
 	private pruneWarmCache(): void {
-		while (this.warmByKey.size > this.maxWarm && this.lruOrder.size > 0) {
-			let oldest: string | null = null;
-			let minVal = Infinity;
-			for (const [key, val] of this.lruOrder) {
-				if (val < minVal) {
-					minVal = val;
-					oldest = key;
-				}
-			}
-			if (oldest) {
-				const inst = this.warmByKey.get(oldest);
-				this.lruOrder.delete(oldest);
-				if (inst) {
-					this.warmByKey.delete(oldest);
-					this.destroyInstance(inst);
-				}
-			} else break;
-		}
-
-		const staleThreshold = this.lruCounter - this.maxWarm * 2;
-		for (const [key, inst] of this.warmByKey) {
-			if (inst.lastAccessTime < staleThreshold) {
-				this.warmByKey.delete(key);
-				this.lruOrder.delete(key);
-				this.destroyInstance(inst);
-			}
+		// Size-based LRU eviction only — the Map's first entry is the least recently used (O(1)).
+		// Deliberately no counter-based stale threshold: lruCounter also advances on cold mounts and
+		// rebinds, so a threshold of lruCounter - maxWarm*2 destroyed legitimately warm entries
+		// (same bug CustomRendererManager.pruneWarmCache documents and removed).
+		while (this.warmByKey.size > this.maxWarm) {
+			const oldest = this.warmByKey.entries().next();
+			if (oldest.done) break;
+			const [oldestKey, inst] = oldest.value;
+			this.warmByKey.delete(oldestKey);
+			this.destroyInstance(inst);
 		}
 	}
 }
