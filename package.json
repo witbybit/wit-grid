@@ -32,12 +32,13 @@
 		"format:check": "prettier --check ."
 	},
 	"devDependencies": {
+		"@eregister/wit-grid-eslint": "workspace:*",
 		"@testing-library/react": "^16.3.2",
+		"@typescript/typescript6": "^6.0.2",
 		"eslint": "^8.57.1",
 		"jsdom": "^29.1.1",
 		"prettier": "^3.2.5",
 		"typescript": "^7.0.2",
-		"typescript-eslint": "^7.10.0",
 		"vitest": "4.1.8"
 	}
 }

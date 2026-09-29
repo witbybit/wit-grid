@@ -3,7 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prettier from 'prettier';
-import ts from 'typescript';
+// TypeScript 7 (the repo compiler) ships no JS compiler API; this script needs TypeScript 6's.
+import ts from '@typescript/typescript6';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

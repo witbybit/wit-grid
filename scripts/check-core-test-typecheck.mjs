@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import ts from 'typescript';
+// TypeScript 7 (the repo compiler) ships no JS compiler API; this script needs TypeScript 6's.
+import ts from '@typescript/typescript6';
 
 const workspaceRoot = path.resolve(import.meta.dirname, '..');
 const configPath = path.join(workspaceRoot, 'packages/core/tsconfig.test-typecheck.json');

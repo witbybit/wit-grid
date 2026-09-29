@@ -1,0 +1,17 @@
+{
+	"name": "@eregister/wit-grid-eslint",
+	"private": true,
+	"version": "0.0.0",
+	"description": "Lint tooling pinned to TypeScript 6: typescript-eslint loads the JS compiler API, which TypeScript 7 (the repo compiler) no longer ships.",
+	"type": "module",
+	"exports": {
+		".": "./index.mjs"
+	},
+	"dependencies": {
+		"typescript": "6.0.3",
+		"typescript-eslint": "^8.71.0"
+	},
+	"peerDependencies": {
+		"eslint": "^8.57.0"
+	}
+}
