@@ -296,26 +296,44 @@ Exports (284):
 
 ## `./experimental` — experimental
 
-Declaration SHA-256: `5590297f72982ce0db60741357ac37992ec44273278bfe8836737d7187252cbd`
-Exports (28):
+Declaration SHA-256: `1bea93da80449863a3ea6e588d46548ddd5f7db1f640e451682bf6ba3e874b18`
+Exports (47):
 
 - `canEditCell` — value
 - `canFocusVisualRow` — value
 - `clearFlightRecorder` — value
 - `compileStyleRules` — value
+- `createGridTraceReplay` — value
 - `explainFlightRecorderCell` — value
 - `getFlightRecorderSnapshot` — value
+- `GRID_TRACE_REPLAY_LIMITS` — value
+- `GRID_TRACE_REPLAY_VERSION` — value
 - `GridCausalEvent` — type
 - `GridCausalTraceEnvelope` — type
 - `GridCausalTraceSnapshot` — type
 - `GridCellExplanation` — type
 - `GridFlightRecorderOptions` — type
+- `GridReplayCheckpoint` — type
+- `GridReplayCheckpointExpectation` — type
+- `GridReplayCommand` — type
+- `GridReplayDivergence` — type
+- `GridReplayExpectedFacts` — type
+- `GridReplayInitialFixture` — type
+- `GridReplayObservation` — type
+- `GridReplayObservationKind` — type
+- `GridReplayScheduler` — type
+- `GridReplaySemanticFacts` — type
+- `GridReplayTrace` — type
+- `GridReplayValidation` — type
+- `GridTraceReplay` — value + type
+- `GridTraceReplayStatus` — type
 - `GroupPathItem` — type
 - `isDataCellSelectable` — value
 - `isDataVisualRow` — value
 - `isEditableVisualRow` — value
 - `isFullWidthVisualRow` — value
 - `isSelectableVisualRow` — value
+- `JsonValue` — type
 - `NOOP_INSTRUMENTATION` — value
 - `NoopGridInstrumentation` — value + type
 - `parseVisualRowId` — value
@@ -327,6 +345,7 @@ Exports (28):
 - `toFooterVisualRowId` — value
 - `toGroupVisualRowId` — value
 - `toLoadingVisualRowId` — value
+- `validateGridReplayTrace` — value
 
 ## `./internal` — adapter-only
 
