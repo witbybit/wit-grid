@@ -1,7 +1,12 @@
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	recordDispatchWrite,
+	stampMountedVersions,
+	getCellRendererLifecycle,
+} from './binderShared.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
 
 /**
  * scrollPresentation: 'html-snapshot' — replays a captured inert HTML clone during scroll
@@ -11,7 +16,7 @@ import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.
 export function applyHtmlSnapshotCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
-	const lifecycle = createCellRendererLifecycle(deps);
+	const lifecycle = getCellRendererLifecycle(deps);
 
 	if (presentation.kind === 'html-pending') {
 		if (input.phase === 'scroll') deps.incrementHtmlSnapshotMissesDuringScroll?.();
@@ -54,7 +59,20 @@ export function applyHtmlSnapshotCellPresentation<TRowData>(input: DispatchCellP
 	// is inert — no React fiber, no event handlers — and the fidelity lane will replace it
 	// with the live portal on the next post-scroll pass.
 	const portalHost = deps.ensureCellPortalHost(cellSlot.element);
-	portalHost.innerHTML = presentation.html ?? '';
+	const html = presentation.html ?? '';
+	// Skip the (parse + subtree replace) write when this host still holds exactly what we wrote last
+	// time — see CellSlot.lastSnapshotHtml for why the boundary-node check is sufficient.
+	const hostUnchanged =
+		cellSlot.lastSnapshotHtml === html &&
+		portalHost.firstChild === cellSlot.lastSnapshotHtmlFirst &&
+		portalHost.lastChild === cellSlot.lastSnapshotHtmlLast;
+	if (!hostUnchanged) {
+		portalHost.innerHTML = html;
+		cellSlot.lastSnapshotHtml = html;
+		cellSlot.lastSnapshotHtmlFirst = portalHost.firstChild;
+		cellSlot.lastSnapshotHtmlLast = portalHost.lastChild;
+	}
+
 	deps.cellRenderer.showPortalContent(cellSlot.element);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,

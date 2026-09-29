@@ -1,12 +1,16 @@
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
-import { createCellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	recordDispatchWrite,
+	stampMountedVersions,
+	getCellRendererLifecycle,
+	isOverscanLiveCell,
+} from './binderShared.js';
 
 function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<TRowData>): boolean {
 	if (input.phase !== 'scroll' || !input.viewportPlan) return false;
-	return input.viewportPlan.liveCells.overscan.some(
-		(cell) => cell.rowIndex === input.geometry.rowIndex && cell.columnInstanceId === input.cellCtrl.columnInstanceId
-	);
+	return isOverscanLiveCell(input.viewportPlan.liveCells.overscan, input.geometry.rowIndex, input.cellCtrl.columnInstanceId);
 }
 
 /** Renders the over-budget emergency shell for a fresh live mount that couldn't be granted this
@@ -40,7 +44,7 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
-	const lifecycle = createCellRendererLifecycle(deps);
+	const lifecycle = getCellRendererLifecycle(deps);
 	const mountRuntime = runtime.mount;
 	if (!mountRuntime) throw new Error('Live cell presentation requires mount runtime.');
 

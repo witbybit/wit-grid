@@ -3,7 +3,13 @@ export type CellContentMode = 'text' | 'portal' | 'loading' | 'empty' | 'fallbac
 import type { CellRendererHandle, CellPlacement } from './cellRendererHandle.js';
 import { isMountedCellVisuallyFresh } from './visualFreshness.js';
 import type { ColumnInstanceId } from '../columnDef.js';
-import type { CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+import { createCellInstanceRendererKey } from './identityKeys.js';
+import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+
+/** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
+export interface CellCtrlOwner {
+	releaseDetachedCellCtrl(cellCtrl: CellCtrl, slotInstanceId: string): boolean;
+}
 
 export interface CellSlotMountedVisualVersions {
 	insightVersion: number;
@@ -73,6 +79,32 @@ export function matchesCellSlotMountedVisualVersions(cellSlot: CellSlot, version
 	);
 }
 
+/** The five non-row version stamps a scroll frame judges mounted state against — satisfied
+ *  structurally by ScrollRenderContext, so callers can pass the context itself. */
+export interface CellSlotFrameVersions {
+	globalVersion: number;
+	insightVersion: number;
+	styleVersion: number;
+	loadingVersion: number;
+	selectionVersion: number;
+}
+
+/**
+ * Allocation-free form of matchesCellSlotMountedFreshness for the per-cell scroll path — the same
+ * predicate as isMountedCellVisuallyFresh (a never-stamped slot is always stale), over scalars.
+ */
+export function isCellSlotMountedFreshAt(cellSlot: CellSlot, rowVersion: number, versions: CellSlotFrameVersions): boolean {
+	if (cellSlot.lastMountedRowVersion === -1 && cellSlot.lastMountedGlobalVersion === -1) return false;
+	return (
+		cellSlot.lastMountedRowVersion === rowVersion &&
+		cellSlot.lastMountedGlobalVersion === versions.globalVersion &&
+		cellSlot.lastMountedInsightVersion === versions.insightVersion &&
+		cellSlot.lastMountedStyleVersion === versions.styleVersion &&
+		cellSlot.lastMountedLoadingVersion === versions.loadingVersion &&
+		cellSlot.lastMountedSelectionVersion === versions.selectionVersion
+	);
+}
+
 export function matchesCellSlotMountedFreshness(
 	cellSlot: CellSlot,
 	request: {
@@ -89,6 +121,20 @@ export function matchesCellSlotMountedFreshness(
 		loadingVersion: request.visualVersions.loadingVersion,
 		selectionVersion: request.visualVersions.selectionVersion,
 	});
+}
+
+/**
+ * Writes a cell's text. When the element already holds exactly one Text node, updating its
+ * nodeValue avoids the node replacement (and allocation) that `textContent =` performs. Empty
+ * text still goes through textContent so the element ends up with no child, as before.
+ */
+function setCellText(element: HTMLElement, text: string): void {
+	const first = element.firstChild;
+	if (text !== '' && first !== null && first === element.lastChild && first.nodeType === 3) {
+		first.nodeValue = text;
+		return;
+	}
+	element.textContent = text;
 }
 
 export class CellSlot<TRowData = unknown> {
@@ -177,6 +223,37 @@ export class CellSlot<TRowData = unknown> {
 	public lastMountedLoadingVersion = -1;
 	public lastMountedSelectionVersion = -1;
 
+	/**
+	 * The CellCtrl this slot is currently presenting, and the store that owns it. When the slot
+	 * attaches a different controller (row rebind) or is cold-unbound, the previous one is handed
+	 * back to its owner so CellCtrl lifetime stays bounded by the physical slot pool.
+	 */
+	public boundCellCtrl: CellCtrl | null = null;
+	public boundCellCtrlOwner: CellCtrlOwner | null = null;
+
+	/** Horizontal-retention recency stamp (see cellSlotRetention.ts); larger = touched more recently. */
+	public retentionStamp = 0;
+
+	/** Cached row-selector checkbox (checkbox-selection columns) — see freezeCellBinder.ts. */
+
+	public rowCheckbox: HTMLInputElement | null = null;
+
+	/**
+	 * The last frozen-HTML string written into the portal host by the html-snapshot binder, plus the
+	 * host's first/last child right after that write. A repeat bind with the same HTML skips the
+	 * innerHTML write only while those boundary nodes are still in place — any other writer (a live
+	 * portal mount, a release clearing the host) replaces them and forces a rewrite.
+	 */
+	public lastSnapshotHtml: string | undefined = undefined;
+	public lastSnapshotHtmlFirst: ChildNode | null = null;
+	public lastSnapshotHtmlLast: ChildNode | null = null;
+
+	// JS-side mirrors of DOM state, so steady-state binds never read the DOM back.
+
+	private lastDatasetColumnInstanceId: string | undefined = undefined;
+	private rendererKeyColumnInstanceId: string | undefined = undefined;
+	private rendererKey = '';
+
 	constructor(element: HTMLDivElement) {
 		this.cellInstanceId = `ci${++_cellInstanceCounter}`;
 		this.portalHostId = `${this.cellInstanceId}-ph`;
@@ -207,6 +284,18 @@ export class CellSlot<TRowData = unknown> {
 			this.portalHostElement = host;
 		}
 		return host;
+	}
+
+	/**
+	 * createCellInstanceRendererKey(this.cellInstanceId, columnInstanceId), memoized — the inputs
+	 * never change for a given column, so the scroll path doesn't rebuild the string per bind.
+	 */
+	public getRendererKey(columnInstanceId: ColumnInstanceId): string {
+		if (this.rendererKeyColumnInstanceId !== columnInstanceId) {
+			this.rendererKeyColumnInstanceId = columnInstanceId;
+			this.rendererKey = createCellInstanceRendererKey(this.cellInstanceId, columnInstanceId);
+		}
+		return this.rendererKey;
 	}
 
 	public static fromElement<TRowData = unknown>(element: HTMLDivElement): CellSlot<TRowData> {
@@ -287,7 +376,9 @@ export class CellSlot<TRowData = unknown> {
 		}
 
 		if (input.focused) {
-			if (!this.hasTabIndex || this.element.getAttribute('tabindex') !== '-1') {
+			// hasTabIndex mirrors the attribute this method wrote; the only other writer
+			// (gridHost focusCellElement) writes the same -1, so no DOM read-back is needed.
+			if (!this.hasTabIndex) {
 				this.element.tabIndex = -1;
 				this.hasTabIndex = true;
 				domUpdated = true;
@@ -333,9 +424,12 @@ export class CellSlot<TRowData = unknown> {
 			this.element.dataset.colField = colField;
 			domUpdated = true;
 		}
-		if (this.element.dataset.columnInstanceId !== this.columnInstanceId) {
-			this.element.dataset.columnInstanceId = this.columnInstanceId;
-			domUpdated = true;
+		if (this.lastDatasetColumnInstanceId !== this.columnInstanceId) {
+			this.lastDatasetColumnInstanceId = this.columnInstanceId;
+			if (this.element.dataset.columnInstanceId !== this.columnInstanceId) {
+				this.element.dataset.columnInstanceId = this.columnInstanceId;
+				domUpdated = true;
+			}
 		}
 		if (this.rowIndex !== rowIndex) {
 			this.rowIndex = rowIndex;
@@ -346,6 +440,11 @@ export class CellSlot<TRowData = unknown> {
 			this.rowId = rowId;
 			this.element.dataset.rowId = rowId;
 			domUpdated = true;
+			// A stale inline visibility can only be left over from before this identity was bound
+			// (nothing sets it on a bound cell), so the style read is limited to rebinds.
+			if (this.element.style.visibility) {
+				this.element.style.visibility = '';
+			}
 		}
 
 		// Position — one DOM write per changed axis, pin-right uses right, others use left
@@ -412,10 +511,6 @@ export class CellSlot<TRowData = unknown> {
 			}
 			domUpdated = true;
 		}
-		if (this.element.style.visibility) {
-			this.element.style.visibility = '';
-			domUpdated = true;
-		}
 
 		this.lastRawValue = rawValue;
 
@@ -426,7 +521,7 @@ export class CellSlot<TRowData = unknown> {
 			if (contentMode === 'text' || contentMode === 'fallback') {
 				if (this.lastFormattedValue !== formattedValue) {
 					this.lastFormattedValue = formattedValue;
-					this.contentElement.textContent = formattedValue;
+					setCellText(this.contentElement, formattedValue);
 					cellSlotWriteStats.cellTextWrites++;
 					domUpdated = true;
 				} else {
@@ -518,7 +613,29 @@ export class CellSlot<TRowData = unknown> {
 		}
 	}
 
+	/**
+	 * Records `cellCtrl` as the controller this slot presents, releasing the previously bound one
+	 * (if different) back to its owner. `owner` is null for test doubles without a RowCtrlStore.
+	 */
+	public attachCellCtrl(cellCtrl: CellCtrl, owner: CellCtrlOwner | null): void {
+		const previous = this.boundCellCtrl;
+		if (previous === cellCtrl) return;
+		if (previous) this.boundCellCtrlOwner?.releaseDetachedCellCtrl(previous, this.cellInstanceId);
+		this.boundCellCtrl = cellCtrl;
+		this.boundCellCtrlOwner = owner;
+	}
+
+	/** Releases the bound controller (if any) back to its owner. */
+	public detachCellCtrl(): void {
+		const previous = this.boundCellCtrl;
+		if (!previous) return;
+		this.boundCellCtrl = null;
+		this.boundCellCtrlOwner?.releaseDetachedCellCtrl(previous, this.cellInstanceId);
+		this.boundCellCtrlOwner = null;
+	}
+
 	public unbindCold(): void {
+		this.detachCellCtrl();
 		if (this.renderer !== null) {
 			this.renderer.destroy();
 			this.renderer = null;
@@ -566,6 +683,7 @@ export class CellSlot<TRowData = unknown> {
 		this.element.removeAttribute('style');
 		delete this.element.dataset.colField;
 		delete this.element.dataset.columnInstanceId;
+		this.lastDatasetColumnInstanceId = undefined;
 		delete this.element.dataset.rowIndex;
 		delete this.element.dataset.rowId;
 		delete this.element.dataset.cellKey;

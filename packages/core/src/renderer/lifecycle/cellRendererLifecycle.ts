@@ -65,6 +65,9 @@ export interface CellRendererLifecycle<TRowData = unknown> {
 		reason: HtmlCaptureReason;
 		token: ControllerWorkToken;
 		cellSlot: CellSlot<TRowData>;
+		/** The host's already-serialized innerHTML, when the caller just read it — avoids a second
+		 *  full-subtree serialization. Omitted means read `host.innerHTML` here. */
+		html?: string;
 		colField: string;
 		rowHeight?: number;
 		colWidth?: number;
@@ -154,9 +157,10 @@ export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TR
 			cellCtrl.rendererState.mountedSlotInstanceId = undefined;
 			cellCtrl.rendererState.mode = 'none';
 		},
-		captureHtml({ cellCtrl, host, token, cellSlot, colField, rowHeight, colWidth }) {
+		captureHtml({ cellCtrl, host, token, cellSlot, colField, rowHeight, colWidth, html: serializedHtml }) {
 			if (!isControllerWorkStillValid({ token, cellCtrl, attachedSlotInstanceId: cellCtrl.lifecycle.attachedSlotInstanceId })) return;
-			const html = host.innerHTML;
+			const html = serializedHtml ?? host.innerHTML;
+
 			if (!html) return;
 			if (deps.engine.htmlScrollSnapshots.createSnapshot) {
 				deps.engine.htmlScrollSnapshots.set(

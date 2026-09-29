@@ -434,7 +434,7 @@ describe('bindCellDuringScroll', () => {
 		});
 
 		expect(getCachedDisplayValue).not.toHaveBeenCalled();
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 		expect(markCellDirtyAfterScroll).toHaveBeenCalledWith(cellSlot.element);
 	});
 
@@ -1787,7 +1787,7 @@ describe('bindCellDuringScroll', () => {
 		expect(cellSlot.element.title).toBe('');
 		expect(snapshotSet).not.toHaveBeenCalled();
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 	});
 
 	it('keeps warm visible primitive text as a temporary compatibility edge but still marks it dirty when snapshots are missing', () => {
@@ -3152,10 +3152,10 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 			isInVisibleContent: true,
 		});
 
-		// Row A's warm text must never leak into row B's slot. With no fresh snapshot, the
-		// renderer must fall back to a deterministic placeholder, not the cached DOM value.
+		// Row A's warm text must never leak into row B's slot. With no fresh snapshot, a plain
+		// primitive column shows row B's own field value (a direct read), never the cached DOM value.
 		expect(cellSlot.lastFormattedValue).not.toBe('Stale Row A Value');
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Row B Value');
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 	});
 

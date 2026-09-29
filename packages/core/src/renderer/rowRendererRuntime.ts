@@ -296,6 +296,7 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			onScrollCellPatched: this.runtimeArgs.incrementCurrentScrollCellsPatched,
 			onScrollCellWritten: this.runtimeArgs.incrementCurrentScrollCellsWritten,
 			retentionStats: this.deps.stateHost.renderStats,
+			getRenderedRowCount: () => this.deps.stateHost.activeRows.size,
 		};
 
 		this.rowRenderMaintenanceDeps = {
@@ -469,30 +470,51 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	}
 }
 
+/** Shared, never-mutated empty topology — reconcileTopology only reads it. */
+const EMPTY_TOPOLOGY: CompiledColumnTopology = Object.freeze({
+	version: 0,
+	placements: [],
+	byColumnId: new Map(),
+	left: [],
+	center: [],
+	right: [],
+	groupSegments: [],
+	pinLeftWidth: 0,
+	pinRightWidth: 0,
+	pinRightBaseLeft: 0,
+	totalContentWidth: 0,
+}) as CompiledColumnTopology;
+const EMPTY_COLUMNS: never[] = [];
+
+/** Per-args collapse/release callbacks, built once instead of two closures per full-width bind. */
+interface FullWidthRowCallbacks<TRowData> {
+	collapseLanes: (slot: RowSlot<TRowData>) => void;
+	releaseRowPortal: (slot: RowSlot<TRowData>) => void;
+}
+
+const fullWidthCallbacksByArgs = new WeakMap<object, FullWidthRowCallbacks<any>>();
+
+function getFullWidthRowCallbacks<TRowData>(args: RowRendererRuntimeArgs<TRowData>): FullWidthRowCallbacks<TRowData> {
+	let callbacks = fullWidthCallbacksByArgs.get(args) as FullWidthRowCallbacks<TRowData> | undefined;
+	if (!callbacks) {
+		callbacks = {
+			collapseLanes: (s) => {
+				// Clear all data cells via reconcileTopology with an empty topology.
+				// This properly removes cells from cellsByColumnInstanceId and calls releaseFn on each.
+				const pinLeftContainer = args.ensurePinnedContainer(s, 'left', 0);
+				const pinRightContainer = args.ensurePinnedContainer(s, 'right', 0);
+				reconcileTopology(s, EMPTY_TOPOLOGY, pinLeftContainer, 0, 0, pinRightContainer, EMPTY_COLUMNS, args.initCell, args.releaseCellFn);
+			},
+			releaseRowPortal: (s) => {
+				args.releaseRowPortal(s);
+			},
+		};
+		fullWidthCallbacksByArgs.set(args, callbacks);
+	}
+	return callbacks;
+}
+
 export function bindFullWidthRow<TRowData>(args: RowRendererRuntimeArgs<TRowData>, slot: RowSlot<TRowData>, visualRow: VisualRow<TRowData>): void {
-	const EMPTY_TOPOLOGY: CompiledColumnTopology = {
-		version: 0,
-		placements: [],
-		byColumnId: new Map(),
-		left: [],
-		center: [],
-		right: [],
-		groupSegments: [],
-		pinLeftWidth: 0,
-		pinRightWidth: 0,
-		pinRightBaseLeft: 0,
-		totalContentWidth: 0,
-	};
-	args.fullWidthRenderer.bind(
-		slot,
-		visualRow,
-		(s) => {
-			// Clear all data cells via reconcileTopology with an empty topology.
-			// This properly removes cells from cellsByColumnInstanceId and calls releaseFn on each.
-			const pinLeftContainer = args.ensurePinnedContainer(s, 'left', 0);
-			const pinRightContainer = args.ensurePinnedContainer(s, 'right', 0);
-			reconcileTopology(s, EMPTY_TOPOLOGY, pinLeftContainer, 0, 0, pinRightContainer, [], args.initCell, args.releaseCellFn);
-		},
-		(s) => args.releaseRowPortal(s)
-	);
+	const callbacks = getFullWidthRowCallbacks(args);
+	args.fullWidthRenderer.bind(slot, visualRow, callbacks.collapseLanes, callbacks.releaseRowPortal);
 }

@@ -3,11 +3,24 @@ import type { DataModelRuntime } from '../engine/runtimePorts.js';
 import { createGridRowDataRef } from '../publicRowRef.js';
 import { RowNode } from '../rowNode.js';
 
+interface FormattedValueCacheEntry {
+	rowVersion: number;
+	globalVersion: number;
+	raw: unknown;
+	rowData: unknown;
+	text: string;
+}
+
+const FORMATTED_VALUE_CACHE_CAPACITY = 8192;
+
 export class DataModel<TRowData = unknown> {
 	private autoRowIdMap = new WeakMap<object, string>();
 	private autoRowIdCounter = 0;
 	private compiledGetters = new Map<string, (data: TRowData) => unknown>();
 	private valueGetterCache = new Map<string, Map<string, unknown>>();
+	/** columnKey → rowId → formatted text; see getCachedFormattedValue. */
+	private formattedValueCache = new Map<string, Map<string, FormattedValueCacheEntry>>();
+	private formattedValueCacheSize = 0;
 
 	constructor(private readonly runtime: DataModelRuntime<TRowData>) {}
 
@@ -47,6 +60,8 @@ export class DataModel<TRowData = unknown> {
 	}
 
 	public clearValueGetterCache(rowId?: string, colField?: string): void {
+		// Anything that invalidates computed values also invalidates their formatted text.
+		this.clearFormattedValueCache(rowId);
 		if (!rowId) {
 			this.valueGetterCache.clear();
 			return;
@@ -64,6 +79,85 @@ export class DataModel<TRowData = unknown> {
 		}
 
 		this.valueGetterCache.delete(rowId);
+	}
+
+	/**
+	 * Bounded cache of valueFormatter output for plain field columns, keyed by (rowId, column
+	 * instance). An entry is valid only for the exact (rowVersion, globalVersion, raw value, row object)
+	 * it was stored at, so any row mutation, row replacement or structural change misses; column
+	 * updates and value-getter invalidations clear it outright. Returns undefined on a miss.
+	 */
+	public getCachedFormattedValue(
+		rowId: string,
+		columnKey: string,
+		rowVersion: number,
+		globalVersion: number,
+		raw: unknown,
+		rowData: unknown
+	): string | undefined {
+		const entry = this.formattedValueCache.get(columnKey)?.get(rowId);
+		if (!entry || entry.rowVersion !== rowVersion || entry.globalVersion !== globalVersion) return undefined;
+		if (!Object.is(entry.raw, raw) || entry.rowData !== rowData) return undefined;
+		return entry.text;
+	}
+
+	public setCachedFormattedValue(
+		rowId: string,
+		columnKey: string,
+		rowVersion: number,
+		globalVersion: number,
+		raw: unknown,
+		rowData: unknown,
+		text: string
+	): void {
+		let byRow = this.formattedValueCache.get(columnKey);
+		if (!byRow) {
+			byRow = new Map();
+			this.formattedValueCache.set(columnKey, byRow);
+		}
+		const existing = byRow.get(rowId);
+		if (existing) {
+			existing.rowVersion = rowVersion;
+			existing.globalVersion = globalVersion;
+			existing.raw = raw;
+			existing.rowData = rowData;
+			existing.text = text;
+			return;
+		}
+		// Bounded: a full reset when over budget is cheap, rare, and only costs re-formatting.
+		if (this.formattedValueCacheSize >= FORMATTED_VALUE_CACHE_CAPACITY) {
+			this.formattedValueCache.clear();
+			this.formattedValueCacheSize = 0;
+			byRow = new Map();
+			this.formattedValueCache.set(columnKey, byRow);
+		}
+		byRow.set(rowId, { rowVersion, globalVersion, raw, rowData, text });
+		this.formattedValueCacheSize++;
+	}
+
+	public clearFormattedValueCache(rowId?: string): void {
+		if (this.formattedValueCacheSize === 0) return;
+		if (!rowId) {
+			this.formattedValueCache.clear();
+			this.formattedValueCacheSize = 0;
+			return;
+		}
+		for (const byRow of this.formattedValueCache.values()) {
+			if (byRow.delete(rowId)) this.formattedValueCacheSize--;
+		}
+	}
+
+	/**
+	 * The raw (unstringified) cached value behind a getCachedDisplayValue hit for a valueGetter or
+	 * formula cell — what a valueFormatter should receive. Only meaningful after getCachedDisplayValue
+	 * returned a string for the same cell; plain fields are read from the row directly by callers.
+	 */
+	public getCachedCellValue(rowId: string, colField: string): unknown {
+		if (this.runtime.hasFormula(rowId, colField)) {
+			const res = this.runtime.getCachedFormulaValue(rowId, colField);
+			return res.hasCached ? res.value : undefined;
+		}
+		return this.valueGetterCache.get(rowId)?.get(colField);
 	}
 
 	private getValueGetterValue(rowId: string, colField: string, col: ColumnDef<TRowData>, node: RowNode<TRowData>): unknown {

@@ -11,9 +11,15 @@ import type { CompiledColumnTopology } from './columnTopology.js';
 import type { ViewportPlan } from './viewportPlanner.js';
 import { GridMetric, type GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { collectCellDecorationSnapshotMetadata, createCellDisplaySnapshot } from './cellDisplaySnapshot.js';
-import { applyCellSlotRetentionPolicy } from './cellSlotRetention.js';
-import { resolveWarmVisibleCellStatus } from './warmCellStatus.js';
-import { createRowCtrl } from './controllers/RowCtrl.js';
+import { applyCellSlotRetentionPolicy, stampNewCellSlotForRetention } from './cellSlotRetention.js';
+import {
+	resolveWarmVisibleCellStatus,
+	type WarmVisibleCellStatus,
+	type WarmVisibleCellStatusContext,
+	type WarmVisibleCellStatusDeps,
+} from './warmCellStatus.js';
+import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
+import { isOverscanLiveCell } from './binders/binderShared.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
 export interface CellSlotRetentionTelemetrySink {
@@ -71,6 +77,8 @@ export interface RowCellBindingLaneDeps<TRowData = unknown> {
 	onScrollCellPatched: () => void;
 	onScrollCellWritten: () => void;
 	retentionStats?: CellSlotRetentionTelemetrySink;
+	/** Rendered row-slot count this frame — sizes the display-snapshot working set. Omitted = unknown. */
+	getRenderedRowCount?: () => number;
 }
 
 export interface BindAllDataCellsRequest<TRowData = unknown> {
@@ -162,6 +170,7 @@ function reconcileTopology<TRowData>(
 			cell = CellSlot.fromElement<TRowData>(el);
 			cell.columnInstanceId = instanceId;
 			slot.cellsByColumnInstanceId.set(instanceId, cell);
+			stampNewCellSlotForRetention(cell);
 			instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
 			if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
 		} else if (retentionStats) {
@@ -240,124 +249,148 @@ function reconcileCellTopologyForScroll<TRowData>(
 	instrumentation?: GridInstrumentation,
 	retentionStats?: CellSlotRetentionTelemetrySink
 ): void {
-	// Compute the set of column instance ids visible in this frame.
-	const visibleInstanceIds = new Set<ColumnInstanceId>();
-	if (pinLeftContainer) {
-		for (const p of topology.left) {
-			if (columns[p.absoluteIndex]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
-		}
-	}
-	for (const p of topology.center) {
-		const c = p.absoluteIndex;
-		if (c >= centerColStart && c < centerColStart + centerColCount) {
-			if (columns[c]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
-		}
-	}
-	if (pinRightContainer) {
-		for (const p of topology.right) {
-			if (columns[p.absoluteIndex]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
-		}
-	}
-	// The currently focused/edited column must survive retention even if a horizontal scroll has
-	// carried it outside the rendered window (e.g. mid-edit elsewhere in a wide grid).
-	if (focusedColumnInstanceId) visibleInstanceIds.add(focusedColumnInstanceId);
-
-	// Detach DOM elements for cells that left the visible window. The CellSlot itself
-	// stays in cellsByColumnInstanceId so it can be reused when the column scrolls back in —
-	// no releaseFn call, no portal teardown.
-	for (const [instanceId, cell] of slot.cellsByColumnInstanceId) {
-		if (!visibleInstanceIds.has(instanceId) && cell.element.parentNode) {
-			cell.element.remove();
-		}
-	}
-
-	function ensureCell(instanceId: ColumnInstanceId): CellSlot<TRowData> {
-		let cell = slot.cellsByColumnInstanceId.get(instanceId);
-		if (!cell) {
-			const el = document.createElement('div');
-			initFn(el);
-			cell = CellSlot.fromElement<TRowData>(el);
-			cell.columnInstanceId = instanceId;
-			slot.cellsByColumnInstanceId.set(instanceId, cell);
-			instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
-			if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
-		} else if (retentionStats) {
-			retentionStats.cellSlotsReusedDuringTopology++;
-		}
-		return cell;
-	}
-
-	slot.leftCells.length = 0;
-	if (pinLeftContainer) {
-		for (const p of topology.left) {
-			const col = columns[p.absoluteIndex];
-			if (!col?.field || !p.columnId) continue;
-			const cell = ensureCell(p.columnId);
-			if (cell.element.parentNode !== pinLeftContainer) pinLeftContainer.appendChild(cell.element);
-			slot.leftCells.push(cell);
-		}
-	}
-
-	slot.centerCells.length = 0;
-	for (const p of topology.center) {
-		const c = p.absoluteIndex;
-		if (c < centerColStart || c >= centerColStart + centerColCount) continue;
-		const col = columns[c];
-		if (!col?.field || !p.columnId) continue;
-		const cell = ensureCell(p.columnId);
-		if (cell.element.parentNode !== slot.element) slot.element.appendChild(cell.element);
-		slot.centerCells.push(cell);
-	}
-
-	slot.rightCells.length = 0;
-	if (pinRightContainer) {
-		for (const p of topology.right) {
-			const col = columns[p.absoluteIndex];
-			if (!col?.field || !p.columnId) continue;
-			const cell = ensureCell(p.columnId);
-			if (cell.element.parentNode !== pinRightContainer) pinRightContainer.appendChild(cell.element);
-			slot.rightCells.push(cell);
-		}
-	}
-
-	slot.centerColStart = centerColStart;
-	slot.pinLeftCount = topology.left.length;
-	slot.pinRightStart = topology.left.length + topology.center.length;
-
-	// Bounded retention: cellsByColumnInstanceId must never grow unbounded just because scroll-frame
-	// reconciliation never evicts on its own. Runs AFTER this frame's cells are ensured (not
-	// before) so newly-entered columns are already accounted for in the budget check — otherwise
-	// eviction would trim to budget using the OLD visible set and then this frame's newly-entered
-	// columns would push it back over on every window shift.
-	if (releaseFn) {
-		const { retainedAfter, evicted } = applyCellSlotRetentionPolicy(slot, visibleInstanceIds, releaseFn, instrumentation);
-		if (retentionStats) {
-			retentionStats.cellSlotsEvictedDuringTopology += evicted;
-			retentionStats.cellSlotsRetained += retainedAfter;
-			if (retainedAfter > retentionStats.maxCellsByColumnIdPerRowSlot) {
-				retentionStats.maxCellsByColumnIdPerRowSlot = retainedAfter;
+	// Compute the set of column instance ids visible in this frame. The Set is a reused scratch —
+	// applyCellSlotRetentionPolicy only reads it during the call and never retains it.
+	const scratchInUse = visibleInstanceIdsScratchInUse;
+	const visibleInstanceIds = scratchInUse ? new Set<ColumnInstanceId>() : visibleInstanceIdsScratch;
+	visibleInstanceIds.clear();
+	visibleInstanceIdsScratchInUse = true;
+	try {
+		if (pinLeftContainer) {
+			for (const p of topology.left) {
+				if (columns[p.absoluteIndex]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
 			}
 		}
+		for (const p of topology.center) {
+			const c = p.absoluteIndex;
+			if (c >= centerColStart && c < centerColStart + centerColCount) {
+				if (columns[c]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
+			}
+		}
+		if (pinRightContainer) {
+			for (const p of topology.right) {
+				if (columns[p.absoluteIndex]?.field && p.columnId) visibleInstanceIds.add(p.columnId);
+			}
+		}
+		// The currently focused/edited column must survive retention even if a horizontal scroll has
+		// carried it outside the rendered window (e.g. mid-edit elsewhere in a wide grid).
+		if (focusedColumnInstanceId) visibleInstanceIds.add(focusedColumnInstanceId);
+
+		// Detach DOM elements for cells that left the visible window. The CellSlot itself
+		// stays in cellsByColumnInstanceId so it can be reused when the column scrolls back in —
+		// no releaseFn call, no portal teardown. Only last frame's lane cells can still be attached
+		// (every reconcile path appends exactly the lane cells and detaches the rest), so scanning the
+		// lane arrays is equivalent to scanning the whole retained map, at a fraction of the size.
+		detachCellsOutside(slot.leftCells, visibleInstanceIds);
+		detachCellsOutside(slot.centerCells, visibleInstanceIds);
+		detachCellsOutside(slot.rightCells, visibleInstanceIds);
+
+		function ensureCell(instanceId: ColumnInstanceId): CellSlot<TRowData> {
+			let cell = slot.cellsByColumnInstanceId.get(instanceId);
+			if (!cell) {
+				const el = document.createElement('div');
+				initFn(el);
+				cell = CellSlot.fromElement<TRowData>(el);
+				cell.columnInstanceId = instanceId;
+				slot.cellsByColumnInstanceId.set(instanceId, cell);
+				stampNewCellSlotForRetention(cell);
+				instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
+				if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
+			} else if (retentionStats) {
+				retentionStats.cellSlotsReusedDuringTopology++;
+			}
+			return cell;
+		}
+
+		slot.leftCells.length = 0;
+		if (pinLeftContainer) {
+			for (const p of topology.left) {
+				const col = columns[p.absoluteIndex];
+				if (!col?.field || !p.columnId) continue;
+				const cell = ensureCell(p.columnId);
+				if (cell.element.parentNode !== pinLeftContainer) pinLeftContainer.appendChild(cell.element);
+				slot.leftCells.push(cell);
+			}
+		}
+
+		slot.centerCells.length = 0;
+		for (const p of topology.center) {
+			const c = p.absoluteIndex;
+			if (c < centerColStart || c >= centerColStart + centerColCount) continue;
+			const col = columns[c];
+			if (!col?.field || !p.columnId) continue;
+			const cell = ensureCell(p.columnId);
+			if (cell.element.parentNode !== slot.element) slot.element.appendChild(cell.element);
+			slot.centerCells.push(cell);
+		}
+
+		slot.rightCells.length = 0;
+		if (pinRightContainer) {
+			for (const p of topology.right) {
+				const col = columns[p.absoluteIndex];
+				if (!col?.field || !p.columnId) continue;
+				const cell = ensureCell(p.columnId);
+				if (cell.element.parentNode !== pinRightContainer) pinRightContainer.appendChild(cell.element);
+				slot.rightCells.push(cell);
+			}
+		}
+
+		slot.centerColStart = centerColStart;
+		slot.pinLeftCount = topology.left.length;
+		slot.pinRightStart = topology.left.length + topology.center.length;
+
+		// Bounded retention: cellsByColumnInstanceId must never grow unbounded just because scroll-frame
+		// reconciliation never evicts on its own. Runs AFTER this frame's cells are ensured (not
+		// before) so newly-entered columns are already accounted for in the budget check — otherwise
+		// eviction would trim to budget using the OLD visible set and then this frame's newly-entered
+		// columns would push it back over on every window shift.
+		if (releaseFn) {
+			const { retainedAfter, evicted } = applyCellSlotRetentionPolicy(slot, visibleInstanceIds, releaseFn, instrumentation);
+			if (retentionStats) {
+				retentionStats.cellSlotsEvictedDuringTopology += evicted;
+				retentionStats.cellSlotsRetained += retainedAfter;
+				if (retainedAfter > retentionStats.maxCellsByColumnIdPerRowSlot) {
+					retentionStats.maxCellsByColumnIdPerRowSlot = retainedAfter;
+				}
+			}
+		}
+	} finally {
+		if (!scratchInUse) {
+			visibleInstanceIdsScratchInUse = false;
+			visibleInstanceIdsScratch.clear();
+		}
+	}
+}
+
+const visibleInstanceIdsScratch = new Set<ColumnInstanceId>();
+let visibleInstanceIdsScratchInUse = false;
+
+function detachCellsOutside<TRowData>(cells: readonly CellSlot<TRowData>[], keep: ReadonlySet<ColumnInstanceId>): void {
+	for (let i = 0; i < cells.length; i++) {
+		const cell = cells[i];
+		if (cell.element.parentNode && !keep.has(cell.columnInstanceId as ColumnInstanceId)) cell.element.remove();
 	}
 }
 
 export { reconcileTopology, reconcileCellTopologyForScroll };
 
+const LOADING_CELL_BASE_CLASS = 'og-cell og-cell-loading';
+
+/** Syncs a loading cell's insight title/validation attributes and returns its decoration class
+ *  suffix (leading space per class, '' when none) to append to LOADING_CELL_BASE_CLASS. */
 function applyLoadingInsightState<TRowData>(
 	deps: RowCellBindingLaneDeps<TRowData>,
 	cellSlot: CellSlot<TRowData>,
 	rowId: string,
 	colField: string
 ): string {
-	let cellClassName = 'og-cell og-cell-loading';
 	if (deps.engine.insights.size === 0) {
 		if (cellSlot.element.dataset.validationError !== undefined) delete cellSlot.element.dataset.validationError;
 		if (cellSlot.element.title) cellSlot.element.removeAttribute('title');
-		return cellClassName;
+		return '';
 	}
 
 	const decorationMetadata = collectCellDecorationSnapshotMetadata(deps.engine.insights.getCellDecorations(rowId, colField));
-	if (decorationMetadata.classNameSuffix) cellClassName += decorationMetadata.classNameSuffix;
 	if (decorationMetadata.validationError) {
 		cellSlot.element.dataset.validationError = decorationMetadata.validationError;
 	} else if (cellSlot.element.dataset.validationError !== undefined) {
@@ -368,30 +401,139 @@ function applyLoadingInsightState<TRowData>(
 	} else if (cellSlot.element.title) {
 		cellSlot.element.removeAttribute('title');
 	}
-	return cellClassName;
+	return decorationMetadata.classNameSuffix;
+}
+
+const NO_WARM_REFRESH: WarmVisibleCellStatus = { needsImmediateWake: false, needsDeferredRefresh: false };
+const WARM_CELL_UNTRACKED: WarmVisibleCellStatus = { needsImmediateWake: true, needsDeferredRefresh: true };
+
+const warmStatusDepsByLaneDeps = new WeakMap<object, WarmVisibleCellStatusDeps>();
+
+function getWarmStatusDeps<TRowData>(deps: RowCellBindingLaneDeps<TRowData>): WarmVisibleCellStatusDeps {
+	let warmDeps = warmStatusDepsByLaneDeps.get(deps);
+	if (!warmDeps) {
+		warmDeps = {
+			getCellPortalHost: (cell) => deps.cellBinderDeps.getCellPortalHost(cell),
+			isCellMounted: (key) => deps.cellBinderDeps.portalMountManager.isCellMounted(key),
+		};
+		warmStatusDepsByLaneDeps.set(deps, warmDeps);
+	}
+	return warmDeps;
+}
+
+/**
+ * Per-row state for the lane bind loops — one object per row instead of the three closures (and
+ * the per-cell deps/context objects inside them) the loop used to allocate.
+ */
+interface DataRowBindState<TRowData> {
+	deps: RowCellBindingLaneDeps<TRowData>;
+	request: BindAllDataCellsRequest<TRowData>;
+	rowCtrl: RowCtrl<TRowData>;
+	isRowLoading: boolean;
+	/** Reused per cell — resolveWarmVisibleCellStatus reads it synchronously and never retains it. */
+	warmContext: WarmVisibleCellStatusContext | null;
+}
+
+/** Warm-cell status for one cell, computed at most once per cell per frame. */
+function getWarmVisibleCellStatus<TRowData>(row: DataRowBindState<TRowData>, cellSlot: CellSlot<TRowData>): WarmVisibleCellStatus {
+	const warmContext = row.warmContext;
+	if (!warmContext) return NO_WARM_REFRESH;
+	const cellCtrl =
+		cellSlot.columnInstanceId !== ''
+			? row.deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(row.request.node.id, cellSlot.columnInstanceId)
+			: undefined;
+	if (!cellCtrl) return WARM_CELL_UNTRACKED;
+	warmContext.cellCtrl = cellCtrl;
+	return resolveWarmVisibleCellStatus(getWarmStatusDeps(row.deps), cellSlot, warmContext);
+}
+
+/**
+ * Binds one data cell of a lane, or skips it when it is stable this scroll frame. Behaviour is the
+ * former per-lane loop body verbatim; the warm status is shared between the refresh and skip checks.
+ */
+function bindDataCell<TRowData>(
+	row: DataRowBindState<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	col: ColumnDef<TRowData>,
+	colIndex: number,
+	lane: 'left' | 'center' | 'right',
+	left: number,
+	isVisibleContent: boolean
+): void {
+	const { deps, request, rowCtrl } = row;
+	const { node, rowIndex, isScrollFrameActive, forceCellRefresh, isRowRebind, refreshVisibleColumns, viewportPlan, ctx } = request;
+	let warmStatus: WarmVisibleCellStatus | undefined;
+
+	// shouldRefreshWarmVisibleCell
+	let needsVisibleRefresh = false;
+	if (isScrollFrameActive && isVisibleContent && ctx) {
+		if (refreshVisibleColumns?.has(colIndex)) needsVisibleRefresh = true;
+		else needsVisibleRefresh = (warmStatus = getWarmVisibleCellStatus(row, cellSlot)).needsDeferredRefresh;
+	}
+
+	// shouldSkipStableCellDuringScroll
+	let skip = false;
+	if (isScrollFrameActive && !forceCellRefresh && !isRowRebind) {
+		if (cellSlot.colIndex === colIndex && cellSlot.rowId === node.id && cellSlot.rowIndex === rowIndex) {
+			if (!isVisibleContent) {
+				const instanceId = (request.columns[colIndex] as InternalColumnDef<TRowData> | undefined)?.instanceId;
+				skip = !(instanceId && viewportPlan && isOverscanLiveCell(viewportPlan.liveCells.overscan, rowIndex, instanceId));
+			} else {
+				warmStatus ??= getWarmVisibleCellStatus(row, cellSlot);
+				skip = !warmStatus.needsImmediateWake && !refreshVisibleColumns?.has(colIndex);
+			}
+		}
+	}
+	if (skip) {
+		if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
+		return;
+	}
+
+	const cellWidth = request.plan.colWidths[colIndex];
+	if (isScrollFrameActive) {
+		deps.onScrollCellVisited();
+		deps.onScrollCellPatched();
+		bindCellDuringScroll(deps.cellBinderDeps, {
+			cellSlot,
+			node,
+			rowIndex,
+			colIndex,
+			col,
+			lane,
+			ctx: ctx!,
+			pooledRowId: request.slot.id,
+			pooledRowGeneration: request.slot.generation,
+			left,
+			right: -1,
+			width: cellWidth,
+			isRowRebind,
+			isRowLoading: row.isRowLoading,
+			isInVisibleContent: isVisibleContent,
+			viewportPlan,
+			rowCtrl,
+		});
+	} else {
+		bindCellFull(deps.cellBinderDeps, {
+			cellSlot,
+			slotId: request.slot.id,
+			slotGeneration: request.slot.generation,
+			node,
+			rowIndex,
+			colIndex,
+			col,
+			lane,
+			pinRightBaseLeft: request.plan.pinRightBaseLeft,
+			plan: request.plan,
+			state: request.state,
+			ctx,
+			rowCtrl,
+		});
+	}
 }
 
 export function bindAllDataCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData>, request: BindAllDataCellsRequest<TRowData>): void {
-	const {
-		slot,
-		node,
-		rowIndex,
-		centerColStart,
-		centerColCount,
-		columns,
-		plan,
-		columnTopology,
-		isScrollFrameActive,
-		ctx,
-		state,
-		isRowRebind,
-		forceCellRefresh,
-		isRowVisible,
-		refreshVisibleColumns,
-		viewportPlan,
-	} = request;
+	const { slot, node, centerColStart, centerColCount, columns, plan, columnTopology, isScrollFrameActive, ctx, isRowVisible } = request;
 	const pinLeftWidth = plan.pinLeftWidth;
-	const pinRightBaseLeft = plan.pinRightBaseLeft;
 	const pinRightWidth = plan.pinRightWidth;
 	const isRowLoading = ctx ? ctx.loadingVersion > 0 && deps.engine.data.isRowLoading(node.id) : false;
 	const visibleColStart = ctx?.visibleColRange?.startIdx ?? centerColStart;
@@ -407,50 +549,27 @@ export function bindAllDataCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData
 	if (currentRowVersion !== undefined) rowCtrl.rowVersion = currentRowVersion;
 	rowCtrl.isEditing = false;
 	rowCtrl.isFocused = false;
-	const getWarmVisibleCellStatus = (cellSlot: CellSlot<TRowData>) => {
-		if (!ctx) return { needsImmediateWake: false, needsDeferredRefresh: false };
-		const cellCtrl =
-			cellSlot.columnInstanceId !== '' ? deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(node.id, cellSlot.columnInstanceId) : undefined;
-		if (!cellCtrl) return { needsImmediateWake: true, needsDeferredRefresh: true };
-		return resolveWarmVisibleCellStatus(
-			{
-				getCellPortalHost: deps.cellBinderDeps.getCellPortalHost,
-				isCellMounted: (key) => deps.cellBinderDeps.portalMountManager.isCellMounted(key),
-			},
-			cellSlot,
-			{
-				currentRowVersion,
-				globalVersion: ctx.globalVersion,
-				globalChangedDuringScroll: ctx.globalChangedDuringScroll,
-				insightVersion: ctx.insightVersion,
-				styleVersion: ctx.styleVersion,
-				loadingVersion: ctx.loadingVersion,
-				selectionVersion: ctx.selectionVersion,
-				hasInsightDecorations: ctx.hasInsightDecorations,
-				hasDeferredCellStyleRules: ctx.hasDeferredCellStyleRules,
-				loadingChangedDuringScroll: ctx.loadingChangedDuringScroll,
-				selectionChangedDuringScroll: ctx.selectionChangedDuringScroll,
-				cellCtrl,
-			}
-		);
-	};
-	const shouldSkipStableCellDuringScroll = (cellSlot: CellSlot<TRowData>, columnIndex: number, isVisibleContent: boolean): boolean => {
-		if (!isScrollFrameActive || forceCellRefresh || isRowRebind) return false;
-		if (cellSlot.colIndex !== columnIndex || cellSlot.rowId !== node.id || cellSlot.rowIndex !== rowIndex) return false;
-		if (!isVisibleContent) {
-			const instanceId = (columns[columnIndex] as InternalColumnDef<TRowData> | undefined)?.instanceId;
-			if (instanceId && viewportPlan?.liveCells.overscan.some((cell) => cell.rowIndex === rowIndex && cell.columnInstanceId === instanceId)) {
-				return false;
-			}
-			return true;
-		}
-		if (getWarmVisibleCellStatus(cellSlot).needsImmediateWake) return false;
-		return !refreshVisibleColumns?.has(columnIndex);
-	};
-	const shouldRefreshWarmVisibleCell = (cellSlot: CellSlot<TRowData>, columnIndex: number, isVisibleContent: boolean): boolean => {
-		if (!isScrollFrameActive || !isVisibleContent || !ctx) return false;
-		if (refreshVisibleColumns?.has(columnIndex)) return true;
-		return getWarmVisibleCellStatus(cellSlot).needsDeferredRefresh;
+	const row: DataRowBindState<TRowData> = {
+		deps,
+		request,
+		rowCtrl,
+		isRowLoading,
+		warmContext: ctx
+			? {
+					currentRowVersion,
+					globalVersion: ctx.globalVersion,
+					globalChangedDuringScroll: ctx.globalChangedDuringScroll,
+					insightVersion: ctx.insightVersion,
+					styleVersion: ctx.styleVersion,
+					loadingVersion: ctx.loadingVersion,
+					selectionVersion: ctx.selectionVersion,
+					hasInsightDecorations: ctx.hasInsightDecorations,
+					hasDeferredCellStyleRules: ctx.hasDeferredCellStyleRules,
+					loadingChangedDuringScroll: ctx.loadingChangedDuringScroll,
+					selectionChangedDuringScroll: ctx.selectionChangedDuringScroll,
+					cellCtrl: undefined as unknown as WarmVisibleCellStatusContext['cellCtrl'],
+				}
+			: null,
 	};
 
 	const pinLeftContainer = deps.ensurePinnedContainer(slot, 'left', pinLeftWidth);
@@ -498,53 +617,7 @@ export function bindAllDataCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData
 		const col = columns[placement.absoluteIndex];
 		const cellSlot = slot.leftCells[i];
 		if (!col || !cellSlot) continue;
-		const isVisibleContent = isRowVisible;
-		const needsVisibleRefresh = shouldRefreshWarmVisibleCell(cellSlot, placement.absoluteIndex, isVisibleContent);
-		if (shouldSkipStableCellDuringScroll(cellSlot, placement.absoluteIndex, isVisibleContent)) {
-			if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
-			continue;
-		}
-		if (isScrollFrameActive) deps.onScrollCellVisited();
-		const leftArg = placement.laneOffset;
-		const cellWidth = plan.colWidths[placement.absoluteIndex];
-		if (isScrollFrameActive) {
-			deps.onScrollCellPatched();
-			bindCellDuringScroll(deps.cellBinderDeps, {
-				cellSlot,
-				node,
-				rowIndex,
-				colIndex: placement.absoluteIndex,
-				col,
-				lane: 'left',
-				ctx: ctx!,
-				pooledRowId: slot.id,
-				pooledRowGeneration: slot.generation,
-				left: leftArg,
-				right: -1,
-				width: cellWidth,
-				isRowRebind,
-				isRowLoading,
-				isInVisibleContent: isVisibleContent,
-				viewportPlan,
-				rowCtrl,
-			});
-		} else {
-			bindCellFull(deps.cellBinderDeps, {
-				cellSlot,
-				slotId: slot.id,
-				slotGeneration: slot.generation,
-				node,
-				rowIndex,
-				colIndex: placement.absoluteIndex,
-				col,
-				lane: 'left',
-				pinRightBaseLeft,
-				plan,
-				state,
-				ctx,
-				rowCtrl,
-			});
-		}
+		bindDataCell(row, cellSlot, col, placement.absoluteIndex, 'left', placement.laneOffset, isRowVisible);
 	}
 
 	for (let i = 0; i < centerColCount; i++) {
@@ -552,116 +625,27 @@ export function bindAllDataCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData
 		const col = columns[c];
 		const cellSlot = slot.centerCells[i];
 		if (!col || !cellSlot) continue;
-		const isVisibleContent = isRowVisible && c >= visibleColStart && c <= visibleColEnd;
-		const needsVisibleRefresh = shouldRefreshWarmVisibleCell(cellSlot, c, isVisibleContent);
-		if (shouldSkipStableCellDuringScroll(cellSlot, c, isVisibleContent)) {
-			if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
-			continue;
-		}
-		if (isScrollFrameActive) deps.onScrollCellVisited();
-		const leftArg = plan.colLefts[c];
-		const cellWidth = plan.colWidths[c];
-		if (isScrollFrameActive) {
-			deps.onScrollCellPatched();
-			bindCellDuringScroll(deps.cellBinderDeps, {
-				cellSlot,
-				node,
-				rowIndex,
-				colIndex: c,
-				col,
-				lane: 'center',
-				ctx: ctx!,
-				pooledRowId: slot.id,
-				pooledRowGeneration: slot.generation,
-				left: leftArg,
-				right: -1,
-				width: cellWidth,
-				isRowRebind,
-				isRowLoading,
-				isInVisibleContent: isVisibleContent,
-				viewportPlan,
-				rowCtrl,
-			});
-		} else {
-			bindCellFull(deps.cellBinderDeps, {
-				cellSlot,
-				slotId: slot.id,
-				slotGeneration: slot.generation,
-				node,
-				rowIndex,
-				colIndex: c,
-				col,
-				lane: 'center',
-				pinRightBaseLeft,
-				plan,
-				state,
-				ctx,
-				rowCtrl,
-			});
-		}
+		bindDataCell(row, cellSlot, col, c, 'center', plan.colLefts[c], isRowVisible && c >= visibleColStart && c <= visibleColEnd);
 	}
 
 	for (let i = 0; i < columnTopology.right.length; i++) {
 		const placement = columnTopology.right[i];
-		const c = placement.absoluteIndex;
-		const col = columns[c];
+		const col = columns[placement.absoluteIndex];
 		const cellSlot = slot.rightCells[i];
 		if (!col || !cellSlot) continue;
-		const isVisibleContent = isRowVisible;
-		const needsVisibleRefresh = shouldRefreshWarmVisibleCell(cellSlot, c, isVisibleContent);
-		if (shouldSkipStableCellDuringScroll(cellSlot, c, isVisibleContent)) {
-			if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
-			continue;
-		}
-		if (isScrollFrameActive) deps.onScrollCellVisited();
 		// Use topology laneOffset for right cells (= absoluteLeft - pinRightBaseLeft).
-		const leftArg = placement.laneOffset;
-		const cellWidth = plan.colWidths[c];
-		if (isScrollFrameActive) {
-			deps.onScrollCellPatched();
-			bindCellDuringScroll(deps.cellBinderDeps, {
-				cellSlot,
-				node,
-				rowIndex,
-				colIndex: c,
-				col,
-				lane: 'right',
-				ctx: ctx!,
-				pooledRowId: slot.id,
-				pooledRowGeneration: slot.generation,
-				left: leftArg,
-				right: -1,
-				width: cellWidth,
-				isRowRebind,
-				isRowLoading,
-				isInVisibleContent: isVisibleContent,
-				viewportPlan,
-				rowCtrl,
-			});
-		} else {
-			bindCellFull(deps.cellBinderDeps, {
-				cellSlot,
-				slotId: slot.id,
-				slotGeneration: slot.generation,
-				node,
-				rowIndex,
-				colIndex: c,
-				col,
-				lane: 'right',
-				pinRightBaseLeft,
-				plan,
-				state,
-				ctx,
-				rowCtrl,
-			});
-		}
+		bindDataCell(row, cellSlot, col, placement.absoluteIndex, 'right', placement.laneOffset, isRowVisible);
 	}
+
+	// Keep the display-snapshot working set at least as large as what is rendered (with headroom
+	// for prewarm rings) — a fixed 1024 is smaller than a 40x30 viewport plus overscan.
+	const renderedRows = deps.getRenderedRowCount?.() ?? 0;
+	if (renderedRows > 0) deps.engine.cellDisplaySnapshots.ensureCapacity?.(3 * renderedRows * slot.cellCount);
 }
 
 export function bindAllLoadingCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData>, request: BindAllLoadingCellsRequest<TRowData>): void {
 	const { slot, rowIndex, centerColStart, centerColCount, columns, plan, columnTopology, isScrollFrameActive } = request;
 	const pinLeftWidth = plan.pinLeftWidth;
-	const pinRightBaseLeft = plan.pinRightBaseLeft;
 	const pinRightWidth = plan.pinRightWidth;
 	const globalVersion = deps.engine.stateManager.getState().globalVersion;
 	const snapshotVisualVersions = deps.cellBinderDeps.getSnapshotVisualVersions();
@@ -698,57 +682,77 @@ export function bindAllLoadingCells<TRowData>(deps: RowCellBindingLaneDeps<TRowD
 		);
 	}
 
-	const bindLoadingCell = (cellSlot: CellSlot<TRowData>, c: number, leftArg: number) => {
-		const col = columns[c];
-		if (!col || !cellSlot) return;
-		if (isScrollFrameActive) deps.onScrollCellVisited();
-		if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
-		const cellWidth = plan.colWidths[c];
-		const rowId = `loading:${rowIndex}`;
-		const cellClassName = applyLoadingInsightState(deps, cellSlot, rowId, col.field);
-		if (isScrollFrameActive) {
-			deps.onScrollCellPatched();
-			deps.markCellDirtyAfterScroll(cellSlot.element);
-		} else {
-			deps.ensureLoadingSkeleton(cellSlot.element);
-		}
-		const didWrite = cellSlot.update(c, col.field, rowIndex, rowId, leftArg, -1, cellWidth, cellClassName, 'loading', undefined, '', undefined);
-		cellSlot.lastMountedRowVersion = -1;
-		cellSlot.lastMountedGlobalVersion = globalVersion;
-		recordCellSlotMountedVisualVersions(cellSlot, {
+	// Everything below is identical for every cell of this loading row — computed once per row
+	// rather than once per cell.
+	const loadingRow: LoadingRowBindState<TRowData> = {
+		deps,
+		request,
+		rowId: `loading:${rowIndex}`,
+		globalVersion,
+		visualVersions: {
 			insightVersion: deps.engine.insights.getVersion(),
 			styleVersion: snapshotVisualVersions.styleVersion,
 			loadingVersion: snapshotVisualVersions.loadingVersion,
 			selectionVersion: deps.engine.selectionVersion,
-		});
-		deps.engine.cellDisplaySnapshots.set(
-			createCellDisplaySnapshot({
-				rowId,
-				columnInstanceId: getColumnInstanceIdentity(col),
-				colField: col.field,
-				rowVersion: -1,
-				globalVersion,
-				insightVersion: deps.engine.insights.getVersion(),
-				styleVersion: snapshotVisualVersions.styleVersion,
-				loadingVersion: snapshotVisualVersions.loadingVersion,
-				selectionVersion: deps.engine.selectionVersion,
-				baseClassName: 'og-cell og-cell-loading',
-				decorationClassName: cellClassName.replace('og-cell og-cell-loading', '').trim(),
-				contentKind: 'loading',
-				contentMode: 'loading',
-				formattedValue: '',
-				title: cellSlot.element.title,
-				validationError: cellSlot.element.dataset.validationError,
-			})
-		);
-		if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
+		},
 	};
 
 	for (let i = 0; i < columnTopology.left.length; i++) {
-		bindLoadingCell(slot.leftCells[i], columnTopology.left[i].absoluteIndex, columnTopology.left[i].laneOffset);
+		bindLoadingCell(loadingRow, slot.leftCells[i], columnTopology.left[i].absoluteIndex, columnTopology.left[i].laneOffset);
 	}
-	for (let i = 0; i < centerColCount; i++) bindLoadingCell(slot.centerCells[i], centerColStart + i, plan.colLefts[centerColStart + i]);
+	for (let i = 0; i < centerColCount; i++) bindLoadingCell(loadingRow, slot.centerCells[i], centerColStart + i, plan.colLefts[centerColStart + i]);
 	for (let i = 0; i < columnTopology.right.length; i++) {
-		bindLoadingCell(slot.rightCells[i], columnTopology.right[i].absoluteIndex, columnTopology.right[i].laneOffset);
+		bindLoadingCell(loadingRow, slot.rightCells[i], columnTopology.right[i].absoluteIndex, columnTopology.right[i].laneOffset);
 	}
+}
+
+interface LoadingRowBindState<TRowData> {
+	deps: RowCellBindingLaneDeps<TRowData>;
+	request: BindAllLoadingCellsRequest<TRowData>;
+	rowId: string;
+	globalVersion: number;
+	visualVersions: { insightVersion: number; styleVersion: number; loadingVersion: number; selectionVersion: number };
+}
+
+function bindLoadingCell<TRowData>(row: LoadingRowBindState<TRowData>, cellSlot: CellSlot<TRowData>, c: number, leftArg: number): void {
+	const { deps, request, rowId, globalVersion, visualVersions } = row;
+	const { columns, plan, rowIndex, isScrollFrameActive } = request;
+	const col = columns[c];
+	if (!col || !cellSlot) return;
+	if (isScrollFrameActive) deps.onScrollCellVisited();
+	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
+	const cellWidth = plan.colWidths[c];
+	const decorationSuffix = applyLoadingInsightState(deps, cellSlot, rowId, col.field);
+	const cellClassName = decorationSuffix ? LOADING_CELL_BASE_CLASS + decorationSuffix : LOADING_CELL_BASE_CLASS;
+	if (isScrollFrameActive) {
+		deps.onScrollCellPatched();
+		deps.markCellDirtyAfterScroll(cellSlot.element);
+	} else {
+		deps.ensureLoadingSkeleton(cellSlot.element);
+	}
+	const didWrite = cellSlot.update(c, col.field, rowIndex, rowId, leftArg, -1, cellWidth, cellClassName, 'loading', undefined, '', undefined);
+	cellSlot.lastMountedRowVersion = -1;
+	cellSlot.lastMountedGlobalVersion = globalVersion;
+	recordCellSlotMountedVisualVersions(cellSlot, visualVersions);
+	deps.engine.cellDisplaySnapshots.set(
+		createCellDisplaySnapshot({
+			rowId,
+			columnInstanceId: getColumnInstanceIdentity(col),
+			colField: col.field,
+			rowVersion: -1,
+			globalVersion,
+			insightVersion: visualVersions.insightVersion,
+			styleVersion: visualVersions.styleVersion,
+			loadingVersion: visualVersions.loadingVersion,
+			selectionVersion: visualVersions.selectionVersion,
+			baseClassName: LOADING_CELL_BASE_CLASS,
+			decorationClassName: decorationSuffix,
+			contentKind: 'loading',
+			contentMode: 'loading',
+			formattedValue: '',
+			title: cellSlot.element.title,
+			validationError: cellSlot.element.dataset.validationError,
+		})
+	);
+	if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
 }

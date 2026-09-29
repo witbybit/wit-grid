@@ -1,5 +1,6 @@
 import { createRowCtrl, type RowCtrl } from './RowCtrl.js';
 import { CellCtrlStore } from './CellCtrlStore.js';
+import type { CellCtrl } from './CellCtrl.js';
 
 export interface RowCtrlStoreStats {
 	created: number;
@@ -13,12 +14,16 @@ export interface RowCtrlStoreStats {
 }
 
 /**
- * Owns RowCtrl lifecycle. NOT bounded by the render window — a row scrolled out of view keeps its
- * RowCtrl (with `attachedSlotId` cleared by the caller on detach) until the row is actually removed
- * from the row model. This is what makes vertical focus/edit row retention possible: the controller
- * for a focused/editing row survives virtualization even when its physical RowSlot doesn't, so
- * re-entering the render window re-attaches to the SAME RowCtrl rather than fabricating a fresh one
- * with no memory of edit state.
+ * Owns RowCtrl lifecycle. Controllers live as long as a physical CellSlot holds them: when a
+ * CellSlot rebinds to another row, or is destroyed, it hands its previous CellCtrl back through
+ * `releaseDetachedCellCtrl`, and a RowCtrl left with no CellCtrls is dropped with it. That keeps
+ * both stores bounded to roughly the rendered window instead of every (row, column) ever visited.
+ *
+ * Focused/editing controllers are the exception — they are never released on detach. This is what
+ * makes vertical focus/edit row retention possible: the controller for a focused/editing row
+ * survives virtualization even when its physical RowSlot doesn't, so re-entering the render window
+ * re-attaches to the SAME RowCtrl/CellCtrl rather than fabricating a fresh one with no memory of
+ * edit state. Every other piece of CellCtrl state is re-derived on the next bind.
  *
  * Known scope limitation (documented, not silently skipped): there is currently no row-removal
  * event this store is wired into automatically, matching the existing codebase's own convention for
@@ -51,6 +56,28 @@ export class RowCtrlStore<TRowData = unknown> {
 
 	public get(rowId: string): RowCtrl<TRowData> | undefined {
 		return this.byRowId.get(rowId);
+	}
+
+	/**
+	 * Called by a CellSlot that stops holding `cellCtrl` (rebinds to another row, or is destroyed).
+	 * Releases the controller unless it has since been attached to a different slot, or it is the
+	 * focused/editing cell. Drops the owning RowCtrl once it has no controllers left and is itself
+	 * neither focused nor editing. Returns true when the controller was released.
+	 */
+	public releaseDetachedCellCtrl(cellCtrl: CellCtrl, slotInstanceId: string): boolean {
+		if (cellCtrl.lifecycle.destroyed) return false;
+		if (cellCtrl.lifecycle.attachedSlotInstanceId !== slotInstanceId) return false;
+		if (cellCtrl.visualState.focused || cellCtrl.visualState.editing) return false;
+		if (!this.cellCtrls.release(cellCtrl)) return false;
+		const rowCtrl = this.byRowId.get(cellCtrl.rowId);
+		if (!rowCtrl) return true;
+		if (rowCtrl.cellKeysByColumnInstanceId.get(cellCtrl.columnInstanceId) === cellCtrl.key) {
+			rowCtrl.cellKeysByColumnInstanceId.delete(cellCtrl.columnInstanceId);
+		}
+		if (!rowCtrl.isFocused && !rowCtrl.isEditing && this.cellCtrls.sizeForRow(rowCtrl.rowId) === 0) {
+			this.byRowId.delete(rowCtrl.rowId);
+		}
+		return true;
 	}
 
 	/** Called when a row is permanently gone from the row model (deleted, filtered out) — NOT when
