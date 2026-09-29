@@ -1,4 +1,4 @@
-import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle, InternalColumnDef } from '../columnDef.js';
+import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle, DomCellRendererParams, InternalColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 
@@ -61,6 +61,11 @@ export class DomCellRendererManager<TRowData = unknown> {
 		this.pruneWarmCache();
 	}
 
+	private getApi(): DomCellRendererParams<TRowData>['api'] {
+		if (!this.engine) throw new Error('DOM cell renderers need a grid engine');
+		return this.engine.getApiRef() as DomCellRendererParams<TRowData>['api'];
+	}
+
 	private ensureHiddenContainer(): HTMLDivElement | null {
 		if (!this.hiddenContainer && typeof document !== 'undefined') {
 			this.hiddenContainer = document.createElement('div');
@@ -104,6 +109,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 			phase: params.phase,
 			isFocused: params.isFocused,
 			isSelected: params.isSelected,
+			api: this.getApi(),
 		};
 
 		const handle = params.renderer.mount(container, mountParams);
@@ -237,6 +243,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 				phase: params.phase,
 				isFocused: params.isFocused,
 				isSelected: params.isSelected,
+				api: this.getApi(),
 			});
 		}
 	}

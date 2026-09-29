@@ -13,6 +13,7 @@ interface Row {
 function makeEngineStub(): any {
 	return {
 		isScrolling: false,
+		getApiRef: () => ({}),
 		customRendererMountsDuringScroll: 0,
 		customRendererWarmHits: 0,
 		customRendererWarmMisses: 0,
@@ -37,6 +38,7 @@ function params(key: string, parentContainer: HTMLElement, overrides: Partial<Ac
 		isLoading: false,
 		phase: 'initial',
 		isScrolling: false,
+		getApiRef: () => ({}),
 		isFocused: false,
 		isSelected: false,
 		...overrides,

@@ -275,6 +275,8 @@ export function createGridRuntimeComposition<TRowData>({
 	};
 
 	const frozen = Object.freeze(api) as GridApi<TRowData>;
+	// Renderers get the public api, not the runtime behind it: DOM cells see what React cells see.
+	runtime.engine.setApiRef(frozen);
 	registerGridRuntimeComposition(frozen, {
 		host: {
 			engine: runtime.engine,

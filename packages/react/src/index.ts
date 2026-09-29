@@ -46,6 +46,8 @@ export {
 	multiSelectColumnType,
 	dropdownColumnType,
 } from './renderers/CellTypes.js';
+// DOM versions of the built-in cells (what the built-in column types use)
+export { CheckboxDomCellRenderer, DateDomCellRenderer, createNumberDomCellRenderer } from './renderers/domCellTypes.js';
 export type {
 	DropdownOption,
 	DropdownOptionColor,

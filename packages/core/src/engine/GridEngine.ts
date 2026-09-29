@@ -152,6 +152,11 @@ export class GridEngine<TRowData = unknown> {
 	public setApiRef(api: import('../api/GridApi.js').GridApi<TRowData>): void {
 		this._apiRef = api;
 	}
+	/** The grid's public api, handed to DOM cell renderers. Throws before the api exists. */
+	public getApiRef(): import('../api/GridApi.js').GridApi<TRowData> {
+		if (!this._apiRef) throw new Error('Grid api is not available yet');
+		return this._apiRef;
+	}
 	private getDistinctValueSourceNodes(): RowNode<TRowData>[] {
 		return asAllDataNodesCapableRowModel(this.rowModel)?.getAllDataNodes() ?? [];
 	}
@@ -281,12 +286,12 @@ export class GridEngine<TRowData = unknown> {
 	constructor(config: GridEngineConfig<TRowData>) {
 		this.getContainerElement = config.getContainerElement ?? (() => null);
 		this.rendererOptions = config.rendererOptions;
+		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
 		this.htmlScrollSnapshots = new HtmlScrollSnapshotStore(config.rendererOptions?.htmlSnapshot?.maxTotalBytes, {
 			maxEntries: config.rendererOptions?.htmlSnapshot?.maxSnapshots,
 			maxSingleEntryBytes: config.rendererOptions?.htmlSnapshot?.maxSingleSnapshotBytes,
 		});
 		this.eventBus = new EventBus<TRowData>();
-		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
 		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows
 		// permanently removed via a structural transaction (grid.applyTransaction({ remove: [...] })).
@@ -482,12 +487,12 @@ export class GridEngine<TRowData = unknown> {
 		);
 
 		this.changeApplier = new GridCommitKernel<TRowData>({
+			beforeCommit: () => this.asyncTransactions.flush(),
 			stateManager: this.stateManager,
 			invalidation: this.invalidation,
 			eventBus: this.eventBus,
 			dispatchEvent: (type, payload) => {
 				if (type === GridEventName.rowsUpdated) {
-			beforeCommit: () => this.asyncTransactions.flush(),
 					this.dispatchRowsUpdated(payload as RowsUpdatedDispatchPayload<TRowData>);
 					return;
 				}
@@ -777,11 +782,6 @@ export class GridEngine<TRowData = unknown> {
 		);
 	}
 
-	public applyTransaction(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null {
-		const execution = this.changeApplier.commitDetailed({
-			reason: 'rows:apply-transaction',
-			domainMutations: [{ kind: 'row-transaction', transaction }],
-		});
 	/** Queued row transactions for applyTransactionAsync; flushed before any other commit. */
 	private readonly asyncTransactions = new AsyncTransactionQueue<TRowData>({
 		apply: (transaction) => this.applyTransaction(transaction),
@@ -804,6 +804,11 @@ export class GridEngine<TRowData = unknown> {
 		this.asyncTransactions.flush();
 	}
 
+	public applyTransaction(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null {
+		const execution = this.changeApplier.commitDetailed({
+			reason: 'rows:apply-transaction',
+			domainMutations: [{ kind: 'row-transaction', transaction }],
+		});
 		const result = execution.appliedMutations[0]?.result as InternalRowNodeTransaction<TRowData> | undefined;
 		return result ? mapInternalRowNodeTransaction(this.getPublicRowNodeDispatchDeps(), result) : null;
 	}
@@ -1557,12 +1562,12 @@ export class GridEngine<TRowData = unknown> {
 	}
 
 	public destroy(): void {
+		this.asyncTransactions.destroy();
 		this.flightRecorder.destroy();
 		this.insights.clear();
 		this.cellNotifications.clear();
 		this.eventBus.clear();
 		this.stateManager.destroy();
-		this.asyncTransactions.destroy();
 		this.domainSubscriptions.clear();
 	}
 

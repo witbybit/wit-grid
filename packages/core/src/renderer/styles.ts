@@ -1047,7 +1047,8 @@ export const CORE_STYLES = `
     overflow: hidden;
   }
 
-  .og-custom-renderer-container {
+  .og-custom-renderer-container,
+  .og-dom-renderer-container {
     width: 100%;
     height: 100%;
     min-width: 0;

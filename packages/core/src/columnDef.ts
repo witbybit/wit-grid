@@ -5,6 +5,7 @@ import type { CellEditorProps, CellRendererProps, HeaderMenuRendererProps, GridS
 import type { GroupVisualRow, DetailVisualRow } from './visualRow.js';
 import type { GridCapabilityCallback } from './capabilities/capabilityTypes.js';
 import type { GridRowDataRef } from './publicRowRef.js';
+import type { GridApi as PublicGridApi } from './api/GridApiSurfaces.js';
 
 // ─── Value getter / setter / validator params ─────────────────────────────────
 
@@ -188,6 +189,8 @@ export interface DomCellRendererParams<TRowData = unknown> {
 	phase: CellRendererPhase;
 	isFocused: boolean;
 	isSelected: boolean;
+	/** The grid's api — the same object React cell renderers receive as `api`. */
+	api: PublicGridApi<TRowData>;
 }
 
 /** Handle returned by DomCellRenderer.mount() — grid calls update() directly in the paint loop */

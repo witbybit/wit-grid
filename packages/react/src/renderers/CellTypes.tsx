@@ -25,30 +25,14 @@
 import React, { useState, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import type { CellRendererProps, CellEditorProps } from '../types.js';
-
-// ─── CSS token constants ──────────────────────────────────────────────────────
-// Each resolves a CSS variable with a dark-theme fallback.
-
-const T = {
-	bg: 'var(--og-ct-bg, #0d1117)',
-	surface: 'var(--og-ct-surface, #030712)',
-	overlay: 'var(--og-ct-overlay, rgba(30,41,59,0.8))',
-	overlayActive: 'var(--og-ct-overlay-active, rgba(30,41,59,1))',
-	border: 'var(--og-ct-border, rgba(30,41,59,0.9))',
-	borderHover: 'var(--og-ct-border-hover, rgba(71,85,105,0.6))',
-	borderFocus: 'var(--og-ct-border-focus, #6366f1)',
-	text: 'var(--og-ct-text, #e2e8f0)',
-	textMuted: 'var(--og-ct-text-muted, #64748b)',
-	textSubtle: 'var(--og-ct-text-subtle, #94a3b8)',
-	accent: 'var(--og-ct-accent, #6366f1)',
-	accentBg: 'var(--og-ct-accent-bg, rgba(99,102,241,0.15))',
-	accentHover: 'var(--og-ct-accent-hover, #818cf8)',
-	accentText: 'var(--og-ct-accent-text, #c7d2fe)',
-	dangerText: 'var(--og-ct-danger-text, #f87171)',
-	dangerBg: 'var(--og-ct-danger-bg, rgba(239,68,68,0.1))',
-	successText: 'var(--og-ct-success-text, #34d399)',
-	warningText: 'var(--og-ct-warning-text, #fbbf24)',
-};
+import { T } from './cellTypeTokens.js';
+import {
+	CheckboxDomCellRenderer,
+	DateDomCellRenderer,
+	createNumberDomCellRenderer,
+	formatNumberCell,
+	type NumberCellRendererOptions,
+} from './domCellTypes.js';
 
 // Tag colour palettes (8 options, index-stable)
 const TAG_PALETTES: ReadonlyArray<{ bg: string; border: string; text: string }> = [
@@ -988,16 +972,7 @@ export function createDropdownCellEditor(options: DropdownOption[]) {
 
 // ─── 5. Number ────────────────────────────────────────────────────────────────
 
-export interface NumberCellRendererOptions {
-	/** String prepended before the number (e.g. `'$'`). */
-	prefix?: string;
-	/** String appended after the number (e.g. `' yrs'`). */
-	suffix?: string;
-	/** Fixed decimal places. Omit to use the raw string value. */
-	decimals?: number;
-	/** Use `toLocaleString` formatting (thousands separator etc). */
-	locale?: boolean;
-}
+export type { NumberCellRendererOptions } from './domCellTypes.js';
 
 /**
  * Factory — returns a number renderer with optional formatting.
@@ -1009,19 +984,9 @@ export interface NumberCellRendererOptions {
  * ```
  */
 export function createNumberCellRenderer(opts: NumberCellRendererOptions = {}) {
-	const { prefix = '', suffix = '', decimals, locale = false } = opts;
-
 	const Renderer = memo(function NumberCellRenderer({ value }: CellRendererProps<any>) {
-		const num = parseFloat(String(value));
-		if (isNaN(num)) return <span style={{ color: T.textMuted, fontSize: 11, fontStyle: 'italic' }}>—</span>;
-
-		let formatted: string;
-		if (decimals !== undefined) {
-			formatted = locale ? num.toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',') : num.toFixed(decimals);
-		} else {
-			formatted = locale ? num.toLocaleString() : String(num);
-		}
-
+		const display = formatNumberCell(value, opts);
+		if (display === null) return <span style={{ color: T.textMuted, fontSize: 11, fontStyle: 'italic' }}>—</span>;
 		return (
 			<span
 				style={{
@@ -1031,9 +996,7 @@ export function createNumberCellRenderer(opts: NumberCellRendererOptions = {}) {
 					letterSpacing: '0.02em',
 				}}
 			>
-				{prefix}
-				{formatted}
-				{suffix}
+				{display}
 			</span>
 		);
 	});
@@ -1240,19 +1203,21 @@ export interface ColumnTypeDefinition<TRowData = unknown> {
 }
 
 // Singleton instances for built-in types — created once at module load, never re-created.
-const _numberRenderer = createNumberCellRenderer();
+// The built-in cells render through DOM renderers (domCellTypes.ts): same markup as the React
+// components above, without a portal or React work per cell.
+const _numberRenderer = createNumberDomCellRenderer();
 const _numberEditor = createNumberCellEditor();
 
 export const BUILTIN_COLUMN_TYPES: Record<string, ColumnTypeDefinition<any>> = {
 	checkbox: {
-		renderer: { kind: 'react', component: CheckboxCellRenderer },
+		renderer: { kind: 'dom', renderer: CheckboxDomCellRenderer },
 	},
 	date: {
-		renderer: { kind: 'react', component: DateCellRenderer },
+		renderer: { kind: 'dom', renderer: DateDomCellRenderer },
 		cellEditor: DateCellEditor,
 	},
 	number: {
-		renderer: { kind: 'react', component: _numberRenderer },
+		renderer: { kind: 'dom', renderer: _numberRenderer },
 		cellEditor: _numberEditor,
 	},
 };
@@ -1270,7 +1235,7 @@ export const BUILTIN_COLUMN_TYPES: Record<string, ColumnTypeDefinition<any>> = {
  */
 export function numberColumnType(opts?: NumberCellRendererOptions & NumberCellEditorOptions): ColumnTypeDefinition<any> {
 	return {
-		renderer: { kind: 'react', component: createNumberCellRenderer(opts) },
+		renderer: { kind: 'dom', renderer: createNumberDomCellRenderer(opts) },
 		cellEditor: createNumberCellEditor(opts),
 	};
 }
