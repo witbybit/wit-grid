@@ -66,8 +66,7 @@ export function applyHierarchyCellFocus<TRowData>(
 		active !== cellSlot.element &&
 		(active === document.body || (viewport?.contains(active) && !binder.isEditorInteractiveElement(active)))
 	) {
-		if (binder.getIsScrolling()) binder.setDeferredFocusCell(cellSlot.element);
-		else binder.applyFocus(cellSlot.element);
+		binder.applyFocus(cellSlot.element);
 	}
 	return ' og-cell-focused';
 }

@@ -493,8 +493,20 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		if (heldPortalKey === cellKey) cellSlot.renderer = null;
 	}
 
+	/**
+	 * Moves DOM focus to the focused cell. While the grid scrolls, the move waits for scroll end —
+	 * unless focus is already in the grid (keyboard navigation, whose moves scroll the viewport):
+	 * deferring then strands focus on <body>, because the previous cell loses its tabindex at once,
+	 * and the next key would scroll the page instead of moving the cell.
+	 */
 	public applyFocus(cell: HTMLDivElement): void {
-		if (this.deps.stateHost.runtimeState.isScrolling()) {
+		const active = typeof document !== 'undefined' ? document.activeElement : null;
+		const viewport = this.deps.getViewportContainer();
+		if (active === cell) return;
+		// Never pull focus out of an open editor.
+		if (active && active !== document.body && this.isEditorInteractiveElement(active)) return;
+		const focusInGrid = !!active && active !== document.body && !!viewport?.contains(active);
+		if (this.deps.stateHost.runtimeState.isScrolling() && !focusInGrid) {
 			this.deps.stateHost.deferredFocusCell = cell;
 			const renderStats = this.deps.stateHost.renderStats;
 			if (renderStats) {
@@ -502,6 +514,8 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			}
 			return;
 		}
+		// Focusable before focusing: the accessibility sync that writes tabindex runs after this.
+		if (!cell.hasAttribute('tabindex')) cell.tabIndex = -1;
 		cell.focus({ preventScroll: true });
 	}
 

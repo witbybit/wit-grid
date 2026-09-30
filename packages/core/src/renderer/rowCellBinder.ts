@@ -563,11 +563,8 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 					!cellSlot.element.contains(activeEl) &&
 					!deps.isEditorInteractiveElement(activeEl)))
 		) {
-			if (deps.getIsScrolling()) {
-				deps.setDeferredFocusCell(cellSlot.element);
-			} else {
-				deps.applyFocus(cellSlot.element);
-			}
+			// applyFocus decides whether the move waits for scroll end.
+			deps.applyFocus(cellSlot.element);
 		}
 	}
 
@@ -877,7 +874,8 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 	if (isFocused) {
 		const programmaticScrollCell = getProgrammaticScrollCellPointer(deps.programmaticScrollCell);
 		const isProgrammatic = doesCanonicalCellPointerMatchColumn(programmaticScrollCell, node.id, col);
-		deps.setDeferredFocusCell(cellSlot.element);
+		// Keyboard navigation keeps DOM focus through its own scroll; applyFocus defers otherwise.
+		deps.applyFocus(cellSlot.element);
 		if (isProgrammatic) deps.clearProgrammaticScrollCell();
 	}
 
