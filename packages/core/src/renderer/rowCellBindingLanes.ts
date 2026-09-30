@@ -4,6 +4,9 @@ import { getColumnInstanceIdentity } from '../columnDef.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
 import { CellSlot, isDirectTextColumn, recordCellSlotMountedVisualVersions } from './cellSlot.js';
+import { bindHierarchyCell } from './hierarchyCellBinder.js';
+import type { GroupVisualRow, TotalVisualRow } from '../visualRow.js';
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import type { RowSlot } from './rowSlot.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
@@ -19,7 +22,8 @@ import {
 	type WarmVisibleCellStatusDeps,
 } from './warmCellStatus.js';
 import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
-import { isOverscanLiveCell } from './binders/binderShared.js';
+import { buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
+import { reportRendererFault } from './rendererFaults.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
 export interface CellSlotRetentionTelemetrySink {
@@ -99,6 +103,19 @@ export interface BindAllDataCellsRequest<TRowData = unknown> {
 	isRowVisible: boolean;
 	refreshVisibleColumns?: ReadonlySet<number> | null;
 	viewportPlan?: ViewportPlan | null;
+}
+
+export interface BindAllHierarchyRowCellsRequest<TRowData = unknown> {
+	slot: RowSlot<TRowData>;
+	row: GroupVisualRow<TRowData> | TotalVisualRow<TRowData>;
+	rowIndex: number;
+	centerColStart: number;
+	centerColCount: number;
+	columns: ColumnDef<TRowData>[];
+	plan: ReturnType<GridEngine<TRowData>['columns']['getCompiledPlan']>;
+	columnTopology: CompiledColumnTopology;
+	isScrollFrameActive: boolean;
+	state: InternalGridState<TRowData>;
 }
 
 export interface BindAllLoadingCellsRequest<TRowData = unknown> {
@@ -464,6 +481,24 @@ function bindDataCell<TRowData>(
 ): void {
 	const { deps, request, rowCtrl } = row;
 	const { node, rowIndex, isScrollFrameActive, forceCellRefresh, isRowRebind, refreshVisibleColumns, viewportPlan, ctx } = request;
+	if (isHierarchyColumn(col)) {
+		const visualRow = deps.engine.getVisualRowModel()?.getVisualRow(rowIndex);
+		if (visualRow) {
+			bindHierarchyCell(deps, {
+				cellSlot,
+				row: visualRow,
+				rowIndex,
+				colIndex,
+				col,
+				lane,
+				left,
+				width: request.plan.colWidths[colIndex],
+				state: request.state,
+				isScrollFrameActive,
+			});
+			return;
+		}
+	}
 	let warmStatus: WarmVisibleCellStatus | undefined;
 
 	// shouldRefreshWarmVisibleCell
@@ -756,5 +791,108 @@ function bindLoadingCell<TRowData>(row: LoadingRowBindState<TRowData>, cellSlot:
 			validationError: cellSlot.element.dataset.validationError,
 		})
 	);
+	if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
+}
+
+/**
+ * Binds a group or total row as a cell row: every lane gets real cells, like a data row. The
+ * hierarchy column shows the group; every other column shows `aggregates[field]` through the
+ * column's value formatter, or nothing. No portals, no framework work: these cells are written
+ * on every bind, scroll frames included, so group and total rows are never blank mid-scroll.
+ */
+export function bindAllHierarchyRowCells<TRowData>(deps: RowCellBindingLaneDeps<TRowData>, request: BindAllHierarchyRowCellsRequest<TRowData>): void {
+	const { slot, centerColStart, centerColCount, columns, plan, columnTopology, isScrollFrameActive } = request;
+	const pinLeftContainer = deps.ensurePinnedContainer(slot, 'left', plan.pinLeftWidth);
+	const pinRightContainer = deps.ensurePinnedContainer(slot, 'right', plan.pinRightWidth);
+	if (!isScrollFrameActive) {
+		reconcileTopology(
+			slot,
+			columnTopology,
+			pinLeftContainer,
+			centerColStart,
+			centerColCount,
+			pinRightContainer,
+			columns,
+			deps.initCell,
+			deps.releaseCellFn
+		);
+	} else {
+		reconcileCellTopologyForScroll(
+			slot,
+			columnTopology,
+			pinLeftContainer,
+			centerColStart,
+			centerColCount,
+			pinRightContainer,
+			columns,
+			deps.initCell,
+			deps.releaseCellFn,
+			undefined,
+			deps.engine.instrumentation,
+			deps.retentionStats
+		);
+	}
+	for (let i = 0; i < columnTopology.left.length; i++) {
+		const placement = columnTopology.left[i];
+		bindHierarchyRowCell(deps, request, slot.leftCells[i], placement.absoluteIndex, 'left', placement.laneOffset);
+	}
+	for (let i = 0; i < centerColCount; i++) {
+		bindHierarchyRowCell(deps, request, slot.centerCells[i], centerColStart + i, 'center', plan.colLefts[centerColStart + i]);
+	}
+	for (let i = 0; i < columnTopology.right.length; i++) {
+		const placement = columnTopology.right[i];
+		bindHierarchyRowCell(deps, request, slot.rightCells[i], placement.absoluteIndex, 'right', placement.laneOffset);
+	}
+}
+
+function bindHierarchyRowCell<TRowData>(
+	deps: RowCellBindingLaneDeps<TRowData>,
+	request: BindAllHierarchyRowCellsRequest<TRowData>,
+	cellSlot: CellSlot<TRowData> | undefined,
+	colIndex: number,
+	lane: 'left' | 'center' | 'right',
+	left: number
+): void {
+	const { row, rowIndex, columns, plan, state, isScrollFrameActive } = request;
+	const col = columns[colIndex];
+	if (!col || !cellSlot) return;
+	const width = plan.colWidths[colIndex];
+	if (isHierarchyColumn(col)) {
+		bindHierarchyCell(deps, { cellSlot, row, rowIndex, colIndex, col, lane, left, width, state, isScrollFrameActive });
+		return;
+	}
+	if (isScrollFrameActive) deps.onScrollCellVisited();
+	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
+	const value = row.aggregates[col.field];
+	let text = '';
+	if (value !== undefined && !col.checkboxSelection) {
+		try {
+			// The column's formatter, else its text impostor (the renderer's cheap text form), else raw.
+			const impostor = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render;
+			if (col.valueFormatter) text = col.valueFormatter({ value, rowData: undefined as TRowData, colDef: col, rowId: row.id });
+			else if (value === null) text = '';
+			else text = (impostor && impostor({ value, formattedValue: String(value) })) || String(value);
+		} catch (error) {
+			reportRendererFault(deps.engine, 'aggregate-format', error, { rowId: row.id, rowIndex, colField: col.field, colIndex });
+			text = String(value);
+		}
+	}
+	const className = `${buildCellPinClass(lane)} og-cell-aggregate${text === '' ? '' : ' og-cell-aggregate-value'}`;
+	const didWrite = cellSlot.update(
+		colIndex,
+		col.field,
+		rowIndex,
+		row.id,
+		left,
+		-1,
+		width,
+		className,
+		text === '' ? 'empty' : 'text',
+		value,
+		text,
+		undefined
+	);
+	cellSlot.hasAggregateText = text !== '';
+	cellSlot.lastMountedRowVersion = -1;
 	if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
 }

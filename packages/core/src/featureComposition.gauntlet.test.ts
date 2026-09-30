@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { HIERARCHY_COLUMN_FIELD } from './rows/hierarchyColumn.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GridEventName } from './api/GridEvents.js';
@@ -116,11 +117,9 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		store.engine.invalidation.consume();
 		store.setGroupBy(['team']);
 		expect(events.splice(0)).toEqual(['renderInvalidated', 'groupByChanged']);
+		// The first grouping adds the hierarchy column; a changed column set repaints everything.
 		const groupFrame = store.engine.invalidation.consume();
-		expect(groupFrame.full).toBe(false);
-		expect(groupFrame.viewport).toBe(true);
-		expect(groupFrame.headers).toBe(true);
-		expect(groupFrame.overlay).toBe(true);
+		expect(groupFrame.full).toBe(true);
 
 		const eastGroup = Array.from({ length: store.getVisualRowCount() }, (_, index) => store.getVisualRow(index)).find((row) => {
 			if (row?.kind !== 'group') return false;
@@ -172,7 +171,10 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		expect(store.getVisualIndexByRowId('r4')).toBe(1);
 		expect(store.getVisualRow(1)?.kind).toBe('data');
 		expect(store.getVisualRow(1)?.node.data.id).toBe('r4');
-		expect(store.getState().selection.bounds).toEqual({ minRow: 1, maxRow: 1, minCol: 2, maxCol: 2 });
+		// The hierarchy column sits in front, so 'score' is found by name rather than a fixed index.
+		const scoreCol = store.getColumnIndex('score');
+		expect(scoreCol).toBe(3);
+		expect(store.getState().selection.bounds).toEqual({ minRow: 1, maxRow: 1, minCol: scoreCol, maxCol: scoreCol });
 
 		controller.dispose();
 		store.destroy();
@@ -388,7 +390,14 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 			columns: store.getState().columns,
 		});
 
-		expect(store.getPinnedColumns()).toEqual({ left: 1, right: 1 });
+		// Tree data adds the pinned hierarchy column in front of the user's pinned column.
+		expect(store.getPinnedColumns()).toEqual({ left: 2, right: 1 });
+		expect(
+			store
+				.getState()
+				.columns.slice(0, 2)
+				.map((column) => column.field)
+		).toEqual([HIERARCHY_COLUMN_FIELD, 'name']);
 		store.selectCell({ rowId: 'child-b', colField: 'name' });
 		store.applyRowSelectionGesture({ kind: 'replace', rowIds: ['child-b'], source: 'api' });
 		await store.copySelectedRange();

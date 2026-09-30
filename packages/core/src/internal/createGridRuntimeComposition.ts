@@ -131,6 +131,8 @@ export function createGridRuntimeComposition<TRowData>({
 		setTreeData: (treeData: Parameters<typeof runtime.setTreeData>[0]) => runtime.setTreeData(treeData),
 		getAggregation: () => runtime.getAggregation(),
 		setAggregation: (defs: Parameters<typeof runtime.setAggregation>[0]) => runtime.setAggregation(defs),
+		getHierarchyColumn: () => runtime.getHierarchyColumn(),
+		setHierarchyColumn: (config: Parameters<typeof runtime.setHierarchyColumn>[0]) => runtime.setHierarchyColumn(config),
 		getDetail: () => runtime.getDetail(),
 		setDetail: (detail: Parameters<typeof runtime.setDetail>[0]) => runtime.setDetail(detail),
 		setExpanded: (id: string, expanded: boolean) => runtime.setExpanded(id, expanded),

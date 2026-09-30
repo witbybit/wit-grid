@@ -1,4 +1,11 @@
-import type { AggregationConfig, DetailConfig, ExpansionState, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
+import type {
+	AggregationConfig,
+	DetailConfig,
+	ExpansionState,
+	GroupingConfig,
+	HierarchyColumnConfig,
+	TreeDataConfig,
+} from '../rows/hierarchyConfig.js';
 import type { ColumnDef, GridStyleRule, GridRendererOptions } from '../columnDef.js';
 import type { ActiveEditState, GridCellPointer, GridSelectionState, RowSelectionOptions } from '../api/GridApi.js';
 import type { BuiltInThemeName, ThemeTokens } from '../renderer/themes.js';
@@ -44,6 +51,8 @@ export interface GridEngineConfig<TRowData = unknown> {
 	treeData?: TreeDataConfig<TRowData>;
 	aggregation?: AggregationConfig<TRowData>;
 	detail?: DetailConfig<TRowData>;
+	hierarchyColumn?: HierarchyColumnConfig<TRowData> | false;
+	pinnedColumns?: { left: number; right: number };
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
 	showFloatingFilters?: boolean;

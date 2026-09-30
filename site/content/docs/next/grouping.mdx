@@ -11,7 +11,13 @@ Tree data instead nests rows using an explicit parent-child relationship. Both a
 
 ## Row grouping
 
-Set `grouping.by` to the columns to fold rows by, and `aggregation.defs` to compute summary values for each group:
+Set `grouping.by` to the columns to fold rows by, and `aggregation.defs` to compute summary values for each group.
+By default group and total rows are ordinary cell rows: an auto **hierarchy column**, pinned left, shows each
+group's toggle, key and row count, and every other column shows that group's aggregate through the column's own
+`valueFormatter`. Configure the hierarchy column with `hierarchyColumn` (header, width, indent, which parts show,
+custom label and count) or turn it off with `hierarchyColumn: false`.
+
+For a fully custom full-width group row instead, set `grouping.display: 'row'` and supply a `groupRowRenderer`:
 
 ```tsx
 import { useCallback, useMemo } from 'react';
@@ -51,7 +57,7 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 			columns={columns}
 			getRowId={(row) => row.id}
 			initialState={{
-				grouping: { by: ['department'], rowHeight: 42, defaultExpanded: 1 },
+				grouping: { by: ['department'], display: 'row', rowHeight: 42, defaultExpanded: 1 },
 				aggregation: { defs: [{ colId: 'salary', aggFunc: 'sum' }] },
 			}}
 			groupRowRenderer={groupRowRenderer}
@@ -73,8 +79,10 @@ group (or per level, with a function of the level), and `grand` adds one total o
 
 ## Tree data
 
-For parent-child hierarchies (file trees, org charts, bill of materials), set `treeData.getParentId`. Each row's
-`hierarchy` gives its level and whether it has children, so a cell renderer can indent it and toggle it:
+For parent-child hierarchies (file trees, org charts, bill of materials), set `treeData.getParentId`, and
+`treeData.column` to the field the hierarchy column shows — indented by level, with a toggle on parents. To draw
+the tree in one of your own columns instead, read each row's `hierarchy` (its level and whether it has children)
+in a cell renderer and set `hierarchyColumn: false`:
 
 ```tsx
 import { useMemo } from 'react';
@@ -112,7 +120,7 @@ export function FileDirectoryGrid({ nodes }: { nodes: FileNode[] }) {
 			rows={nodes}
 			columns={columns}
 			getRowId={(row) => row.id}
-			initialState={{ treeData: { getParentId: (row) => row.parentId, defaultExpanded: true } }}
+			initialState={{ treeData: { getParentId: (row) => row.parentId, defaultExpanded: true }, hierarchyColumn: false }}
 		/>
 	);
 }

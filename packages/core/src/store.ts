@@ -129,8 +129,9 @@ import type {
 	GridStateSnapshot,
 } from './api/GridApi.js';
 import { createGridStateSnapshot } from './api/createGridStateSnapshot.js';
-import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from './rows/hierarchyConfig.js';
+import type { DetailConfig, GroupDef, GroupingConfig, HierarchyColumnConfig, TreeDataConfig } from './rows/hierarchyConfig.js';
 import type { ExpandAllOptions } from './rowModel.js';
+import { syncHierarchyColumn } from './rows/hierarchyColumn.js';
 import type { DescendantSelection } from './rows/hierarchyIndex.js';
 import type { InternalGridState, GridInitialState, ColumnState, RowModelType } from './state/GridState.js';
 import type { GridEventPayloadMap, GridEventListener } from './api/GridEvents.js';
@@ -199,6 +200,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			dataIntegrity?: import('./features/dataIntegrity/integrityTypes.js').GridDataIntegrityConfig<TRowData>;
 		}
 	) {
+		// The hierarchy column is part of the column set from the first frame.
+		{
+			const synced = syncHierarchyColumn({
+				columns: initialState.columns || [],
+				pinnedColumns: initialState.pinnedColumns,
+				grouping: initialState.grouping,
+				treeData: initialState.treeData,
+				hierarchyColumn: initialState.hierarchyColumn,
+			});
+			if (synced.changed) initialState = { ...initialState, columns: synced.columns, pinnedColumns: synced.pinnedColumns };
+		}
 		validateColumns(initialState.columns || []);
 		this.engine = new GridEngine<TRowData>({
 			capabilities: engineOptions?.capabilities,
@@ -225,6 +237,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			treeData: initialState.treeData,
 			aggregation: initialState.aggregation,
 			detail: initialState.detail,
+			hierarchyColumn: initialState.hierarchyColumn,
+			pinnedColumns: initialState.pinnedColumns,
 			showGroupPanel: initialState.showGroupPanel,
 			showFilterChipBar: initialState.showFilterChipBar,
 			showFloatingFilters: initialState.showFloatingFilters,
@@ -623,6 +637,12 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public setAggregation = (defs: AggregationDef<TRowData>[]): void => {
 		this.engine.groupingFeature.setAggregation(defs);
+	};
+
+	public getHierarchyColumn = (): HierarchyColumnConfig<TRowData> | false | undefined => this.engine.groupingFeature.getHierarchyColumn();
+
+	public setHierarchyColumn = (config: HierarchyColumnConfig<TRowData> | false | undefined): void => {
+		this.engine.groupingFeature.setHierarchyColumn(config);
 	};
 
 	public getDetail = (): DetailConfig<TRowData> | undefined => this.engine.groupingFeature.getDetail();

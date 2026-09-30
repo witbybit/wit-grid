@@ -21,10 +21,14 @@ import {
 	type ExpansionState,
 	type GroupDef,
 	type GroupingConfig,
+	type HierarchyColumnConfig,
 	type TreeDataConfig,
 } from '../rows/hierarchyConfig.js';
 import type { GridInvalidation } from '../renderer/invalidationManager.js';
 import type { GridCommitEvent } from '../engine/GridChangeApplier.js';
+import type { GridDomainVersions } from '../state/GridDomainVersions.js';
+import type { GridStateUpdater, InternalGridState } from '../state/GridState.js';
+import { syncHierarchyColumn } from '../rows/hierarchyColumn.js';
 import { asRowHierarchyReadableModel } from '../rowModel.js';
 import type { DescendantSelection, HierarchyIndex } from '../rows/hierarchyIndex.js';
 import { readInteractionState } from '../interaction/interactionState.js';
@@ -101,9 +105,11 @@ export class GroupingFeatureController<TRowData = unknown> {
 		const levelsChanged = !sameColIds(groupByColIds(state.grouping), groupByColIds(grouping));
 		this.ctx.applyChange({
 			reason: 'grouping:set',
-			state: { grouping, ...(levelsChanged ? { expansion: withoutGroupOverrides(state.expansion) } : {}) },
-			invalidations: STRUCTURAL_INVALIDATIONS('grouping'),
-			domains: ['rows', 'geometry'],
+			...this.withHierarchyColumn(
+				{ grouping, ...(levelsChanged ? { expansion: withoutGroupOverrides(state.expansion) } : {}) },
+				STRUCTURAL_INVALIDATIONS('grouping'),
+				['rows', 'geometry']
+			),
 			events: levelsChanged
 				? [
 						{ type: GridEventName.groupingChanged, payload: { grouping } },
@@ -178,9 +184,9 @@ export class GroupingFeatureController<TRowData = unknown> {
 		const groupBy = by.map(colIdOf);
 		this.ctx.applyChange({
 			reason,
-			state: { grouping, expansion: withoutGroupOverrides(state.expansion) },
-			invalidations: STRUCTURAL_INVALIDATIONS('groupBy'),
-			domains: ['rows'],
+			...this.withHierarchyColumn({ grouping, expansion: withoutGroupOverrides(state.expansion) }, STRUCTURAL_INVALIDATIONS('groupBy'), [
+				'rows',
+			]),
 			events: [
 				{ type: GridEventName.groupingChanged, payload: { grouping } },
 				{ type: GridEventName.groupByChanged, payload: { groupBy } },
@@ -202,6 +208,45 @@ export class GroupingFeatureController<TRowData = unknown> {
 		});
 	}
 
+	// ── Hierarchy column ────────────────────────────────────────────────────
+
+	public getHierarchyColumn(): HierarchyColumnConfig<TRowData> | false | undefined {
+		return this.ctx.getState().hierarchyColumn;
+	}
+
+	public setHierarchyColumn(hierarchyColumn: HierarchyColumnConfig<TRowData> | false | undefined): void {
+		this.ctx.applyChange({
+			reason: 'hierarchy:set-column',
+			...this.withHierarchyColumn({ hierarchyColumn }, [{ kind: 'headers', reason: 'hierarchyColumn' }], ['columns']),
+			events: [{ type: GridEventName.hierarchyColumnChanged, payload: { hierarchyColumn } }],
+		});
+	}
+
+	/**
+	 * Adds the hierarchy column change (columns + pinned count) implied by a hierarchy config change
+	 * to the same commit, so the column appears, updates or goes in step with the rows.
+	 */
+	private withHierarchyColumn(
+		patch: Partial<Pick<InternalGridState<TRowData>, 'grouping' | 'treeData' | 'hierarchyColumn' | 'expansion'>>,
+		invalidations: GridInvalidation[],
+		domains: ReadonlyArray<keyof GridDomainVersions>
+	): { state: GridStateUpdater<TRowData>; invalidations: GridInvalidation[]; domains: ReadonlyArray<keyof GridDomainVersions> } {
+		const state = this.ctx.getState();
+		const synced = syncHierarchyColumn({
+			columns: state.columns,
+			pinnedColumns: state.pinnedColumns,
+			grouping: 'grouping' in patch ? patch.grouping : state.grouping,
+			treeData: 'treeData' in patch ? patch.treeData : state.treeData,
+			hierarchyColumn: 'hierarchyColumn' in patch ? patch.hierarchyColumn : state.hierarchyColumn,
+		});
+		if (!synced.changed) return { state: patch, invalidations, domains };
+		return {
+			state: { ...patch, columns: synced.columns, pinnedColumns: synced.pinnedColumns },
+			invalidations: [{ kind: 'full', reason: 'hierarchyColumn' }],
+			domains: [...new Set([...domains, 'columns', 'geometry'] as Array<keyof GridDomainVersions>)],
+		};
+	}
+
 	// ── Tree data, aggregation, detail ─────────────────────────────────────
 
 	public getTreeData(): TreeDataConfig<TRowData> | undefined {
@@ -213,9 +258,11 @@ export class GroupingFeatureController<TRowData = unknown> {
 		const state = this.ctx.getState();
 		this.ctx.applyChange({
 			reason: 'hierarchy:set-tree-data',
-			state: { treeData, expansion: { ...state.expansion, rows: {}, base: undefined } },
-			invalidations: STRUCTURAL_INVALIDATIONS('treeData'),
-			domains: ['rows', 'geometry'],
+			...this.withHierarchyColumn(
+				{ treeData, expansion: { ...state.expansion, rows: {}, base: undefined } },
+				STRUCTURAL_INVALIDATIONS('treeData'),
+				['rows', 'geometry']
+			),
 			events: [{ type: GridEventName.treeDataChanged, payload: { treeData } }],
 		});
 	}

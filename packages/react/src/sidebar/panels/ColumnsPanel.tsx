@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { isHierarchyColumn } from '@eregister/wit-grid-core';
 import type { GridApi, ColumnDef } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';
 
@@ -98,7 +99,8 @@ export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 	useGridKeySelector('themeName', (s) => s.themeName);
 	const theme = api.getTheme();
 
-	const allCols = api.getColumns();
+	// The hierarchy column belongs to grouping / tree data, not to the user's column list.
+	const allCols = api.getColumns().filter((column) => !isHierarchyColumn(column));
 	const groupBy: string[] = stateGroupBy ?? EMPTY_GROUP_BY;
 	const visibleCount = allCols.filter((c) => !c.hide).length;
 
@@ -141,8 +143,7 @@ export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 		setDropTargetIdx(null);
 		if (fromIndex === null || fromIndex === toIndex) return;
 
-		const cols = api.getColumns();
-		const reordered = [...cols];
+		const reordered = [...allCols];
 		const [moved] = reordered.splice(fromIndex, 1);
 		reordered.splice(toIndex, 0, moved);
 		api.setColumnOrder(reordered.map((c) => c.field));

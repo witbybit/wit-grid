@@ -4,6 +4,10 @@ import type { GridInteractionHandle } from './GridInteractionController.js';
 export interface GridViewportInteractionRouterDeps {
 	getInteraction(): GridInteractionHandle | null;
 	resolveCellPointer(target: Element): GridCellPointer | null;
+	/** The hierarchy cell's toggle was clicked (visual row id). */
+	onHierarchyToggle?(id: string): void;
+	/** The hierarchy cell's checkbox was clicked (visual row id). */
+	onHierarchySelect?(id: string, selected: boolean): void;
 }
 
 export interface GridViewportInteractionRouter {
@@ -23,6 +27,19 @@ export function createGridViewportInteractionRouter(deps: GridViewportInteractio
 
 			const target = event.target as HTMLElement | null;
 			if (!target) return;
+
+			const hierarchySelect = target.closest<HTMLInputElement>('input.og-hierarchy-checkbox');
+			if (hierarchySelect?.dataset.ogHierarchySelect && deps.onHierarchySelect) {
+				event.stopPropagation();
+				deps.onHierarchySelect(hierarchySelect.dataset.ogHierarchySelect, hierarchySelect.checked);
+				return;
+			}
+			const hierarchyToggle = target.closest<HTMLElement>('.og-hierarchy-toggle[data-og-hierarchy-toggle]');
+			if (hierarchyToggle && !hierarchyToggle.classList.contains('og-hierarchy-toggle-none') && deps.onHierarchyToggle) {
+				event.stopPropagation();
+				deps.onHierarchyToggle(hierarchyToggle.dataset.ogHierarchyToggle!);
+				return;
+			}
 
 			const checkbox = target.closest<HTMLInputElement>('input.og-row-checkbox');
 			if (checkbox) {

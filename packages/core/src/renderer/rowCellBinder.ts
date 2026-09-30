@@ -1,3 +1,5 @@
+import { bindHierarchyCell } from './hierarchyCellBinder.js';
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import { createEditRendererKey, createCellInstanceRendererKey } from './identityKeys.js';
 import { reportRendererFault } from './rendererFaults.js';
@@ -524,6 +526,12 @@ function isCellSelectedInBounds(selectionBounds: ScrollRenderContext['selectionB
 }
 
 export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, request: BindCellFullRequest<TRowData>): void {
+	if (isHierarchyColumn(request.col)) {
+		const cellLeft = request.plan.colLefts[request.colIndex];
+		const left = request.lane === 'right' ? cellLeft - request.pinRightBaseLeft : cellLeft;
+		if (bindHierarchyCellFor(deps, request, left, request.plan.colWidths[request.colIndex], false)) return;
+	}
+	clearAggregateText(request.cellSlot);
 	deps.incrementFullCellBinds?.();
 	deps.incrementCellSlotRebinds?.();
 	const { cellSlot, slotId, node, rowIndex, colIndex, col, lane, pinRightBaseLeft, plan, state, ctx, phase = 'initial' } = request;
@@ -820,7 +828,33 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 	recordCellCtrlPhysicalBinding(cellCtrl, cellSlot);
 }
 
+/** A data bind never inherits a group / total row's aggregate text (see CellSlot.hasAggregateText). */
+function clearAggregateText<TRowData>(cellSlot: CellSlot<TRowData>): void {
+	if (!cellSlot.hasAggregateText) return;
+	cellSlot.hasAggregateText = false;
+	cellSlot.clearText();
+}
+
+/** Every bind path draws the hierarchy column the same way (see hierarchyCellBinder.ts). */
+function bindHierarchyCellFor<TRowData>(
+	deps: RowCellBinderDeps<TRowData>,
+	request: { cellSlot: CellSlot<TRowData>; rowIndex: number; colIndex: number; col: ColumnDef<TRowData>; lane: 'left' | 'center' | 'right' },
+	left: number,
+	width: number,
+	isScrollFrameActive: boolean
+): boolean {
+	const row = deps.engine.getVisualRowModel()?.getVisualRow(request.rowIndex);
+	if (!row) return false;
+	bindHierarchyCell(
+		{ engine: deps.engine, releaseCellPortal: (cell) => deps.releaseCellPortal(cell) },
+		{ ...request, row, left, width, state: deps.engine.stateManager.getState(), isScrollFrameActive }
+	);
+	return true;
+}
+
 export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>, request: BindCellDuringScrollRequest<TRowData>): void {
+	if (isHierarchyColumn(request.col) && bindHierarchyCellFor(deps, request, request.left, request.width, true)) return;
+	clearAggregateText(request.cellSlot);
 	deps.incrementGeometryOnlyCellBinds?.();
 	deps.incrementCellSlotRebinds?.();
 	const { cellSlot, node, rowIndex, colIndex, col, lane, ctx, isRowRebind, isRowLoading, isInVisibleContent } = request;

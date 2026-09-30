@@ -161,7 +161,21 @@ the group key or tree column value through that column's formatter), `count(ctx)
 names. Or replace the whole cell with `renderer: ColumnRendererSpec`; the renderer receives
 `HierarchyCellParams { row, hierarchy, label, aggregates, toggle(), setSelected(), selection }`.
 
+Implemented (phases 2–3): the column is `__hierarchy__` in `state.columns` (one index space, like the row-select
+column), kept in sync by `withHierarchyColumnFor` on every full column-list write and by the grouping / tree /
+`hierarchyColumn` commands in the same commit, with the pinned count adjusted; the pinned lane follows
+`state.pinnedColumns`. The cell is written directly by the binder (`renderer/hierarchyCell.ts`: parts created once
+per cell, then diffed) on every bind path — full, scroll, repaint — so a recycled row never shows another row's
+label. Toggle and checkbox clicks are delegated at the viewport. Implemented config: `header`, `width`, `minWidth`,
+`pinned`, `indentPerLevel`, `show.{toggle, checkbox, count}`, `label(ctx)`, `count(ctx)`, `cellClass`; tree rows
+show `treeData.column`. Still to come: the whole-cell `renderer` override and `icon`.
+
 ### Aggregate cells
+
+Implemented (phase 3): group and total rows bind like loading rows — real cells in every lane, no portal — via
+`bindAllHierarchyRowCells`; aggregate text goes through `valueFormatter`, else the renderer's text impostor. A
+cell that showed an aggregate is flagged so the next data bind clears that text (renderer cells keep text as
+their scroll-time placeholder). Still to come: `aggregateRenderer` and `display: 'columns'`.
 
 In group and total rows, a column's cell shows `aggregates[colId]` through the column's `valueFormatter`, or
 through `ColumnDef.aggregateRenderer?: ColumnRendererSpec` when the column wants something else (a sparkline, a

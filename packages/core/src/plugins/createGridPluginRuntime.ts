@@ -91,6 +91,8 @@ export function createGridPluginRuntime<TRowData>(source: GridPluginRuntime<TRow
 		setTreeData: source.setTreeData,
 		getAggregation: source.getAggregation,
 		setAggregation: source.setAggregation,
+		getHierarchyColumn: source.getHierarchyColumn,
+		setHierarchyColumn: source.setHierarchyColumn,
 		getDetail: source.getDetail,
 		setDetail: source.setDetail,
 		setExpanded: source.setExpanded,

@@ -117,6 +117,8 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 		sortable: true,
 
 		enableRowGroup: false,
+		// Formats the group and total aggregates (the renderer draws the data cells).
+		valueFormatter: ({ value }) => (typeof value === 'number' ? `$${Math.round(value).toLocaleString('en-US')}` : ''),
 		renderer: { kind: 'react', component: CurrencyRenderer, capabilities: { scrollPresentation: 'freeze' } },
 	},
 	{ field: 'units', header: 'Units', width: 75, sortable: true, enableRowGroup: false },
@@ -127,6 +129,7 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 		sortable: true,
 
 		enableRowGroup: false,
+		valueFormatter: ({ value }) => (typeof value === 'number' ? `${value.toFixed(1)}%` : ''),
 		renderer: { kind: 'react', component: MarginRenderer, capabilities: { scrollPresentation: 'freeze' } },
 	},
 	{

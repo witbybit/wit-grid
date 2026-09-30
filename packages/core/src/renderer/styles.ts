@@ -890,6 +890,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox,
+  .og-hierarchy-checkbox,
   .og-header-checkbox {
     appearance: none;
     -webkit-appearance: none;
@@ -908,6 +909,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:hover,
+  .og-hierarchy-checkbox:hover,
   .og-header-checkbox:hover {
     border-color: #93c5fd;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
@@ -920,6 +922,8 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:checked,
+  .og-hierarchy-checkbox:checked,
+  .og-hierarchy-checkbox:indeterminate,
   .og-header-checkbox:checked,
   .og-header-checkbox:indeterminate {
     border-color: #60a5fa;
@@ -927,6 +931,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:checked::after,
+  .og-hierarchy-checkbox:checked::after,
   .og-header-checkbox:checked::after {
     content: '';
     width: 8px;
@@ -936,12 +941,87 @@ export const CORE_STYLES = `
     transform: rotate(-45deg) translateY(-1px);
   }
 
+  .og-hierarchy-checkbox:indeterminate::after,
   .og-header-checkbox:indeterminate::after {
     content: '';
     width: 8px;
     height: 2px;
     border-radius: 2px;
     background: #ffffff;
+  }
+
+  /* ── Hierarchy column: indent | toggle | checkbox | label | count ── */
+  .og-hierarchy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .og-hierarchy-toggle {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--og-group-badge-text, #c4b5fd);
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.12s ease;
+  }
+
+  .og-hierarchy-toggle:hover {
+    background: var(--og-group-badge-bg, rgba(167, 139, 250, 0.14));
+  }
+
+  .og-hierarchy-toggle-open {
+    transform: rotate(90deg);
+  }
+
+  /* No children: keeps the slot so labels at one level align. */
+  .og-hierarchy-toggle-none {
+    cursor: default;
+    visibility: hidden;
+  }
+
+  .og-hierarchy-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .og-hierarchy-count {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--og-group-badge-bg);
+    border: 1px solid var(--og-group-badge-border);
+    color: var(--og-group-badge-text);
+  }
+
+  .og-cell-hierarchy-group .og-hierarchy-label,
+  .og-cell-hierarchy-total .og-hierarchy-label {
+    font-weight: 600;
+  }
+
+  /* Group and total rows drawn as cell rows. */
+  .og-row.og-row-group:not(.og-row-group-sticky) {
+    background: var(--og-group-row-bg);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
+  }
+
+  .og-row.og-row-total {
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 var(--og-group-badge-border, rgba(148, 163, 184, 0.3));
   }
 
   .og-row-node-selected .og-row-checkbox {

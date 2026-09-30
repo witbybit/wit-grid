@@ -396,7 +396,12 @@ describe('ClientRowModelController', () => {
 	it('uses targeted structural invalidations when grouping columns change', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
-			columns: [{ field: 'category', header: 'Category' }],
+			columns: [
+				{ field: 'category', header: 'Category' },
+				{ field: 'name', header: 'Name' },
+			],
+			// Already grouped: the hierarchy column exists, so changing levels needs no column change.
+			grouping: { by: ['category'] },
 		});
 
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -408,7 +413,7 @@ describe('ClientRowModelController', () => {
 		});
 
 		store.engine.invalidation.consume();
-		store.setGroupBy(['category']);
+		store.setGroupBy(['category', 'name']);
 		const frame = store.engine.invalidation.consume();
 
 		expect(frame.full).toBe(false);

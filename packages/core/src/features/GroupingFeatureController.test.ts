@@ -98,12 +98,19 @@ describe('GroupingFeatureController', () => {
 			const engine = (store as any).engine;
 			const feature = makeFeature(store);
 
-			const spyApply = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
-
+			// The first grouping adds the hierarchy column: a column change repaints everything.
+			const first = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
 			feature.setGroupBy(['category']);
+			expect((first.mock.calls[0][0] as any).full).toBe(true);
+			first.mockRestore();
+
+			// Regrouping with the column already present is targeted.
+			const spyApply = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
+			feature.setGroupBy(['category', 'name']);
 
 			expect(spyApply).toHaveBeenCalled();
 			const plan = spyApply.mock.calls[0][0] as any;
+			expect(plan.full).toBe(false);
 			expect(plan.geometry).toBe(true);
 			expect(plan.viewport).toBe(true);
 			expect(plan.headers).toBe(true);

@@ -158,7 +158,10 @@ export type {
 	BuiltInAggFunc,
 	DetailConfig,
 	ExpansionState,
+	HierarchyColumnConfig,
+	HierarchyCellContext,
 } from './rows/hierarchyConfig.js';
+export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn } from './rows/hierarchyColumn.js';
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';
 export type { ExpandAllOptions } from './rowModel.js';
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';

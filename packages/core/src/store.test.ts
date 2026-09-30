@@ -609,7 +609,8 @@ describe('GridStore generic row-store functionality', () => {
 		expect(liveAfter.activeEdit?.validationError).toBe('Required');
 		expect(liveAfter.pagination?.page).toBe(2);
 		expect(liveAfter.grouping?.by).toEqual(['name']);
-		expect(freshSnapshot.columns[0]?.header).toBe('ID');
+		// Grouped: the first column is the hierarchy column; its header survived the mutation attempt.
+		expect(freshSnapshot.columns[0]?.header).toBe('Group');
 		expect(freshSnapshot.sortModel).toEqual([{ colId: 'name', sort: 'asc' }]);
 		expect(freshSnapshot.filterModel).toEqual({ name: { type: 'text', operator: 'contains', value: 'A' } });
 		expect(freshSnapshot.queryModel).toEqual(queryModel);
@@ -3955,11 +3956,16 @@ describe('groupBy mutation API', () => {
 		store.destroy();
 	});
 
-	it('addGroupBy clears invalidation geometry when first group is added', () => {
+	it('addGroupBy repaints fully when the first group adds the hierarchy column, then targets later levels', () => {
 		const store = makeGroupStore();
 		store.engine.invalidation.consume();
 		store.addGroupBy('region');
+		expect(store.engine.invalidation.consume().full).toBe(true);
+
+		const next = store.getState().columns.find((column) => column.field !== 'region' && !column.field.startsWith('__'))!.field;
+		store.addGroupBy(next);
 		const frame = store.engine.invalidation.consume();
+		expect(frame.full).toBe(false);
 		expect(frame.geometry).toBe(true);
 		expect(frame.viewport).toBe(true);
 		store.destroy();

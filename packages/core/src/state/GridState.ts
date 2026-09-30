@@ -1,6 +1,13 @@
 import type { FilterModel, QuickFilterModel, SortDirection, SortModel } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
-import type { AggregationConfig, DetailConfig, ExpansionState, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
+import type {
+	AggregationConfig,
+	DetailConfig,
+	ExpansionState,
+	GroupingConfig,
+	HierarchyColumnConfig,
+	TreeDataConfig,
+} from '../rows/hierarchyConfig.js';
 import type { ServerSideStoreSnapshot } from '../serverSideRowModel.js';
 import type { ColumnDef, GridStyleRule, GridRendererOptions } from '../columnDef.js';
 import type { CanonicalGridSelectionState, GridInteractionState } from '../interaction/interactionState.js';
@@ -52,6 +59,8 @@ export interface GridModelState<TRowData = unknown> {
 	aggregation?: AggregationConfig<TRowData>;
 	/** Master-detail: rows that can open a detail row beneath them. */
 	detail?: DetailConfig<TRowData>;
+	/** The auto hierarchy column shown while rows are grouped or tree-shaped; `false` turns it off. */
+	hierarchyColumn?: HierarchyColumnConfig<TRowData> | false;
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
 	pinnedColumns?: { left: number; right: number };

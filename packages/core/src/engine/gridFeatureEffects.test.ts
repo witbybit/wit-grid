@@ -120,12 +120,19 @@ describe('Phase 0: gridFeatureEffects characterization', () => {
 			const store = makeStore();
 			const engine = (store as any).engine;
 
-			const spyApply = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
-
+			// The first grouping adds the hierarchy column: a column change repaints everything.
+			const first = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
 			store.setGroupBy(['name']);
+			expect(first.mock.calls[0][0].full).toBe(true);
+			first.mockRestore();
+
+			// Regrouping with the column already present is targeted.
+			const spyApply = vi.spyOn(engine.invalidation, 'applyNormalizedPlan');
+			store.setGroupBy(['name', 'price']);
 
 			expect(spyApply).toHaveBeenCalled();
 			const plan = spyApply.mock.calls[0][0];
+			expect(plan.full).toBe(false);
 			expect(plan.geometry).toBe(true);
 			expect(plan.viewport).toBe(true);
 			expect(plan.headers).toBe(true);

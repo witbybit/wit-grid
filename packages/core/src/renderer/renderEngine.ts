@@ -320,6 +320,17 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.viewportInteractionRouter = createGridViewportInteractionRouter({
 			getInteraction: () => this.interactionController,
 			resolveCellPointer: (target) => this.resolveViewportInteractionPointer(target),
+			onHierarchyToggle: (id) => this.engine.groupingFeature.toggleExpanded(id),
+			onHierarchySelect: (id, selected) => {
+				// A group cell selects the rows beneath it; a data row's cell selects that row (the
+				// descendant cascade for tree parents is `selectDescendants`, a later phase).
+				const rowModel = this.engine.getVisualRowModel();
+				const row = rowModel?.getVisualRow(rowModel.getVisualIndexById(id));
+				const rowIds = row?.kind === 'data' ? [row.rowId] : [...this.engine.groupingFeature.getDescendantRowIds(id)];
+				if (rowIds.length === 0) return;
+				if (selected) this.engine.selectRowIds(rowIds, 'checkbox');
+				else this.engine.deselectRowIds(rowIds, 'checkbox');
+			},
 		});
 	}
 

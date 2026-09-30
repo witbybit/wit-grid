@@ -65,6 +65,14 @@ export class GridProjectionPipeline<TRowData = unknown> {
 		const updatedSet = new Set(phase.getChangedKeys());
 		const prevState = phase.prevState;
 
+		// Pinned lanes follow state, so a commit that adds a pinned column (the hierarchy column) moves
+		// the lane boundary with it.
+		if (updatedSet.has('pinnedColumns')) {
+			const pins = currState.pinnedColumns;
+			this.deps.viewport.pinLeftColumns = pins?.left ?? 0;
+			this.deps.viewport.pinRightColumns = pins?.right ?? 0;
+		}
+
 		if (updatedSet.has('columns') || updatedSet.has('columnWidths') || updatedSet.has('defaultColWidth')) {
 			this.deps.columns.updateColumns(currState.columns, currState.columnWidths, currState.defaultColWidth);
 		}
@@ -73,7 +81,13 @@ export class GridProjectionPipeline<TRowData = unknown> {
 			this.deps.data.clearValueGetterCache();
 		}
 
-		if (updatedSet.has('sortModel') || updatedSet.has('filterModel') || updatedSet.has('groupBy') || updatedSet.has('expansion')) {
+		if (
+			updatedSet.has('sortModel') ||
+			updatedSet.has('filterModel') ||
+			updatedSet.has('grouping') ||
+			updatedSet.has('treeData') ||
+			updatedSet.has('expansion')
+		) {
 			this.pendingStructuralBoundsUpdate = true;
 		}
 

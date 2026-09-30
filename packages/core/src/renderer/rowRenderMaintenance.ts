@@ -1,3 +1,4 @@
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { CellRendererPhase, ColumnDef, InternalColumnDef } from '../columnDef.js';
 import type { InternalGridState } from '../state/GridState.js';
@@ -204,7 +205,8 @@ export function repaintInvalidatedRows<TRowData>(deps: RowRenderMaintenanceDeps<
 
 		deps.selectionPaint.updateRowClassNameSlot(slot, row.node, rowIndex, state);
 		for (let c = 0; c < colCount; c++) {
-			if (!columns[c].checkboxSelection) continue;
+			// Selection-driven parts: the row checkbox and the hierarchy cell's checkbox.
+			if (!columns[c].checkboxSelection && !isHierarchyColumn(columns[c])) continue;
 			const cellSlot = slot.getCellForCol(c);
 			if (!cellSlot) continue;
 			const lane = columnTopology.byColumnId.get((columns[c] as InternalColumnDef<TRowData>).instanceId)?.lane ?? 'center';

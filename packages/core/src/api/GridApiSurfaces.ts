@@ -7,7 +7,7 @@ import type {
 	RowModelCapability,
 	RowModelCapabilities,
 } from '../rowModel.js';
-import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
+import type { DetailConfig, GroupDef, GroupingConfig, HierarchyColumnConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 import type { DescendantSelection } from '../rows/hierarchyIndex.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
@@ -173,6 +173,9 @@ export interface GridStructureApi<TRowData = unknown> {
 	setTreeData(treeData: TreeDataConfig<TRowData> | undefined): void;
 	getAggregation(): AggregationDef<TRowData>[];
 	setAggregation(defs: AggregationDef<TRowData>[]): void;
+	getHierarchyColumn(): HierarchyColumnConfig<TRowData> | false | undefined;
+	/** Configures the auto hierarchy column (or turns it off with `false`). */
+	setHierarchyColumn(config: HierarchyColumnConfig<TRowData> | false | undefined): void;
 	getDetail(): DetailConfig<TRowData> | undefined;
 	setDetail(detail: DetailConfig<TRowData> | undefined): void;
 	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). */

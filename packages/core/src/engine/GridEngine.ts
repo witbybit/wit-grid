@@ -90,6 +90,7 @@ import { RowCtrlStore } from '../renderer/controllers/RowCtrlStore.js';
 import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
 import { mapRowsUpdatedDispatchPayload, type PublicRowNodeDispatchDeps } from './publicRowNodeDispatch.js';
 import { GridFlightRecorder } from '../diagnostics/GridFlightRecorder.js';
+import { withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
 import {
 	freezeAggregationConfig,
 	freezeDetailConfig,
@@ -461,6 +462,8 @@ export class GridEngine<TRowData = unknown> {
 			treeData: freezeTreeDataConfig(config.treeData),
 			aggregation: freezeAggregationConfig(config.aggregation),
 			detail: freezeDetailConfig(config.detail),
+			hierarchyColumn: config.hierarchyColumn,
+			pinnedColumns: config.pinnedColumns,
 			showGroupPanel: config.showGroupPanel,
 			showFilterChipBar: config.showFilterChipBar,
 			showFloatingFilters: config.showFloatingFilters,
@@ -653,7 +656,7 @@ export class GridEngine<TRowData = unknown> {
 		if (payload.defaultRowHeight !== undefined) domains.push('geometry');
 		this.changeApplier.apply({
 			reason: 'columns:set-data',
-			state: (state) => ({ ...state, ...payload }),
+			state: (state) => ({ ...state, ...payload, ...(payload.columns ? withHierarchyColumnFor(payload.columns, state) : {}) }),
 			invalidations: [{ kind: 'full', reason: 'set data' }],
 			domains,
 			requestRender: true,
@@ -670,7 +673,7 @@ export class GridEngine<TRowData = unknown> {
 		getRowId?: ((row: TRowData) => string) | undefined;
 	}): void {
 		const nextState: Partial<InternalGridState<TRowData>> = {};
-		if (model.columns) nextState.columns = model.columns;
+		if (model.columns) Object.assign(nextState, withHierarchyColumnFor(model.columns, this.stateManager.getState()));
 		if (model.getRowId !== undefined) nextState.getRowId = model.getRowId;
 		if (Object.keys(nextState).length === 0) return;
 		this.changeApplier.apply({

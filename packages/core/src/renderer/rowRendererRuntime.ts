@@ -12,9 +12,11 @@ import { bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import {
 	bindAllDataCells,
 	bindAllLoadingCells,
+	bindAllHierarchyRowCells,
 	reconcileTopology,
 	type BindAllDataCellsRequest,
 	type BindAllLoadingCellsRequest,
+	type BindAllHierarchyRowCellsRequest,
 	type RowCellBindingLaneDeps,
 } from './rowCellBindingLanes.js';
 import type { CompiledColumnTopology } from './columnTopology.js';
@@ -377,6 +379,11 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	public bindAllLoadingCells(request: BindAllLoadingCellsRequest<TRowData>): void {
 		this.refreshCachedHotState();
 		bindAllLoadingCells(this.rowCellBindingLaneDeps, request);
+	}
+
+	public bindAllHierarchyRowCells(request: BindAllHierarchyRowCellsRequest<TRowData>): void {
+		this.refreshCachedHotState();
+		bindAllHierarchyRowCells(this.rowCellBindingLaneDeps, request);
 	}
 
 	public markCellDirtyAfterScroll(cell: HTMLDivElement): void {

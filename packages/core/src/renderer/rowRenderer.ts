@@ -675,30 +675,15 @@ export class RowRenderer<TRowData = unknown> {
 			if (isScrollFrameActive && rowUpdated) this.currentScrollRowsRebound++;
 
 			// ── Bind cells based on row kind ──────────────────────────────────────────
+			const lanes = { slot, rowIndex: r, centerColStart, centerColCount, columns, plan, columnTopology, isScrollFrameActive };
 			if (visualRow.kind === 'loading') {
 				this.releaseRowPortal(slot);
-				this.runtime.bindAllLoadingCells({
-					slot,
-					rowIndex: r,
-					centerColStart,
-					centerColCount,
-					columns,
-					plan,
-					columnTopology,
-					isScrollFrameActive,
-				});
+				this.runtime.bindAllLoadingCells(lanes);
 			} else if (visualRow.kind === 'data') {
 				this.releaseRowPortal(slot);
 				this.runtime.bindAllDataCells({
-					slot,
+					...lanes,
 					node: visualRow.node,
-					rowIndex: r,
-					centerColStart,
-					centerColCount,
-					columns,
-					plan,
-					columnTopology,
-					isScrollFrameActive,
 					ctx,
 					state,
 					isRowRebind,
@@ -707,8 +692,12 @@ export class RowRenderer<TRowData = unknown> {
 					refreshVisibleColumns,
 					viewportPlan: this.currentViewportPlan,
 				});
+			} else if ((visualRow.kind === 'group' || visualRow.kind === 'total') && (state.grouping?.display ?? 'column') === 'column') {
+				// Group and total rows are cell rows: hierarchy cell + aggregate cells in every lane.
+				this.releaseRowPortal(slot);
+				this.runtime.bindAllHierarchyRowCells({ ...lanes, row: visualRow, state });
 			} else {
-				// Full-width row (group / detail / footer / failed / placeholder)
+				// Full-width row (detail / failed / placeholder; group and total rows in `display: 'row'`)
 				this.runtime.bindFullWidthRow(slot, visualRow);
 			}
 		}

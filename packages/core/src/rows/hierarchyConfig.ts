@@ -51,10 +51,18 @@ export interface GroupingConfig<TData = unknown> {
 	stickyHeaders?: boolean;
 	/** Height of group and total rows. Default: the grid's row height. */
 	rowHeight?: number;
+	/**
+	 * How group rows render. `'column'` (default): group and total rows are cell rows — the hierarchy
+	 * column shows the group, other columns show its aggregates. `'row'`: one full-width row drawn by
+	 * the adapter's group row renderer.
+	 */
+	display?: 'column' | 'row';
 }
 
 export interface TreeDataConfig<TData = unknown> {
 	getParentId: (row: TData) => string | null | undefined;
+	/** Field whose value the hierarchy column shows for each tree row (through that column's formatter). */
+	column?: string;
 	/** Source fields read by `getParentId`. When declared, only changes to them rebuild the tree. */
 	getParentIdDependencies?: string[];
 	defaultExpanded?: DefaultExpanded<TreeRowInfo<TData>>;
@@ -62,6 +70,48 @@ export interface TreeDataConfig<TData = unknown> {
 	filterMode?: 'strict' | 'includeAncestors' | 'includeDescendants';
 	/** Tree parents carry the aggregate of their descendants. Default: true when aggregation is configured. */
 	aggregateParents?: boolean;
+}
+
+/** What the hierarchy cell knows about the row it is drawn for. */
+export interface HierarchyCellContext<TData = unknown> {
+	kind: 'group' | 'total' | 'data';
+	/** Visual row id. */
+	id: string;
+	level: number;
+	hasChildren: boolean;
+	expanded: boolean;
+	leafCount: number;
+	/** Group rows: the group key; tree rows: the `treeData.column` value; totals: the group key or null. */
+	value: unknown;
+	/** `value` through the grouped (or tree) column's formatter. */
+	formattedValue: string;
+	/** Group rows: the grouped column; tree rows: `treeData.column`. */
+	field: string | null;
+	/** Tree and leaf rows: the row data. */
+	data?: TData;
+	aggregates?: Record<string, unknown>;
+}
+
+/**
+ * The auto column that shows the hierarchy: indent, expand toggle, optional checkbox, label, count.
+ * It is added while rows are grouped (display `'column'`) or tree-shaped, pinned left by default.
+ */
+export interface HierarchyColumnConfig<TData = unknown> {
+	header?: string;
+	width?: number;
+	minWidth?: number;
+	/** Default: true (pinned left). */
+	pinned?: boolean;
+	/** Indent per level in px. Default: 16. */
+	indentPerLevel?: number;
+	/** Parts to show. Defaults: toggle and count on, checkbox off. */
+	show?: { toggle?: boolean; checkbox?: boolean; count?: boolean };
+	/** Replaces the label. Default: `formattedValue`; totals read "Total" / "Grand total". */
+	label?: (ctx: HierarchyCellContext<TData>) => string;
+	/** Replaces the count. Default: group rows show their leaf count, others nothing. */
+	count?: (ctx: HierarchyCellContext<TData>) => string | null;
+	/** Extra class names for the cell. */
+	cellClass?: string | ((ctx: HierarchyCellContext<TData>) => string | undefined);
 }
 
 export type BuiltInAggFunc = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'distinctCount' | 'first' | 'last';

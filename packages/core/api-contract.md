@@ -6,8 +6,8 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `2477fe86190c9509d95cb3b86fce3317c0b9bc5d6cbec6d92f41d3e2a11ab62a`
-Exports (299):
+Declaration SHA-256: `9ce75dd0f77c42dba2607a7c73f7a0545a49ef5f0d6896b838894e26ede95866`
+Exports (303):
 
 - `ActiveEditState` — type
 - `AggregateContext` — type
@@ -202,6 +202,9 @@ Exports (299):
 - `GroupVisualRow` — type
 - `HeaderCellStyleRule` — type
 - `HeaderMenuRendererProps` — type
+- `HIERARCHY_COLUMN_FIELD` — value
+- `HierarchyCellContext` — type
+- `HierarchyColumnConfig` — type
 - `HIGH_CONTRAST_DARK_THEME` — value
 - `HIGH_CONTRAST_LIGHT_THEME` — value
 - `ImperativeCellHandle` — type
@@ -214,6 +217,7 @@ Exports (299):
 - `isBuiltInThemeName` — value
 - `isDomCellRenderer` — value
 - `isFilterableColumn` — value
+- `isHierarchyColumn` — value
 - `isQueryModelActive` — value
 - `isRootServerSideRoute` — value
 - `LIGHT_THEME` — value

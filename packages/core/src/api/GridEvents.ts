@@ -1,4 +1,4 @@
-import type { AggregationDef, DetailConfig, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
+import type { AggregationDef, DetailConfig, GroupingConfig, HierarchyColumnConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 import type { FilterModel, QuickFilterModel, SortModel } from '../rowModel.js';
 import type { GridCellPointer, GridSelectionState, SelectionChangeResult, RowSelectionChangeResult, GridCellClickParams } from './GridApi.js';
 import type { ColumnDef } from '../columnDef.js';
@@ -35,6 +35,7 @@ export enum GridEventName {
 	focusChanged = 'focusChanged',
 	groupByChanged = 'groupByChanged',
 	groupingChanged = 'groupingChanged',
+	hierarchyColumnChanged = 'hierarchyColumnChanged',
 	groupColumnAdded = 'groupColumnAdded',
 	groupColumnRemoved = 'groupColumnRemoved',
 	groupColumnMoved = 'groupColumnMoved',
@@ -106,6 +107,7 @@ export interface GridEventPayloadMap<TRowData = unknown> {
 	[GridEventName.focusChanged]: { focus: GridCellPointer | null; selection: GridSelectionState };
 	[GridEventName.groupByChanged]: { groupBy: string[] };
 	[GridEventName.groupingChanged]: { grouping: GroupingConfig<TRowData> | undefined };
+	[GridEventName.hierarchyColumnChanged]: { hierarchyColumn: HierarchyColumnConfig<TRowData> | false | undefined };
 	[GridEventName.groupColumnAdded]: { colId: string; index: number; groupBy: string[] };
 	[GridEventName.groupColumnRemoved]: { colId: string; groupBy: string[] };
 	[GridEventName.groupColumnMoved]: { colId: string; fromIndex: number; toIndex: number; groupBy: string[] };

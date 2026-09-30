@@ -32,6 +32,7 @@ export type GridCommitReason =
 	| 'hierarchy:set-tree-data'
 	| 'hierarchy:set-aggregation'
 	| 'hierarchy:set-detail'
+	| 'hierarchy:set-column'
 	| 'grouping:set-panel'
 	| 'selection:set-range'
 	| 'selection:rows'

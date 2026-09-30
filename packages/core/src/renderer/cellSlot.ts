@@ -4,6 +4,7 @@ import type { CellRendererHandle, CellPlacement } from './cellRendererHandle.js'
 import { isMountedCellVisuallyFresh } from './visualFreshness.js';
 import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
 import { createCellInstanceRendererKey } from './identityKeys.js';
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
@@ -145,8 +146,8 @@ function setCellText(element: HTMLElement, text: string): void {
  * style-match and one more layout object to re-lay out whenever the text changes.
  * A CellSlot belongs to one column for its whole life, so the choice never changes for a slot.
  */
-export function isDirectTextColumn(col: Pick<ColumnDef<unknown>, 'checkboxSelection'> & { cellRenderer?: unknown }): boolean {
-	return !col.cellRenderer && !col.checkboxSelection;
+export function isDirectTextColumn(col: Pick<ColumnDef<unknown>, 'checkboxSelection' | 'field'> & { cellRenderer?: unknown }): boolean {
+	return !col.cellRenderer && !col.checkboxSelection && !isHierarchyColumn(col);
 }
 
 export class CellSlot<TRowData = unknown> {
@@ -253,6 +254,13 @@ export class CellSlot<TRowData = unknown> {
 	/** Cached row-selector checkbox (checkbox-selection columns) — see checkboxCellBinder.ts. */
 
 	public rowCheckbox: HTMLInputElement | null = null;
+	/**
+	 * The cell's text was written for a group / total row (an aggregate). A data bind clears it first:
+	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
+	 */
+	public hasAggregateText = false;
+	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
+	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
 
 	/**
 	 * The last frozen-HTML string written into the portal host by the html-snapshot binder, plus the
