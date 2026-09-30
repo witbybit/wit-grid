@@ -17,7 +17,8 @@
 		"./realtime-dashboard": "./src/showcases/RealtimeDashboard.tsx",
 		"./kanban-board": "./src/showcases/KanbanBoardDemo.tsx",
 		"./clipboard": "./src/showcases/ClipboardDemo.tsx",
-		"./realtime-grouping": "./src/showcases/RealtimeGroupingDemo.tsx"
+		"./realtime-grouping": "./src/showcases/RealtimeGroupingDemo.tsx",
+		"./nested-hierarchy": "./src/showcases/NestedHierarchyDemo.tsx"
 	},
 	"scripts": {
 		"typecheck": "tsc --noEmit",

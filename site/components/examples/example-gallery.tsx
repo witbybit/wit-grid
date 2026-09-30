@@ -58,6 +58,7 @@ const previewModules = {
 	'kanban-board': dynamic(() => import('@eregister/wit-grid-examples/kanban-board'), { ssr: false }),
 	clipboard: dynamic(() => import('@eregister/wit-grid-examples/clipboard'), { ssr: false }),
 	'realtime-grouping': dynamic(() => import('@eregister/wit-grid-examples/realtime-grouping'), { ssr: false }),
+	'nested-hierarchy': dynamic(() => import('@eregister/wit-grid-examples/nested-hierarchy'), { ssr: false }),
 };
 
 type HighlightToken = {

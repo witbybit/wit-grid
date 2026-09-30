@@ -17,7 +17,7 @@ const DynamicLayout = lazy(() => import('./pages/DynamicLayout'));
 const HeadlessSkinsPlayground = lazy(() => import('./pages/HeadlessSkinsPlayground'));
 const RealtimeDashboard = lazy(() => import('@eregister/wit-grid-examples/realtime-dashboard'));
 const GanttSchedulingWorkspace = lazy(() => import('./pages/GanttSchedulingWorkspace'));
-const NestedTablesGrouping = lazy(() => import('./pages/NestedTablesGrouping'));
+const NestedTablesGrouping = lazy(() => import('@eregister/wit-grid-examples/nested-hierarchy'));
 const PerformanceLab = lazy(() => import('./pages/PerformanceLab'));
 const FlightRecorderLab = lazy(() => import('./pages/FlightRecorderLab'));
 const SidebarPanelsDemo = lazy(() => import('./pages/SidebarPanelsDemo'));

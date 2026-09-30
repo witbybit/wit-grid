@@ -104,6 +104,17 @@ const promotedShowcases = [
 		showcase: true,
 		sourcePath: 'packages/examples/src/showcases/RealtimeGroupingDemo.tsx',
 	},
+	{
+		id: 'nested-hierarchy',
+		title: 'Nested hierarchy workbench',
+		description: 'Three hierarchy modes in one showcase: grouped analytics, parent-child tree data, and editable master-detail nested grids.',
+		category: 'Row models',
+		level: 'advanced',
+		tags: ['grouping', 'tree data', 'master detail'],
+		docs: '/docs/next/grouping',
+		showcase: true,
+		sourcePath: 'packages/examples/src/showcases/NestedHierarchyDemo.tsx',
+	},
 ] satisfies WitGridExampleMeta[];
 
 export const allExamples = [basicGrid, rowSelection, persistence, ...promotedShowcases] as const;

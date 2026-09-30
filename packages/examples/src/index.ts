@@ -11,3 +11,4 @@ export { default as RowDragShowcase } from './showcases/RowDragDemo';
 export { default as KanbanBoardShowcase } from './showcases/KanbanBoardDemo';
 export { default as ClipboardShowcase } from './showcases/ClipboardDemo';
 export { default as RealtimeGroupingShowcase } from './showcases/RealtimeGroupingDemo';
+export { default as NestedHierarchyShowcase } from './showcases/NestedHierarchyDemo';
