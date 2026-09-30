@@ -111,6 +111,13 @@ export class PortalMountManager<TRowData = unknown> {
 	public onUnmountCellContent?: (unmount: GridCellContentUnmount) => void;
 	public onFlushCellContent?: (flush: { flushSync?: boolean }) => void;
 	public onMountRowContent?: (mount: GridRowContentMount<TRowData>) => void;
+	/** Which full-width rows the adapter draws itself; unset means every row it is handed. */
+	public rendersRow?: (row: VisualRow<TRowData>) => boolean;
+
+	/** Whether a full-width row goes to the adapter (else core draws it). */
+	public adapterRendersRow(row: VisualRow<TRowData>): boolean {
+		return !!this.onMountRowContent && (this.rendersRow ? this.rendersRow(row) : true);
+	}
 	public onUnmountRowContent?: (unmount: GridRowContentUnmount) => void;
 	public onMountHeaderMenu?: (mount: GridHeaderMenuMount<TRowData>) => void;
 	public onUnmountHeaderMenu?: (unmount: GridHeaderMenuUnmount) => void;

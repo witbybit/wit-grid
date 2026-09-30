@@ -1027,6 +1027,61 @@ export const CORE_STYLES = `
     font-weight: 600;
   }
 
+  /* Core's built-in full-width rows (display: 'row' groups and totals, detail / failed / placeholder). */
+  .og-full-width-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 100%;
+    min-width: 0;
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .og-full-width-group {
+    background: var(--og-group-row-bg);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
+  }
+
+  .og-full-width-total {
+    font-weight: 600;
+  }
+
+  .og-full-width-hierarchy {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .og-full-width-aggregates {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .og-full-width-aggregate {
+    display: inline-flex;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--og-group-badge-text);
+  }
+
+  .og-full-width-aggregate > span {
+    opacity: 0.7;
+  }
+
+  .og-full-width-detail,
+  .og-full-width-placeholder {
+    color: var(--og-header-text);
+    opacity: 0.75;
+  }
+
+  .og-full-width-failed {
+    color: #fca5a5;
+    font-weight: 600;
+  }
+
   /* Group and total rows drawn as cell rows. */
   .og-row.og-row-group:not(.og-row-group-sticky) {
     background: var(--og-group-row-bg);

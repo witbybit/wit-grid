@@ -77,6 +77,9 @@ export function GridView<TRowData = unknown>({
 	autoRowHeight,
 }: GridViewProps<TRowData>) {
 	const portalStore = useMemo(() => createPortalStore<TRowData>(), []);
+	// Which full-width rows React draws: only kinds the user gave a renderer for. Core draws the rest.
+	const userRowRenderersRef = useRef({ group: false, detail: false, total: false });
+	userRowRenderersRef.current = { group: !!groupRowRenderer, detail: !!detailRowRenderer, total: !!totalRowRenderer };
 	const containerRef = useRef<HTMLDivElement>(null);
 	const hostRef = useRef<GridHostWithAdapter<TRowData> | null>(null);
 	const [adapterHandle, setAdapterHandle] = useState<GridAdapterHandle<unknown> | null>(null);
@@ -178,6 +181,7 @@ export function GridView<TRowData = unknown>({
 				flushCellContent: () => {},
 			},
 			rowContent: {
+				rendersRow: (row) => (userRowRenderersRef.current as Record<string, boolean>)[row.kind] ?? false,
 				mountRowContent: (mount) => {
 					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow, mount.renderer);
 				},

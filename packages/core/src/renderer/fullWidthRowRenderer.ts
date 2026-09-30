@@ -1,6 +1,7 @@
 import type { VisualRow } from '../visualRow.js';
 import type { RowSlot } from './rowSlot.js';
 import { isVisualRowEqual, type PortalMountManager } from './portalMountManager.js';
+import { getDefaultRowRenderer } from './defaultRowRenderers.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { DomRowRenderer, DomRowRendererHandle, RowRendererParams, RowRendererSpec } from '../rows/hierarchyConfig.js';
 
@@ -78,8 +79,16 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 	public mountContent(host: HTMLElement, rowKey: string, visualRow: VisualRow<TRowData>): void {
 		this.syncAutoHeight(host, visualRow);
 		const spec = this.resolveSpec(visualRow);
-		if (spec?.kind === 'dom') {
-			this.bindDomRow(host, rowKey, visualRow, spec.renderer);
+		// A DOM spec, else the adapter when it draws this row (a React spec, or its own renderer for
+		// the kind), else core's built-in renderer: adapters carry no hierarchy logic of their own.
+		const domRenderer =
+			spec?.kind === 'dom'
+				? spec.renderer
+				: spec?.kind === 'react' || this.portalMountManager.adapterRendersRow(visualRow)
+					? undefined
+					: getDefaultRowRenderer(visualRow);
+		if (domRenderer) {
+			this.bindDomRow(host, rowKey, visualRow, domRenderer);
 			return;
 		}
 		this.destroyDomRow(host);

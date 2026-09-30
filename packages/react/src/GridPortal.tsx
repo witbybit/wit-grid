@@ -4,28 +4,12 @@ import { createPortal } from 'react-dom';
 import { GridProvider } from './gridContext.js';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { createPortalStore, type ConcretePortalStore } from './gridPortalStore.js';
-import {
-	PortalCell,
-	PortalCellWrapper,
-	ImperativePortalCellWrapper,
-	DefaultGroupRowRenderer,
-	DefaultDetailRowRenderer,
-	DefaultTotalRowRenderer,
-	DefaultFailedRowRenderer,
-	DefaultPlaceholderRowRenderer,
-} from './gridPortalHosts.js';
+import { PortalCell, PortalCellWrapper, ImperativePortalCellWrapper } from './gridPortalHosts.js';
 import type { PortalStore, PortalManagerProps } from './gridPortalTypes.js';
 
 export { createPortalStore };
 export type { PortalStore };
-export {
-	PortalCell,
-	DefaultGroupRowRenderer,
-	DefaultDetailRowRenderer,
-	DefaultTotalRowRenderer,
-	DefaultFailedRowRenderer,
-	DefaultPlaceholderRowRenderer,
-};
+export { PortalCell };
 export type { PortalCellProps, PortalData, CellPortalSnapshot, RowMenuPortalSnapshot, PortalManagerProps } from './gridPortalTypes.js';
 
 // ─── CellPortalPool ───────────────────────────────────────────────────────────
@@ -105,20 +89,13 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 						api,
 					});
 				} else if (visualRow.kind === 'group') {
-					content = groupRowRenderer ? groupRowRenderer({ visualRow, api }) : <DefaultGroupRowRenderer visualRow={visualRow} api={api} />;
+					content = groupRowRenderer?.({ visualRow, api }) ?? null;
 				} else if (visualRow.kind === 'detail') {
-					content = detailRowRenderer ? (
-						detailRowRenderer({ visualRow, api })
-					) : (
-						<DefaultDetailRowRenderer visualRow={visualRow} api={api} />
-					);
+					content = detailRowRenderer?.({ visualRow, api }) ?? null;
 				} else if (visualRow.kind === 'total') {
-					content = totalRowRenderer ? totalRowRenderer({ visualRow, api }) : <DefaultTotalRowRenderer visualRow={visualRow} api={api} />;
-				} else if (visualRow.kind === 'failed') {
-					content = <DefaultFailedRowRenderer visualRow={visualRow} api={api} />;
-				} else if (visualRow.kind === 'placeholder') {
-					content = <DefaultPlaceholderRowRenderer visualRow={visualRow} api={api} />;
+					content = totalRowRenderer?.({ visualRow, api }) ?? null;
 				}
+				// Rows without a user renderer are drawn by core and never reach the adapter.
 				// Keyed via createPortal's third arg — see CellPortalPool note.
 				return createPortal(content, container, rowKey);
 			})}

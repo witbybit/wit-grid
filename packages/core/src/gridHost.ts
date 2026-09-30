@@ -29,6 +29,11 @@ export interface GridCellContentAdapter<TRowData = unknown> {
 export interface GridRowContentAdapter<TRowData = unknown> {
 	mountRowContent?: (mount: GridRowContentMount<TRowData>) => void;
 	unmountRowContent?: (unmount: GridRowContentUnmount) => void;
+	/**
+	 * Which full-width rows (detail, full-width group / total, failed, placeholder) the adapter draws
+	 * with its own renderers. Rows it does not draw get core's built-in renderers. Unset: all.
+	 */
+	rendersRow?: (row: import('./visualRow.js').VisualRow<TRowData>) => boolean;
 }
 
 export interface GridHeaderMenuAdapter<TRowData = unknown> {
@@ -164,6 +169,7 @@ export function mountGridHost<TRowData>(
 	renderEngine.portalMountManager.onFlushCellContent = options.cellContent?.flushCellContent;
 	renderEngine.onMountRowContent = options.rowContent?.mountRowContent;
 	renderEngine.onUnmountRowContent = options.rowContent?.unmountRowContent;
+	renderEngine.portalMountManager.rendersRow = options.rowContent?.rendersRow;
 	renderEngine.onMountHeaderMenu = options.headerMenu?.mountHeaderMenu;
 	renderEngine.onUnmountHeaderMenu = options.headerMenu?.unmountHeaderMenu;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);

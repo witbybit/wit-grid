@@ -27,7 +27,7 @@ const SALES: Sale[] = [
 	{ id: '3', region: 'APAC', product: 'Cloud', amount: 5 },
 ];
 
-function mountGrid(initial: Partial<GridInitialState<Sale>>, rows: Sale[] = SALES, height = 400) {
+function mountGrid(initial: Partial<GridInitialState<Sale>>, rows: Sale[] = SALES, height = 400, rendersRow?: (row: { kind: string }) => boolean) {
 	const store = new GridStore<Sale>({ columns: COLUMNS, defaultRowHeight: 40, getRowId: (row) => row.id, ...initial });
 	const controller = new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
 	const container = document.createElement('div');
@@ -47,6 +47,7 @@ function mountGrid(initial: Partial<GridInitialState<Sale>>, rows: Sale[] = SALE
 	const mountRowContent = vi.fn();
 	renderer.portalMountManager.onMountRowContent = mountRowContent;
 	renderer.portalMountManager.onUnmountRowContent = vi.fn();
+	renderer.portalMountManager.rendersRow = rendersRow;
 	renderer.mount(container);
 	renderer.fullPaint();
 	const rowAt = (index: number) => container.querySelector<HTMLElement>(`.og-rows-container .og-row[data-row-index="${index}"]`);
@@ -450,5 +451,45 @@ describe("detail.height: 'auto'", () => {
 		expect(grid.store.engine.geometry.getRowHeight(detailIndex, 40)).toBe(137);
 		grid.destroy();
 		vi.unstubAllGlobals();
+	});
+});
+
+describe("core's built-in full-width rows", () => {
+	function mountWithAdapter(initial: Partial<GridInitialState<Sale>>, rendersRow: (row: { kind: string }) => boolean) {
+		return mountGrid(initial, SALES, 400, rendersRow);
+	}
+
+	it("draws display: 'row' group rows itself when the adapter has no group renderer", () => {
+		const grid = mountWithAdapter(
+			{ grouping: { by: ['region'], display: 'row' }, aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] } },
+			() => false
+		);
+		const group = grid.rowAt(0)!;
+		expect(group.querySelector('.og-full-width-group .og-hierarchy-label')?.textContent).toBe('EMEA');
+		expect(group.querySelector('.og-full-width-aggregate')?.textContent).toBe('Amount$30');
+		expect(grid.mountRowContent).not.toHaveBeenCalled();
+		grid.destroy();
+	});
+
+	it('reflects and drives the selection of every row in a collapsed full-width group', () => {
+		const grid = mountWithAdapter(
+			{ grouping: { by: ['region'], display: 'row' }, hierarchyColumn: { show: { checkbox: true } }, rowSelection: { mode: 'multiple' } },
+			() => false
+		);
+		const checkbox = () => grid.rowAt(0)!.querySelector<HTMLInputElement>('.og-hierarchy-checkbox')!;
+		grid.store.selectRows(['1']);
+		expect(checkbox().indeterminate).toBe(true);
+		grid.store.selectRows(['2']);
+		expect(checkbox().checked).toBe(true);
+		checkbox().click();
+		expect(grid.store.getSelectedRowIds()).toEqual([]);
+		grid.destroy();
+	});
+
+	it('hands the adapter only the rows it says it draws', () => {
+		const grid = mountWithAdapter({ grouping: { by: ['region'], display: 'row' } }, (row) => row.kind === 'group');
+		expect(grid.mountRowContent.mock.calls.every(([mount]) => mount.visualRow.kind === 'group')).toBe(true);
+		expect(grid.mountRowContent).toHaveBeenCalled();
+		grid.destroy();
 	});
 });
