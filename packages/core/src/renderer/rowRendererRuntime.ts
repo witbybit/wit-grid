@@ -386,6 +386,14 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		bindAllHierarchyRowCells(this.rowCellBindingLaneDeps, request);
 	}
 
+	/** Releases a slot bound outside the pool (sticky headers): its cells' portals, then its DOM. */
+	public releaseDetachedSlot(slot: RowSlot<TRowData>): void {
+		slot.forEachCell((cell) => {
+			if (cell.lastPortalKey) this.releaseCellPortal(cell.element, false, 'destroyed');
+		});
+		slot.destroyCold();
+	}
+
 	public markCellDirtyAfterScroll(cell: HTMLDivElement): void {
 		if (!this.deps.stateHost.dirtyCellsAfterScroll.has(cell)) {
 			this.deps.stateHost.dirtyCellsAfterScroll.add(cell);

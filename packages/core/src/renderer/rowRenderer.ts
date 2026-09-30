@@ -1,3 +1,4 @@
+import type { StickyCellRowBinder } from './stickyGroupRenderer.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
 import type { PortalMountManager } from './portalMountManager.js';
@@ -260,6 +261,12 @@ export class RowRenderer<TRowData = unknown> {
 		this.activeRows.clear();
 		this.viewportRenderer.syncActiveDescendant(null);
 	}
+
+	/** Binds group rows into slots outside the pool (the sticky header layer) through the cell-row path. */
+	public readonly detachedRowBinder: StickyCellRowBinder<TRowData> = {
+		bind: (request) => this.runtime.bindAllHierarchyRowCells(request),
+		release: (slot) => this.runtime.releaseDetachedSlot(slot),
+	};
 
 	// ── Pinned container management ──────────────────────────────────────────────────
 

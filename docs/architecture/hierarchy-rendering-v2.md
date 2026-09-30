@@ -201,6 +201,11 @@ for `column` / `columns`, the row renderer for `row`), so they carry the hierarc
 cells that scroll horizontally with the content. The layer is compositor-positioned (`position: sticky`); script
 only moves a header when the next group pushes it.
 
+Implemented (phase 5): in `column` display each sticky header is a real `RowSlot` bound by the body's
+`bindAllHierarchyRowCells` (hierarchy cell in the pinned-left lane, aggregates scrolling with the content), never a
+portal and never deferred. The layer is `position: sticky`; a header's offset inside it changes only when the stack
+changes or the next group pushes it. `display: 'row'` keeps the adapter's full-width renderer.
+
 ## Behaviour
 
 - **Focus and keyboard:** group and total rows are cell rows, so their cells are focusable like data cells.

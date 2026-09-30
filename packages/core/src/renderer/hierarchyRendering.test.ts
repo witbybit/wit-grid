@@ -197,6 +197,45 @@ describe('group and total rows as cell rows', () => {
 	});
 });
 
+describe('sticky group headers as cell rows', () => {
+	it('draws the nested sticky stack with the same cells as body group rows, no row portals', () => {
+		const rows: Sale[] = [];
+		for (const region of ['EMEA', 'APAC']) {
+			for (const product of ['Cloud', 'Hardware']) {
+				for (let i = 0; i < 20; i++) rows.push({ id: `${region}-${product}-${i}`, region, product, amount: 1 });
+			}
+		}
+		const grid = mountGrid(
+			{
+				grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true },
+				aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+			},
+			rows,
+			300
+		);
+		const viewport = grid.container.querySelector<HTMLDivElement>('.og-scroll-viewport')!;
+		// Rows: 0 EMEA, 1 EMEA/Cloud, 2..21 its rows — scroll into the middle of EMEA/Cloud.
+		viewport.scrollTop = 400;
+		grid.store.engine.viewport.setScrollPosition(400, 0);
+		grid.renderer.fullPaint();
+
+		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+		const labels = [...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent);
+		expect(labels).toEqual(['EMEA', 'Cloud']);
+		const emea = layer.querySelector('[data-row-id="group:region=EMEA"]')!;
+		expect(emea.querySelector('.og-row-pin-left .og-cell-hierarchy')).not.toBeNull();
+		expect(emea.querySelector('[data-col-field="amount"]')?.textContent).toBe('$40');
+		expect(grid.mountRowContent.mock.calls.some(([mount]) => mount.rowKey.startsWith('sticky-group:'))).toBe(false);
+
+		// Scrolling on into EMEA/Hardware replaces the inner header, keeps the outer one.
+		viewport.scrollTop = 1300;
+		grid.store.engine.viewport.setScrollPosition(1300, 0);
+		grid.renderer.fullPaint();
+		expect([...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent)).toEqual(['EMEA', 'Hardware']);
+		grid.destroy();
+	});
+});
+
 describe('tree rows in the hierarchy column', () => {
 	it('shows treeData.column through its formatter, indented by level, toggle only on parents', () => {
 		const tree: Sale[] = [

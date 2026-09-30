@@ -2,10 +2,18 @@ import type { GridEngine } from '../engine/GridEngine.js';
 import type { VisualRow } from '../visualRow.js';
 import { snapToDevicePixel, type GridLayoutPlan } from './layoutPlan.js';
 import type { PortalMountManager } from './portalMountManager.js';
+import { RowSlot } from './rowSlot.js';
+import type { BindAllHierarchyRowCellsRequest } from './rowCellBindingLanes.js';
+
+/** Binds sticky headers through the body's cell-row path (see RowRenderer.bindDetachedHierarchyRow). */
+export interface StickyCellRowBinder<TRowData> {
+	bind(request: BindAllHierarchyRowCellsRequest<TRowData>): void;
+	release(slot: RowSlot<TRowData>): void;
+}
 
 const STICKY_ROW_KEY_PREFIX = 'sticky-group:';
 
-interface StickyGroupHost {
+interface StickyGroupHost<TRowData> {
 	element: HTMLDivElement;
 	rowKey: string;
 	// Last written presentation — sync() runs every scroll frame, so writes are diffed against these.
@@ -16,13 +24,17 @@ interface StickyGroupHost {
 	height: number;
 	top: number;
 	zIndex: number;
+	/** Cell-row display: the header is a real row slot with cells in every lane. */
+	slot: RowSlot<TRowData> | null;
 }
 
 export class StickyGroupRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
 	private readonly portalMountManager: PortalMountManager<TRowData>;
 	private layer: HTMLDivElement | null = null;
-	private readonly hosts = new Map<string, StickyGroupHost>();
+	private readonly hosts = new Map<string, StickyGroupHost<TRowData>>();
+	/** Set by the render engine once the row renderer exists. */
+	public cellRowBinder: StickyCellRowBinder<TRowData> | null = null;
 	private readonly nextKeysScratch = new Set<string>();
 	private lastLayerWidth = -1;
 	private lastLayerTop = Number.NaN;
@@ -97,8 +109,33 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				host.zIndex = zIndex;
 				el.style.zIndex = String(zIndex);
 			}
-			this.portalMountManager.mountRow({ rowKey, container: host.element, visualRow: visualRow as VisualRow<TRowData> });
-			this.portalMountManager.flushDeferredRowMount(rowKey);
+			const binder = this.cellRowBinder;
+			if (binder && (this.engine.stateManager.getState().grouping?.display ?? 'column') === 'column') {
+				// The same cells as the body's group row: the hierarchy cell in the pinned-left lane,
+				// aggregates scrolling horizontally with the content. Written every frame (a handful of
+				// cells), never deferred.
+				if (host.slot === null) {
+					this.portalMountManager.releaseRow({ rowKey, container: host.element });
+					host.slot = new RowSlot<TRowData>(rowKey, host.element);
+				}
+				const state = this.engine.stateManager.getState();
+				binder.bind({
+					slot: host.slot,
+					row: visualRow as Extract<VisualRow<TRowData>, { kind: 'group' }>,
+					rowIndex: item.visualIndex,
+					centerColStart: plan.columns.colStart,
+					centerColCount: Math.max(0, plan.columns.colEnd - plan.columns.colStart + 1),
+					columns: this.engine.columns.getDisplayedColumns(),
+					plan: this.engine.columns.getCompiledPlan(),
+					columnTopology: plan.columnTopology,
+					isScrollFrameActive: false,
+					state,
+				});
+			} else {
+				this.releaseSlot(host);
+				this.portalMountManager.mountRow({ rowKey, container: host.element, visualRow: visualRow as VisualRow<TRowData> });
+				this.portalMountManager.flushDeferredRowMount(rowKey);
+			}
 		}
 
 		this.releaseMissing(nextKeys);
@@ -110,12 +147,23 @@ export class StickyGroupRenderer<TRowData = unknown> {
 		this.layer = null;
 	}
 
-	private ensureHost(rowKey: string): StickyGroupHost {
+	private ensureHost(rowKey: string): StickyGroupHost<TRowData> {
 		const existing = this.hosts.get(rowKey);
 		if (existing) return existing;
 		const element = document.createElement('div');
 		element.dataset.rowKey = rowKey;
-		const host: StickyGroupHost = { element, rowKey, rowIndex: -1, rowId: '', className: '', width: -1, height: -1, top: Number.NaN, zIndex: -1 };
+		const host: StickyGroupHost<TRowData> = {
+			element,
+			rowKey,
+			rowIndex: -1,
+			rowId: '',
+			className: '',
+			width: -1,
+			height: -1,
+			top: Number.NaN,
+			zIndex: -1,
+			slot: null,
+		};
 		this.hosts.set(rowKey, host);
 		this.layer?.appendChild(element);
 		return host;
@@ -124,10 +172,25 @@ export class StickyGroupRenderer<TRowData = unknown> {
 	private releaseMissing(nextKeys: ReadonlySet<string>): void {
 		for (const [rowKey, host] of this.hosts) {
 			if (nextKeys.has(rowKey)) continue;
+			this.releaseSlot(host);
 			this.portalMountManager.releaseRow({ rowKey, container: host.element });
 			host.element.remove();
 			this.hosts.delete(rowKey);
 		}
+	}
+
+	private releaseSlot(host: StickyGroupHost<TRowData>): void {
+		if (!host.slot) return;
+		this.cellRowBinder?.release(host.slot);
+		host.slot = null;
+		// destroyCold resets the element; the host re-applies its presentation on the next sync.
+		host.className = '';
+		host.width = -1;
+		host.height = -1;
+		host.top = Number.NaN;
+		host.zIndex = -1;
+		host.rowIndex = -1;
+		host.rowId = '';
 	}
 
 	private getHostClassName(depth: number, pushed: boolean): string {
