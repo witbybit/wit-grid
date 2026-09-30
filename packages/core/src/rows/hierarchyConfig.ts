@@ -53,11 +53,11 @@ export interface GroupingConfig<TData = unknown> {
 	/** Height of group and total rows. Default: the grid's row height. */
 	rowHeight?: number;
 	/**
-	 * How group rows render. `'column'` (default): group and total rows are cell rows — the hierarchy
-	 * column shows the group, other columns show its aggregates. `'row'`: one full-width row drawn by
-	 * the adapter's group row renderer.
+	 * How group rows render. `'column'` (default): group and total rows are cell rows — one hierarchy
+	 * column shows every level, other columns show the aggregates. `'columns'`: one hierarchy column
+	 * per grouping level, each showing its own level. `'row'`: one full-width row per group.
 	 */
-	display?: 'column' | 'row';
+	display?: 'column' | 'columns' | 'row';
 	/** `display: 'row'`: draws each group row. Without one, the adapter's group row renderer is used. */
 	rowRenderer?: RowRendererSpec<TData>;
 }

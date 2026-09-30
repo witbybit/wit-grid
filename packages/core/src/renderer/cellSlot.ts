@@ -146,8 +146,11 @@ function setCellText(element: HTMLElement, text: string): void {
  * style-match and one more layout object to re-lay out whenever the text changes.
  * A CellSlot belongs to one column for its whole life, so the choice never changes for a slot.
  */
-export function isDirectTextColumn(col: Pick<ColumnDef<unknown>, 'checkboxSelection' | 'field'> & { cellRenderer?: unknown }): boolean {
-	return !col.cellRenderer && !col.checkboxSelection && !isHierarchyColumn(col);
+export function isDirectTextColumn(
+	col: Pick<ColumnDef<unknown>, 'checkboxSelection' | 'field'> & { cellRenderer?: unknown; aggregateRenderer?: unknown }
+): boolean {
+	// An aggregate renderer mounts into the content wrapper on group / total rows.
+	return !col.cellRenderer && !col.checkboxSelection && !isHierarchyColumn(col) && !col.aggregateRenderer;
 }
 
 export class CellSlot<TRowData = unknown> {
@@ -259,6 +262,27 @@ export class CellSlot<TRowData = unknown> {
 	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
 	 */
 	public hasAggregateText = false;
+	/** An aggregate renderer mounted in this cell (group / total rows), and what it last drew. */
+	// Typed loosely: only the binder, which knows the row type, calls into it.
+	public aggregateMount: {
+		renderer: unknown;
+		handle: { update?(params: never): void; destroy?(): void };
+		rowId: string;
+		value: unknown;
+	} | null = null;
+
+	/** Destroys a mounted aggregate renderer and clears its content. */
+	public releaseAggregateMount(): void {
+		const mount = this.aggregateMount;
+		if (!mount) return;
+		this.aggregateMount = null;
+		try {
+			mount.handle.destroy?.();
+		} finally {
+			this.contentElement.textContent = '';
+			this.lastFormattedValue = '';
+		}
+	}
 	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
 	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
 
@@ -697,6 +721,7 @@ export class CellSlot<TRowData = unknown> {
 
 	public unbindCold(): void {
 		this.detachCellCtrl();
+		this.releaseAggregateMount();
 		if (this.renderer !== null) {
 			this.renderer.destroy();
 			this.renderer = null;

@@ -1,8 +1,8 @@
 import type { ColumnDef } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
-import { hierarchyRowCellText } from './hierarchyCellModel.js';
+import { hierarchyCellInputsFor, hierarchyRowCellText } from './hierarchyCellModel.js';
 import { isHierarchyColumn } from './hierarchyColumn.js';
-import { isGroupingActive, type GroupingConfig, type HierarchyColumnConfig, type TreeDataConfig } from './hierarchyConfig.js';
+import { type GroupingConfig, type HierarchyColumnConfig, type TreeDataConfig } from './hierarchyConfig.js';
 
 export interface HierarchyTextSource<TData> {
 	getState(): { grouping?: GroupingConfig<TData>; treeData?: TreeDataConfig<TData>; hierarchyColumn?: HierarchyColumnConfig<TData> | false };
@@ -27,11 +27,7 @@ export function createHierarchyTextResolver<TData>(source: HierarchyTextSource<T
 			row,
 			col,
 			isHierarchyColumn(col),
-			{
-				config: state.hierarchyColumn || undefined,
-				treeColumn: state.treeData?.column,
-				isTree: !isGroupingActive(state.grouping) && !!state.treeData,
-			},
+			hierarchyCellInputsFor(state, col),
 			{ getColumn: source.getColumn, getCellValue: source.getCellValue, isRowSelected: () => false, getDescendantSelection: () => 'none' },
 			options
 		);

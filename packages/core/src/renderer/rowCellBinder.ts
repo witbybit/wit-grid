@@ -830,6 +830,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 
 /** A data bind never inherits a group / total row's aggregate text (see CellSlot.hasAggregateText). */
 function clearAggregateText<TRowData>(cellSlot: CellSlot<TRowData>): void {
+	cellSlot.releaseAggregateMount();
 	if (!cellSlot.hasAggregateText) return;
 	cellSlot.hasAggregateText = false;
 	cellSlot.clearText();

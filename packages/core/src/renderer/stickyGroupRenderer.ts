@@ -115,7 +115,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				el.style.zIndex = String(zIndex);
 			}
 			const binder = this.cellRowBinder;
-			if (binder && (this.engine.stateManager.getState().grouping?.display ?? 'column') === 'column') {
+			if (binder && this.engine.stateManager.getState().grouping?.display !== 'row') {
 				// The same cells as the body's group row: the hierarchy cell in the pinned-left lane,
 				// aggregates scrolling horizontally with the content. Written every frame (a handful of
 				// cells), never deferred.

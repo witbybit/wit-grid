@@ -122,6 +122,7 @@ describe('Public/internal boundary', () => {
 				'getOpsForType',
 				'getQueryOperator',
 				'getQueryOperatorsForType',
+				'hierarchyColumnGroupColId',
 				'isBuiltInThemeName',
 				'isDomCellRenderer',
 				'isFilterableColumn',

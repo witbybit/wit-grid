@@ -109,6 +109,8 @@ export type {
 	ColumnRendererSpec,
 	DomCellRenderer,
 	DomCellRendererHandle,
+	DomAggregateRenderer,
+	AggregateRendererParams,
 	DomCellRendererParams,
 	DomCellRendererRowRef,
 	ImperativeCellHandle,
@@ -165,7 +167,7 @@ export type {
 	DomRowRendererHandle,
 	RowRendererParams,
 } from './rows/hierarchyConfig.js';
-export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn } from './rows/hierarchyColumn.js';
+export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn, hierarchyColumnGroupColId } from './rows/hierarchyColumn.js';
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';
 export type { ExpandAllOptions } from './rowModel.js';
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';

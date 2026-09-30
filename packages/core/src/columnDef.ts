@@ -143,6 +143,23 @@ export interface NormalizedCellRendererCapabilities extends CellRendererCapabili
  * presentation modes. Deliberately NOT part of ColumnDef: windowing/budget/cache policy is a grid-
  * wide concern, not a per-column one.
  */
+/** What an aggregate renderer receives. */
+export interface AggregateRendererParams<TRowData = unknown> {
+	value: unknown;
+	/** `value` through the column's `valueFormatter` (or String). */
+	formattedValue: string;
+	/** The group or total row. */
+	row: import('./visualRow.js').GroupVisualRow<TRowData> | import('./visualRow.js').TotalVisualRow<TRowData>;
+	col: ColumnDef<TRowData>;
+}
+
+export interface DomAggregateRenderer<TRowData = unknown> {
+	mount(
+		container: HTMLElement,
+		params: AggregateRendererParams<TRowData>
+	): { update?(params: AggregateRendererParams<TRowData>): void; destroy?(): void } | void;
+}
+
 export interface GridRendererOptions {
 	/** Per-frame budget for DOM renderers updating in place during scroll (`scrollPresentation: 'update'`). */
 	domUpdate?: {
@@ -357,6 +374,11 @@ export interface ColumnDef<TRowData = unknown> {
 	 */
 	valueSetter?: (params: ValueSetterParams<TRowData>) => boolean | Promise<boolean>;
 	renderer?: ColumnRendererSpec<TRowData>;
+	/**
+	 * Draws this column's aggregate on group and total rows (a sparkline, a badge…). Without one the
+	 * aggregate is text through `valueFormatter`. Mounted by the grid directly, on every bind.
+	 */
+	aggregateRenderer?: { kind: 'dom'; renderer: DomAggregateRenderer<TRowData> };
 	cellEditor?: (props: CellEditorProps<TRowData>) => unknown;
 	headerMenuRenderer?: (props: HeaderMenuRendererProps<TRowData>) => void;
 	headerMenuComponent?: any;

@@ -1,6 +1,6 @@
 import type { ColumnDef } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
-import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
+import { hierarchyColumnGroupColId, isHierarchyColumn } from '../rows/hierarchyColumn.js';
 export interface CsvExportOptions {
 	/** Downloaded file name. Default: 'export.csv' */
 	fileName?: string;
@@ -114,7 +114,7 @@ function writeHierarchyRows<TRowData>(
 					return escapeCell([...path.slice(0, level), label].filter(Boolean).join(' > '), delimiter);
 				}
 				const withCount = row.kind === 'group' ? text(row, col, { withCount: true }) : label;
-				return escapeCell('  '.repeat(level) + withCount, delimiter);
+				return escapeCell((hierarchyColumnGroupColId(col) === null ? '  '.repeat(level) : '') + withCount, delimiter);
 			}
 			if (row.kind !== 'data') return escapeCell(text(row, col), delimiter);
 			const rowId = row.rowId;

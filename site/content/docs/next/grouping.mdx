@@ -130,6 +130,23 @@ Use `grouping` when groups come from repeated column values, and `treeData` when
 in the data; when both are set, grouping wins. With aggregation configured, tree parents carry the aggregate of
 their descendants (`treeData.aggregateParents`, default on).
 
+## Hierarchy column and display modes
+
+| `grouping.display`   | What you get                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `'column'` (default) | One hierarchy column, pinned left, showing every level indented.                             |
+| `'columns'`          | One hierarchy column per grouping level (headed by that column), each showing its own level. |
+| `'row'`              | A full-width row per group, drawn by `groupRowRenderer` (or `grouping.rowRenderer`).         |
+
+`hierarchyColumn` configures the auto column(s): `header`, `width`, `minWidth`, `pinned` (default `true`),
+`indentPerLevel` (default 16), `show: { toggle, checkbox, count }`, and `label(ctx)` / `count(ctx)` /
+`cellClass` to replace a part — each receives the row's kind, level, key or value, formatted value and
+aggregates. `hierarchyColumn: false` removes it.
+
+A column's aggregate can be drawn instead of written: `aggregateRenderer: { kind: 'dom', renderer }` is mounted by
+the grid into that column's cells on group and total rows, with `{ value, formattedValue, row, col }`
+(`mount(container, params)` returns `{ update?, destroy? }`) — a sparkline, a progress bar, a badge.
+
 ## Keyboard, accessibility, selection and export
 
 Group and total rows take focus like data rows. On the hierarchy cell, **ArrowRight** opens a closed row (or

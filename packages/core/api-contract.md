@@ -6,11 +6,12 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `d75e6a5f1c4e30b47d8de086edb089c4a6cc2b33b3c3b965b5c2f08dc391184c`
-Exports (307):
+Declaration SHA-256: `a6dd8ca7a70aa49adff767c7377f41010f6589368cb97f988e3c0b6029da5255`
+Exports (310):
 
 - `ActiveEditState` — type
 - `AggregateContext` — type
+- `AggregateRendererParams` — type
 - `AggregationConfig` — type
 - `AggregationDef` — type
 - `AllDataNodesCapableRowModel` — type
@@ -81,6 +82,7 @@ Exports (307):
 - `DetailVisualRow` — type
 - `doesCanonicalCellPointerMatchColumn` — value
 - `doesCellPointerMatchColumn` — value
+- `DomAggregateRenderer` — type
 - `DomCellRenderer` — type
 - `DomCellRendererHandle` — type
 - `DomCellRendererParams` — type
@@ -207,6 +209,7 @@ Exports (307):
 - `HIERARCHY_COLUMN_FIELD` — value
 - `HierarchyCellContext` — type
 - `HierarchyColumnConfig` — type
+- `hierarchyColumnGroupColId` — value
 - `HIGH_CONTRAST_DARK_THEME` — value
 - `HIGH_CONTRAST_LIGHT_THEME` — value
 - `ImperativeCellHandle` — type

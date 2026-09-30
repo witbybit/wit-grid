@@ -535,3 +535,118 @@ describe('focus on hierarchy rows', () => {
 		grid.destroy();
 	});
 });
+
+describe("display: 'columns'", () => {
+	const ROWS: Sale[] = [
+		{ id: '1', region: 'EMEA', product: 'Cloud', amount: 10 },
+		{ id: '2', region: 'EMEA', product: 'Hardware', amount: 20 },
+	];
+
+	it('adds one pinned hierarchy column per level, each showing its own level, unindented', () => {
+		const grid = mountGrid(
+			{
+				grouping: { by: ['region', 'product'], display: 'columns', defaultExpanded: true, totals: { groups: 'bottom' } },
+				aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+			},
+			ROWS
+		);
+		const columns = grid.store.getState().columns.map((column) => [column.field, column.header]);
+		expect(columns.slice(0, 2)).toEqual([
+			['__hierarchy__:region', 'Region'],
+			['__hierarchy__:product', 'Product'],
+		]);
+		expect(grid.store.engine.viewport.pinLeftColumns).toBe(2);
+		const label = (index: number, field: string) =>
+			grid.cellOf(grid.rowAt(index), field)?.querySelector('.og-hierarchy-label')?.textContent ?? '';
+		// Rows: 0 EMEA, 1 Cloud, 2 row 1, 3 Cloud total, 4 Hardware, …
+		expect([label(0, '__hierarchy__:region'), label(0, '__hierarchy__:product')]).toEqual(['EMEA', '']);
+		expect([label(1, '__hierarchy__:region'), label(1, '__hierarchy__:product')]).toEqual(['', 'Cloud']);
+		expect(grid.cellOf(grid.rowAt(1), '__hierarchy__:product')!.querySelector<HTMLElement>('.og-hierarchy')!.style.paddingLeft).toBe('0px');
+		expect(label(3, '__hierarchy__:product')).toBe('Total');
+
+		grid.store.updateGrouping({ display: 'column' });
+		expect(
+			grid.store
+				.getState()
+				.columns.filter((column) => column.field.startsWith('__hierarchy__'))
+				.map((c) => c.field)
+		).toEqual(['__hierarchy__']);
+		expect(grid.store.engine.viewport.pinLeftColumns).toBe(1);
+		grid.destroy();
+	});
+});
+
+describe('aggregateRenderer', () => {
+	it('draws group and total aggregates with the column renderer, updates in place, and leaves data cells alone', () => {
+		const mounts: unknown[] = [];
+		const updates: unknown[] = [];
+		const destroys = vi.fn();
+		const columns: ColumnDef<Sale>[] = [
+			{ field: 'region', header: 'Region' },
+			{
+				field: 'amount',
+				header: 'Amount',
+				aggregateRenderer: {
+					kind: 'dom',
+					renderer: {
+						mount: (container, params) => {
+							mounts.push(params.value);
+							const bar = document.createElement('span');
+							bar.className = 'bar';
+							bar.textContent = params.formattedValue;
+							container.appendChild(bar);
+							return {
+								update: (next) => {
+									updates.push(next.value);
+									bar.textContent = next.formattedValue;
+								},
+								destroy: destroys,
+							};
+						},
+					},
+				},
+			},
+		];
+		const store = new GridStore<Sale>({
+			columns,
+			defaultRowHeight: 40,
+			getRowId: (row) => row.id,
+			grouping: { by: ['region'] },
+			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+		});
+		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), { rows: SALES, columns: store.getState().columns });
+		const container = document.createElement('div');
+		vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+			x: 0,
+			y: 0,
+			top: 0,
+			left: 0,
+			right: 800,
+			bottom: 400,
+			width: 800,
+			height: 400,
+			toJSON: () => ({}),
+		});
+		document.body.appendChild(container);
+		const renderer = new RenderEngine(store.engine, store);
+		renderer.mount(container);
+		renderer.fullPaint();
+		const amount = (index: number) => container.querySelector(`.og-row[data-row-index="${index}"] [data-col-field="amount"]`)!;
+		expect(amount(0).querySelector('.bar')?.textContent).toBe('30');
+		expect(mounts).toEqual([30, 5]);
+
+		store.applyTransaction({ update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 15 }] });
+		renderer.fullPaint();
+		expect(updates).toEqual([35]);
+		expect(amount(0).querySelector('.bar')?.textContent).toBe('35');
+
+		// Expanding puts data rows where the APAC group row was: the renderer goes, the value shows.
+		store.setExpanded('group:region=EMEA', true);
+		renderer.fullPaint();
+		expect(destroys).toHaveBeenCalled();
+		expect(amount(1).querySelector('.bar')).toBeNull();
+		renderer.unmount();
+		controller.dispose();
+		store.destroy();
+	});
+});

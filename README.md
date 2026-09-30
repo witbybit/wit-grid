@@ -180,11 +180,13 @@ Row grouping organizes rows into an expandable folder-like structure based on id
 
 #### Configuration
 
-To enable row grouping, set `grouping.by` inside `initialState`. Define aggregates with `aggregation.defs`.
+To enable row grouping, set `grouping.by` inside `initialState`, and define aggregates with `aggregation.defs`.
+Group and total rows are real cell rows: a pinned **hierarchy column** shows each group's toggle, key and row
+count, and every other column shows the group's aggregate through its own `valueFormatter`.
 
 ```tsx
-import React, { useMemo, useCallback } from 'react';
-import { Grid, type ColumnDef, type VisualRow, type GridApi } from '@eregister/wit-grid-react';
+import { useMemo } from 'react';
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
 
 interface EmployeeRow {
 	id: string;
@@ -196,55 +198,32 @@ interface EmployeeRow {
 export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	const columns = useMemo<ColumnDef<EmployeeRow>[]>(
 		() => [
-			{ field: 'id', header: 'ID', width: 100 },
 			{ field: 'name', header: 'Full Name', width: 180 },
 			{ field: 'department', header: 'Department', width: 150 },
-			{ field: 'salary', header: 'Salary', width: 120 },
+			{ field: 'salary', header: 'Salary', width: 120, valueFormatter: ({ value }) => `$${Number(value).toLocaleString()}` },
 		],
 		[]
 	);
 
-	// Custom group row renderer to display summary aggregates
-	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
-		if (visualRow.kind !== 'group') return null;
-
-		const expanded = visualRow.hierarchy.expanded;
-		const handleToggle = (e: React.MouseEvent) => {
-			e.stopPropagation();
-			api.toggleExpanded(visualRow.id);
-		};
-
-		return (
-			<div
-				className='flex items-center justify-between px-4 h-full bg-slate-900 border-b border-slate-800 cursor-pointer'
-				onClick={handleToggle}
-				style={{ paddingLeft: `${visualRow.hierarchy.level * 20 + 10}px` }}
-			>
-				<div className='flex items-center gap-2'>
-					<span>{expanded ? '▼' : '▶'}</span>
-					<span className='font-bold text-xs text-purple-400'>{visualRow.field.toUpperCase()}:</span>
-					<span className='text-white font-semibold text-xs'>{String(visualRow.key)}</span>
-				</div>
-				<span className='text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-2 py-0.5 rounded-full font-bold'>
-					{visualRow.hierarchy.leafCount} employees
-				</span>
-			</div>
-		);
-	}, []);
-
 	return (
 		<div style={{ height: '500px' }}>
 			<Grid
-				mode='client'
 				rows={data}
 				columns={columns}
-				initialState={{ grouping: { by: ['department'], rowHeight: 42 } }}
-				groupRowRenderer={groupRowRenderer}
+				getRowId={(row) => row.id}
+				initialState={{
+					grouping: { by: ['department'], defaultExpanded: 1, totals: { groups: 'bottom', grand: 'bottom' }, stickyHeaders: true },
+					aggregation: { defs: [{ colId: 'salary', aggFunc: 'sum' }] },
+				}}
 			/>
 		</div>
 	);
 }
 ```
+
+Use `grouping.display: 'columns'` for one hierarchy column per grouping level, or `grouping.display: 'row'` with a
+`groupRowRenderer` for a fully custom full-width group row. See the [Grouping & Tree Data](site/content/docs/next/grouping.mdx) docs
+for totals, expansion, selection, keyboard and export.
 
 ---
 

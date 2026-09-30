@@ -71,7 +71,6 @@ export function writeHierarchyCell(content: HTMLElement, existing: HierarchyCell
 			parts.toggle.setAttribute('role', 'button');
 			parts.toggle.setAttribute('aria-expanded', String(model.toggle === 'open'));
 			parts.toggle.setAttribute('aria-label', model.toggle === 'open' ? 'Collapse' : 'Expand');
-			if (last.toggle == null) parts.toggle.textContent = '▸';
 		}
 		last.toggle = model.toggle;
 	}

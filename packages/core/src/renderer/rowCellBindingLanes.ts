@@ -878,6 +878,40 @@ function bindHierarchyRowCell<TRowData>(
 		}
 	}
 	const focusClass = applyHierarchyCellFocus(deps, cellSlot, row.id, rowIndex, colIndex, col, state);
+	const spec = col.aggregateRenderer;
+	if (spec && value != null && !cellSlot.directText) {
+		// The column draws its aggregate itself: mounted here, updated in place, destroyed when the
+		// cell shows anything else (see CellSlot.releaseAggregateMount).
+		const params = { value, formattedValue: text, row, col };
+		const mounted = cellSlot.aggregateMount;
+		if (mounted && mounted.renderer === spec.renderer && mounted.handle.update) {
+			if (mounted.rowId !== row.id || !Object.is(mounted.value, value)) mounted.handle.update(params as never);
+			mounted.rowId = row.id;
+			mounted.value = value;
+		} else if (!mounted || mounted.renderer !== spec.renderer || mounted.rowId !== row.id || !Object.is(mounted.value, value)) {
+			cellSlot.releaseAggregateMount();
+			cellSlot.clearText();
+			cellSlot.contentElement.textContent = '';
+			try {
+				const handle = spec.renderer.mount(cellSlot.contentElement, params) ?? {};
+				cellSlot.aggregateMount = {
+					renderer: spec.renderer,
+					handle: handle as { update?(params: never): void; destroy?(): void },
+					rowId: row.id,
+					value,
+				};
+			} catch (error) {
+				reportRendererFault(deps.engine, 'aggregate-renderer', error, { rowId: row.id, rowIndex, colField: col.field, colIndex });
+			}
+		}
+		cellSlot.hasAggregateText = false;
+		const className = `${buildCellPinClass(lane)} og-cell-aggregate og-cell-aggregate-value${focusClass}`;
+		const didWrite = cellSlot.update(colIndex, col.field, rowIndex, row.id, left, -1, width, className, 'custom', value, '', undefined);
+		cellSlot.lastMountedRowVersion = -1;
+		if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
+		return;
+	}
+	cellSlot.releaseAggregateMount();
 	const className = `${buildCellPinClass(lane)} og-cell-aggregate${text === '' ? '' : ' og-cell-aggregate-value'}${focusClass}`;
 	const didWrite = cellSlot.update(
 		colIndex,

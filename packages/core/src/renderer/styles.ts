@@ -976,26 +976,41 @@ export const CORE_STYLES = `
   }
 
   .og-hierarchy-toggle {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 18px;
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    font-size: 11px;
-    line-height: 1;
-    color: var(--og-group-badge-text, #c4b5fd);
+    border-radius: 5px;
+    color: currentColor;
+    opacity: 0.8;
     cursor: pointer;
-    transition: transform 0.15s ease, background-color 0.12s ease;
+    transition: background-color 0.12s ease, opacity 0.12s ease;
+  }
+
+  /* A drawn chevron: crisp at any zoom, inherits the row's text colour. */
+  .og-hierarchy-toggle::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateX(-1px) rotate(-45deg);
+    transition: transform 0.15s ease;
+  }
+
+  .og-hierarchy-toggle-open::before {
+    transform: translateY(-2px) rotate(45deg);
   }
 
   .og-hierarchy-toggle:hover {
+    opacity: 1;
     background: var(--og-group-badge-bg, rgba(167, 139, 250, 0.14));
   }
 
-  .og-hierarchy-toggle-open {
-    transform: rotate(90deg);
+  .og-hierarchy-toggle-none::before {
+    content: none;
   }
 
   /* No children: keeps the slot so labels at one level align. */

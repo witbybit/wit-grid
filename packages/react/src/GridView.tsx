@@ -40,8 +40,14 @@ export interface GridViewProps<TRowData = unknown> {
 		editTrigger?: 'singleClick' | 'doubleClick';
 		arrowKeyNavigationEdit?: boolean;
 	};
+	/**
+	 * Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row
+	 * display — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence.
+	 */
 	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	/** Detail rows (master-detail). Without one the grid draws a placeholder; `detail.renderer` takes precedence. */
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	/** Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid. */
 	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
 	enableChart?: boolean;

@@ -1,11 +1,19 @@
 import type { ColumnDef } from '../columnDef.js';
-import { isGroupingActive, type GroupingConfig, type HierarchyColumnConfig, type TreeDataConfig } from './hierarchyConfig.js';
+import { groupByColIds, isGroupingActive, type GroupingConfig, type HierarchyColumnConfig, type TreeDataConfig } from './hierarchyConfig.js';
 
-/** Field of the auto hierarchy column. */
+/** Field of the auto hierarchy column; `display: 'columns'` adds one per level as `__hierarchy__:<colId>`. */
 export const HIERARCHY_COLUMN_FIELD = '__hierarchy__';
+const LEVEL_PREFIX = `${HIERARCHY_COLUMN_FIELD}:`;
 
 export function isHierarchyColumn(column: { field: string } | null | undefined): boolean {
-	return column?.field === HIERARCHY_COLUMN_FIELD;
+	const field = column?.field;
+	return field === HIERARCHY_COLUMN_FIELD || (!!field && field.startsWith(LEVEL_PREFIX));
+}
+
+/** `display: 'columns'`: the grouped column a level column shows; null for the single hierarchy column. */
+export function hierarchyColumnGroupColId(column: { field: string } | null | undefined): string | null {
+	const field = column?.field;
+	return field && field.startsWith(LEVEL_PREFIX) ? field.slice(LEVEL_PREFIX.length) : null;
 }
 
 export interface HierarchyColumnInputs<TData> {
@@ -16,19 +24,23 @@ export interface HierarchyColumnInputs<TData> {
 	hierarchyColumn?: HierarchyColumnConfig<TData> | false;
 }
 
-/** Whether the hierarchy column should exist for this configuration. */
+/** Whether hierarchy columns should exist for this configuration. */
 export function wantsHierarchyColumn<TData>(inputs: Omit<HierarchyColumnInputs<TData>, 'columns' | 'pinnedColumns'>): boolean {
 	if (inputs.hierarchyColumn === false) return false;
-	if (isGroupingActive(inputs.grouping)) return (inputs.grouping.display ?? 'column') === 'column';
+	if (isGroupingActive(inputs.grouping)) return (inputs.grouping.display ?? 'column') !== 'row';
 	return !!inputs.treeData;
 }
 
-function createHierarchyColumn<TData>(inputs: HierarchyColumnInputs<TData>, existing: ColumnDef<TData> | undefined): ColumnDef<TData> {
-	const config = inputs.hierarchyColumn || undefined;
+function createHierarchyColumn<TData>(
+	field: string,
+	header: string,
+	width: number,
+	config: HierarchyColumnConfig<TData> | undefined
+): ColumnDef<TData> {
 	return {
-		field: HIERARCHY_COLUMN_FIELD,
-		header: config?.header ?? (isGroupingActive(inputs.grouping) ? 'Group' : 'Name'),
-		width: config?.width ?? existing?.width ?? 240,
+		field,
+		header,
+		width,
 		...(config?.minWidth !== undefined ? { minWidth: config.minWidth } : {}),
 		sortable: false,
 		filterType: 'none',
@@ -40,8 +52,28 @@ function createHierarchyColumn<TData>(inputs: HierarchyColumnInputs<TData>, exis
 	};
 }
 
+/** The hierarchy columns this configuration wants, reusing widths of existing ones (user resizes). */
+function wantedHierarchyColumns<TData>(inputs: HierarchyColumnInputs<TData>, existing: ReadonlyMap<string, ColumnDef<TData>>): ColumnDef<TData>[] {
+	if (!wantsHierarchyColumn(inputs)) return [];
+	const config = inputs.hierarchyColumn || undefined;
+	if (isGroupingActive(inputs.grouping) && inputs.grouping.display === 'columns') {
+		const columnsByField = new Map(inputs.columns.map((column) => [column.field, column]));
+		return groupByColIds(inputs.grouping).map((colId) => {
+			const field = `${LEVEL_PREFIX}${colId}`;
+			return createHierarchyColumn(
+				field,
+				columnsByField.get(colId)?.header ?? colId,
+				config?.width ?? existing.get(field)?.width ?? 180,
+				config
+			);
+		});
+	}
+	const header = config?.header ?? (isGroupingActive(inputs.grouping) ? 'Group' : 'Name');
+	return [createHierarchyColumn(HIERARCHY_COLUMN_FIELD, header, config?.width ?? existing.get(HIERARCHY_COLUMN_FIELD)?.width ?? 240, config)];
+}
+
 /**
- * Adds, updates or removes the hierarchy column in `columns` so it matches the configuration, and
+ * Adds, updates or removes the hierarchy column(s) in `columns` so they match the configuration, and
  * keeps the pinned-left count in step. Pinned: placed after any leading row-selection column;
  * unpinned: first unpinned column. Returns the inputs unchanged (same references) when nothing moves.
  */
@@ -52,29 +84,30 @@ export function syncHierarchyColumn<TData>(inputs: HierarchyColumnInputs<TData>)
 } {
 	const { columns } = inputs;
 	const pins = inputs.pinnedColumns ?? { left: 0, right: 0 };
-	const index = columns.findIndex(isHierarchyColumn);
-	const wanted = wantsHierarchyColumn(inputs);
+	const existing = new Map<string, ColumnDef<TData>>();
+	let pinnedExisting = 0;
+	columns.forEach((column, i) => {
+		if (!isHierarchyColumn(column)) return;
+		existing.set(column.field, column);
+		if (i < pins.left) pinnedExisting++;
+	});
+	const wanted = wantedHierarchyColumns(inputs, existing);
+	if (wanted.length === 0 && existing.size === 0) return { columns, pinnedColumns: inputs.pinnedColumns, changed: false };
 
-	if (!wanted) {
-		if (index === -1) return { columns, pinnedColumns: inputs.pinnedColumns, changed: false };
-		const next = columns.filter((_, i) => i !== index);
-		return { columns: next, pinnedColumns: index < pins.left ? { ...pins, left: pins.left - 1 } : inputs.pinnedColumns, changed: true };
-	}
-
+	const without = existing.size === 0 ? columns : columns.filter((column) => !isHierarchyColumn(column));
+	const leftWithout = pins.left - pinnedExisting;
 	const pinned = (inputs.hierarchyColumn || undefined)?.pinned ?? true;
-	const column = createHierarchyColumn(inputs, index === -1 ? undefined : columns[index]);
-	const without = index === -1 ? columns : columns.filter((_, i) => i !== index);
-	const leftWithout = index !== -1 && index < pins.left ? pins.left - 1 : pins.left;
-	let insertAt: number;
+	let insertAt = leftWithout;
 	if (pinned) {
 		insertAt = 0;
 		while (insertAt < leftWithout && without[insertAt]?.checkboxSelection) insertAt++;
-	} else {
-		insertAt = leftWithout;
 	}
-	const next = [...without.slice(0, insertAt), column, ...without.slice(insertAt)];
-	const nextPins = { ...pins, left: pinned ? leftWithout + 1 : leftWithout };
-	const unchanged = index === insertAt && nextPins.left === pins.left && sameColumnConfig(columns[index], column);
+	const next = [...without.slice(0, insertAt), ...wanted, ...without.slice(insertAt)];
+	const nextPins = { ...pins, left: pinned && wanted.length > 0 ? leftWithout + wanted.length : leftWithout };
+	const unchanged =
+		nextPins.left === pins.left &&
+		next.length === columns.length &&
+		next.every((column, i) => column.field === columns[i].field && (!isHierarchyColumn(column) || sameColumnConfig(columns[i], column)));
 	if (unchanged) return { columns, pinnedColumns: inputs.pinnedColumns, changed: false };
 	return { columns: next, pinnedColumns: nextPins, changed: true };
 }
@@ -92,10 +125,10 @@ export function withHierarchyColumnFor<TData>(
 	nextColumns: ColumnDef<TData>[],
 	state: Omit<HierarchyColumnInputs<TData>, 'columns'> & { columns: ColumnDef<TData>[] }
 ): { columns: ColumnDef<TData>[]; pinnedColumns?: { left: number; right: number } } {
-	const currentIndex = state.columns.findIndex(isHierarchyColumn);
 	const pins = state.pinnedColumns;
-	// Pin counts exclude the column while it is stripped; the sync puts it (and its pin) back.
-	const pinsWithout = pins && currentIndex !== -1 && currentIndex < pins.left ? { ...pins, left: pins.left - 1 } : pins;
+	// Pin counts exclude the hierarchy columns while they are stripped; the sync puts them (and their pins) back.
+	const pinnedHierarchy = pins ? state.columns.filter((column, i) => i < pins.left && isHierarchyColumn(column)).length : 0;
+	const pinsWithout = pins && pinnedHierarchy > 0 ? { ...pins, left: pins.left - pinnedHierarchy } : pins;
 	const synced = syncHierarchyColumn({ ...state, columns: nextColumns.filter((column) => !isHierarchyColumn(column)), pinnedColumns: pinsWithout });
 	const nextPins = synced.pinnedColumns;
 	const pinsChanged = !!nextPins && (nextPins.left !== pins?.left || nextPins.right !== pins?.right);

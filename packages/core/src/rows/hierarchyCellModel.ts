@@ -1,5 +1,13 @@
 import type { ColumnDef } from '../columnDef.js';
-import type { HierarchyCellContext, HierarchyColumnConfig } from './hierarchyConfig.js';
+import {
+	groupByColIds,
+	isGroupingActive,
+	type GroupingConfig,
+	type HierarchyCellContext,
+	type HierarchyColumnConfig,
+	type TreeDataConfig,
+} from './hierarchyConfig.js';
+import { hierarchyColumnGroupColId } from './hierarchyColumn.js';
 import type { DescendantSelectionState } from './hierarchyIndex.js';
 import type { VisualRow } from '../visualRow.js';
 
@@ -29,6 +37,24 @@ export interface HierarchyCellInputs<TData> {
 	/** `treeData.column`: the field tree rows show. */
 	treeColumn: string | undefined;
 	isTree: boolean;
+	/** `display: 'columns'`: the grouping level this column shows; undefined for the single hierarchy column. */
+	levelIndex?: number;
+}
+
+/** The inputs for a hierarchy cell of `col` (a level column in `display: 'columns'`), from grid state. */
+export function hierarchyCellInputsFor<TData>(
+	state: { grouping?: GroupingConfig<TData>; treeData?: TreeDataConfig<TData>; hierarchyColumn?: HierarchyColumnConfig<TData> | false },
+	col?: { field: string } | null
+): HierarchyCellInputs<TData> {
+	const grouped = isGroupingActive(state.grouping);
+	const levelColId = hierarchyColumnGroupColId(col);
+	const levelIndex = levelColId !== null && grouped ? groupByColIds(state.grouping).indexOf(levelColId) : -1;
+	return {
+		config: state.hierarchyColumn || undefined,
+		treeColumn: state.treeData?.column,
+		isTree: !grouped && !!state.treeData,
+		...(levelIndex >= 0 ? { levelIndex } : {}),
+	};
 }
 
 const DEFAULT_INDENT = 16;
@@ -47,9 +73,15 @@ export function resolveHierarchyCellModel<TData>(
 	deps: HierarchyCellDeps<TData>
 ): HierarchyCellModel | null {
 	if (row.kind !== 'group' && row.kind !== 'total' && row.kind !== 'data') return null;
-	const { config } = inputs;
+	const { config, levelIndex } = inputs;
 	const { hierarchy } = row;
 	const show = config?.show;
+	if (levelIndex !== undefined) {
+		// One column per level: a group shows in its own level's column, a total under its group's.
+		if (row.kind === 'data') return null;
+		const shownAt = row.kind === 'group' ? hierarchy.level : row.scope === 'grand' ? 0 : hierarchy.level - 1;
+		if (shownAt !== levelIndex) return null;
+	}
 
 	let ctx: HierarchyCellContext<TData>;
 	if (row.kind === 'group') {
@@ -107,7 +139,7 @@ export function resolveHierarchyCellModel<TData>(
 	const extraClass = typeof config?.cellClass === 'function' ? config.cellClass(ctx) : config?.cellClass;
 	return {
 		targetId: ctx.id,
-		indentPx: ctx.level * (config?.indentPerLevel ?? DEFAULT_INDENT),
+		indentPx: levelIndex !== undefined ? 0 : ctx.level * (config?.indentPerLevel ?? DEFAULT_INDENT),
 		toggle: (show?.toggle ?? true) && ctx.hasChildren ? (ctx.expanded ? 'open' : 'closed') : null,
 		checkbox,
 		label,
@@ -129,7 +161,7 @@ export function hierarchyRowCellText<TData>(
 		const model = resolveHierarchyCellModel(row, inputs, deps);
 		if (!model) return '';
 		const level = row.kind === 'group' || row.kind === 'total' || row.kind === 'data' ? row.hierarchy.level : 0;
-		const prefix = options.indent ? options.indent.repeat(level) : '';
+		const prefix = options.indent && inputs.levelIndex === undefined ? options.indent.repeat(level) : '';
 		return prefix + model.label + (options.withCount && model.count !== null ? ` (${model.count})` : '');
 	}
 	if (row.kind !== 'group' && row.kind !== 'total') return '';

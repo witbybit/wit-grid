@@ -701,7 +701,7 @@ export class RowRenderer<TRowData = unknown> {
 					refreshVisibleColumns,
 					viewportPlan: this.currentViewportPlan,
 				});
-			} else if ((visualRow.kind === 'group' || visualRow.kind === 'total') && (state.grouping?.display ?? 'column') === 'column') {
+			} else if ((visualRow.kind === 'group' || visualRow.kind === 'total') && state.grouping?.display !== 'row') {
 				// Group and total rows are cell rows: hierarchy cell + aggregate cells in every lane.
 				this.releaseRowPortal(slot);
 				this.runtime.bindAllHierarchyRowCells({ ...lanes, row: visualRow, state });

@@ -1,6 +1,6 @@
+import { hierarchyCellInputsFor } from '../rows/hierarchyCellModel.js';
 import type { ColumnDef } from '../columnDef.js';
 import { readInteractionState } from '../interaction/interactionState.js';
-import { isGroupingActive } from '../rows/hierarchyConfig.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { VisualRow } from '../visualRow.js';
 import type { CellSlot } from './cellSlot.js';
@@ -100,15 +100,7 @@ export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowDa
 	if (isScrollFrameActive) deps.onScrollCellVisited?.();
 	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
 
-	const model = resolveHierarchyCellModel(
-		row,
-		{
-			config: state.hierarchyColumn || undefined,
-			treeColumn: state.treeData?.column,
-			isTree: !isGroupingActive(state.grouping) && !!state.treeData,
-		},
-		createDeps(deps, state)
-	);
+	const model = resolveHierarchyCellModel(row, hierarchyCellInputsFor(state, col), createDeps(deps, state));
 	const rowId = row.kind === 'data' ? row.rowId : row.id;
 	if (!model) {
 		if (cellSlot.hierarchyParts) {

@@ -105,8 +105,18 @@ both **on the grid**, in `initialState` — the column stays a plain column defi
 
 </Tabs>
 
-Grouping renders through a `groupRowRenderer` you supply, not an auto-generated group column — see
-[Grouping & Tree Data](/docs/next/grouping) for the full renderer contract and toggling API
+Group rows are cell rows with an auto group column, as in AG Grid:
+
+| AG Grid                                              | Wit Grid                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| `groupDisplayType: 'singleColumn'`                   | `grouping.display: 'column'` (default)                       |
+| `groupDisplayType: 'multipleColumns'`                | `grouping.display: 'columns'`                                |
+| `groupDisplayType: 'groupRows'` + `groupRowRenderer` | `grouping.display: 'row'` + `groupRowRenderer`               |
+| `autoGroupColumnDef`                                 | `hierarchyColumn`                                            |
+| `groupTotalRow` / `grandTotalRow`                    | `grouping.totals.groups` / `grouping.totals.grand`           |
+| `groupDefaultExpanded`                               | `grouping.defaultExpanded` (boolean, levels, or a predicate) |
+
+See [Grouping & Tree Data](/docs/next/grouping) for the details and the expansion API
 (`api.toggleExpanded`, `api.expandAll`).
 
 ## Row models
