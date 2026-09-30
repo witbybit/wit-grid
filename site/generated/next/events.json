@@ -3,10 +3,10 @@
 	"source": "packages/core/src/api/GridEvents.ts",
 	"events": [
 		{
-			"name": "aggDefsChanged",
-			"value": "aggDefsChanged",
-			"payload": "{ aggDefs: AggregationDef<TRowData>[] | undefined }",
-			"category": "Aggregation"
+			"name": "aggregationChanged",
+			"value": "aggregationChanged",
+			"payload": "{ defs: AggregationDef<TRowData>[] }",
+			"category": "Grid"
 		},
 		{
 			"name": "cellClicked",
@@ -81,10 +81,16 @@
 			"category": "Editing"
 		},
 		{
-			"name": "enableStickyGroupRowsChanged",
-			"value": "enableStickyGroupRowsChanged",
-			"payload": "{ enableStickyGroupRows: boolean | undefined }",
-			"category": "Rows"
+			"name": "detailChanged",
+			"value": "detailChanged",
+			"payload": "{ detail: DetailConfig<TRowData> | undefined }; /** A group, tree row or detail opened or closed; `target: 'all'` for expandAll / collapseAll. */",
+			"category": "Grid"
+		},
+		{
+			"name": "expansionChanged",
+			"value": "expansionChanged",
+			"payload": "{ target: 'row' | 'detail' | 'all'; id: string | null; expanded: boolean; maxLevel?: number }",
+			"category": "Grid"
 		},
 		{
 			"name": "filterChanged",
@@ -107,8 +113,20 @@
 		{
 			"name": "groupByChanged",
 			"value": "groupByChanged",
-			"payload": "{ groupBy: string[] | undefined }",
+			"payload": "{ groupBy: string[] }",
 			"category": "Grouping"
+		},
+		{
+			"name": "groupingChanged",
+			"value": "groupingChanged",
+			"payload": "{ grouping: GroupingConfig<TRowData> | undefined }",
+			"category": "Grid"
+		},
+		{
+			"name": "hierarchyColumnChanged",
+			"value": "hierarchyColumnChanged",
+			"payload": "{ hierarchyColumn: HierarchyColumnConfig<TRowData> | false | undefined }",
+			"category": "Grid"
 		},
 		{
 			"name": "groupColumnAdded",
@@ -195,16 +213,16 @@
 			"category": "Server row model"
 		},
 		{
-			"name": "showGroupFooterChanged",
-			"value": "showGroupFooterChanged",
-			"payload": "{ showGroupFooter: boolean | undefined }",
-			"category": "Grouping"
-		},
-		{
 			"name": "sortChanged",
 			"value": "sortChanged",
 			"payload": "{ sortModel: SortModel | null }",
 			"category": "Sorting"
+		},
+		{
+			"name": "treeDataChanged",
+			"value": "treeDataChanged",
+			"payload": "{ treeData: TreeDataConfig<TRowData> | undefined }",
+			"category": "Grid"
 		},
 		{
 			"name": "cellValidationChanged",

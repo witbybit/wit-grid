@@ -109117,7 +109117,7 @@
 			"title": "Grouping & aggregation",
 			"description": "Drag columns into the group panel to group live, with sticky group rows, sum/avg aggregates, and a custom group row renderer.",
 			"sourcePath": "packages/examples/src/showcases/RealtimeGroupingDemo.tsx",
-			"source": "import React, { useEffect, useState } from 'react';\nimport { Grid } from '@eregister/wit-grid-react';\nimport type { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';\n\n// ── Data model ────────────────────────────────────────────────────────────────\n\ninterface SalesRow {\n\tid: string;\n\tregion: string;\n\tcountry: string;\n\tcategory: string;\n\tproduct: string;\n\trep: string;\n\tquarter: string;\n\trevenue: number;\n\tunits: number;\n\tmargin: number;\n\tstatus: 'Won' | 'Lost' | 'Pending';\n}\n\nconst REGIONS = ['Americas', 'EMEA', 'APAC'];\nconst COUNTRIES: Record<string, string[]> = {\n\tAmericas: ['USA', 'Canada', 'Brazil', 'Mexico'],\n\tEMEA: ['UK', 'Germany', 'France', 'Netherlands', 'Sweden'],\n\tAPAC: ['Japan', 'Australia', 'Singapore', 'India', 'South Korea'],\n};\nconst CATEGORIES = ['Hardware', 'Software', 'Services', 'Cloud'];\nconst PRODUCTS: Record<string, string[]> = {\n\tHardware: ['Workstation Pro', 'Server Blade', 'Network Switch', 'SSD Array'],\n\tSoftware: ['Analytics Suite', 'DevOps Platform', 'Security Shield', 'ERP Core'],\n\tServices: ['Consulting Pack', 'Support Gold', 'Training Bundle', 'Migration Kit'],\n\tCloud: ['Compute Flex', 'Storage Plus', 'CDN Accelerate', 'ML Pipeline'],\n};\nconst REPS = ['Alice Chen', 'Ben Morris', 'Cara Singh', 'David Kim', 'Elena Voss', 'Felix Tan', 'Grace Park', 'Hiro Yamamoto'];\nconst QUARTERS = ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024'];\nconst STATUSES: SalesRow['status'][] = ['Won', 'Won', 'Won', 'Pending', 'Pending', 'Lost'];\n\nfunction generateRows(count: number): SalesRow[] {\n\treturn Array.from({ length: count }, (_, i) => {\n\t\tconst region = REGIONS[i % REGIONS.length];\n\t\tconst countryList = COUNTRIES[region];\n\t\tconst country = countryList[Math.floor(i / REGIONS.length) % countryList.length];\n\t\tconst category = CATEGORIES[(i * 3) % CATEGORIES.length];\n\t\tconst productList = PRODUCTS[category];\n\t\tconst product = productList[(i * 7) % productList.length];\n\t\tconst rep = REPS[(i * 5) % REPS.length];\n\t\tconst quarter = QUARTERS[(i * 2) % QUARTERS.length];\n\t\tconst base = 20000 + ((i * 7919 + 13) % 180000);\n\t\tconst revenue = Math.round(base / 100) * 100;\n\t\tconst units = 1 + ((i * 11 + 3) % 49);\n\t\tconst margin = Math.round((15 + ((i * 17) % 45)) * 10) / 10;\n\t\tconst status = STATUSES[i % STATUSES.length];\n\t\treturn { id: `sale-${i}`, region, country, category, product, rep, quarter, revenue, units, margin, status };\n\t});\n}\n\n// ── Aggregation definitions ───────────────────────────────────────────────────\n\nconst AGG_DEFS: AggregationDef<SalesRow>[] = [\n\t{ field: 'revenue', aggFunc: 'sum' },\n\t{ field: 'units', aggFunc: 'sum' },\n\t{ field: 'margin', aggFunc: 'avg' },\n];\n\n// ── Cell renderers ────────────────────────────────────────────────────────────\n\nconst CurrencyRenderer = ({ value }: CellRendererProps<SalesRow>) => (\n\t<span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>${Number(value).toLocaleString()}</span>\n);\n\nconst MarginRenderer = ({ value }: CellRendererProps<SalesRow>) => {\n\tconst v = Number(value);\n\tconst color = v >= 40 ? '#34d399' : v >= 25 ? '#fbbf24' : '#f87171';\n\treturn <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color }}>{v.toFixed(1)}%</span>;\n};\n\nconst StatusRenderer = ({ value }: CellRendererProps<SalesRow>) => {\n\tconst v = String(value);\n\tconst s =\n\t\tv === 'Won'\n\t\t\t? { bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)', color: '#34d399' }\n\t\t\t: v === 'Pending'\n\t\t\t\t? { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.25)', color: '#fbbf24' }\n\t\t\t\t: { bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)', color: '#f87171' };\n\treturn (\n\t\t<span\n\t\t\tstyle={{\n\t\t\t\tfontSize: 10,\n\t\t\t\tfontWeight: 700,\n\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\tletterSpacing: '0.05em',\n\t\t\t\tpadding: '2px 7px',\n\t\t\t\tborderRadius: 4,\n\t\t\t\tbackground: s.bg,\n\t\t\t\tborder: `1px solid ${s.border}`,\n\t\t\t\tcolor: s.color,\n\t\t\t}}\n\t\t>\n\t\t\t{v}\n\t\t</span>\n\t);\n};\n\n// ── Column definitions ────────────────────────────────────────────────────────\n\nconst COLUMNS: ColumnDef<SalesRow>[] = [\n\t{ field: 'region', header: 'Region', width: 110, sortable: true, enableRowGroup: true },\n\t{ field: 'country', header: 'Country', width: 120, sortable: true, enableRowGroup: true },\n\t{ field: 'category', header: 'Category', width: 110, sortable: true, enableRowGroup: true },\n\t{ field: 'product', header: 'Product', width: 160, sortable: true, enableRowGroup: true },\n\t{ field: 'rep', header: 'Sales Rep', width: 145, sortable: true, enableRowGroup: true },\n\t{ field: 'quarter', header: 'Quarter', width: 100, sortable: true, enableRowGroup: true },\n\t{\n\t\tfield: 'revenue',\n\t\theader: 'Revenue',\n\t\twidth: 130,\n\t\tsortable: true,\n\n\t\tenableRowGroup: false,\n\t\trenderer: { kind: 'react', component: CurrencyRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n\t{ field: 'units', header: 'Units', width: 75, sortable: true, enableRowGroup: false },\n\t{\n\t\tfield: 'margin',\n\t\theader: 'Margin %',\n\t\twidth: 95,\n\t\tsortable: true,\n\n\t\tenableRowGroup: false,\n\t\trenderer: { kind: 'react', component: MarginRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n\t{\n\t\tfield: 'status',\n\t\theader: 'Status',\n\t\twidth: 95,\n\t\tsortable: true,\n\n\t\tenableRowGroup: true,\n\t\trenderer: { kind: 'react', component: StatusRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n];\n\nconst ROWS = generateRows(500);\n\n// ── Group row renderer ────────────────────────────────────────────────────────\n\nfunction GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesRow>; api: GridApi<SalesRow> }) {\n\tconst isExpanded = api.isGroupExpanded(visualRow.groupId);\n\tconst agg = visualRow.aggregateValues;\n\n\treturn (\n\t\t<div\n\t\t\tstyle={{\n\t\t\t\tdisplay: 'flex',\n\t\t\t\talignItems: 'center',\n\t\t\t\theight: '100%',\n\t\t\t\tpaddingLeft: 12 + visualRow.depth * 18,\n\t\t\t\tpaddingRight: 12,\n\t\t\t\tgap: 8,\n\t\t\t\tcursor: 'pointer',\n\t\t\t\tminWidth: 0,\n\t\t\t\tbackground: 'linear-gradient(90deg, rgba(124,58,237,0.16), rgba(37,99,235,0.08) 42%, rgba(15,23,42,0.02))',\n\t\t\t\tboxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',\n\t\t\t}}\n\t\t\tonClick={() => api.toggleGroupExpanded(visualRow.groupId)}\n\t\t>\n\t\t\t<span\n\t\t\t\tstyle={{\n\t\t\t\t\twidth: 3,\n\t\t\t\t\theight: 22,\n\t\t\t\t\tborderRadius: 999,\n\t\t\t\t\tbackground: visualRow.depth === 0 ? '#8b5cf6' : '#3b82f6',\n\t\t\t\t\topacity: 0.9,\n\t\t\t\t\tflexShrink: 0,\n\t\t\t\t}}\n\t\t\t/>\n\t\t\t<span\n\t\t\t\tstyle={{\n\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\talignItems: 'center',\n\t\t\t\t\tjustifyContent: 'center',\n\t\t\t\t\twidth: 16,\n\t\t\t\t\theight: 16,\n\t\t\t\t\tborderRadius: 3,\n\t\t\t\t\tbackground: 'rgba(167,139,250,0.15)',\n\t\t\t\t\tborder: '1px solid rgba(167,139,250,0.3)',\n\t\t\t\t\tcolor: '#a78bfa',\n\t\t\t\t\tfontSize: 9,\n\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\ttransition: 'transform 0.15s',\n\t\t\t\t\ttransform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',\n\t\t\t\t}}\n\t\t\t>\n\t\t\t\t▶\n\t\t\t</span>\n\n\t\t\t<span\n\t\t\t\tstyle={{\n\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\talignItems: 'baseline',\n\t\t\t\t\tgap: 6,\n\t\t\t\t\tminWidth: 130,\n\t\t\t\t\tmaxWidth: 260,\n\t\t\t\t\toverflow: 'hidden',\n\t\t\t\t}}\n\t\t\t>\n\t\t\t\t<span\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tfontSize: 10,\n\t\t\t\t\t\tfontWeight: 800,\n\t\t\t\t\t\tcolor: '#94a3b8',\n\t\t\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\t\t\twhiteSpace: 'nowrap',\n\t\t\t\t\t}}\n\t\t\t\t>\n\t\t\t\t\t{visualRow.field}\n\t\t\t\t</span>\n\t\t\t\t<span\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tfontSize: 13,\n\t\t\t\t\t\tfontWeight: 800,\n\t\t\t\t\t\tcolor: '#c4b5fd',\n\t\t\t\t\t\twhiteSpace: 'nowrap',\n\t\t\t\t\t\toverflow: 'hidden',\n\t\t\t\t\t\ttextOverflow: 'ellipsis',\n\t\t\t\t\t}}\n\t\t\t\t>\n\t\t\t\t\t{visualRow.keyString}\n\t\t\t\t</span>\n\t\t\t</span>\n\n\t\t\t<span\n\t\t\t\tstyle={{\n\t\t\t\t\tfontSize: 10,\n\t\t\t\t\tcolor: '#64748b',\n\t\t\t\t\tfontWeight: 500,\n\t\t\t\t\tpadding: '1px 6px',\n\t\t\t\t\tborderRadius: 10,\n\t\t\t\t\tbackground: 'rgba(100,116,139,0.1)',\n\t\t\t\t\tborder: '1px solid rgba(100,116,139,0.2)',\n\t\t\t\t\tflexShrink: 0,\n\t\t\t\t}}\n\t\t\t>\n\t\t\t\t{visualRow.leafCount} rows\n\t\t\t</span>\n\n\t\t\t{/* Aggregate chips */}\n\t\t\t{agg && (\n\t\t\t\t<div style={{ display: 'flex', gap: 6, marginLeft: 'auto', minWidth: 0, overflow: 'hidden' }}>\n\t\t\t\t\t{agg.revenue != null && (\n\t\t\t\t\t\t<span style={aggChip('#3b82f6')}>\n\t\t\t\t\t\t\tRev: <strong>${Number(agg.revenue).toLocaleString()}</strong>\n\t\t\t\t\t\t</span>\n\t\t\t\t\t)}\n\t\t\t\t\t{agg.units != null && (\n\t\t\t\t\t\t<span style={aggChip('#10b981')}>\n\t\t\t\t\t\t\tUnits: <strong>{Number(agg.units).toLocaleString()}</strong>\n\t\t\t\t\t\t</span>\n\t\t\t\t\t)}\n\t\t\t\t\t{agg.margin != null && (\n\t\t\t\t\t\t<span style={aggChip('#f59e0b')}>\n\t\t\t\t\t\t\tAvg Margin: <strong>{Number(agg.margin).toFixed(1)}%</strong>\n\t\t\t\t\t\t</span>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t)}\n\t\t</div>\n\t);\n}\n\nfunction aggChip(color: string): React.CSSProperties {\n\treturn {\n\t\tfontSize: 10,\n\t\tfontWeight: 700,\n\t\tpadding: '2px 8px',\n\t\tborderRadius: 999,\n\t\tbackground: `${color}14`,\n\t\tborder: `1px solid ${color}33`,\n\t\tcolor: `${color}cc`,\n\t\twhiteSpace: 'nowrap',\n\t\tflexShrink: 0,\n\t};\n}\n\n// ── Toolbar ───────────────────────────────────────────────────────────────────\n\nfunction Toolbar({ api, showPanel, onTogglePanel }: { api: GridApi<SalesRow> | null; showPanel: boolean; onTogglePanel: () => void }) {\n\treturn (\n\t\t<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>\n\t\t\t<ToolBtn onClick={() => api?.expandAllGroups()} title='Expand all groups'>\n\t\t\t\tExpand All\n\t\t\t</ToolBtn>\n\t\t\t<ToolBtn onClick={() => api?.collapseAllGroups()} title='Collapse all groups'>\n\t\t\t\tCollapse All\n\t\t\t</ToolBtn>\n\t\t\t<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />\n\t\t\t<ToolBtn onClick={onTogglePanel} title='Toggle drag-to-group panel' accent={showPanel}>\n\t\t\t\t{showPanel ? 'Hide Group Panel' : 'Group Panel'}\n\t\t\t</ToolBtn>\n\t\t\t<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />\n\t\t\t<ToolBtn onClick={() => api?.exportCsv({ fileName: 'sales-pipeline.csv' })} title='Download as CSV (Excel-compatible)' accent>\n\t\t\t\tExport CSV\n\t\t\t</ToolBtn>\n\t\t</div>\n\t);\n}\n\nfunction ToolBtn({ children, onClick, title, accent }: { children: React.ReactNode; onClick: () => void; title?: string; accent?: boolean }) {\n\treturn (\n\t\t<button\n\t\t\tonClick={onClick}\n\t\t\ttitle={title}\n\t\t\tstyle={{\n\t\t\t\theight: 26,\n\t\t\t\tpadding: '0 10px',\n\t\t\t\tfontSize: 10,\n\t\t\t\tfontWeight: 700,\n\t\t\t\tletterSpacing: '0.05em',\n\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\tborderRadius: 5,\n\t\t\t\tborder: accent ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(30,41,59,0.8)',\n\t\t\t\tbackground: accent ? 'rgba(59,130,246,0.12)' : 'rgba(15,23,42,0.6)',\n\t\t\t\tcolor: accent ? '#60a5fa' : '#64748b',\n\t\t\t\tcursor: 'pointer',\n\t\t\t\twhiteSpace: 'nowrap',\n\t\t\t}}\n\t\t>\n\t\t\t{children}\n\t\t</button>\n\t);\n}\n\n// ── Inner component ───────────────────────────────────────────────────────────\n\nfunction RealtimeGroupingDemoInner({\n\tapi,\n\tonGridReady,\n\tcompact,\n}: {\n\tapi: GridApi<SalesRow> | null;\n\tonGridReady?: (event: GridReadyEvent<SalesRow>) => void;\n\tcompact: boolean;\n}) {\n\tconst [showPanel, setShowPanel] = useState(!compact);\n\n\tuseEffect(() => {\n\t\tif (!api) return;\n\t\tapi.setRows(ROWS);\n\t\tapi.setAggDefs(AGG_DEFS);\n\t}, [api]);\n\n\tuseEffect(() => {\n\t\tif (!api) return;\n\t\tapi.setShowGroupPanel(showPanel);\n\t}, [api, showPanel]);\n\n\treturn (\n\t\t<div style={{ display: 'flex', height: '100%', flexDirection: 'column', gap: 12 }}>\n\t\t\t{/* Intro strip */}\n\t\t\t<div className='bg-slate-900/10 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-4 shrink-0 relative overflow-hidden'>\n\t\t\t\t<div className='flex items-center gap-2'>\n\t\t\t\t\t<span className='w-2 h-2 rounded-full bg-violet-500 animate-pulse' />\n\t\t\t\t\t<span className='text-[10px] text-slate-400 font-extrabold uppercase tracking-wider'>\n\t\t\t\t\t\t{compact ? 'Sales Pipeline — Live Grouping' : 'Sales Pipeline — 500 rows · 10 columns · Live Grouping + Aggregations'}\n\t\t\t\t\t</span>\n\t\t\t\t\t{!compact && showPanel && (\n\t\t\t\t\t\t<span className='text-[10px] text-blue-400/60 font-semibold ml-2'>· Drag column headers into the group panel to group</span>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t\t<Toolbar api={api} showPanel={showPanel} onTogglePanel={() => setShowPanel((v) => !v)} />\n\t\t\t</div>\n\n\t\t\t{/* Grid */}\n\t\t\t<div className='flex-1 min-h-0 rounded-lg overflow-hidden border border-slate-800 shadow-2xl'>\n\t\t\t\t<Grid<SalesRow>\n\t\t\t\t\trowModelType='client'\n\t\t\t\t\tcolumns={COLUMNS}\n\t\t\t\t\trows={ROWS}\n\t\t\t\t\tpersistence='wit-grid-sales-demo'\n\t\t\t\t\tinitialState={{\n\t\t\t\t\t\tgroupBy: ['region', 'category'],\n\t\t\t\t\t\tgroupRowHeight: 44,\n\t\t\t\t\t\tshowGroupFooter: true,\n\t\t\t\t\t\tenableStickyGroupRows: true,\n\t\t\t\t\t\tshowGroupPanel: true,\n\t\t\t\t\t}}\n\t\t\t\t\tpinLeftColumns={1}\n\t\t\t\t\tenableContextMenu={true}\n\t\t\t\t\tgroupRowRenderer={(props) => <GroupRowRenderer visualRow={props.visualRow as GroupVisualRow<SalesRow>} api={props.api} />}\n\t\t\t\t\tsidebar={\n\t\t\t\t\t\tcompact\n\t\t\t\t\t\t\t? undefined\n\t\t\t\t\t\t\t: { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }\n\t\t\t\t\t}\n\t\t\t\t\tonGridReady={onGridReady}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t</div>\n\t);\n}\n\n// ── Page export ───────────────────────────────────────────────────────────────\n\ninterface RealtimeGroupingDemoProps {\n\tonGridReady?: (event: GridReadyEvent<SalesRow>) => void;\n\t/** Hides the description subtitle and the built-in columns/filters/sort/themes sidebar. */\n\tcompact?: boolean;\n}\n\nexport default function RealtimeGroupingDemo({ onGridReady, compact = false }: RealtimeGroupingDemoProps) {\n\tconst [api, setApi] = useState<GridApi<SalesRow> | null>(null);\n\n\treturn (\n\t\t<RealtimeGroupingDemoInner\n\t\t\tapi={api}\n\t\t\tcompact={compact}\n\t\t\tonGridReady={(event) => {\n\t\t\t\tsetApi(event.api);\n\t\t\t\tonGridReady?.(event);\n\t\t\t}}\n\t\t/>\n\t);\n}\n",
+			"source": "import React, { useEffect, useState } from 'react';\nimport { Grid } from '@eregister/wit-grid-react';\nimport type { AggregationDef, ColumnDef, CellRendererProps, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';\n\n// ── Data model ────────────────────────────────────────────────────────────────\n\ninterface SalesRow {\n\tid: string;\n\tregion: string;\n\tcountry: string;\n\tcategory: string;\n\tproduct: string;\n\trep: string;\n\tquarter: string;\n\trevenue: number;\n\tunits: number;\n\tmargin: number;\n\tstatus: 'Won' | 'Lost' | 'Pending';\n}\n\nconst REGIONS = ['Americas', 'EMEA', 'APAC'];\nconst COUNTRIES: Record<string, string[]> = {\n\tAmericas: ['USA', 'Canada', 'Brazil', 'Mexico'],\n\tEMEA: ['UK', 'Germany', 'France', 'Netherlands', 'Sweden'],\n\tAPAC: ['Japan', 'Australia', 'Singapore', 'India', 'South Korea'],\n};\nconst CATEGORIES = ['Hardware', 'Software', 'Services', 'Cloud'];\nconst PRODUCTS: Record<string, string[]> = {\n\tHardware: ['Workstation Pro', 'Server Blade', 'Network Switch', 'SSD Array'],\n\tSoftware: ['Analytics Suite', 'DevOps Platform', 'Security Shield', 'ERP Core'],\n\tServices: ['Consulting Pack', 'Support Gold', 'Training Bundle', 'Migration Kit'],\n\tCloud: ['Compute Flex', 'Storage Plus', 'CDN Accelerate', 'ML Pipeline'],\n};\nconst REPS = ['Alice Chen', 'Ben Morris', 'Cara Singh', 'David Kim', 'Elena Voss', 'Felix Tan', 'Grace Park', 'Hiro Yamamoto'];\nconst QUARTERS = ['Q1 2024', 'Q2 2024', 'Q3 2024', 'Q4 2024'];\nconst STATUSES: SalesRow['status'][] = ['Won', 'Won', 'Won', 'Pending', 'Pending', 'Lost'];\n\nfunction generateRows(count: number): SalesRow[] {\n\treturn Array.from({ length: count }, (_, i) => {\n\t\tconst region = REGIONS[i % REGIONS.length];\n\t\tconst countryList = COUNTRIES[region];\n\t\tconst country = countryList[Math.floor(i / REGIONS.length) % countryList.length];\n\t\tconst category = CATEGORIES[(i * 3) % CATEGORIES.length];\n\t\tconst productList = PRODUCTS[category];\n\t\tconst product = productList[(i * 7) % productList.length];\n\t\tconst rep = REPS[(i * 5) % REPS.length];\n\t\tconst quarter = QUARTERS[(i * 2) % QUARTERS.length];\n\t\tconst base = 20000 + ((i * 7919 + 13) % 180000);\n\t\tconst revenue = Math.round(base / 100) * 100;\n\t\tconst units = 1 + ((i * 11 + 3) % 49);\n\t\tconst margin = Math.round((15 + ((i * 17) % 45)) * 10) / 10;\n\t\tconst status = STATUSES[i % STATUSES.length];\n\t\treturn { id: `sale-${i}`, region, country, category, product, rep, quarter, revenue, units, margin, status };\n\t});\n}\n\n// ── Aggregation definitions ───────────────────────────────────────────────────\n\nconst AGG_DEFS: AggregationDef<SalesRow>[] = [\n\t{ colId: 'revenue', aggFunc: 'sum' },\n\t{ colId: 'units', aggFunc: 'sum' },\n\t{ colId: 'margin', aggFunc: 'avg' },\n];\n\n// ── Cell renderers ────────────────────────────────────────────────────────────\n\nconst CurrencyRenderer = ({ value }: CellRendererProps<SalesRow>) => (\n\t<span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>${Number(value).toLocaleString()}</span>\n);\n\nconst MarginRenderer = ({ value }: CellRendererProps<SalesRow>) => {\n\tconst v = Number(value);\n\tconst color = v >= 40 ? '#34d399' : v >= 25 ? '#fbbf24' : '#f87171';\n\treturn <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color }}>{v.toFixed(1)}%</span>;\n};\n\nconst StatusRenderer = ({ value }: CellRendererProps<SalesRow>) => {\n\tconst v = String(value);\n\tconst s =\n\t\tv === 'Won'\n\t\t\t? { bg: 'rgba(52,211,153,0.1)', border: 'rgba(52,211,153,0.25)', color: '#34d399' }\n\t\t\t: v === 'Pending'\n\t\t\t\t? { bg: 'rgba(251,191,36,0.1)', border: 'rgba(251,191,36,0.25)', color: '#fbbf24' }\n\t\t\t\t: { bg: 'rgba(248,113,113,0.1)', border: 'rgba(248,113,113,0.25)', color: '#f87171' };\n\treturn (\n\t\t<span\n\t\t\tstyle={{\n\t\t\t\tfontSize: 10,\n\t\t\t\tfontWeight: 700,\n\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\tletterSpacing: '0.05em',\n\t\t\t\tpadding: '2px 7px',\n\t\t\t\tborderRadius: 4,\n\t\t\t\tbackground: s.bg,\n\t\t\t\tborder: `1px solid ${s.border}`,\n\t\t\t\tcolor: s.color,\n\t\t\t}}\n\t\t>\n\t\t\t{v}\n\t\t</span>\n\t);\n};\n\n// ── Column definitions ────────────────────────────────────────────────────────\n\nconst COLUMNS: ColumnDef<SalesRow>[] = [\n\t{ field: 'region', header: 'Region', width: 110, sortable: true, enableRowGroup: true },\n\t{ field: 'country', header: 'Country', width: 120, sortable: true, enableRowGroup: true },\n\t{ field: 'category', header: 'Category', width: 110, sortable: true, enableRowGroup: true },\n\t{ field: 'product', header: 'Product', width: 160, sortable: true, enableRowGroup: true },\n\t{ field: 'rep', header: 'Sales Rep', width: 145, sortable: true, enableRowGroup: true },\n\t{ field: 'quarter', header: 'Quarter', width: 100, sortable: true, enableRowGroup: true },\n\t{\n\t\tfield: 'revenue',\n\t\theader: 'Revenue',\n\t\twidth: 130,\n\t\tsortable: true,\n\n\t\tenableRowGroup: false,\n\t\t// Formats the group and total aggregates (the renderer draws the data cells).\n\t\tvalueFormatter: ({ value }) => (typeof value === 'number' ? `$${Math.round(value).toLocaleString('en-US')}` : ''),\n\t\trenderer: { kind: 'react', component: CurrencyRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n\t{ field: 'units', header: 'Units', width: 75, sortable: true, enableRowGroup: false },\n\t{\n\t\tfield: 'margin',\n\t\theader: 'Margin %',\n\t\twidth: 95,\n\t\tsortable: true,\n\n\t\tenableRowGroup: false,\n\t\tvalueFormatter: ({ value }) => (typeof value === 'number' ? `${value.toFixed(1)}%` : ''),\n\t\trenderer: { kind: 'react', component: MarginRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n\t{\n\t\tfield: 'status',\n\t\theader: 'Status',\n\t\twidth: 95,\n\t\tsortable: true,\n\n\t\tenableRowGroup: true,\n\t\trenderer: { kind: 'react', component: StatusRenderer, capabilities: { scrollPresentation: 'freeze' } },\n\t},\n];\n\nconst ROWS = generateRows(500);\n\n// ── Toolbar ───────────────────────────────────────────────────────────────────\n\nfunction Toolbar({ api, showPanel, onTogglePanel }: { api: GridApi<SalesRow> | null; showPanel: boolean; onTogglePanel: () => void }) {\n\treturn (\n\t\t<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>\n\t\t\t<ToolBtn onClick={() => api?.expandAll()} title='Expand all groups'>\n\t\t\t\tExpand All\n\t\t\t</ToolBtn>\n\t\t\t<ToolBtn onClick={() => api?.collapseAll()} title='Collapse all groups'>\n\t\t\t\tCollapse All\n\t\t\t</ToolBtn>\n\t\t\t<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />\n\t\t\t<ToolBtn onClick={onTogglePanel} title='Toggle drag-to-group panel' accent={showPanel}>\n\t\t\t\t{showPanel ? 'Hide Group Panel' : 'Group Panel'}\n\t\t\t</ToolBtn>\n\t\t\t<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />\n\t\t\t<ToolBtn onClick={() => api?.exportCsv({ fileName: 'sales-pipeline.csv' })} title='Download as CSV (Excel-compatible)' accent>\n\t\t\t\tExport CSV\n\t\t\t</ToolBtn>\n\t\t</div>\n\t);\n}\n\nfunction ToolBtn({ children, onClick, title, accent }: { children: React.ReactNode; onClick: () => void; title?: string; accent?: boolean }) {\n\treturn (\n\t\t<button\n\t\t\tonClick={onClick}\n\t\t\ttitle={title}\n\t\t\tstyle={{\n\t\t\t\theight: 26,\n\t\t\t\tpadding: '0 10px',\n\t\t\t\tfontSize: 10,\n\t\t\t\tfontWeight: 700,\n\t\t\t\tletterSpacing: '0.05em',\n\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\tborderRadius: 5,\n\t\t\t\tborder: accent ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(30,41,59,0.8)',\n\t\t\t\tbackground: accent ? 'rgba(59,130,246,0.12)' : 'rgba(15,23,42,0.6)',\n\t\t\t\tcolor: accent ? '#60a5fa' : '#64748b',\n\t\t\t\tcursor: 'pointer',\n\t\t\t\twhiteSpace: 'nowrap',\n\t\t\t}}\n\t\t>\n\t\t\t{children}\n\t\t</button>\n\t);\n}\n\n// ── Inner component ───────────────────────────────────────────────────────────\n\nfunction RealtimeGroupingDemoInner({\n\tapi,\n\tonGridReady,\n\tcompact,\n}: {\n\tapi: GridApi<SalesRow> | null;\n\tonGridReady?: (event: GridReadyEvent<SalesRow>) => void;\n\tcompact: boolean;\n}) {\n\tconst [showPanel, setShowPanel] = useState(!compact);\n\n\tuseEffect(() => {\n\t\tif (!api) return;\n\t\tapi.setRows(ROWS);\n\t}, [api]);\n\n\tuseEffect(() => {\n\t\tif (!api) return;\n\t\tapi.setShowGroupPanel(showPanel);\n\t}, [api, showPanel]);\n\n\treturn (\n\t\t<div style={{ display: 'flex', height: '100%', flexDirection: 'column', gap: 12 }}>\n\t\t\t{/* Intro strip */}\n\t\t\t<div className='bg-slate-900/10 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-4 shrink-0 relative overflow-hidden'>\n\t\t\t\t<div className='flex items-center gap-2'>\n\t\t\t\t\t<span className='w-2 h-2 rounded-full bg-violet-500 animate-pulse' />\n\t\t\t\t\t<span className='text-[10px] text-slate-400 font-extrabold uppercase tracking-wider'>\n\t\t\t\t\t\t{compact ? 'Sales Pipeline — Live Grouping' : 'Sales Pipeline — 500 rows · 10 columns · Live Grouping + Aggregations'}\n\t\t\t\t\t</span>\n\t\t\t\t\t{!compact && showPanel && (\n\t\t\t\t\t\t<span className='text-[10px] text-blue-400/60 font-semibold ml-2'>· Drag column headers into the group panel to group</span>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t\t<Toolbar api={api} showPanel={showPanel} onTogglePanel={() => setShowPanel((v) => !v)} />\n\t\t\t</div>\n\n\t\t\t{/* Grid */}\n\t\t\t<div className='flex-1 min-h-0 rounded-lg overflow-hidden border border-slate-800 shadow-2xl'>\n\t\t\t\t<Grid<SalesRow>\n\t\t\t\t\trowModelType='client'\n\t\t\t\t\tcolumns={COLUMNS}\n\t\t\t\t\trows={ROWS}\n\t\t\t\t\tpersistence='wit-grid-sales-demo'\n\t\t\t\t\tinitialState={{\n\t\t\t\t\t\tgrouping: { by: ['region', 'category'], rowHeight: 44, totals: { groups: 'bottom' }, stickyHeaders: true },\n\t\t\t\t\t\taggregation: { defs: AGG_DEFS },\n\t\t\t\t\t\tshowGroupPanel: true,\n\t\t\t\t\t}}\n\t\t\t\t\tpinLeftColumns={1}\n\t\t\t\t\tenableContextMenu={true}\n\t\t\t\t\tsidebar={\n\t\t\t\t\t\tcompact\n\t\t\t\t\t\t\t? undefined\n\t\t\t\t\t\t\t: { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }\n\t\t\t\t\t}\n\t\t\t\t\tonGridReady={onGridReady}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t</div>\n\t);\n}\n\n// ── Page export ───────────────────────────────────────────────────────────────\n\ninterface RealtimeGroupingDemoProps {\n\tonGridReady?: (event: GridReadyEvent<SalesRow>) => void;\n\t/** Hides the description subtitle and the built-in columns/filters/sort/themes sidebar. */\n\tcompact?: boolean;\n}\n\nexport default function RealtimeGroupingDemo({ onGridReady, compact = false }: RealtimeGroupingDemoProps) {\n\tconst [api, setApi] = useState<GridApi<SalesRow> | null>(null);\n\n\treturn (\n\t\t<RealtimeGroupingDemoInner\n\t\t\tapi={api}\n\t\t\tcompact={compact}\n\t\t\tonGridReady={(event) => {\n\t\t\t\tsetApi(event.api);\n\t\t\t\tonGridReady?.(event);\n\t\t\t}}\n\t\t/>\n\t);\n}\n",
 			"tokens": [
 				[
 					{
@@ -109185,7 +109185,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } ",
+						"content": " { AggregationDef, ColumnDef, CellRendererProps, GridApi, GridReadyEvent } ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -111457,7 +111457,7 @@
 				],
 				[
 					{
-						"content": "\t{ field: ",
+						"content": "\t{ colId: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -111479,7 +111479,7 @@
 				],
 				[
 					{
-						"content": "\t{ field: ",
+						"content": "\t{ colId: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -111501,7 +111501,7 @@
 				],
 				[
 					{
-						"content": "\t{ field: ",
+						"content": "\t{ colId: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -112910,6 +112910,146 @@
 				],
 				[
 					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// Formats the group and total aggregates (the renderer draws the data cells).",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "valueFormatter",
+						"color": "#B392F0"
+					},
+					{
+						"content": ": ({ ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "value",
+						"color": "#FFAB70"
+					},
+					{
+						"content": " }) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "typeof",
+						"color": "#F97583"
+					},
+					{
+						"content": " value ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'number'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`$${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "Math",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "round",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ").",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "toLocaleString",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'en-US'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ")",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
 						"content": "\t\trenderer: { kind: ",
 						"color": "#E1E4E8"
 					},
@@ -113056,6 +113196,120 @@
 					},
 					{
 						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "valueFormatter",
+						"color": "#B392F0"
+					},
+					{
+						"content": ": ({ ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "value",
+						"color": "#FFAB70"
+					},
+					{
+						"content": " }) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "typeof",
+						"color": "#F97583"
+					},
+					{
+						"content": " value ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'number'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "toFixed",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "1",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ")",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}%`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "),",
 						"color": "#E1E4E8"
 					}
 				],
@@ -113238,2227 +113492,6 @@
 					},
 					{
 						"content": ");",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "// ── Group row renderer ────────────────────────────────────────────────────────",
-						"color": "#6A737D"
-					}
-				],
-				[],
-				[
-					{
-						"content": "function",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "GroupRowRenderer",
-						"color": "#B392F0"
-					},
-					{
-						"content": "({ ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "visualRow",
-						"color": "#FFAB70"
-					},
-					{
-						"content": ", ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "api",
-						"color": "#FFAB70"
-					},
-					{
-						"content": " }",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " { ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "visualRow",
-						"color": "#FFAB70"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "GroupVisualRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "SalesRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ">; ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "api",
-						"color": "#FFAB70"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "GridApi",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "SalesRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": "> }) {",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "isExpanded",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " api.",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "isGroupExpanded",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(visualRow.groupId);",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "agg",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " visualRow.aggregateValues;",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "return",
-						"color": "#F97583"
-					},
-					{
-						"content": " (",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "div",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tdisplay: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'flex'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\talignItems: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'center'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\theight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'100%'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tpaddingLeft: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "12",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "+",
-						"color": "#F97583"
-					},
-					{
-						"content": " visualRow.depth ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "*",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "18",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tpaddingRight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "12",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tgap: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "8",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tcursor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'pointer'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tminWidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'linear-gradient(90deg, rgba(124,58,237,0.16), rgba(37,99,235,0.08) 42%, rgba(15,23,42,0.02))'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tboxShadow: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'inset 0 1px 0 rgba(255,255,255,0.04)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "onClick",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{() ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=>",
-						"color": "#F97583"
-					},
-					{
-						"content": " api.",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "toggleGroupExpanded",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(visualRow.groupId)}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\twidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "3",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\theight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "22",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "999",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tbackground: visualRow.depth ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "===",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "?",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#8b5cf6'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#3b82f6'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\topacity: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0.9",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tflexShrink: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t/>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tdisplay: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'flex'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\talignItems: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'center'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tjustifyContent: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'center'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\twidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "16",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\theight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "16",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "3",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'rgba(167,139,250,0.15)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tborder: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'1px solid rgba(167,139,250,0.3)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#a78bfa'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "9",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tflexShrink: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\ttransition: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'transform 0.15s'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\ttransform: isExpanded ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "?",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'rotate(90deg)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'rotate(0deg)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t▶",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tdisplay: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'flex'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\talignItems: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'baseline'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tgap: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "6",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tminWidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "130",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tmaxWidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "260",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\toverflow: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'hidden'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "10",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontWeight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "800",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#94a3b8'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\ttextTransform: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'uppercase'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\twhiteSpace: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'nowrap'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t{visualRow.field}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "13",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontWeight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "800",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#c4b5fd'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\twhiteSpace: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'nowrap'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\toverflow: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'hidden'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\ttextOverflow: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'ellipsis'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t{visualRow.keyString}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "10",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#64748b'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tfontWeight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "500",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tpadding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'1px 6px'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "10",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'rgba(100,116,139,0.1)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tborder: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'1px solid rgba(100,116,139,0.2)'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tflexShrink: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t}}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t{visualRow.leafCount} rows",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "\t\t\t{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "/* Aggregate chips */",
-						"color": "#6A737D"
-					},
-					{
-						"content": "}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t{agg ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "&&",
-						"color": "#F97583"
-					},
-					{
-						"content": " (",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "div",
-						"color": "#85E89D"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{{ display: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'flex'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", gap: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "6",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ", marginLeft: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'auto'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", minWidth: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ", overflow: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'hidden'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": " }}>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t{agg.revenue ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "!=",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "&&",
-						"color": "#F97583"
-					},
-					{
-						"content": " (",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "aggChip",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#3b82f6'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ")}>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t\tRev: <",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">${",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "Number",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(agg.revenue).",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "toLocaleString",
-						"color": "#B392F0"
-					},
-					{
-						"content": "()}</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t)}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t{agg.units ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "!=",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "&&",
-						"color": "#F97583"
-					},
-					{
-						"content": " (",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "aggChip",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#10b981'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ")}>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t\tUnits: <",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "Number",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(agg.units).",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "toLocaleString",
-						"color": "#B392F0"
-					},
-					{
-						"content": "()}</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t)}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t{agg.margin ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "!=",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "&&",
-						"color": "#F97583"
-					},
-					{
-						"content": " (",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "style",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "aggChip",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#f59e0b'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ")}>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t\tAvg Margin: <",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">{",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "Number",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(agg.margin).",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "toFixed",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ")}%</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "strong",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "span",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t)}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "div",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t)}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t</",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "div",
-						"color": "#85E89D"
-					},
-					{
-						"content": ">",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t);",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "}",
-						"color": "#E1E4E8"
-					}
-				],
-				[],
-				[
-					{
-						"content": "function",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "aggChip",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "color",
-						"color": "#FFAB70"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ")",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "React",
-						"color": "#B392F0"
-					},
-					{
-						"content": ".",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "CSSProperties",
-						"color": "#B392F0"
-					},
-					{
-						"content": " {",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "return",
-						"color": "#F97583"
-					},
-					{
-						"content": " {",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "10",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tfontWeight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "700",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tpadding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'2px 8px'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "999",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "`${",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "color",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "}14`",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tborder: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "`1px solid ${",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "color",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "}33`",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "`${",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "color",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "}cc`",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\twhiteSpace: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'nowrap'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\tflexShrink: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t};",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "}",
 						"color": "#E1E4E8"
 					}
 				],
@@ -115710,7 +113743,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "expandAllGroups",
+						"content": "expandAll",
 						"color": "#B392F0"
 					},
 					{
@@ -115788,7 +113821,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "collapseAllGroups",
+						"content": "collapseAll",
 						"color": "#B392F0"
 					},
 					{
@@ -117048,28 +115081,6 @@
 				],
 				[
 					{
-						"content": "\t\tapi.",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "setAggDefs",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "AGG_DEFS",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ");",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
 						"content": "\t}, [api]);",
 						"color": "#E1E4E8"
 					}
@@ -117773,7 +115784,7 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t\t\tgroupBy: [",
+						"content": "\t\t\t\t\t\tgrouping: { by: [",
 						"color": "#E1E4E8"
 					},
 					{
@@ -117789,13 +115800,7 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": "],",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tgroupRowHeight: ",
+						"content": "], rowHeight: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -117803,27 +115808,15 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tshowGroupFooter: ",
+						"content": ", totals: { groups: ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "true",
-						"color": "#79B8FF"
+						"content": "'bottom'",
+						"color": "#9ECBFF"
 					},
 					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tenableStickyGroupRows: ",
+						"content": " }, stickyHeaders: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -117831,7 +115824,21 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ",",
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\taggregation: { defs: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "AGG_DEFS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -117904,96 +115911,6 @@
 					},
 					{
 						"content": "}",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "groupRowRenderer",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "props",
-						"color": "#FFAB70"
-					},
-					{
-						"content": ") ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=>",
-						"color": "#F97583"
-					},
-					{
-						"content": " <",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "GroupRowRenderer",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "visualRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{props.visualRow ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "as",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "GroupVisualRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "SalesRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ">} ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "api",
-						"color": "#B392F0"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": "{props.api} />}",
 						"color": "#E1E4E8"
 					}
 				],

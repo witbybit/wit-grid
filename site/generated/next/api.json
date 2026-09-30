@@ -304,11 +304,6 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "FooterVisualRow",
-			"kind": "type",
-			"source": "./types.js"
-		},
-		{
 			"name": "getBuiltInTheme",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -849,6 +844,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "TotalVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
 			"name": "useGridApi",
 			"kind": "value",
 			"source": "./hooks.js"
@@ -945,11 +945,6 @@
 					"optional": true,
 					"type": "GridCapabilitiesConfig<TRowData>",
 					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
-				},
-				{
-					"name": "detailRowHeight",
-					"optional": true,
-					"type": "number"
 				},
 				{
 					"name": "pagination",
@@ -1086,11 +1081,6 @@
 					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
 				},
 				{
-					"name": "detailRowHeight",
-					"optional": true,
-					"type": "number"
-				},
-				{
 					"name": "pagination",
 					"optional": true,
 					"type": "boolean | GridPaginationConfig",
@@ -1224,11 +1214,6 @@
 					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
 				},
 				{
-					"name": "detailRowHeight",
-					"optional": true,
-					"type": "number"
-				},
-				{
 					"name": "pagination",
 					"optional": true,
 					"type": "boolean | GridPaginationConfig",
@@ -1356,17 +1341,20 @@
 				{
 					"name": "groupRowRenderer",
 					"optional": true,
-					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode",
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence."
 				},
 				{
 					"name": "detailRowRenderer",
 					"optional": true,
-					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode",
+					"description": "Detail rows (master-detail). Without one the grid draws a placeholder; `detail.renderer` takes precedence."
 				},
 				{
-					"name": "footerRowRenderer",
+					"name": "totalRowRenderer",
 					"optional": true,
-					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode",
+					"description": "Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid."
 				},
 				{
 					"name": "sidebar",
