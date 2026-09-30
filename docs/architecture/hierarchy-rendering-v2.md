@@ -132,6 +132,12 @@ Core computes, for every group and tree parent, `all | some | none` over its des
 or not). `selectDescendants` makes selecting a group or tree parent select its rows. The header checkbox and the
 hierarchy cell checkbox both read this; neither computes it.
 
+Implemented in phase 1: a `HierarchyIndex` built lazily per pipeline run (data row ids in pre-order plus a
+`[start, end)` slice per group / tree parent, O(rows) memory) backs `getDescendantRowIds(id)`,
+`getDescendantSelection(id) → { state, selected, total }` (cached per selection state) and
+`setDescendantsSelected(id, selected)`. Descendants include collapsed and off-page rows and exclude filtered-out
+ones. The `selectDescendants` cascade (selecting the group or tree-parent row itself) lands with phase 6.
+
 ## Rendering
 
 ### Group display
@@ -191,7 +197,10 @@ only moves a header when the next group pushes it.
 - **Copy and export:** ranges that include group and total rows copy their cells (hierarchy label, formatted
   aggregates). CSV export gains `includeGroups`, `includeTotals` and renders the hierarchy column as indented text
   or a path.
-- **Repaint:** group and total rows are invalidated when their aggregates change, like data cells.
+- **Repaint:** group and total rows are invalidated when their aggregates change, like data cells. (Phase 1: the
+  refresh diff reports `aggregateChangedIndices` for rows that kept their place but changed aggregates, and an
+  aggregate-only write invalidates just those rows — no blanket viewport. Until group and total rows are cell rows
+  (phase 3), a row-range repaint goes through the viewport sync, where only portals whose rows changed re-render.)
 
 ## Against AG Grid
 

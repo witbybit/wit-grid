@@ -25,6 +25,9 @@ import {
 } from '../rows/hierarchyConfig.js';
 import type { GridInvalidation } from '../renderer/invalidationManager.js';
 import type { GridCommitEvent } from '../engine/GridChangeApplier.js';
+import { asRowHierarchyReadableModel } from '../rowModel.js';
+import type { DescendantSelection, HierarchyIndex } from '../rows/hierarchyIndex.js';
+import { readInteractionState } from '../interaction/interactionState.js';
 
 export interface GroupingFeatureControllerDeps<TRowData = unknown> {
 	ctx: GridFeatureContext<TRowData>;
@@ -78,6 +81,7 @@ export class GroupingFeatureController<TRowData = unknown> {
 		if (result.changedStartIndex !== undefined && result.changedEndIndex !== undefined) {
 			this.invalidation.invalidateRowRange(result.changedStartIndex, result.changedEndIndex, reason);
 		}
+		for (const index of result.aggregateChangedIndices ?? []) this.invalidation.invalidateRowRange(index, index, reason);
 		if (result.previousRowCount !== result.nextRowCount) {
 			this.invalidation.invalidateGeometry(reason);
 		}
@@ -287,6 +291,37 @@ export class GroupingFeatureController<TRowData = unknown> {
 
 	public toggleDetailOpen(rowId: string): void {
 		this.setDetailOpen(rowId, !this.isDetailOpen(rowId));
+	}
+
+	// ── Hierarchy selection ─────────────────────────────────────────────────
+
+	private selectionCache: {
+		index: HierarchyIndex;
+		selectedRowIds: readonly string[];
+		set: ReadonlySet<string>;
+		byId: Map<string, DescendantSelection>;
+	} | null = null;
+
+	/** Data rows beneath a group or tree row (visual row id), collapsed and off-page rows included; filtered-out rows excluded. */
+	public getDescendantRowIds(id: string): readonly string[] {
+		return asRowHierarchyReadableModel(this.getRowModel())?.getHierarchyIndex()?.getDescendantRowIds(id) ?? [];
+	}
+
+	/**
+	 * `all` / `some` / `none` of a group's or tree parent's descendant rows are selected. Cached per
+	 * hierarchy and selection state, so every group row can ask on every paint.
+	 */
+	public getDescendantSelection(id: string): DescendantSelection {
+		const index = asRowHierarchyReadableModel(this.getRowModel())?.getHierarchyIndex();
+		if (!index) return { state: 'none', selected: 0, total: 0 };
+		const selectedRowIds = readInteractionState(this.ctx.getState()).rowSelection.selectedRowIds;
+		let cache = this.selectionCache;
+		if (!cache || cache.index !== index || cache.selectedRowIds !== selectedRowIds) {
+			cache = this.selectionCache = { index, selectedRowIds, set: new Set(selectedRowIds), byId: new Map() };
+		}
+		let result = cache.byId.get(id);
+		if (!result) cache.byId.set(id, (result = index.countSelected(id, cache.set)));
+		return result;
 	}
 
 	private dispatchExpansionChanged(payload: { target: 'row' | 'detail' | 'all'; id: string | null; expanded: boolean; maxLevel?: number }): void {

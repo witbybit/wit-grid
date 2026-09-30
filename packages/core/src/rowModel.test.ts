@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GridStore, isEditableVisualRow, isFullWidthVisualRow } from './store.js';
-import { ClientRowModelController } from './rowModel.js';
+import { ClientRowModelController, type RowModelRefreshResult } from './rowModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import { RowPipeline } from './rows/RowPipeline.js';
-import { toDataVisualRowId, toDetailVisualRowId } from './rows/visualRowIds.js';
+import { toDataVisualRowId, toDetailVisualRowId, toTotalVisualRowId } from './rows/visualRowIds.js';
 import { RecordingGridInstrumentation, GridMetric } from './diagnostics/GridInstrumentation.js';
 
 interface TestRow {
@@ -1508,6 +1508,51 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 
 		const after = getGroupAggregates(controller, 'group:category=Eng');
 		expect(after?.salary).toBe(350); // 150 + 200 — was stale (300) before Plan 092 fix
+	});
+
+	it('reports the group and total rows whose aggregates changed, so they repaint', () => {
+		const rows: AggRow[] = [
+			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
+			{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 20 },
+			{ id: '3', name: 'Cara', category: 'Ops', salary: 50, bonus: 5 },
+		];
+		const { store, controller } = makeAggStore(rows);
+		store.updateGrouping({ totals: { groups: 'bottom', grand: 'bottom' } });
+		const reconcile = vi.spyOn(controller, 'reconcileAfterDataWrite');
+
+		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] });
+
+		const result = reconcile.mock.results.at(-1)?.value as RowModelRefreshResult;
+		const ids = Array.from({ length: controller.getVisualRowCount() }, (_, i) => controller.getVisualRow(i)!.id);
+		const groupIdx = ids.indexOf('group:category=Eng');
+		const grandIdx = ids.indexOf('total:grand');
+		// Same rows, new aggregates: exactly the Eng group, its total and the grand total changed — not the
+		// untouched Ops group and total that sit between them.
+		expect(result.changed).toBe(true);
+		expect(result.changedStartIndex).toBeUndefined();
+		expect(result.aggregateChangedIndices).toEqual([groupIdx, ids.indexOf(toTotalVisualRowId('group:category=Eng')), grandIdx]);
+		store.destroy();
+	});
+
+	it('invalidates exactly the rows whose aggregates changed after a write', () => {
+		const rows: AggRow[] = [
+			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
+			{ id: '3', name: 'Cara', category: 'Ops', salary: 50, bonus: 5 },
+		];
+		const { store } = makeAggStore(rows);
+		store.updateGrouping({ totals: { groups: 'bottom' } });
+		// Rows: 0 group Eng, 1 Alice, 2 total Eng, 3 group Ops, 4 Cara, 5 total Ops.
+		store.engine.invalidation.consume();
+
+		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] });
+		const frame = store.engine.invalidation.consume();
+
+		expect(frame.rowRanges).toContainEqual(expect.objectContaining({ startIndex: 0, endIndex: 0 }));
+		expect(frame.rowRanges).toContainEqual(expect.objectContaining({ startIndex: 2, endIndex: 2 }));
+		expect(frame.rowRanges.some((range) => range.startIndex <= 3 && range.endIndex >= 3)).toBe(false);
+		// Precise: no blanket viewport invalidation for an aggregate-only change.
+		expect(frame.viewport).toBe(false);
+		store.destroy();
 	});
 
 	it('group average stays consistent after leaf bonus update via applyTransaction', () => {

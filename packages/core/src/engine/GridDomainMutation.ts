@@ -309,7 +309,13 @@ function createInvalidationsFromRefreshResult<TRowData>(
 		context.syncRowGeometryFrom?.(result.changedStartIndex);
 	}
 	const effectiveReason: GridInvalidation['reason'] = result.layoutTransitionHint === 'live-reorder' ? 'sort' : reason;
-	const invalidations: GridInvalidation[] = [{ kind: 'viewport', reason: effectiveReason }];
+	// Aggregates changing in place (same rows, same order) need only those rows, not the viewport.
+	const aggregateOnly =
+		result.changedStartIndex === undefined &&
+		!result.groupId &&
+		result.previousRowCount === result.nextRowCount &&
+		!!result.aggregateChangedIndices;
+	const invalidations: GridInvalidation[] = aggregateOnly ? [] : [{ kind: 'viewport', reason: effectiveReason }];
 	if (result.groupId) {
 		invalidations.push({ kind: 'group', groupId: result.groupId, reason: effectiveReason });
 	}
@@ -320,6 +326,16 @@ function createInvalidationsFromRefreshResult<TRowData>(
 			endIndex: result.changedEndIndex,
 			reason: effectiveReason,
 		});
+	}
+	// Rows whose aggregates changed in place, as contiguous runs.
+	const aggregateRows = result.aggregateChangedIndices;
+	if (aggregateRows) {
+		for (let i = 0; i < aggregateRows.length; ) {
+			let end = i;
+			while (end + 1 < aggregateRows.length && aggregateRows[end + 1] === aggregateRows[end] + 1) end++;
+			invalidations.push({ kind: 'row-range', startIndex: aggregateRows[i], endIndex: aggregateRows[end], reason: effectiveReason });
+			i = end + 1;
+		}
 	}
 	if (result.previousRowCount !== result.nextRowCount) {
 		invalidations.push({ kind: 'geometry', reason: effectiveReason });

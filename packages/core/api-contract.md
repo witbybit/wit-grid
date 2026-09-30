@@ -6,10 +6,12 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `f9211313b231fdd1f87819cb3c2c51865abae6b63d2a1f1fd849ff2d80fdc6ea`
-Exports (285):
+Declaration SHA-256: `2477fe86190c9509d95cb3b86fce3317c0b9bc5d6cbec6d92f41d3e2a11ab62a`
+Exports (299):
 
 - `ActiveEditState` — type
+- `AggregateContext` — type
+- `AggregationConfig` — type
 - `AggregationDef` — type
 - `AllDataNodesCapableRowModel` — type
 - `applyFilterToModel` — value
@@ -24,6 +26,7 @@ Exports (285):
 - `BUILT_IN_THEME_METADATA` — value
 - `BUILT_IN_THEME_ORDER` — value
 - `BUILT_IN_THEMES` — value
+- `BuiltInAggFunc` — type
 - `BuiltInThemeName` — type
 - `CAPABILITY_ALLOWED` — value
 - `CapabilityDiagnostics` — type
@@ -69,7 +72,11 @@ Exports (285):
 - `DATE_OPS` — value
 - `DateFilterCondition` — type
 - `DateFilterOperator` — type
+- `DefaultExpanded` — type
 - `defaultOpForType` — value
+- `DescendantSelection` — type
+- `DescendantSelectionState` — type
+- `DetailConfig` — type
 - `DetailRowStyleRule` — type
 - `DetailVisualRow` — type
 - `doesCanonicalCellPointerMatchColumn` — value
@@ -81,6 +88,8 @@ Exports (285):
 - `duplicateValueRule` — value
 - `email` — value
 - `evaluateQueryModel` — value
+- `ExpandAllOptions` — type
+- `ExpansionState` — type
 - `FailedVisualRow` — type
 - `FallbackMetric` — type
 - `FilterCondition` — type
@@ -187,6 +196,8 @@ Exports (285):
 - `GridWriteBlockedSource` — type
 - `GridWriteBlockedStatus` — type
 - `GroupDef` — type
+- `GroupInfo` — type
+- `GroupingConfig` — type
 - `GroupRowStyleRule` — type
 - `GroupVisualRow` — type
 - `HeaderCellStyleRule` — type
@@ -286,7 +297,10 @@ Exports (285):
 - `ThemeTokens` — type
 - `TooltipParams` — type
 - `TotalPlacement` — type
+- `TotalsConfig` — type
 - `TotalVisualRow` — type
+- `TreeDataConfig` — type
+- `TreeRowInfo` — type
 - `validateSchemaVersion` — value
 - `ValueFormatterParams` — type
 - `ValueGetterParams` — type

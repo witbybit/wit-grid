@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
 import {
 	ColumnDef,
 	doesCanonicalCellPointerMatchColumn,
@@ -12,7 +12,6 @@ import {
 } from '@eregister/wit-grid-core';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { useGridApi } from './hooks.js';
-import { GridAdapterContext } from './gridContext.js';
 import type { PortalCellProps, PortalData, PortalRowNodeLike, PortalStore } from './gridPortalTypes.js';
 
 // Static inline styles hoisted to module scope so cell renders don't allocate a fresh object each time.
@@ -309,12 +308,11 @@ function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { 
 			return value;
 		}, [api])
 	);
-	const adapterHandle = useContext(GridAdapterContext);
-	const descendantIds = adapterHandle?.getGroupVisibleDescendantRowIds(visualRow.groupId) ?? [];
-	const selectedSet = new Set(selectedRowIds);
-	const selectedDescendantCount = descendantIds.reduce((count, rowId) => count + (selectedSet.has(rowId) ? 1 : 0), 0);
-	const allDescendantsSelected = descendantIds.length > 0 && selectedDescendantCount === descendantIds.length;
-	const someDescendantsSelected = selectedDescendantCount > 0 && selectedDescendantCount < descendantIds.length;
+	// Core counts every row beneath the group, collapsed or not; re-read whenever selection changes.
+	void selectedRowIds;
+	const selection = api.getDescendantSelection(visualRow.id);
+	const allDescendantsSelected = selection.state === 'all';
+	const someDescendantsSelected = selection.state === 'some';
 
 	const handleToggle = (e: React.MouseEvent) => {
 		e.stopPropagation();
@@ -323,9 +321,8 @@ function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { 
 
 	const handleGroupSelection = (e: React.MouseEvent<HTMLInputElement>) => {
 		e.stopPropagation();
-		if (descendantIds.length === 0) return;
-		if (allDescendantsSelected) api.deselectRows(descendantIds);
-		else api.selectRows(descendantIds);
+		if (selection.total === 0) return;
+		api.setDescendantsSelected(visualRow.id, !allDescendantsSelected);
 	};
 
 	return (
@@ -340,11 +337,7 @@ function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { 
 				onClick={handleGroupSelection}
 				onChange={() => undefined}
 				aria-label={allDescendantsSelected ? 'Deselect group rows' : 'Select group rows'}
-				title={
-					selectedDescendantCount > 0
-						? `${selectedDescendantCount} of ${descendantIds.length} visible rows selected`
-						: `Select ${descendantIds.length} visible rows`
-				}
+				title={selection.selected > 0 ? `${selection.selected} of ${selection.total} rows selected` : `Select ${selection.total} rows`}
 			/>
 			<span className={`og-group-row-toggle ${expanded ? 'og-group-row-toggle-expanded' : ''}`}>▶</span>
 			<span className='og-group-row-label-prefix'>{visualRow.field}:</span>

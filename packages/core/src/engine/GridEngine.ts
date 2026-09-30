@@ -710,6 +710,7 @@ export class GridEngine<TRowData = unknown> {
 		if (refreshResult?.changedStartIndex !== undefined && refreshResult.changedEndIndex !== undefined) {
 			this.invalidation.invalidateRowRange(refreshResult.changedStartIndex, refreshResult.changedEndIndex, reason);
 		}
+		for (const index of refreshResult?.aggregateChangedIndices ?? []) this.invalidation.invalidateRowRange(index, index, reason);
 		if (refreshResult && refreshResult.previousRowCount !== refreshResult.nextRowCount) {
 			this.invalidation.invalidateGeometry(reason);
 		}

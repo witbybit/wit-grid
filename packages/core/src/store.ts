@@ -131,6 +131,7 @@ import type {
 import { createGridStateSnapshot } from './api/createGridStateSnapshot.js';
 import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from './rows/hierarchyConfig.js';
 import type { ExpandAllOptions } from './rowModel.js';
+import type { DescendantSelection } from './rows/hierarchyIndex.js';
 import type { InternalGridState, GridInitialState, ColumnState, RowModelType } from './state/GridState.js';
 import type { GridEventPayloadMap, GridEventListener } from './api/GridEvents.js';
 import { GridEventName } from './api/GridEvents.js';
@@ -657,6 +658,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public isDetailOpen = (rowId: string): boolean => this.engine.groupingFeature.isDetailOpen(rowId);
+
+	public getDescendantRowIds = (id: string): readonly string[] => this.engine.groupingFeature.getDescendantRowIds(id);
+
+	public getDescendantSelection = (id: string): DescendantSelection => this.engine.groupingFeature.getDescendantSelection(id);
+
+	public setDescendantsSelected = (id: string, selected: boolean): void => {
+		const rowIds = [...this.getDescendantRowIds(id)];
+		if (rowIds.length === 0) return;
+		if (selected) this.selectRows(rowIds);
+		else this.deselectRows(rowIds);
+	};
 
 	public setShowGroupPanel = (enabled: boolean): void => {
 		this.engine.setShowGroupPanel(enabled);

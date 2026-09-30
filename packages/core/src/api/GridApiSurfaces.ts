@@ -8,6 +8,7 @@ import type {
 	RowModelCapabilities,
 } from '../rowModel.js';
 import type { DetailConfig, GroupDef, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
+import type { DescendantSelection } from '../rows/hierarchyIndex.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
 import type { RuntimePortBinding, RuntimePortBindResult, GridRuntimePorts } from '../engine/rendererPorts.js';
@@ -186,6 +187,12 @@ export interface GridStructureApi<TRowData = unknown> {
 	setDetailOpen(rowId: string, open: boolean): void;
 	toggleDetailOpen(rowId: string): void;
 	isDetailOpen(rowId: string): boolean;
+	/** Data rows beneath a group or tree row (visual row id), collapsed ones included. */
+	getDescendantRowIds(id: string): readonly string[];
+	/** Whether `all`, `some` or `none` of a group's or tree parent's rows are selected, with counts. */
+	getDescendantSelection(id: string): DescendantSelection;
+	/** Selects or deselects every data row beneath a group or tree row. */
+	setDescendantsSelected(id: string, selected: boolean): void;
 	setShowGroupPanel(enabled: boolean): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;

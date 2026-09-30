@@ -12,6 +12,7 @@ import { RowPipeline, type RowPipelineInput, type RowPipelineOutput } from './ro
 import { groupByColIds, isGroupingActive } from './rows/hierarchyConfig.js';
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
+import { HierarchyIndex } from './rows/hierarchyIndex.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
 import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
@@ -249,6 +250,11 @@ export interface RowModelRefreshResult {
 	changedStartIndex?: number;
 	changedEndIndex?: number;
 	groupId?: string;
+	/**
+	 * Rows outside the changed range that kept their identity but whose aggregates changed (group,
+	 * total and tree-parent rows after a write to an aggregated column), ascending. They repaint too.
+	 */
+	aggregateChangedIndices?: number[];
 }
 
 export interface ExpandAllOptions {
@@ -435,6 +441,15 @@ export function asRowExpansionCapableModel<TRowData = unknown>(rowModel: RowMode
 	return hasFunctions(rowModel, ['setExpanded', 'expandAll', 'collapseAll', 'setDetailOpen'])
 		? (rowModel as unknown as RowExpansionCapableModel<TRowData>)
 		: null;
+}
+
+/** Row models that know the full hierarchy (collapsed subtrees included). */
+export interface RowHierarchyReadableModel {
+	getHierarchyIndex(): HierarchyIndex | null;
+}
+
+export function asRowHierarchyReadableModel(rowModel: RowModel<unknown> | null): RowHierarchyReadableModel | null {
+	return hasFunctions(rowModel, ['getHierarchyIndex']) ? (rowModel as unknown as RowHierarchyReadableModel) : null;
 }
 
 export function asRowExpansionStateReadableModel(rowModel: RowModel<unknown> | null): RowExpansionStateReadableModel | null {
@@ -721,6 +736,23 @@ function sameVisualRowIdentity<TData>(left: VisualRow<TData>, right: VisualRow<T
 	return left.kind === right.kind && left.id === right.id;
 }
 
+function rowAggregates<TData>(row: VisualRow<TData>): Record<string, unknown> | undefined {
+	return row.kind === 'group' || row.kind === 'total' || row.kind === 'data' ? row.aggregates : undefined;
+}
+
+function sameRowAggregates<TData>(left: VisualRow<TData>, right: VisualRow<TData>): boolean {
+	const a = rowAggregates(left);
+	const b = rowAggregates(right);
+	if (a === b) return true;
+	if (!a || !b) return false;
+	let count = 0;
+	for (const key in a) {
+		if (!Object.is(a[key], b[key])) return false;
+		count++;
+	}
+	return count === Object.keys(b).length;
+}
+
 function describeVisualRowDiff<TData>(
 	previousRows: Array<VisualRow<TData>>,
 	nextRows: Array<VisualRow<TData>>,
@@ -741,15 +773,26 @@ function describeVisualRowDiff<TData>(
 		suffix++;
 	}
 
-	const changed = previousRows.length !== nextRows.length || prefix < previousRows.length || prefix < nextRows.length;
-	const changedEndIndex = changed ? Math.max(previousRows.length, nextRows.length) - suffix - 1 : undefined;
+	const structural = previousRows.length !== nextRows.length || prefix < previousRows.length || prefix < nextRows.length;
+	const changedEndIndex = structural ? Math.max(previousRows.length, nextRows.length) - suffix - 1 : undefined;
+
+	// Rows that kept their place (the identical prefix and suffix) may still carry new aggregates.
+	let aggregateChangedIndices: number[] | undefined;
+	const noteAggregateChange = (prev: VisualRow<TData>, next: VisualRow<TData>, index: number) => {
+		if (!sameRowAggregates(prev, next)) (aggregateChangedIndices ??= []).push(index);
+	};
+	for (let i = 0; i < prefix; i++) noteAggregateChange(previousRows[i], nextRows[i], i);
+	for (let k = suffix - 1; k >= 0; k--) {
+		noteAggregateChange(previousRows[previousRows.length - 1 - k], nextRows[nextRows.length - 1 - k], nextRows.length - 1 - k);
+	}
 
 	return {
-		changed,
+		changed: structural || aggregateChangedIndices !== undefined,
+		aggregateChangedIndices,
 		reason,
 		previousRowCount: previousRows.length,
 		nextRowCount: nextRows.length,
-		changedStartIndex: changed ? prefix : undefined,
+		changedStartIndex: structural ? prefix : undefined,
 		changedEndIndex,
 		groupId,
 	};
@@ -1021,6 +1064,13 @@ export class ClientRowModelController<TData = unknown>
 	private _groupMetaByVisualIndex = new Map<number, GroupRowMeta>();
 	private _pageWindow: PageWindow | null = null;
 	private _roots: RowTreeNode<TData>[] | null = null;
+	private _hierarchyIndex: HierarchyIndex | null = null;
+
+	/** Built on first use after each pipeline run that produced a row tree. */
+	public getHierarchyIndex = (): HierarchyIndex | null => {
+		if (!this._roots) return null;
+		return (this._hierarchyIndex ??= new HierarchyIndex(this._roots as RowTreeNode<unknown>[]));
+	};
 
 	public getStickyGroupMeta = (): Map<number, number> => this._stickyGroupMeta;
 	public getPageWindow = (): PageWindow | null => this._pageWindow;
@@ -1745,6 +1795,7 @@ export class ClientRowModelController<TData = unknown>
 		this._groupMeta = result.groupMeta;
 		this._groupMetaByVisualIndex = result.groupMetaByVisualIndex;
 		this._roots = result.roots;
+		this._hierarchyIndex = null;
 		this.dataRowCount = result.stats.totalDataRows;
 
 		this.runtime.bumpGlobalVersion();
