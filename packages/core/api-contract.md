@@ -6,8 +6,8 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `9ce75dd0f77c42dba2607a7c73f7a0545a49ef5f0d6896b838894e26ede95866`
-Exports (303):
+Declaration SHA-256: `d75e6a5f1c4e30b47d8de086edb089c4a6cc2b33b3c3b965b5c2f08dc391184c`
+Exports (307):
 
 - `ActiveEditState` — type
 - `AggregateContext` — type
@@ -85,6 +85,8 @@ Exports (303):
 - `DomCellRendererHandle` — type
 - `DomCellRendererParams` — type
 - `DomCellRendererRowRef` — type
+- `DomRowRenderer` — type
+- `DomRowRendererHandle` — type
 - `duplicateValueRule` — value
 - `email` — value
 - `evaluateQueryModel` — value
@@ -264,6 +266,8 @@ Exports (303):
 - `RowNodeSelectionOptions` — type
 - `RowNodeTransaction` — type
 - `RowRangeLoadState` — type
+- `RowRendererParams` — type
+- `RowRendererSpec` — type
 - `RowSelectionMode` — type
 - `RowSelectionOptions` — type
 - `RowSelectionScope` — type

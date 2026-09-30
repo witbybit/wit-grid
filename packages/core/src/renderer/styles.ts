@@ -800,14 +800,29 @@ export const CORE_STYLES = `
     transition: none;
   }
 
+  /* Full-width row content: viewport-wide and horizontally fixed (see --og-viewport-width). */
   .og-row-portal-host {
-    width: 100%;
+    position: sticky;
+    left: 0;
+    flex: 0 0 auto;
+    width: var(--og-viewport-width, 100%);
+    max-width: 100%;
     height: 100%;
   }
 
   .og-row-portal-host > * {
     width: 100%;
     height: 100%;
+  }
+
+  /* detail.height: 'auto' — the host takes its content's height, which the grid measures. */
+  .og-row-portal-host-auto {
+    height: auto;
+    align-self: flex-start;
+  }
+
+  .og-row-portal-host-auto > * {
+    height: auto;
   }
 
   .og-row-selected {

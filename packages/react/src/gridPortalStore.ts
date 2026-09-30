@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import type { ColumnDef, VisualRow, CellRendererPhase } from '@eregister/wit-grid-core';
+import type { ColumnDef, VisualRow, CellRendererPhase, RowRendererSpec } from '@eregister/wit-grid-core';
 import type {
 	PortalData,
 	RowPortalData,
@@ -330,9 +330,9 @@ export function createPortalStore<TRowData = unknown>() {
 		},
 
 		// ── Row mounts ───────────────────────────────────────────────────────────
-		mountRow(rowKey: string, container: HTMLElement, visualRow: VisualRow<TRowData>) {
+		mountRow(rowKey: string, container: HTMLElement, visualRow: VisualRow<TRowData>, renderer?: RowRendererSpec<TRowData>) {
 			const existing = rowPortals.get(rowKey);
-			if (existing && existing.container === container && existing.visualRow === visualRow) {
+			if (existing && existing.container === container && existing.visualRow === visualRow && existing.renderer === renderer) {
 				rowPortalKeyByContainer.set(container, rowKey);
 				return;
 			}
@@ -343,7 +343,7 @@ export function createPortalStore<TRowData = unknown>() {
 			if (existingKeyForContainer && existingKeyForContainer !== rowKey) {
 				rowPortals.delete(existingKeyForContainer);
 			}
-			rowPortals.set(rowKey, { rowKey, container, visualRow });
+			rowPortals.set(rowKey, { rowKey, container, visualRow, renderer });
 			rowPortalKeyByContainer.set(container, rowKey);
 			rebuildRowMenuSnapshot();
 			notifyRowMenuStructural();

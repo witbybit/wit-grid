@@ -98,8 +98,30 @@ describe('PortalMountManager', () => {
 		expect(releaseMenu).toHaveBeenCalledTimes(1);
 	});
 
-	it('defers row portal mounts and releases while scrolling', () => {
+	it('mounts full-width rows during scroll up to the per-frame budget, and defers the rest', () => {
 		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 1;
+		const mountRow = vi.fn();
+		const releaseRow = vi.fn();
+		manager.onMountRowContent = mountRow;
+		manager.onUnmountRowContent = releaseRow;
+		manager.setRuntimeState(makeScrollingRuntimeState());
+		const detail = (id: string) => ({ kind: 'detail', id: `detail:${id}`, parentId: id, depth: 0, height: 40, render: null }) as never;
+
+		manager.mountRow({ rowKey: 'detail:1', container: document.createElement('div'), visualRow: detail('1') });
+		manager.mountRow({ rowKey: 'detail:2', container: document.createElement('div'), visualRow: detail('2') });
+		// Within budget: mounted in-frame. Over budget: waits for scroll to settle.
+		expect(mountRow.mock.calls.map(([mount]) => mount.rowKey)).toEqual(['detail:1']);
+
+		manager.setRuntimeState(makeIdleRuntimeState());
+		manager.flushDeferred();
+		expect(mountRow.mock.calls.map(([mount]) => mount.rowKey)).toEqual(['detail:1', 'detail:2']);
+		expect(releaseRow).not.toHaveBeenCalled();
+	});
+
+	it('defers row portal mounts and releases while scrolling when the budget is spent', () => {
+		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 0;
 		const mountRow = vi.fn();
 		const releaseRow = vi.fn();
 		manager.onMountRowContent = mountRow;

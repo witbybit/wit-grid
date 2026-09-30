@@ -3,6 +3,7 @@ import type { VisualRow } from '../visualRow.js';
 import { snapToDevicePixel, type GridLayoutPlan } from './layoutPlan.js';
 import type { PortalMountManager } from './portalMountManager.js';
 import { RowSlot } from './rowSlot.js';
+import { FullWidthRowRenderer } from './fullWidthRowRenderer.js';
 import type { BindAllHierarchyRowCellsRequest } from './rowCellBindingLanes.js';
 
 /** Binds sticky headers through the body's cell-row path (see RowRenderer.bindDetachedHierarchyRow). */
@@ -39,9 +40,13 @@ export class StickyGroupRenderer<TRowData = unknown> {
 	private lastLayerWidth = -1;
 	private lastLayerTop = Number.NaN;
 
+	/** `display: 'row'` headers: the same full-width content path as body rows (DOM specs included). */
+	private readonly fullWidth: FullWidthRowRenderer<TRowData>;
+
 	constructor(engine: GridEngine<TRowData>, portalMountManager: PortalMountManager<TRowData>) {
 		this.engine = engine;
 		this.portalMountManager = portalMountManager;
+		this.fullWidth = new FullWidthRowRenderer<TRowData>(portalMountManager, new WeakMap(), engine);
 	}
 
 	public mount(layer: HTMLDivElement): void {
@@ -115,7 +120,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				// aggregates scrolling horizontally with the content. Written every frame (a handful of
 				// cells), never deferred.
 				if (host.slot === null) {
-					this.portalMountManager.releaseRow({ rowKey, container: host.element });
+					this.fullWidth.releaseContent(host.element, rowKey);
 					host.slot = new RowSlot<TRowData>(rowKey, host.element);
 				}
 				const state = this.engine.stateManager.getState();
@@ -133,7 +138,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				});
 			} else {
 				this.releaseSlot(host);
-				this.portalMountManager.mountRow({ rowKey, container: host.element, visualRow: visualRow as VisualRow<TRowData> });
+				this.fullWidth.mountContent(host.element, rowKey, visualRow as VisualRow<TRowData>);
 				this.portalMountManager.flushDeferredRowMount(rowKey);
 			}
 		}
@@ -173,7 +178,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 		for (const [rowKey, host] of this.hosts) {
 			if (nextKeys.has(rowKey)) continue;
 			this.releaseSlot(host);
-			this.portalMountManager.releaseRow({ rowKey, container: host.element });
+			this.fullWidth.releaseContent(host.element, rowKey);
 			host.element.remove();
 			this.hosts.delete(rowKey);
 		}

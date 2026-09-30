@@ -179,7 +179,7 @@ export function GridView<TRowData = unknown>({
 			},
 			rowContent: {
 				mountRowContent: (mount) => {
-					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow);
+					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow, mount.renderer);
 				},
 				unmountRowContent: (unmount) => {
 					portalStore.unmountRow(unmount.rowKey, unmount.container);

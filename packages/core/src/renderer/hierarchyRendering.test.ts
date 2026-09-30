@@ -294,3 +294,161 @@ describe('writeHierarchyCell', () => {
 		expect(content.querySelector('.og-hierarchy-label')?.textContent).toBe('A');
 	});
 });
+
+describe('full-width rows during scroll', () => {
+	it('mounts detail rows entering the viewport in the scroll frame, bounded per frame', () => {
+		const callbacks: FrameRequestCallback[] = [];
+		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => callbacks.push(cb));
+		vi.stubGlobal('cancelAnimationFrame', () => {});
+		const rows: Sale[] = Array.from({ length: 80 }, (_, i) => ({ id: `r${i}`, region: 'EMEA', product: `P${i}`, amount: i }));
+		const store = new GridStore<Sale>({
+			columns: COLUMNS,
+			defaultRowHeight: 40,
+			getRowId: (row) => row.id,
+			detail: { height: 40 },
+			expansion: { rows: {}, details: Object.fromEntries(rows.map((row) => [row.id, true])) },
+		});
+		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
+		const container = document.createElement('div');
+		vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+			x: 0,
+			y: 0,
+			top: 0,
+			left: 0,
+			right: 500,
+			bottom: 160,
+			width: 500,
+			height: 160,
+			toJSON: () => ({}),
+		});
+		document.body.appendChild(container);
+		const renderer = new RenderEngine(store.engine, store);
+		const mounts = vi.fn();
+		renderer.portalMountManager.onMountRowContent = mounts;
+		renderer.portalMountManager.onUnmountRowContent = vi.fn();
+		renderer.mount(container);
+		mounts.mockClear();
+
+		const viewport = container.querySelector<HTMLDivElement>('.og-scroll-viewport')!;
+		viewport.scrollTop = 1600;
+		viewport.dispatchEvent(new Event('scroll'));
+		callbacks.shift()!(0);
+
+		const detailMounts = mounts.mock.calls.filter(([mount]) => mount.visualRow.kind === 'detail');
+		expect(detailMounts.length).toBeGreaterThan(0);
+		expect(detailMounts.length).toBeLessThanOrEqual(4);
+		renderer.unmount();
+		controller.dispose();
+		store.destroy();
+		vi.unstubAllGlobals();
+	});
+});
+
+describe('full-width row renderer specs', () => {
+	it('mounts a DOM detail renderer directly (no adapter), with the master data, and destroys it on collapse', () => {
+		const destroy = vi.fn();
+		const seen: Array<string | undefined> = [];
+		const grid = mountGrid({
+			detail: {
+				height: 60,
+				renderer: {
+					kind: 'dom',
+					renderer: {
+						mount: (container, params) => {
+							seen.push((params.masterData as Sale | undefined)?.product);
+							container.textContent = `detail of ${(params.masterData as Sale).product}`;
+							return { destroy };
+						},
+					},
+				},
+			},
+			expansion: { rows: {}, details: { '1': true } },
+		});
+		const detailRow = grid.container.querySelector('.og-row-detail, .og-row[data-row-id^="detail:"]');
+		expect(grid.container.textContent).toContain('detail of Cloud');
+		expect(seen).toEqual(['Cloud']);
+		expect(grid.mountRowContent.mock.calls.some(([mount]) => mount.visualRow.kind === 'detail')).toBe(false);
+		void detailRow;
+
+		grid.store.setDetailOpen('1', false);
+		grid.renderer.fullPaint();
+		expect(destroy).toHaveBeenCalledOnce();
+		expect(grid.container.textContent).not.toContain('detail of Cloud');
+		grid.destroy();
+	});
+
+	it("draws display: 'row' group rows with grouping.rowRenderer and updates them when aggregates change", () => {
+		const update = vi.fn();
+		const grid = mountGrid({
+			grouping: {
+				by: ['region'],
+				display: 'row',
+				rowRenderer: {
+					kind: 'dom',
+					renderer: {
+						mount: (container, params) => {
+							const row = params.row as Extract<typeof params.row, { kind: 'group' }>;
+							container.textContent = `${String(row.key)}: ${String(row.aggregates.amount)}`;
+							return {
+								update: (next) => {
+									update();
+									const nextRow = next.row as typeof row;
+									container.textContent = `${String(nextRow.key)}: ${String(nextRow.aggregates.amount)}`;
+								},
+							};
+						},
+					},
+				},
+			},
+			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+		});
+		expect(grid.container.textContent).toContain('EMEA: 30');
+		grid.store.applyTransaction({ update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 110 }] });
+		grid.renderer.fullPaint();
+		expect(update).toHaveBeenCalled();
+		expect(grid.container.textContent).toContain('EMEA: 130');
+		expect(grid.mountRowContent.mock.calls.some(([mount]) => mount.visualRow.kind === 'group')).toBe(false);
+		grid.destroy();
+	});
+
+	it('hands the React spec to the adapter with the mount', () => {
+		const component = () => null;
+		const grid = mountGrid({ detail: { renderer: { kind: 'react', component } }, expansion: { rows: {}, details: { '1': true } } });
+		const detailMount = grid.mountRowContent.mock.calls.find(([mount]) => mount.visualRow.kind === 'detail')?.[0];
+		expect(detailMount?.renderer).toEqual({ kind: 'react', component });
+		grid.destroy();
+	});
+});
+
+describe("detail.height: 'auto'", () => {
+	it('measures the content and makes the row follow it', () => {
+		let deliver: ((entries: Array<{ target: Element; borderBoxSize: Array<{ blockSize: number }> }>) => void) | null = null;
+		const observed: Element[] = [];
+		vi.stubGlobal(
+			'ResizeObserver',
+			class {
+				constructor(callback: typeof deliver) {
+					deliver = callback;
+				}
+				observe(target: Element) {
+					observed.push(target);
+				}
+				unobserve() {}
+				disconnect() {}
+			}
+		);
+		const grid = mountGrid({
+			detail: { height: 'auto', estimatedHeight: 90 },
+			expansion: { rows: {}, details: { '1': true } },
+		});
+		const detailIndex = grid.store.getVisualIndexById?.('detail:1') ?? 1;
+		expect(grid.store.engine.geometry.getRowHeight(detailIndex, 40)).toBe(90);
+		expect(observed).toHaveLength(1);
+
+		deliver!([{ target: observed[0], borderBoxSize: [{ blockSize: 137 }] }]);
+		expect(grid.store.getState().rowHeights['detail:1']).toBe(137);
+		expect(grid.store.engine.geometry.getRowHeight(detailIndex, 40)).toBe(137);
+		grid.destroy();
+		vi.unstubAllGlobals();
+	});
+});

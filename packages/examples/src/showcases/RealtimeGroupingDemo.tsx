@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Grid } from '@eregister/wit-grid-react';
-import type { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
+import type { AggregationDef, ColumnDef, CellRendererProps, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -145,146 +145,6 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 
 const ROWS = generateRows(500);
 
-// ── Group row renderer ────────────────────────────────────────────────────────
-
-function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesRow>; api: GridApi<SalesRow> }) {
-	const isExpanded = visualRow.hierarchy.expanded;
-	const agg = visualRow.aggregates;
-
-	return (
-		<div
-			style={{
-				display: 'flex',
-				alignItems: 'center',
-				height: '100%',
-				paddingLeft: 12 + visualRow.hierarchy.level * 18,
-				paddingRight: 12,
-				gap: 8,
-				cursor: 'pointer',
-				minWidth: 0,
-				background: 'linear-gradient(90deg, rgba(124,58,237,0.16), rgba(37,99,235,0.08) 42%, rgba(15,23,42,0.02))',
-				boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-			}}
-			onClick={() => api.toggleExpanded(visualRow.id)}
-		>
-			<span
-				style={{
-					width: 3,
-					height: 22,
-					borderRadius: 999,
-					background: visualRow.hierarchy.level === 0 ? '#8b5cf6' : '#3b82f6',
-					opacity: 0.9,
-					flexShrink: 0,
-				}}
-			/>
-			<span
-				style={{
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					width: 16,
-					height: 16,
-					borderRadius: 3,
-					background: 'rgba(167,139,250,0.15)',
-					border: '1px solid rgba(167,139,250,0.3)',
-					color: '#a78bfa',
-					fontSize: 9,
-					flexShrink: 0,
-					transition: 'transform 0.15s',
-					transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-				}}
-			>
-				▶
-			</span>
-
-			<span
-				style={{
-					display: 'flex',
-					alignItems: 'baseline',
-					gap: 6,
-					minWidth: 130,
-					maxWidth: 260,
-					overflow: 'hidden',
-				}}
-			>
-				<span
-					style={{
-						fontSize: 10,
-						fontWeight: 800,
-						color: '#94a3b8',
-						textTransform: 'uppercase',
-						whiteSpace: 'nowrap',
-					}}
-				>
-					{visualRow.field}
-				</span>
-				<span
-					style={{
-						fontSize: 13,
-						fontWeight: 800,
-						color: '#c4b5fd',
-						whiteSpace: 'nowrap',
-						overflow: 'hidden',
-						textOverflow: 'ellipsis',
-					}}
-				>
-					{visualRow.keyString}
-				</span>
-			</span>
-
-			<span
-				style={{
-					fontSize: 10,
-					color: '#64748b',
-					fontWeight: 500,
-					padding: '1px 6px',
-					borderRadius: 10,
-					background: 'rgba(100,116,139,0.1)',
-					border: '1px solid rgba(100,116,139,0.2)',
-					flexShrink: 0,
-				}}
-			>
-				{visualRow.hierarchy.leafCount} rows
-			</span>
-
-			{/* Aggregate chips */}
-			{agg && (
-				<div style={{ display: 'flex', gap: 6, marginLeft: 'auto', minWidth: 0, overflow: 'hidden' }}>
-					{agg.revenue != null && (
-						<span style={aggChip('#3b82f6')}>
-							Rev: <strong>${Number(agg.revenue).toLocaleString()}</strong>
-						</span>
-					)}
-					{agg.units != null && (
-						<span style={aggChip('#10b981')}>
-							Units: <strong>{Number(agg.units).toLocaleString()}</strong>
-						</span>
-					)}
-					{agg.margin != null && (
-						<span style={aggChip('#f59e0b')}>
-							Avg Margin: <strong>{Number(agg.margin).toFixed(1)}%</strong>
-						</span>
-					)}
-				</div>
-			)}
-		</div>
-	);
-}
-
-function aggChip(color: string): React.CSSProperties {
-	return {
-		fontSize: 10,
-		fontWeight: 700,
-		padding: '2px 8px',
-		borderRadius: 999,
-		background: `${color}14`,
-		border: `1px solid ${color}33`,
-		color: `${color}cc`,
-		whiteSpace: 'nowrap',
-		flexShrink: 0,
-	};
-}
-
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
 function Toolbar({ api, showPanel, onTogglePanel }: { api: GridApi<SalesRow> | null; showPanel: boolean; onTogglePanel: () => void }) {
@@ -386,7 +246,6 @@ function RealtimeGroupingDemoInner({
 					}}
 					pinLeftColumns={1}
 					enableContextMenu={true}
-					groupRowRenderer={(props) => <GroupRowRenderer visualRow={props.visualRow as GroupVisualRow<SalesRow>} api={props.api} />}
 					sidebar={
 						compact
 							? undefined

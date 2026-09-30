@@ -52,7 +52,7 @@ function isSameAggregates(a: Record<string, unknown> | undefined, b: Record<stri
 	return true;
 }
 
-function isVisualRowEqual<TRowData>(a: VisualRow<TRowData> | undefined, b: VisualRow<TRowData> | undefined): boolean {
+export function isVisualRowEqual<TRowData>(a: VisualRow<TRowData> | undefined, b: VisualRow<TRowData> | undefined): boolean {
 	if (a === b) return true;
 	if (!a || !b) return false;
 	if (a.kind !== b.kind) return false;
@@ -620,6 +620,15 @@ export class PortalMountManager<TRowData = unknown> {
 		if (existingContainer === mount.container && isVisualRowEqual(existingVisualRow, mount.visualRow)) return;
 		this.mountedRows.set(mount.rowKey, mount.container);
 		this.mountedRowVisualRows.set(mount.rowKey, mount.visualRow);
+		// Full-width rows are few per frame, so they mount during scroll too (bounded per frame)
+		// rather than sitting blank until scroll settles.
+		if (this.scrolling && this.takeScrollRowMount()) {
+			this.stats.mountsDuringScroll++;
+			this.deferredRowMounts.delete(mount.rowKey);
+			this.deferredRowReleases.delete(mount.rowKey);
+			this.onMountRowContent?.(mount);
+			return;
+		}
 		if (this.scrolling) {
 			this.stats.mountsDuringScroll++;
 			this.stats.deferredDuringScroll++;
@@ -643,6 +652,22 @@ export class PortalMountManager<TRowData = unknown> {
 			return;
 		}
 		this.onUnmountRowContent?.(unmount);
+	}
+
+	/** Adapter row mounts allowed per scroll frame (`rendererOptions.fullWidth.maxMountsPerScrollFrame`). */
+	public maxRowMountsPerScrollFrame = 4;
+	private scrollRowMountEpoch = -1;
+	private scrollRowMountsThisFrame = 0;
+
+	private takeScrollRowMount(): boolean {
+		const epoch = this.runtimeState?.frameEpoch ?? -1;
+		if (epoch !== this.scrollRowMountEpoch) {
+			this.scrollRowMountEpoch = epoch;
+			this.scrollRowMountsThisFrame = 0;
+		}
+		if (this.scrollRowMountsThisFrame >= this.maxRowMountsPerScrollFrame) return false;
+		this.scrollRowMountsThisFrame++;
+		return true;
 	}
 
 	/** Immediately flush a deferred row mount (bypasses the scrolling-deferred queue). */

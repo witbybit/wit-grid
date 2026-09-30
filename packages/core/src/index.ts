@@ -160,6 +160,10 @@ export type {
 	ExpansionState,
 	HierarchyColumnConfig,
 	HierarchyCellContext,
+	RowRendererSpec,
+	DomRowRenderer,
+	DomRowRendererHandle,
+	RowRendererParams,
 } from './rows/hierarchyConfig.js';
 export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn } from './rows/hierarchyColumn.js';
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';

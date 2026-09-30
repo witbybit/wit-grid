@@ -225,7 +225,7 @@ export class RowRenderer<TRowData = unknown> {
 
 	public mount(_estRows: number): void {
 		this.rowSlotPool = new RowSlotPool<TRowData>(this.viewportRenderer.rowsContainer!);
-		this.fullWidthRenderer = new FullWidthRowRenderer<TRowData>(this.portalMountManager, this.rowPortalHosts);
+		this.fullWidthRenderer = new FullWidthRowRenderer<TRowData>(this.portalMountManager, this.rowPortalHosts, this.engine);
 	}
 
 	public unmount(): void {
@@ -256,7 +256,7 @@ export class RowRenderer<TRowData = unknown> {
 			this.rowSlotPool = new RowSlotPool<TRowData>(this.viewportRenderer.rowsContainer);
 		}
 		if (!this.fullWidthRenderer) {
-			this.fullWidthRenderer = new FullWidthRowRenderer<TRowData>(this.portalMountManager, this.rowPortalHosts);
+			this.fullWidthRenderer = new FullWidthRowRenderer<TRowData>(this.portalMountManager, this.rowPortalHosts, this.engine);
 		}
 		this.activeRows.clear();
 		this.viewportRenderer.syncActiveDescendant(null);

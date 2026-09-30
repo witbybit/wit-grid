@@ -367,7 +367,8 @@ export default function NestedTablesGrouping({ onGridReady }: NestedTablesGroupi
 
 	const groupInitialState = useMemo(
 		() => ({
-			grouping: { by: ['department'], rowHeight: 42 },
+			// A custom full-width group row design: display 'row' draws it with groupRowRenderer.
+			grouping: { by: ['department'], display: 'row', rowHeight: 42 },
 			styleRules: [{ kind: 'groupRow', rowClass: 'border-l-[3px] border-purple-500 bg-purple-950/5' }],
 		}),
 		[]

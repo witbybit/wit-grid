@@ -87,6 +87,18 @@ export function MasterOrdersGrid({ orders }: { orders: OrderRow[] }) {
 	`visualRow.parentId` (the master row's id) as needed.
 </Callout>
 
+Detail content is as wide as the grid's visible area and stays in view when the grid scrolls horizontally. Detail
+rows entering during a scroll are drawn in that frame (a few per frame, `rendererOptions.fullWidth.maxMountsPerScrollFrame`,
+default 4), not after the scroll ends.
+
+Set `detail.height: 'auto'` to size each detail row to its content: the grid measures it (starting from
+`detail.estimatedHeight`, default 200) and keeps the row in step when the content changes.
+
+Instead of the adapter's `detailRowRenderer`, `detail.renderer` takes a renderer spec: `{ kind: 'dom', renderer }`
+is mounted by the grid itself, synchronously, with `{ row, masterData, api }` — `mount(container, params)` returns
+`{ update?, destroy? }` — and `{ kind: 'react', component }` is rendered by the React adapter with
+`{ visualRow, api }`. `grouping.rowRenderer` does the same for full-width group rows (`grouping.display: 'row'`).
+
 Open and close detail rows programmatically with `api.setDetailOpen(rowId, open)` or `api.toggleDetailOpen(rowId)`,
 and check state with `api.isDetailOpen(rowId)`. `detailRowRenderer` receives `{ visualRow, api }` where `api` is the **master**
 grid's `GridApi` — use it to read sibling row data or coordinate with the parent grid.

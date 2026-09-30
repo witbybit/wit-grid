@@ -154,6 +154,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			engine.runtimeFaults.report({ source: 'renderer', operation: 'runtime-phase-transition', error: new Error(msg) })
 		);
 		this.portalMountManager = new PortalMountManager<TRowData>(engine);
+		this.portalMountManager.maxRowMountsPerScrollFrame = engine.rendererOptions?.fullWidth?.maxMountsPerScrollFrame ?? 4;
 		this.headerMenu = new HeaderMenuController<TRowData>(
 			engine,
 			this.portalMountManager,

@@ -1,5 +1,6 @@
 import type { GridRowDataRef } from '../publicRowRef.js';
-import type { TotalPlacement } from '../visualRow.js';
+import type { GridApi } from '../api/GridApiSurfaces.js';
+import type { TotalPlacement, VisualRow } from '../visualRow.js';
 import type { GroupPathItem } from './visualRowIds.js';
 
 /** One grouping level. `colId` names the column whose value is the group key. */
@@ -57,6 +58,8 @@ export interface GroupingConfig<TData = unknown> {
 	 * the adapter's group row renderer.
 	 */
 	display?: 'column' | 'row';
+	/** `display: 'row'`: draws each group row. Without one, the adapter's group row renderer is used. */
+	rowRenderer?: RowRendererSpec<TData>;
 }
 
 export interface TreeDataConfig<TData = unknown> {
@@ -138,12 +141,44 @@ export interface AggregationConfig<TData = unknown> {
 	defs: AggregationDef<TData>[];
 }
 
+/** What a full-width row renderer receives. */
+export interface RowRendererParams<TData = unknown> {
+	/** The detail, group or total row being drawn. */
+	row: VisualRow<TData>;
+	/** Detail rows: the master row's data. */
+	masterData?: TData;
+	api: GridApi<TData>;
+}
+
+export interface DomRowRendererHandle<TData = unknown> {
+	/** Called when the same row is drawn again with new content (aggregates, expansion, data). */
+	update?(params: RowRendererParams<TData>): void;
+	destroy?(): void;
+}
+
+/** A framework-free full-width row renderer: mounted by core, synchronously, even mid-scroll. */
+export interface DomRowRenderer<TData = unknown> {
+	mount(container: HTMLElement, params: RowRendererParams<TData>): DomRowRendererHandle<TData> | void;
+}
+
+/**
+ * How a full-width row is drawn: a DOM renderer core mounts itself, or a component the adapter
+ * mounts (React: `{ kind: 'react', component }`, rendered with `{ visualRow, api }`).
+ */
+export type RowRendererSpec<TData = unknown> = { kind: 'dom'; renderer: DomRowRenderer<TData> } | { kind: 'react'; component: unknown };
+
 export interface DetailConfig<TData = unknown> {
 	/** Which rows can open a detail. Default: every row. */
 	isMaster?: (row: TData, rowId: string) => boolean;
-	/** Detail row height. Default: 200. */
-	height?: number | ((params: { row: TData; rowId: string }) => number);
-	renderer?: unknown;
+	/**
+	 * Detail row height: a number, a function of the master row, or `'auto'` — the rendered content
+	 * is measured and the row follows it (starting from `estimatedHeight`). Default: 200.
+	 */
+	height?: number | 'auto' | ((params: { row: TData; rowId: string }) => number);
+	/** `height: 'auto'`: the height used until the content has been measured. Default: 200. */
+	estimatedHeight?: number;
+	/** Draws the detail row. Without one, the adapter's detail row renderer is used. */
+	renderer?: RowRendererSpec<TData>;
 }
 
 /**

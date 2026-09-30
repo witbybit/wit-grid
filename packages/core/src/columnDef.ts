@@ -167,6 +167,11 @@ export interface GridRendererOptions {
 	textImpostor?: {
 		allowRawValueFallback?: boolean;
 	};
+	/** Full-width rows (detail rows, full-width group rows) entering during scroll. */
+	fullWidth?: {
+		/** Adapter row mounts allowed per scroll frame; the rest wait for scroll to settle. Default 4. */
+		maxMountsPerScrollFrame?: number;
+	};
 }
 
 // ─── Imperative handle ────────────────────────────────────────────────────────

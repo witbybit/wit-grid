@@ -2899,7 +2899,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('defers row portal work for detail rows during active scroll', () => {
+	it('defers row portal work for detail rows during active scroll once the mount budget is spent', () => {
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 			callbacks.push(cb);
@@ -2915,6 +2915,8 @@ describe('RenderEngine', () => {
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
 			detail: { height: 40 },
+			// Budget 0: every full-width row waits for scroll to settle (the deferral path).
+			rendererOptions: { fullWidth: { maxMountsPerScrollFrame: 0 } },
 			expansion: {
 				rows: {},
 				details: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`row-${index}`, true])),

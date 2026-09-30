@@ -105,6 +105,14 @@ export function findTreeNode<TData>(roots: RowTreeNode<TData>[], visualRowId: st
 	return null;
 }
 
+/** A measured `'auto'` height (recorded under the detail row's visual id) wins over the estimate. */
+function resolveDetailHeight<TData>(detail: DetailConfig<TData>, row: TData, rowId: string, recorded: Record<string, number>): number {
+	const { height } = detail;
+	if (typeof height === 'function') return height({ row, rowId });
+	if (height === 'auto') return recorded[toDetailVisualRowId(rowId)] ?? detail.estimatedHeight ?? 200;
+	return height ?? 200;
+}
+
 function groupTotalPlacement(totals: TotalsConfig | undefined, level: number): TotalPlacement | false {
 	const groups = totals?.groups;
 	if (typeof groups === 'function') return groups(level);
@@ -197,7 +205,7 @@ function flattenNode<TData>(
 					posInSet: 0,
 					setSize: 0,
 				},
-				height: typeof detail.height === 'function' ? detail.height({ row: node.node.data, rowId }) : (detail.height ?? 200),
+				height: resolveDetailHeight(detail, node.node.data, rowId, config.rowHeightsRecord),
 				render: detail.renderer,
 			});
 		}

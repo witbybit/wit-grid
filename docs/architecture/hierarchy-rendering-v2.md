@@ -194,6 +194,14 @@ frame, so they render during scroll (a DOM renderer in-frame; a React one mounte
 rows, bounded by the existing live-mount budget) instead of waiting for scroll to end. `detail.height: 'auto'`
 measures content with a ResizeObserver and feeds row heights through the existing batched height path.
 
+Implemented (phase 4): `RowRendererSpec` on `detail.renderer` and `grouping.rowRenderer`. DOM specs are mounted by
+`FullWidthRowRenderer` directly (synchronous, `update` when the same row changes, `destroy` on release), React specs
+travel with the adapter mount. The row host is `position: sticky; left: 0; width: var(--og-viewport-width)` (the
+variable is set on the rows and sticky layers from the scrollport width). During scroll, adapter row mounts run in
+the frame up to `rendererOptions.fullWidth.maxMountsPerScrollFrame` (default 4); the rest settle after scroll.
+`detail.height: 'auto'`: the host sizes to content, one ResizeObserver batches measurements into the auto row-height
+commit under the detail visual id (starting from `estimatedHeight`), and geometry prefers the recorded height.
+
 ### Sticky group headers
 
 Built from the corrected `stickyCandidates`. Sticky rows render through the same path as the row they copy (cells

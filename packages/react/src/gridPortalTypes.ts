@@ -1,4 +1,4 @@
-import type { ColumnDef, GridApi, VisualRow, CellRendererPhase } from '@eregister/wit-grid-core';
+import type { ColumnDef, GridApi, VisualRow, CellRendererPhase, RowRendererSpec } from '@eregister/wit-grid-core';
 
 export interface PortalRowNodeLike<TRowData = unknown> {
 	id: string;
@@ -58,6 +58,8 @@ export interface RowPortalData<TRowData = unknown> {
 	rowKey: string;
 	container: HTMLElement;
 	visualRow: VisualRow<TRowData>;
+	/** The row's configured renderer spec (`detail.renderer` / `grouping.rowRenderer`), when React. */
+	renderer?: RowRendererSpec<TRowData>;
 }
 
 export interface MenuPortalData<TRowData = unknown> {

@@ -1076,8 +1076,8 @@ export class GridEngine<TRowData = unknown> {
 		this.stateFeature.resizeRow(rowId, height, undoable);
 	}
 	/** Internal renderer path for a single delivery of DOM row-height measurements. */
-	public applyAutoRowHeightBatch(measuredHeights: ReadonlyMap<string, number>): void {
-		this.stateFeature.applyAutoRowHeightBatch(measuredHeights);
+	public applyAutoRowHeightBatch(measuredHeights: ReadonlyMap<string, number>, baseline?: (rowId: string) => number | undefined): void {
+		this.stateFeature.applyAutoRowHeightBatch(measuredHeights, baseline);
 	}
 	public setRowHeights(rowHeights: Record<string, number>): void {
 		this.stateFeature.setRowHeights(rowHeights);
@@ -1310,6 +1310,10 @@ export class GridEngine<TRowData = unknown> {
 				if (!row) return defaultRowHeight;
 				if (row.kind === 'data') {
 					const recorded = rowHeightsRecord[row.rowId];
+					if (recorded !== undefined) return recorded;
+				} else if (row.kind === 'detail') {
+					// A measured `detail.height: 'auto'` row, recorded under its visual id.
+					const recorded = rowHeightsRecord[row.id];
 					if (recorded !== undefined) return recorded;
 				}
 				const explicitHeight = row.height ?? rowHeightsRecord[row.id];

@@ -1,4 +1,4 @@
-import { memo, useSyncExternalStore } from 'react';
+import { createElement, memo, useSyncExternalStore } from 'react';
 import { GridApi, VisualRow } from '@eregister/wit-grid-core';
 import { createPortal } from 'react-dom';
 import { GridProvider } from './gridContext.js';
@@ -96,9 +96,15 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 	return (
 		<>
 			{rowPortalList.map((rp) => {
-				const { rowKey, container, visualRow } = rp;
+				const { rowKey, container, visualRow, renderer } = rp;
 				let content: React.ReactNode = null;
-				if (visualRow.kind === 'group') {
+				if (renderer?.kind === 'react') {
+					// The row's configured component (`detail.renderer` / `grouping.rowRenderer`) wins.
+					content = createElement(renderer.component as React.ComponentType<{ visualRow: typeof visualRow; api: typeof api }>, {
+						visualRow,
+						api,
+					});
+				} else if (visualRow.kind === 'group') {
 					content = groupRowRenderer ? groupRowRenderer({ visualRow, api }) : <DefaultGroupRowRenderer visualRow={visualRow} api={api} />;
 				} else if (visualRow.kind === 'detail') {
 					content = detailRowRenderer ? (
