@@ -164,3 +164,24 @@ Copying a range that spans group or total rows copies what they show (the label 
 
 See [Events](/docs/next/events) for `groupingChanged`, `groupByChanged`, `groupColumnAdded/Removed/Moved`,
 `aggregationChanged`, `treeDataChanged` and `expansionChanged`.
+
+## Upgrading from 1.x
+
+The hierarchy configuration changed shape; there is no compatibility layer.
+
+| 1.x                                                                              | Now                                                                                 |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `groupBy: [...]`, `groupRowHeight`                                               | `grouping: { by: [...], rowHeight }`                                                |
+| `showGroupFooter`, `footerRowRenderer`                                           | `grouping.totals: { groups: 'bottom' }`, `totalRowRenderer`                         |
+| `enableStickyGroupRows`                                                          | `grouping.stickyHeaders`                                                            |
+| `getParentId`, `rowModelConfig.treeData`                                         | `treeData: { getParentId, column, defaultExpanded, filterMode }`                    |
+| `masterDetailEnabled`, `detailRowHeight`, `detailRenderer`                       | `detail: { height, renderer, isMaster }`                                            |
+| `setAggDefs([{ field, aggFunc }])`                                               | `aggregation: { defs: [{ colId, aggFunc }] }` / `api.setAggregation(defs)`          |
+| `toggleGroupExpanded`, `isGroupExpanded`, `expandAllGroups`, `collapseAllGroups` | `toggleExpanded`, `isExpanded`, `expandAll({ maxLevel })`, `collapseAll`            |
+| `toggleDetailExpanded`, `isDetailExpanded`                                       | `toggleDetailOpen`, `isDetailOpen`                                                  |
+| `visualRow.depth` / `expanded` / `childCount`, `aggregateValues`                 | `visualRow.hierarchy.level` / `.expanded` / `.childCount`, `aggregates`             |
+| Group rows drawn by `groupRowRenderer`                                           | Cell rows with a hierarchy column; `grouping.display: 'row'` for `groupRowRenderer` |
+| `DefaultGroupRowRenderer` and the other default React row renderers              | Removed — the grid draws these rows itself                                          |
+
+Saved grid state from 1.x (schema v2) is not restored; the grouping part of saved state is now
+`grouping: { by, totals, stickyHeaders }` (schema v3).
