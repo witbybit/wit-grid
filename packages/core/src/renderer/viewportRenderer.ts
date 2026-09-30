@@ -1,3 +1,4 @@
+import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
 import { CORE_STYLES } from './styles.js';
@@ -267,9 +268,16 @@ export class ViewportRenderer<TRowData = unknown> {
 		}
 	}
 
+	private lastAriaRole = 'grid';
+
 	private syncAriaCounts(): void {
 		// ARIA counts — guarded so we only touch the DOM when they actually change.
 		if (this.container) {
+			const role = isHierarchyActive(this.engine.stateManager.getState()) ? 'treegrid' : 'grid';
+			if (this.lastAriaRole !== role) {
+				this.lastAriaRole = role;
+				this.container.setAttribute('role', role);
+			}
 			const rowCount = this.engine.getRowModel()?.getVisualRowCount() ?? 0;
 			const colCount = this.engine.columns.getCompiledPlan().displayedColumns.length;
 			if (this.lastAriaRowCount !== rowCount) {

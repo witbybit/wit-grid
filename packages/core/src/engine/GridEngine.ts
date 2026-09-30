@@ -91,6 +91,7 @@ import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
 import { mapRowsUpdatedDispatchPayload, type PublicRowNodeDispatchDeps } from './publicRowNodeDispatch.js';
 import { GridFlightRecorder } from '../diagnostics/GridFlightRecorder.js';
 import { withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
+import { createHierarchyTextResolver } from '../rows/hierarchyText.js';
 import {
 	freezeAggregationConfig,
 	freezeDetailConfig,
@@ -554,6 +555,11 @@ export class GridEngine<TRowData = unknown> {
 			validateWriteProposal: (updates, source) => this.dataIntegrity?.validateWriteProposal(updates, source) ?? Promise.resolve([]),
 			checkCapability: (action, p) => this.capabilityManager.can(action, p),
 			recordRejectedWrite: (reason, cell) => this.flightRecorder.recordRejectedWrite(reason, cell),
+			hierarchyCellText: createHierarchyTextResolver<TRowData>({
+				getState: () => this.stateManager.getState(),
+				getColumn: (field) => this.columns.getColumnByFieldOrInstanceId(field),
+				getCellValue: (rowId, field) => this.data.getCellValue(rowId, field),
+			}),
 		});
 		this.groupingFeature = new GroupingFeatureController<TRowData>({
 			ctx: featureContext,

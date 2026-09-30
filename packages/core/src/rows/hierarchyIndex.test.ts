@@ -115,3 +115,45 @@ describe('hierarchy selection (grid API)', () => {
 		store.destroy();
 	});
 });
+
+describe('treeData.selectDescendants', () => {
+	const TREE: Row[] = [
+		{ id: 'root', region: '', category: '' },
+		{ id: 'a', region: '', category: '', parentId: 'root' },
+		{ id: 'a1', region: '', category: '', parentId: 'a' },
+		{ id: 'b', region: '', category: '', parentId: 'root' },
+		{ id: 'other', region: '', category: '' },
+	];
+
+	function makeTree(selectDescendants: boolean) {
+		const store = new GridStore<Row>({
+			getRowId: (row) => row.id,
+			columns: [{ field: 'region', header: 'Region' }],
+			// Collapsed: descendants are selected even though none are displayed.
+			treeData: { getParentId: (row) => row.parentId, selectDescendants },
+			rowSelection: { mode: 'multiple' },
+		});
+		const controller = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), { rows: TREE, columns: store.getState().columns });
+		return { store, controller };
+	}
+
+	it('selects and deselects a parent together with every row beneath it', () => {
+		const { store, controller } = makeTree(true);
+		store.selectRows(['root']);
+		expect(store.getSelectedRowIds().sort()).toEqual(['a', 'a1', 'b', 'root']);
+		store.toggleRowSelection('a');
+		expect(store.getSelectedRowIds().sort()).toEqual(['b', 'root']);
+		store.deselectRows(['root']);
+		expect(store.getSelectedRowIds()).toEqual([]);
+		controller.dispose();
+		store.destroy();
+	});
+
+	it('selects only the row itself without it', () => {
+		const { store, controller } = makeTree(false);
+		store.selectRows(['root']);
+		expect(store.getSelectedRowIds()).toEqual(['root']);
+		controller.dispose();
+		store.destroy();
+	});
+});

@@ -73,6 +73,8 @@ export interface TreeDataConfig<TData = unknown> {
 	filterMode?: 'strict' | 'includeAncestors' | 'includeDescendants';
 	/** Tree parents carry the aggregate of their descendants. Default: true when aggregation is configured. */
 	aggregateParents?: boolean;
+	/** Selecting (deselecting) a tree parent selects (deselects) every row beneath it. Default: false. */
+	selectDescendants?: boolean;
 }
 
 /** What the hierarchy cell knows about the row it is drawn for. */
@@ -207,6 +209,11 @@ export function groupByColIds<TData>(grouping: GroupingConfig<TData> | undefined
 /** True when rows are actually grouped (a config with no levels groups nothing). */
 export function isGroupingActive<TData>(grouping: GroupingConfig<TData> | undefined): grouping is GroupingConfig<TData> {
 	return !!grouping && grouping.by.length > 0;
+}
+
+/** Whether rows form a hierarchy (grouped or tree-shaped): the grid is then a treegrid. */
+export function isHierarchyActive(state: { grouping?: { by: readonly unknown[] }; treeData?: unknown }): boolean {
+	return (state.grouping?.by.length ?? 0) > 0 || !!state.treeData;
 }
 
 /** Resolves a default with no override: booleans as-is, a number as "levels below it are open". */

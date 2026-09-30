@@ -1116,6 +1116,14 @@ export class ClientRowModelController<TData = unknown>
 		return this.refresh('expansion');
 	};
 
+	/** Every row of the hierarchy with all groups and tree rows expanded, and no detail rows (export). */
+	public getHierarchyExportRows = (): VisualRow<TData>[] | null => {
+		if (!this._roots) return null;
+		const input = this.buildPipelineInput(this.runtime.getState(), false);
+		// A separate pipeline: the live one's version and caches are untouched.
+		return new RowPipeline<TData>().run({ ...input, detail: undefined, expansion: { rows: {}, details: {}, base: true } }).visualRows;
+	};
+
 	public isDetailOpen = (rowId: string): boolean => {
 		return !!this.runtime.getState().expansion.details[rowId];
 	};

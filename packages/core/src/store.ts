@@ -35,7 +35,9 @@ import { type GridInstrumentation, NOOP_INSTRUMENTATION } from './diagnostics/Gr
 import type { RenderStats } from './renderer/renderTelemetry.js';
 import type { GridRowNode } from './publicRowNode.js';
 import type { AggregationDef } from './rows/stages/aggregateStage.js';
-import { exportToCsv, type CsvExportOptions } from './export/csvExport.js';
+import { exportToCsv, toCsv, type CsvExportOptions } from './export/csvExport.js';
+import { createHierarchyTextResolver } from './rows/hierarchyText.js';
+import { isHierarchyActive } from './rows/hierarchyConfig.js';
 import type { PersistenceStatus, PersistedGridState } from './persistence/statePersistence.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './workspace/workspaceTypes.js';
 import { extractPersistedState, preparePersistedGridStateRestore, areRowHeightsEqual } from './persistence/statePersistence.js';
@@ -705,6 +707,20 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public exportCsv = (options?: CsvExportOptions): void => {
 		exportToCsv(this, options);
 	};
+
+	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
+
+	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
+	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {
+		const rowModel = this.engine.getRowModel() as { getHierarchyExportRows?: () => VisualRow<TRowData>[] | null } | null;
+		return isHierarchyActive(this.state) ? (rowModel?.getHierarchyExportRows?.() ?? null) : null;
+	};
+
+	public hierarchyCellText = createHierarchyTextResolver<TRowData>({
+		getState: () => this.state,
+		getColumn: (field) => this.engine.columns.getColumnByFieldOrInstanceId(field),
+		getCellValue: (rowId, field) => this.engine.data.getCellValue(rowId, field),
+	});
 
 	// All persistence methods are overridden by the private runtime composition root when an adapter is configured.
 	public hasPersistence = (): boolean => false;

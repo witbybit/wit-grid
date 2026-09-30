@@ -1,3 +1,4 @@
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { ColumnDef } from '../columnDef.js';
 import { getColumnInstanceIdentity } from '../columnDef.js';
 import type { CanonicalGridCellPointer, GridWriteResult } from '../api/GridApi.js';
@@ -27,6 +28,8 @@ interface ClipboardContext<TRowData> {
 	) => Promise<readonly GridIntegrityIssue[]>;
 	checkCapability?: (action: GridCapabilityAction, params: Partial<GridCapabilityParams<TRowData>>) => GridCapabilityResult;
 	recordRejectedWrite?: (reason: string, cell?: { rowId: string; colField: string }) => void;
+	/** Text of hierarchy cells: the hierarchy column on any row, and every column of group / total rows. */
+	hierarchyCellText?: (row: VisualRow<TRowData>, col: ColumnDef<TRowData>) => string;
 }
 
 interface CopyResult {
@@ -233,7 +236,18 @@ export class ClipboardController<TRowData = unknown> {
 
 		for (let r = minRow; r <= maxRow; r++) {
 			const vr = this.c.getVisualRow(r);
-			if (!vr || vr.kind !== 'data') continue;
+			if (!vr) continue;
+			if ((vr.kind === 'group' || vr.kind === 'total') && this.c.hierarchyCellText) {
+				// Group and total rows copy what they show: the group label and formatted aggregates.
+				const rowCells: string[] = [];
+				for (let c = minCol; c <= maxCol; c++) {
+					const col = this.getDisplayedColumnAtIndex(c);
+					if (col) rowCells.push(this.c.hierarchyCellText(vr, col));
+				}
+				rows.push(rowCells.join('	'));
+				continue;
+			}
+			if (vr.kind !== 'data') continue;
 			const rowCells: string[] = [];
 			for (let c = minCol; c <= maxCol; c++) {
 				const col = this.getDisplayedColumnAtIndex(c);
@@ -242,7 +256,9 @@ export class ClipboardController<TRowData = unknown> {
 					const res = this.c.checkCapability('copy', { rowId: vr.rowId, colField: col.field });
 					if (!res.allowed) continue;
 				}
-				rowCells.push(this._getCellText(vr.rowId, col, state));
+				rowCells.push(
+					isHierarchyColumn(col) && this.c.hierarchyCellText ? this.c.hierarchyCellText(vr, col) : this._getCellText(vr.rowId, col, state)
+				);
 				cells.push({ rowId: vr.rowId, colField: col.field });
 			}
 			rows.push(rowCells.join('\t'));

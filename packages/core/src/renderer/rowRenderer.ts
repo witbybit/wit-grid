@@ -1,4 +1,5 @@
 import type { StickyCellRowBinder } from './stickyGroupRenderer.js';
+import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
 import type { PortalMountManager } from './portalMountManager.js';
@@ -673,6 +674,7 @@ export class RowRenderer<TRowData = unknown> {
 
 			const prevSlotIdx = slot.visualIndex;
 			const rowUpdated = slot.update(r, visualRow.id, visualRow.kind as any, rowTop, rowHeight, rowClassName);
+			slot.applyHierarchyAria(isHierarchyActive(state) ? visualRow.hierarchy : null);
 			// Incremental index: update map only when the binding changes.
 			if (prevSlotIdx !== r) {
 				if (prevSlotIdx >= 0) this.activeRows.delete(prevSlotIdx);

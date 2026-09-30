@@ -294,6 +294,8 @@ export interface GridDiagnosticsCapabilityApi<TRowData = unknown> {
 	toggleChart(): void;
 	isChartOpen(): boolean;
 	exportCsv(options?: CsvExportOptions): void;
+	/** The CSV text `exportCsv` would download. */
+	getCsv(options?: CsvExportOptions): string;
 	can(action: GridCapabilityAction, params?: Partial<GridCapabilityParams<TRowData>>): GridCapabilityResult;
 	canEdit(rowId: string, colField: string): boolean;
 	canCopy(rowId?: string, colField?: string): boolean;

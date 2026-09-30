@@ -1,6 +1,6 @@
 import type { GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { registerGridRuntimeComposition } from './apiInternalBridge.js';
-import { exportToCsv, type CsvExportOptions } from '../export/csvExport.js';
+import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
 import type { GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
@@ -150,6 +150,7 @@ export function createGridRuntimeComposition<TRowData>({
 		setShowFloatingFilters: (enabled: boolean) => runtime.setShowFloatingFilters(enabled),
 		setShowFilterChipBar: (enabled: boolean) => runtime.setShowFilterChipBar(enabled),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
+		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
 		setStyleRules: (styleRules: GridInitialState<TRowData>['styleRules']) => runtime.setStyleRules(styleRules),
 		addEventListener: runtime.addEventListener,
 		dispatchEvent: runtime.dispatchEvent,

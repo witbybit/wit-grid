@@ -493,3 +493,28 @@ describe("core's built-in full-width rows", () => {
 		grid.destroy();
 	});
 });
+
+describe('treegrid semantics', () => {
+	it('is a treegrid with row level, expanded state and set position while grouped, and a plain grid otherwise', () => {
+		const grid = mountGrid({ grouping: { by: ['region'], defaultExpanded: true } });
+		const root = grid.container;
+		expect(root.getAttribute('role')).toBe('treegrid');
+		const group = grid.rowAt(0)!;
+		expect([
+			group.getAttribute('aria-level'),
+			group.getAttribute('aria-expanded'),
+			group.getAttribute('aria-posinset'),
+			group.getAttribute('aria-setsize'),
+		]).toEqual(['1', 'true', '1', '2']);
+		const leaf = grid.rowAt(1)!;
+		expect(leaf.getAttribute('aria-level')).toBe('2');
+		expect(leaf.hasAttribute('aria-expanded')).toBe(false);
+		expect(leaf.getAttribute('aria-setsize')).toBe('2');
+
+		grid.store.setGroupBy([]);
+		grid.renderer.fullPaint();
+		expect(root.getAttribute('role')).toBe('grid');
+		expect(grid.rowAt(0)!.hasAttribute('aria-level')).toBe(false);
+		grid.destroy();
+	});
+});

@@ -144,6 +144,7 @@ export function createGridPluginRuntime<TRowData>(source: GridPluginRuntime<TRow
 		toggleChart: source.toggleChart,
 		isChartOpen: source.isChartOpen,
 		exportCsv: source.exportCsv,
+		getCsv: source.getCsv,
 		hasPersistence: source.hasPersistence,
 		clearPersistedState: source.clearPersistedState,
 		setAutoSave: source.setAutoSave,

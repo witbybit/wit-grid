@@ -1,3 +1,4 @@
+import type { RowHierarchy } from '../visualRow.js';
 import { CellSlot, toPx } from './cellSlot.js';
 import type { ColumnInstanceId } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
@@ -81,6 +82,35 @@ export class RowSlot<TRowData = unknown> {
 		if (element.getAttribute('role') !== 'row') element.setAttribute('role', 'row');
 		element.dataset.rowSlotId = id;
 		this.hiddenByUnbind = element.style.visibility === 'hidden';
+	}
+
+	private lastHierarchyAria = '';
+
+	/**
+	 * Treegrid semantics for grouped / tree grids: aria-level (1-based), aria-expanded on rows with
+	 * children, aria-posinset / aria-setsize among siblings. `null` (flat grids) clears them.
+	 */
+	public applyHierarchyAria(hierarchy: RowHierarchy | null): void {
+		const key = hierarchy
+			? `${hierarchy.level}|${hierarchy.hasChildren ? (hierarchy.expanded ? 1 : 0) : -1}|${hierarchy.posInSet}|${hierarchy.setSize}`
+			: '';
+		if (key === this.lastHierarchyAria) return;
+		this.lastHierarchyAria = key;
+		const el = this.element;
+		if (!hierarchy) {
+			for (const name of ['aria-level', 'aria-expanded', 'aria-posinset', 'aria-setsize']) el.removeAttribute(name);
+			return;
+		}
+		el.setAttribute('aria-level', String(hierarchy.level + 1));
+		if (hierarchy.hasChildren) el.setAttribute('aria-expanded', String(hierarchy.expanded));
+		else el.removeAttribute('aria-expanded');
+		if (hierarchy.setSize > 0) {
+			el.setAttribute('aria-posinset', String(hierarchy.posInSet));
+			el.setAttribute('aria-setsize', String(hierarchy.setSize));
+		} else {
+			el.removeAttribute('aria-posinset');
+			el.removeAttribute('aria-setsize');
+		}
 	}
 
 	// ── Lookup ───────────────────────────────────────────────────────────────────────
