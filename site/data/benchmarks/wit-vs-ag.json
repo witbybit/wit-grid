@@ -1,1080 +1,1080 @@
 {
-  "generatedAt": "2026-09-30T09:14:21.127Z",
-  "method": {
-    "rounds": 5,
-    "pairing": "Each round runs both grids back to back on the same scenario, alternating which goes first.",
-    "input": "Real mouse-wheel events through Chrome (playwright-core), 16ms apart; each grid uses its own defaults.",
-    "metrics": "Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame."
-  },
-  "environment": {
-    "chrome": "154.0.8037.58",
-    "headless": true,
-    "os": "Windows_NT 10.0.26200",
-    "cpu": "AMD Ryzen 5 7535HS with Radeon Graphics",
-    "cores": 12,
-    "witGrid": "1.4.1",
-    "agGrid": "36.2.0",
-    "commit": "0cc7c90c",
-    "uncommittedChanges": false
-  },
-  "scenarios": [
-    {
-      "name": "vertical-text",
-      "title": "Vertical scroll, plain text",
-      "description": "100,000 rows x 50 text columns; 150 wheel events of 360px down, then back up.",
-      "query": {
-        "rows": 100000,
-        "cols": 50,
-        "domCols": 0
-      },
-      "wheel": {
-        "dy": 360,
-        "events": 150
-      }
-    },
-    {
-      "name": "vertical-dom-renderers",
-      "title": "Vertical scroll, custom DOM renderers",
-      "description": "Same grid with 10 columns drawn by a custom renderer (a bar and a label); each grid uses its own default renderer path.",
-      "query": {
-        "rows": 100000,
-        "cols": 50,
-        "domCols": 10
-      },
-      "wheel": {
-        "dy": 360,
-        "events": 150
-      }
-    },
-    {
-      "name": "horizontal-200-cols",
-      "title": "Horizontal scroll, 200 columns",
-      "description": "100,000 rows x 200 text columns; 150 wheel events of 300px right, then back left.",
-      "query": {
-        "rows": 100000,
-        "cols": 200,
-        "domCols": 0
-      },
-      "wheel": {
-        "dx": 300,
-        "events": 150
-      }
-    },
-    {
-      "name": "vertical-fast-fling",
-      "title": "Very fast fling",
-      "description": "90 wheel events of 2,400px, close to dragging the scrollbar; stresses blank area.",
-      "query": {
-        "rows": 100000,
-        "cols": 50,
-        "domCols": 0
-      },
-      "wheel": {
-        "dy": 2400,
-        "events": 90
-      }
-    }
-  ],
-  "results": [
-    {
-      "scenario": "vertical-text",
-      "grid": "wit",
-      "frames": 306,
-      "meanMs": 16.796732026143793,
-      "p95Ms": 17.100000000000136,
-      "p99Ms": 17.59999999999991,
-      "maxMs": 25.5,
-      "droppedPct": 0,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 18.91334533333334,
-      "scriptMs": 474.65200000000004,
-      "layoutMs": 198.744,
-      "styleMs": 51.366,
-      "layoutCount": 150,
-      "styleCount": 313,
-      "taskMs": 1597.4969999999998,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 306,
-          "min": 281,
-          "max": 310
-        },
-        "meanMs": {
-          "median": 16.796732026143793,
-          "min": 16.692580645161293,
-          "max": 24.949110320284696
-        },
-        "p95Ms": {
-          "median": 17.100000000000136,
-          "min": 17,
-          "max": 25.400000000000546
-        },
-        "p99Ms": {
-          "median": 17.59999999999991,
-          "min": 17.199999999999818,
-          "max": 25.599999999999454
-        },
-        "maxMs": {
-          "median": 25.5,
-          "min": 17.300000000000182,
-          "max": 35.80000000000018
-        },
-        "droppedPct": {
-          "median": 0,
-          "min": 0,
-          "max": 4.901960784313726
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 18.91334533333334,
-          "min": 18.171659333333324,
-          "max": 32.191190666666664
-        },
-        "scriptMs": {
-          "median": 474.65200000000004,
-          "min": 407.291,
-          "max": 551.257
-        },
-        "layoutMs": {
-          "median": 198.744,
-          "min": 171.141,
-          "max": 212.225
-        },
-        "styleMs": {
-          "median": 51.366,
-          "min": 48.984,
-          "max": 61.122
-        },
-        "layoutCount": {
-          "median": 150,
-          "min": 150,
-          "max": 150
-        },
-        "styleCount": {
-          "median": 313,
-          "min": 311,
-          "max": 314
-        },
-        "taskMs": {
-          "median": 1597.4969999999998,
-          "min": 1368.382,
-          "max": 1795.848
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "vertical-text",
-      "grid": "ag",
-      "frames": 441,
-      "meanMs": 18.120728929384956,
-      "p95Ms": 25.199999999999818,
-      "p99Ms": 25.400000000001455,
-      "maxMs": 33.400000000000546,
-      "droppedPct": 0.22123893805309736,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 39.02763933333333,
-      "scriptMs": 1057.513,
-      "layoutMs": 241.20600000000002,
-      "styleMs": 293.932,
-      "layoutCount": 300,
-      "styleCount": 302,
-      "taskMs": 2863.915,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 441,
-          "min": 425,
-          "max": 455
-        },
-        "meanMs": {
-          "median": 18.120728929384956,
-          "min": 16.72879120879121,
-          "max": 24.995764705882358
-        },
-        "p95Ms": {
-          "median": 25.199999999999818,
-          "min": 17.00000000000091,
-          "max": 25.5
-        },
-        "p99Ms": {
-          "median": 25.400000000001455,
-          "min": 17.200000000000273,
-          "max": 25.700000000000728
-        },
-        "maxMs": {
-          "median": 33.400000000000546,
-          "min": 26.199999999999818,
-          "max": 33.59999999999991
-        },
-        "droppedPct": {
-          "median": 0.22123893805309736,
-          "min": 0,
-          "max": 9.567198177676538
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 39.02763933333333,
-          "min": 36.15269533333335,
-          "max": 58.47537933333331
-        },
-        "scriptMs": {
-          "median": 1057.513,
-          "min": 1016.271,
-          "max": 1180.711
-        },
-        "layoutMs": {
-          "median": 241.20600000000002,
-          "min": 228.816,
-          "max": 287.07500000000005
-        },
-        "styleMs": {
-          "median": 293.932,
-          "min": 285.439,
-          "max": 339.499
-        },
-        "layoutCount": {
-          "median": 300,
-          "min": 300,
-          "max": 300
-        },
-        "styleCount": {
-          "median": 302,
-          "min": 302,
-          "max": 302
-        },
-        "taskMs": {
-          "median": 2863.915,
-          "min": 2826.548,
-          "max": 3261.003
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "vertical-text",
-      "grid": "ratio",
-      "witOverAgTaskMs": {
-        "median": 0.5500934909031867,
-        "min": 0.4841177294707184,
-        "max": 0.610129080112927
-      },
-      "rounds": 5
-    },
-    {
-      "scenario": "vertical-dom-renderers",
-      "grid": "wit",
-      "frames": 286,
-      "meanMs": 24.97342657342657,
-      "p95Ms": 25.599999999999454,
-      "p99Ms": 25.699999999999818,
-      "maxMs": 26,
-      "droppedPct": 0,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 31.677119999999995,
-      "scriptMs": 674.453,
-      "layoutMs": 315.59999999999997,
-      "styleMs": 133.678,
-      "layoutCount": 150,
-      "styleCount": 310,
-      "taskMs": 2691.5550000000003,
-      "mounts": 370,
-      "updates": 14054,
-      "spread": {
-        "frames": {
-          "median": 286,
-          "min": 277,
-          "max": 327
-        },
-        "meanMs": {
-          "median": 24.97342657342657,
-          "min": 16.748447204968937,
-          "max": 25.00912280701755
-        },
-        "p95Ms": {
-          "median": 25.599999999999454,
-          "min": 17.199999999999818,
-          "max": 25.59999999999991
-        },
-        "p99Ms": {
-          "median": 25.699999999999818,
-          "min": 17.400000000000546,
-          "max": 25.800000000000182
-        },
-        "maxMs": {
-          "median": 26,
-          "min": 25.700000000000045,
-          "max": 33.80000000000018
-        },
-        "droppedPct": {
-          "median": 0,
-          "min": 0,
-          "max": 4.587155963302752
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 31.677119999999995,
-          "min": 20.693025333333253,
-          "max": 33.105708666666665
-        },
-        "scriptMs": {
-          "median": 674.453,
-          "min": 654.676,
-          "max": 683.926
-        },
-        "layoutMs": {
-          "median": 315.59999999999997,
-          "min": 302.796,
-          "max": 320.714
-        },
-        "styleMs": {
-          "median": 133.678,
-          "min": 132.293,
-          "max": 140.877
-        },
-        "layoutCount": {
-          "median": 150,
-          "min": 150,
-          "max": 154
-        },
-        "styleCount": {
-          "median": 310,
-          "min": 310,
-          "max": 316
-        },
-        "taskMs": {
-          "median": 2691.5550000000003,
-          "min": 2643.554,
-          "max": 2744.585
-        },
-        "mounts": {
-          "median": 370,
-          "min": 370,
-          "max": 370
-        },
-        "updates": {
-          "median": 14054,
-          "min": 14033,
-          "max": 14100
-        }
-      }
-    },
-    {
-      "scenario": "vertical-dom-renderers",
-      "grid": "ag",
-      "frames": 426,
-      "meanMs": 25.002685446009387,
-      "p95Ms": 25.5,
-      "p99Ms": 25.600000000000364,
-      "maxMs": 26,
-      "droppedPct": 0,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 58.61590133333327,
-      "scriptMs": 1229.96,
-      "layoutMs": 319.305,
-      "styleMs": 441.364,
-      "layoutCount": 300,
-      "styleCount": 302,
-      "taskMs": 3777.667,
-      "mounts": 12990,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 426,
-          "min": 425,
-          "max": 444
-        },
-        "meanMs": {
-          "median": 25.002685446009387,
-          "min": 16.736711711711713,
-          "max": 25.05529411764706
-        },
-        "p95Ms": {
-          "median": 25.5,
-          "min": 17.199999999999818,
-          "max": 25.5
-        },
-        "p99Ms": {
-          "median": 25.600000000000364,
-          "min": 17.300000000000182,
-          "max": 25.699999999999818
-        },
-        "maxMs": {
-          "median": 26,
-          "min": 25.700000000000728,
-          "max": 50.5
-        },
-        "droppedPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0.23529411764705882
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 58.61590133333327,
-          "min": 35.29434333333338,
-          "max": 58.81431400000001
-        },
-        "scriptMs": {
-          "median": 1229.96,
-          "min": 1221.041,
-          "max": 1289.714
-        },
-        "layoutMs": {
-          "median": 319.305,
-          "min": 312.61699999999996,
-          "max": 326.346
-        },
-        "styleMs": {
-          "median": 441.364,
-          "min": 425.24,
-          "max": 452.111
-        },
-        "layoutCount": {
-          "median": 300,
-          "min": 300,
-          "max": 300
-        },
-        "styleCount": {
-          "median": 302,
-          "min": 302,
-          "max": 302
-        },
-        "taskMs": {
-          "median": 3777.667,
-          "min": 3656.858,
-          "max": 3888.322
-        },
-        "mounts": {
-          "median": 12990,
-          "min": 12990,
-          "max": 12990
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "vertical-dom-renderers",
-      "grid": "ratio",
-      "witOverAgTaskMs": {
-        "median": 0.7265290985150359,
-        "min": 0.6798701342121357,
-        "max": 0.7285601464426564
-      },
-      "rounds": 5
-    },
-    {
-      "scenario": "horizontal-200-cols",
-      "grid": "wit",
-      "frames": 300,
-      "meanMs": 16.705787781350477,
-      "p95Ms": 17.200000000000728,
-      "p99Ms": 17.399999999999636,
-      "maxMs": 18,
-      "droppedPct": 0,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 19.03393333333331,
-      "scriptMs": 667.157,
-      "layoutMs": 143.664,
-      "styleMs": 96.30900000000001,
-      "layoutCount": 140,
-      "styleCount": 144,
-      "taskMs": 1668.022,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 300,
-          "min": 293,
-          "max": 311
-        },
-        "meanMs": {
-          "median": 16.705787781350477,
-          "min": 16.685000000000006,
-          "max": 18.174061433447093
-        },
-        "p95Ms": {
-          "median": 17.200000000000728,
-          "min": 17.199999999999818,
-          "max": 25.19999999999891
-        },
-        "p99Ms": {
-          "median": 17.399999999999636,
-          "min": 17.300000000000182,
-          "max": 25.400000000000546
-        },
-        "maxMs": {
-          "median": 18,
-          "min": 17.399999999999636,
-          "max": 25.799999999999272
-        },
-        "droppedPct": {
-          "median": 0,
-          "min": 0,
-          "max": 8.873720136518772
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 19.03393333333331,
-          "min": 17.715857999999812,
-          "max": 19.99590400000025
-        },
-        "scriptMs": {
-          "median": 667.157,
-          "min": 654.7950000000001,
-          "max": 730.8280000000001
-        },
-        "layoutMs": {
-          "median": 143.664,
-          "min": 138.375,
-          "max": 166.152
-        },
-        "styleMs": {
-          "median": 96.30900000000001,
-          "min": 93.14,
-          "max": 109.436
-        },
-        "layoutCount": {
-          "median": 140,
-          "min": 140,
-          "max": 140
-        },
-        "styleCount": {
-          "median": 144,
-          "min": 144,
-          "max": 144
-        },
-        "taskMs": {
-          "median": 1668.022,
-          "min": 1630.951,
-          "max": 1813.76
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "horizontal-200-cols",
-      "grid": "ag",
-      "frames": 448,
-      "meanMs": 17.65636971046771,
-      "p95Ms": 25,
-      "p99Ms": 25.399999999999636,
-      "maxMs": 35.17599999999993,
-      "droppedPct": 4.67706013363029,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 37.45316733333321,
-      "scriptMs": 992.3149999999999,
-      "layoutMs": 275.796,
-      "styleMs": 183.10100000000003,
-      "layoutCount": 280,
-      "styleCount": 558,
-      "taskMs": 2632.14,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 448,
-          "min": 427,
-          "max": 453
-        },
-        "meanMs": {
-          "median": 17.65636971046771,
-          "min": 16.7237174392936,
-          "max": 18.33138041002278
-        },
-        "p95Ms": {
-          "median": 25,
-          "min": 17.100000000000364,
-          "max": 25.200000000000728
-        },
-        "p99Ms": {
-          "median": 25.399999999999636,
-          "min": 17.200000000000728,
-          "max": 33.30000000000018
-        },
-        "maxMs": {
-          "median": 35.17599999999993,
-          "min": 33.5,
-          "max": 50.099999999999454
-        },
-        "droppedPct": {
-          "median": 4.67706013363029,
-          "min": 0.22075055187637968,
-          "max": 5.922551252847381
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 1
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 53
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 37.45316733333321,
-          "min": 35.82454199999998,
-          "max": 39.68274400000014
-        },
-        "scriptMs": {
-          "median": 992.3149999999999,
-          "min": 898.518,
-          "max": 1054.838
-        },
-        "layoutMs": {
-          "median": 275.796,
-          "min": 242.981,
-          "max": 297.473
-        },
-        "styleMs": {
-          "median": 183.10100000000003,
-          "min": 161.012,
-          "max": 202.076
-        },
-        "layoutCount": {
-          "median": 280,
-          "min": 280,
-          "max": 280
-        },
-        "styleCount": {
-          "median": 558,
-          "min": 558,
-          "max": 558
-        },
-        "taskMs": {
-          "median": 2632.14,
-          "min": 2476.3620000000005,
-          "max": 2812.042
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "horizontal-200-cols",
-      "grid": "ratio",
-      "witOverAgTaskMs": {
-        "median": 0.6449974787005315,
-        "min": 0.6050311960561771,
-        "max": 0.6813289010249711
-      },
-      "rounds": 5
-    },
-    {
-      "scenario": "vertical-fast-fling",
-      "grid": "wit",
-      "frames": 201,
-      "meanMs": 18.149999999999995,
-      "p95Ms": 25.200000000000273,
-      "p99Ms": 25.5,
-      "maxMs": 33.200000000000045,
-      "droppedPct": 8.37696335078534,
-      "longTasks": 0,
-      "longTaskMs": 0,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 23.52367111111073,
-      "scriptMs": 584.704,
-      "layoutMs": 390.572,
-      "styleMs": 67.493,
-      "layoutCount": 90,
-      "styleCount": 281,
-      "taskMs": 1890.836,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 201,
-          "min": 191,
-          "max": 206
-        },
-        "meanMs": {
-          "median": 18.149999999999995,
-          "min": 17.75097087378641,
-          "max": 18.92251308900523
-        },
-        "p95Ms": {
-          "median": 25.200000000000273,
-          "min": 25.100000000000364,
-          "max": 25.399999999999636
-        },
-        "p99Ms": {
-          "median": 25.5,
-          "min": 25.40000000000009,
-          "max": 33.5
-        },
-        "maxMs": {
-          "median": 33.200000000000045,
-          "min": 25.5,
-          "max": 41.799999999999955
-        },
-        "droppedPct": {
-          "median": 8.37696335078534,
-          "min": 6.310679611650485,
-          "max": 8.955223880597014
-        },
-        "longTasks": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "longTaskMs": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 23.52367111111073,
-          "min": 23.15172111111137,
-          "max": 24.439463333333457
-        },
-        "scriptMs": {
-          "median": 584.704,
-          "min": 577.4789999999999,
-          "max": 594.576
-        },
-        "layoutMs": {
-          "median": 390.572,
-          "min": 380.702,
-          "max": 394.14
-        },
-        "styleMs": {
-          "median": 67.493,
-          "min": 66.431,
-          "max": 69.548
-        },
-        "layoutCount": {
-          "median": 90,
-          "min": 90,
-          "max": 90
-        },
-        "styleCount": {
-          "median": 281,
-          "min": 280,
-          "max": 285
-        },
-        "taskMs": {
-          "median": 1890.836,
-          "min": 1867.505,
-          "max": 1908.009
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "vertical-fast-fling",
-      "grid": "ag",
-      "frames": 339,
-      "meanMs": 21.539402985074627,
-      "p95Ms": 33.5,
-      "p99Ms": 41.19999999999982,
-      "maxMs": 66.30000000000018,
-      "droppedPct": 19.104477611940297,
-      "longTasks": 2,
-      "longTaskMs": 134,
-      "minCoverage": 1,
-      "blankSamplesPct": 0,
-      "inputOverheadMs": 67.61779666666666,
-      "scriptMs": 1823.078,
-      "layoutMs": 425.139,
-      "styleMs": 455.781,
-      "layoutCount": 270,
-      "styleCount": 272,
-      "taskMs": 4083.7200000000003,
-      "mounts": 0,
-      "updates": 0,
-      "spread": {
-        "frames": {
-          "median": 339,
-          "min": 335,
-          "max": 347
-        },
-        "meanMs": {
-          "median": 21.539402985074627,
-          "min": 20.486064896755163,
-          "max": 22.042985074626863
-        },
-        "p95Ms": {
-          "median": 33.5,
-          "min": 33.399999999999636,
-          "max": 33.5
-        },
-        "p99Ms": {
-          "median": 41.19999999999982,
-          "min": 33.69999999999982,
-          "max": 50
-        },
-        "maxMs": {
-          "median": 66.30000000000018,
-          "min": 50.09999999999991,
-          "max": 66.5
-        },
-        "droppedPct": {
-          "median": 19.104477611940297,
-          "min": 14.749262536873156,
-          "max": 23.054755043227665
-        },
-        "longTasks": {
-          "median": 2,
-          "min": 2,
-          "max": 4
-        },
-        "longTaskMs": {
-          "median": 134,
-          "min": 102,
-          "max": 242
-        },
-        "minCoverage": {
-          "median": 1,
-          "min": 1,
-          "max": 1
-        },
-        "blankSamplesPct": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "inputOverheadMs": {
-          "median": 67.61779666666666,
-          "min": 63.20708111111114,
-          "max": 69.97754222222268
-        },
-        "scriptMs": {
-          "median": 1823.078,
-          "min": 1541.443,
-          "max": 1908.903
-        },
-        "layoutMs": {
-          "median": 425.139,
-          "min": 368.612,
-          "max": 447.09700000000004
-        },
-        "styleMs": {
-          "median": 455.781,
-          "min": 401.294,
-          "max": 487.576
-        },
-        "layoutCount": {
-          "median": 270,
-          "min": 270,
-          "max": 270
-        },
-        "styleCount": {
-          "median": 272,
-          "min": 272,
-          "max": 272
-        },
-        "taskMs": {
-          "median": 4083.7200000000003,
-          "min": 3583.046,
-          "max": 4286.377
-        },
-        "mounts": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        },
-        "updates": {
-          "median": 0,
-          "min": 0,
-          "max": 0
-        }
-      }
-    },
-    {
-      "scenario": "vertical-fast-fling",
-      "grid": "ratio",
-      "witOverAgTaskMs": {
-        "median": 0.46722326702124534,
-        "min": 0.4411268537508483,
-        "max": 0.5309845310386749
-      },
-      "rounds": 5
-    }
-  ]
+	"generatedAt": "2026-09-30T09:14:21.127Z",
+	"method": {
+		"rounds": 5,
+		"pairing": "Each round runs both grids back to back on the same scenario, alternating which goes first.",
+		"input": "Real mouse-wheel events through Chrome (playwright-core), 16ms apart; each grid uses its own defaults.",
+		"metrics": "Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame."
+	},
+	"environment": {
+		"chrome": "154.0.8037.58",
+		"headless": true,
+		"os": "Windows_NT 10.0.26200",
+		"cpu": "AMD Ryzen 5 7535HS with Radeon Graphics",
+		"cores": 12,
+		"witGrid": "1.4.1",
+		"agGrid": "36.2.0",
+		"commit": "0cc7c90c",
+		"uncommittedChanges": false
+	},
+	"scenarios": [
+		{
+			"name": "vertical-text",
+			"title": "Vertical scroll, plain text",
+			"description": "100,000 rows x 50 text columns; 150 wheel events of 360px down, then back up.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 0
+			},
+			"wheel": {
+				"dy": 360,
+				"events": 150
+			}
+		},
+		{
+			"name": "vertical-dom-renderers",
+			"title": "Vertical scroll, custom DOM renderers",
+			"description": "Same grid with 10 columns drawn by a custom renderer (a bar and a label); each grid uses its own default renderer path.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 10
+			},
+			"wheel": {
+				"dy": 360,
+				"events": 150
+			}
+		},
+		{
+			"name": "horizontal-200-cols",
+			"title": "Horizontal scroll, 200 columns",
+			"description": "100,000 rows x 200 text columns; 150 wheel events of 300px right, then back left.",
+			"query": {
+				"rows": 100000,
+				"cols": 200,
+				"domCols": 0
+			},
+			"wheel": {
+				"dx": 300,
+				"events": 150
+			}
+		},
+		{
+			"name": "vertical-fast-fling",
+			"title": "Very fast fling",
+			"description": "90 wheel events of 2,400px, close to dragging the scrollbar; stresses blank area.",
+			"query": {
+				"rows": 100000,
+				"cols": 50,
+				"domCols": 0
+			},
+			"wheel": {
+				"dy": 2400,
+				"events": 90
+			}
+		}
+	],
+	"results": [
+		{
+			"scenario": "vertical-text",
+			"grid": "wit",
+			"frames": 306,
+			"meanMs": 16.796732026143793,
+			"p95Ms": 17.100000000000136,
+			"p99Ms": 17.59999999999991,
+			"maxMs": 25.5,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 18.91334533333334,
+			"scriptMs": 474.65200000000004,
+			"layoutMs": 198.744,
+			"styleMs": 51.366,
+			"layoutCount": 150,
+			"styleCount": 313,
+			"taskMs": 1597.4969999999998,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 306,
+					"min": 281,
+					"max": 310
+				},
+				"meanMs": {
+					"median": 16.796732026143793,
+					"min": 16.692580645161293,
+					"max": 24.949110320284696
+				},
+				"p95Ms": {
+					"median": 17.100000000000136,
+					"min": 17,
+					"max": 25.400000000000546
+				},
+				"p99Ms": {
+					"median": 17.59999999999991,
+					"min": 17.199999999999818,
+					"max": 25.599999999999454
+				},
+				"maxMs": {
+					"median": 25.5,
+					"min": 17.300000000000182,
+					"max": 35.80000000000018
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 4.901960784313726
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 18.91334533333334,
+					"min": 18.171659333333324,
+					"max": 32.191190666666664
+				},
+				"scriptMs": {
+					"median": 474.65200000000004,
+					"min": 407.291,
+					"max": 551.257
+				},
+				"layoutMs": {
+					"median": 198.744,
+					"min": 171.141,
+					"max": 212.225
+				},
+				"styleMs": {
+					"median": 51.366,
+					"min": 48.984,
+					"max": 61.122
+				},
+				"layoutCount": {
+					"median": 150,
+					"min": 150,
+					"max": 150
+				},
+				"styleCount": {
+					"median": 313,
+					"min": 311,
+					"max": 314
+				},
+				"taskMs": {
+					"median": 1597.4969999999998,
+					"min": 1368.382,
+					"max": 1795.848
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-text",
+			"grid": "ag",
+			"frames": 441,
+			"meanMs": 18.120728929384956,
+			"p95Ms": 25.199999999999818,
+			"p99Ms": 25.400000000001455,
+			"maxMs": 33.400000000000546,
+			"droppedPct": 0.22123893805309736,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 39.02763933333333,
+			"scriptMs": 1057.513,
+			"layoutMs": 241.20600000000002,
+			"styleMs": 293.932,
+			"layoutCount": 300,
+			"styleCount": 302,
+			"taskMs": 2863.915,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 441,
+					"min": 425,
+					"max": 455
+				},
+				"meanMs": {
+					"median": 18.120728929384956,
+					"min": 16.72879120879121,
+					"max": 24.995764705882358
+				},
+				"p95Ms": {
+					"median": 25.199999999999818,
+					"min": 17.00000000000091,
+					"max": 25.5
+				},
+				"p99Ms": {
+					"median": 25.400000000001455,
+					"min": 17.200000000000273,
+					"max": 25.700000000000728
+				},
+				"maxMs": {
+					"median": 33.400000000000546,
+					"min": 26.199999999999818,
+					"max": 33.59999999999991
+				},
+				"droppedPct": {
+					"median": 0.22123893805309736,
+					"min": 0,
+					"max": 9.567198177676538
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 39.02763933333333,
+					"min": 36.15269533333335,
+					"max": 58.47537933333331
+				},
+				"scriptMs": {
+					"median": 1057.513,
+					"min": 1016.271,
+					"max": 1180.711
+				},
+				"layoutMs": {
+					"median": 241.20600000000002,
+					"min": 228.816,
+					"max": 287.07500000000005
+				},
+				"styleMs": {
+					"median": 293.932,
+					"min": 285.439,
+					"max": 339.499
+				},
+				"layoutCount": {
+					"median": 300,
+					"min": 300,
+					"max": 300
+				},
+				"styleCount": {
+					"median": 302,
+					"min": 302,
+					"max": 302
+				},
+				"taskMs": {
+					"median": 2863.915,
+					"min": 2826.548,
+					"max": 3261.003
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-text",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.5500934909031867,
+				"min": 0.4841177294707184,
+				"max": 0.610129080112927
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "wit",
+			"frames": 286,
+			"meanMs": 24.97342657342657,
+			"p95Ms": 25.599999999999454,
+			"p99Ms": 25.699999999999818,
+			"maxMs": 26,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 31.677119999999995,
+			"scriptMs": 674.453,
+			"layoutMs": 315.59999999999997,
+			"styleMs": 133.678,
+			"layoutCount": 150,
+			"styleCount": 310,
+			"taskMs": 2691.5550000000003,
+			"mounts": 370,
+			"updates": 14054,
+			"spread": {
+				"frames": {
+					"median": 286,
+					"min": 277,
+					"max": 327
+				},
+				"meanMs": {
+					"median": 24.97342657342657,
+					"min": 16.748447204968937,
+					"max": 25.00912280701755
+				},
+				"p95Ms": {
+					"median": 25.599999999999454,
+					"min": 17.199999999999818,
+					"max": 25.59999999999991
+				},
+				"p99Ms": {
+					"median": 25.699999999999818,
+					"min": 17.400000000000546,
+					"max": 25.800000000000182
+				},
+				"maxMs": {
+					"median": 26,
+					"min": 25.700000000000045,
+					"max": 33.80000000000018
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 4.587155963302752
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 31.677119999999995,
+					"min": 20.693025333333253,
+					"max": 33.105708666666665
+				},
+				"scriptMs": {
+					"median": 674.453,
+					"min": 654.676,
+					"max": 683.926
+				},
+				"layoutMs": {
+					"median": 315.59999999999997,
+					"min": 302.796,
+					"max": 320.714
+				},
+				"styleMs": {
+					"median": 133.678,
+					"min": 132.293,
+					"max": 140.877
+				},
+				"layoutCount": {
+					"median": 150,
+					"min": 150,
+					"max": 154
+				},
+				"styleCount": {
+					"median": 310,
+					"min": 310,
+					"max": 316
+				},
+				"taskMs": {
+					"median": 2691.5550000000003,
+					"min": 2643.554,
+					"max": 2744.585
+				},
+				"mounts": {
+					"median": 370,
+					"min": 370,
+					"max": 370
+				},
+				"updates": {
+					"median": 14054,
+					"min": 14033,
+					"max": 14100
+				}
+			}
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "ag",
+			"frames": 426,
+			"meanMs": 25.002685446009387,
+			"p95Ms": 25.5,
+			"p99Ms": 25.600000000000364,
+			"maxMs": 26,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 58.61590133333327,
+			"scriptMs": 1229.96,
+			"layoutMs": 319.305,
+			"styleMs": 441.364,
+			"layoutCount": 300,
+			"styleCount": 302,
+			"taskMs": 3777.667,
+			"mounts": 12990,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 426,
+					"min": 425,
+					"max": 444
+				},
+				"meanMs": {
+					"median": 25.002685446009387,
+					"min": 16.736711711711713,
+					"max": 25.05529411764706
+				},
+				"p95Ms": {
+					"median": 25.5,
+					"min": 17.199999999999818,
+					"max": 25.5
+				},
+				"p99Ms": {
+					"median": 25.600000000000364,
+					"min": 17.300000000000182,
+					"max": 25.699999999999818
+				},
+				"maxMs": {
+					"median": 26,
+					"min": 25.700000000000728,
+					"max": 50.5
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0.23529411764705882
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 58.61590133333327,
+					"min": 35.29434333333338,
+					"max": 58.81431400000001
+				},
+				"scriptMs": {
+					"median": 1229.96,
+					"min": 1221.041,
+					"max": 1289.714
+				},
+				"layoutMs": {
+					"median": 319.305,
+					"min": 312.61699999999996,
+					"max": 326.346
+				},
+				"styleMs": {
+					"median": 441.364,
+					"min": 425.24,
+					"max": 452.111
+				},
+				"layoutCount": {
+					"median": 300,
+					"min": 300,
+					"max": 300
+				},
+				"styleCount": {
+					"median": 302,
+					"min": 302,
+					"max": 302
+				},
+				"taskMs": {
+					"median": 3777.667,
+					"min": 3656.858,
+					"max": 3888.322
+				},
+				"mounts": {
+					"median": 12990,
+					"min": 12990,
+					"max": 12990
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-dom-renderers",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.7265290985150359,
+				"min": 0.6798701342121357,
+				"max": 0.7285601464426564
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "wit",
+			"frames": 300,
+			"meanMs": 16.705787781350477,
+			"p95Ms": 17.200000000000728,
+			"p99Ms": 17.399999999999636,
+			"maxMs": 18,
+			"droppedPct": 0,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 19.03393333333331,
+			"scriptMs": 667.157,
+			"layoutMs": 143.664,
+			"styleMs": 96.30900000000001,
+			"layoutCount": 140,
+			"styleCount": 144,
+			"taskMs": 1668.022,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 300,
+					"min": 293,
+					"max": 311
+				},
+				"meanMs": {
+					"median": 16.705787781350477,
+					"min": 16.685000000000006,
+					"max": 18.174061433447093
+				},
+				"p95Ms": {
+					"median": 17.200000000000728,
+					"min": 17.199999999999818,
+					"max": 25.19999999999891
+				},
+				"p99Ms": {
+					"median": 17.399999999999636,
+					"min": 17.300000000000182,
+					"max": 25.400000000000546
+				},
+				"maxMs": {
+					"median": 18,
+					"min": 17.399999999999636,
+					"max": 25.799999999999272
+				},
+				"droppedPct": {
+					"median": 0,
+					"min": 0,
+					"max": 8.873720136518772
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 19.03393333333331,
+					"min": 17.715857999999812,
+					"max": 19.99590400000025
+				},
+				"scriptMs": {
+					"median": 667.157,
+					"min": 654.7950000000001,
+					"max": 730.8280000000001
+				},
+				"layoutMs": {
+					"median": 143.664,
+					"min": 138.375,
+					"max": 166.152
+				},
+				"styleMs": {
+					"median": 96.30900000000001,
+					"min": 93.14,
+					"max": 109.436
+				},
+				"layoutCount": {
+					"median": 140,
+					"min": 140,
+					"max": 140
+				},
+				"styleCount": {
+					"median": 144,
+					"min": 144,
+					"max": 144
+				},
+				"taskMs": {
+					"median": 1668.022,
+					"min": 1630.951,
+					"max": 1813.76
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "ag",
+			"frames": 448,
+			"meanMs": 17.65636971046771,
+			"p95Ms": 25,
+			"p99Ms": 25.399999999999636,
+			"maxMs": 35.17599999999993,
+			"droppedPct": 4.67706013363029,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 37.45316733333321,
+			"scriptMs": 992.3149999999999,
+			"layoutMs": 275.796,
+			"styleMs": 183.10100000000003,
+			"layoutCount": 280,
+			"styleCount": 558,
+			"taskMs": 2632.14,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 448,
+					"min": 427,
+					"max": 453
+				},
+				"meanMs": {
+					"median": 17.65636971046771,
+					"min": 16.7237174392936,
+					"max": 18.33138041002278
+				},
+				"p95Ms": {
+					"median": 25,
+					"min": 17.100000000000364,
+					"max": 25.200000000000728
+				},
+				"p99Ms": {
+					"median": 25.399999999999636,
+					"min": 17.200000000000728,
+					"max": 33.30000000000018
+				},
+				"maxMs": {
+					"median": 35.17599999999993,
+					"min": 33.5,
+					"max": 50.099999999999454
+				},
+				"droppedPct": {
+					"median": 4.67706013363029,
+					"min": 0.22075055187637968,
+					"max": 5.922551252847381
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 1
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 53
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 37.45316733333321,
+					"min": 35.82454199999998,
+					"max": 39.68274400000014
+				},
+				"scriptMs": {
+					"median": 992.3149999999999,
+					"min": 898.518,
+					"max": 1054.838
+				},
+				"layoutMs": {
+					"median": 275.796,
+					"min": 242.981,
+					"max": 297.473
+				},
+				"styleMs": {
+					"median": 183.10100000000003,
+					"min": 161.012,
+					"max": 202.076
+				},
+				"layoutCount": {
+					"median": 280,
+					"min": 280,
+					"max": 280
+				},
+				"styleCount": {
+					"median": 558,
+					"min": 558,
+					"max": 558
+				},
+				"taskMs": {
+					"median": 2632.14,
+					"min": 2476.3620000000005,
+					"max": 2812.042
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "horizontal-200-cols",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.6449974787005315,
+				"min": 0.6050311960561771,
+				"max": 0.6813289010249711
+			},
+			"rounds": 5
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "wit",
+			"frames": 201,
+			"meanMs": 18.149999999999995,
+			"p95Ms": 25.200000000000273,
+			"p99Ms": 25.5,
+			"maxMs": 33.200000000000045,
+			"droppedPct": 8.37696335078534,
+			"longTasks": 0,
+			"longTaskMs": 0,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 23.52367111111073,
+			"scriptMs": 584.704,
+			"layoutMs": 390.572,
+			"styleMs": 67.493,
+			"layoutCount": 90,
+			"styleCount": 281,
+			"taskMs": 1890.836,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 201,
+					"min": 191,
+					"max": 206
+				},
+				"meanMs": {
+					"median": 18.149999999999995,
+					"min": 17.75097087378641,
+					"max": 18.92251308900523
+				},
+				"p95Ms": {
+					"median": 25.200000000000273,
+					"min": 25.100000000000364,
+					"max": 25.399999999999636
+				},
+				"p99Ms": {
+					"median": 25.5,
+					"min": 25.40000000000009,
+					"max": 33.5
+				},
+				"maxMs": {
+					"median": 33.200000000000045,
+					"min": 25.5,
+					"max": 41.799999999999955
+				},
+				"droppedPct": {
+					"median": 8.37696335078534,
+					"min": 6.310679611650485,
+					"max": 8.955223880597014
+				},
+				"longTasks": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"longTaskMs": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 23.52367111111073,
+					"min": 23.15172111111137,
+					"max": 24.439463333333457
+				},
+				"scriptMs": {
+					"median": 584.704,
+					"min": 577.4789999999999,
+					"max": 594.576
+				},
+				"layoutMs": {
+					"median": 390.572,
+					"min": 380.702,
+					"max": 394.14
+				},
+				"styleMs": {
+					"median": 67.493,
+					"min": 66.431,
+					"max": 69.548
+				},
+				"layoutCount": {
+					"median": 90,
+					"min": 90,
+					"max": 90
+				},
+				"styleCount": {
+					"median": 281,
+					"min": 280,
+					"max": 285
+				},
+				"taskMs": {
+					"median": 1890.836,
+					"min": 1867.505,
+					"max": 1908.009
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "ag",
+			"frames": 339,
+			"meanMs": 21.539402985074627,
+			"p95Ms": 33.5,
+			"p99Ms": 41.19999999999982,
+			"maxMs": 66.30000000000018,
+			"droppedPct": 19.104477611940297,
+			"longTasks": 2,
+			"longTaskMs": 134,
+			"minCoverage": 1,
+			"blankSamplesPct": 0,
+			"inputOverheadMs": 67.61779666666666,
+			"scriptMs": 1823.078,
+			"layoutMs": 425.139,
+			"styleMs": 455.781,
+			"layoutCount": 270,
+			"styleCount": 272,
+			"taskMs": 4083.7200000000003,
+			"mounts": 0,
+			"updates": 0,
+			"spread": {
+				"frames": {
+					"median": 339,
+					"min": 335,
+					"max": 347
+				},
+				"meanMs": {
+					"median": 21.539402985074627,
+					"min": 20.486064896755163,
+					"max": 22.042985074626863
+				},
+				"p95Ms": {
+					"median": 33.5,
+					"min": 33.399999999999636,
+					"max": 33.5
+				},
+				"p99Ms": {
+					"median": 41.19999999999982,
+					"min": 33.69999999999982,
+					"max": 50
+				},
+				"maxMs": {
+					"median": 66.30000000000018,
+					"min": 50.09999999999991,
+					"max": 66.5
+				},
+				"droppedPct": {
+					"median": 19.104477611940297,
+					"min": 14.749262536873156,
+					"max": 23.054755043227665
+				},
+				"longTasks": {
+					"median": 2,
+					"min": 2,
+					"max": 4
+				},
+				"longTaskMs": {
+					"median": 134,
+					"min": 102,
+					"max": 242
+				},
+				"minCoverage": {
+					"median": 1,
+					"min": 1,
+					"max": 1
+				},
+				"blankSamplesPct": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"inputOverheadMs": {
+					"median": 67.61779666666666,
+					"min": 63.20708111111114,
+					"max": 69.97754222222268
+				},
+				"scriptMs": {
+					"median": 1823.078,
+					"min": 1541.443,
+					"max": 1908.903
+				},
+				"layoutMs": {
+					"median": 425.139,
+					"min": 368.612,
+					"max": 447.09700000000004
+				},
+				"styleMs": {
+					"median": 455.781,
+					"min": 401.294,
+					"max": 487.576
+				},
+				"layoutCount": {
+					"median": 270,
+					"min": 270,
+					"max": 270
+				},
+				"styleCount": {
+					"median": 272,
+					"min": 272,
+					"max": 272
+				},
+				"taskMs": {
+					"median": 4083.7200000000003,
+					"min": 3583.046,
+					"max": 4286.377
+				},
+				"mounts": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				},
+				"updates": {
+					"median": 0,
+					"min": 0,
+					"max": 0
+				}
+			}
+		},
+		{
+			"scenario": "vertical-fast-fling",
+			"grid": "ratio",
+			"witOverAgTaskMs": {
+				"median": 0.46722326702124534,
+				"min": 0.4411268537508483,
+				"max": 0.5309845310386749
+			},
+			"rounds": 5
+		}
+	]
 }
