@@ -1,3 +1,4 @@
+import { getMemoizedColumnTopology } from './columnTopology.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { RenderRuntimeState } from './renderRuntimeState.js';
 import type { GridCellClassParams } from '../columnDef.js';
@@ -328,6 +329,22 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			dirtyRowsAfterScroll: this.deps.stateHost.dirtyRowsAfterScroll,
 			dirtyBuckets: this.deps.stateHost.dirtyBuckets,
 			incrementPostScrollDirtyCellsDecorated: this.runtimeArgs.incrementPostScrollDirtyCellsDecorated,
+			rebindHierarchyRow: (slot, row, rowIndex) => {
+				const engine = this.deps.engine;
+				const plan = engine.columns.getCompiledPlan();
+				this.bindAllHierarchyRowCells({
+					slot,
+					row,
+					rowIndex,
+					centerColStart: slot.centerColStart,
+					centerColCount: slot.centerCells.length,
+					columns: engine.columns.getDisplayedColumns(),
+					plan,
+					columnTopology: getMemoizedColumnTopology(plan),
+					isScrollFrameActive: false,
+					state: engine.stateManager.getState(),
+				});
+			},
 			bindCellFull: (request: RowCellBindRequest<TRowData>) =>
 				bindCellFull(this.rowCellBinderDeps, {
 					cellSlot: request.cellSlot as CellSlot<TRowData>,

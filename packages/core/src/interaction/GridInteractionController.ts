@@ -1,3 +1,5 @@
+import type { VisualRow } from '../visualRow.js';
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CanonicalGridCellPointer, GridCellPointer } from '../api/GridApi.js';
 import type { GridPluginRuntime, ScrollToCellOptions, ScrollToRowOptions } from '../api/GridApiSurfaces.js';
 import type { GridSelectionSource, RowSelectionChangeResult, RowSelectionGesture } from '../api/GridApi.js';
@@ -8,6 +10,11 @@ import { getColumnInstanceIdentity, type ColumnDef } from '../columnDef.js';
 export interface GridNavigationOptions {
 	editTrigger?: 'singleClick' | 'doubleClick';
 	arrowKeyNavigationEdit?: boolean;
+}
+
+/** Rows focus can rest on: data rows, and group / total rows (cell rows of the hierarchy). */
+function isCellRow<TRowData>(row: VisualRow<TRowData> | null | undefined): row is Extract<VisualRow<TRowData>, { kind: 'data' | 'group' | 'total' }> {
+	return row?.kind === 'data' || row?.kind === 'group' || row?.kind === 'total';
 }
 
 export interface GridInteractionCommandPort {
@@ -137,10 +144,11 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 	private getPointerFromCoords(rowIdx: number, colIdx: number): CanonicalGridCellPointer | null {
 		const visualRow = this.runtime.getVisualRow(rowIdx);
 		const col = this.getDisplayedColumnAtIndex(colIdx);
-		if (!visualRow || !col || visualRow.kind !== 'data') return null;
+		if (!visualRow || !col || !isCellRow(visualRow)) return null;
 		const colField = col.field;
 		return {
-			rowId: visualRow.rowId,
+			// Group and total rows are addressed by their visual row id.
+			rowId: visualRow.kind === 'data' ? visualRow.rowId : visualRow.id,
 			colField,
 			columnInstanceId: getColumnInstanceIdentity(col),
 			colId: col?.colId ?? colField,
@@ -160,27 +168,31 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		return { rowIdx, colIdx };
 	}
 
-	private getNextDataRowIndex(currentIndex: number, direction: 'up' | 'down'): number {
+	/**
+	 * The next row focus can move to. `withHierarchyRows`: group and total rows too (navigation);
+	 * without it data rows only (edit navigation — hierarchy rows are never edited).
+	 */
+	private getNextDataRowIndex(currentIndex: number, direction: 'up' | 'down', withHierarchyRows = false): number {
 		const rowModel = this.runtime.getRowModel();
 		if (!rowModel) return -1;
 		const rowCount = rowModel.getVisualRowCount();
 		let idx = currentIndex + (direction === 'down' ? 1 : -1);
 		while (idx >= 0 && idx < rowCount) {
 			const row = rowModel.getVisualRow(idx);
-			if (row?.kind === 'data') return idx;
+			if (row?.kind === 'data' || (withHierarchyRows && isCellRow(row))) return idx;
 			idx += direction === 'down' ? 1 : -1;
 		}
 		return -1;
 	}
 
-	private getTabTarget(row: number, col: number, maxCol: number, forward: boolean): { row: number; col: number } | null {
+	private getTabTarget(row: number, col: number, maxCol: number, forward: boolean, withHierarchyRows = false): { row: number; col: number } | null {
 		if (forward) {
 			if (col < maxCol) return { row, col: col + 1 };
-			const nextRow = this.getNextDataRowIndex(row, 'down');
+			const nextRow = this.getNextDataRowIndex(row, 'down', withHierarchyRows);
 			return nextRow === -1 ? null : { row: nextRow, col: 0 };
 		}
 		if (col > 0) return { row, col: col - 1 };
-		const prevRow = this.getNextDataRowIndex(row, 'up');
+		const prevRow = this.getNextDataRowIndex(row, 'up', withHierarchyRows);
 		return prevRow === -1 ? null : { row: prevRow, col: maxCol };
 	}
 
@@ -190,10 +202,10 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		const count = rowModel.getVisualRowCount();
 		if (count === 0) return idx;
 		const clamped = Math.max(0, Math.min(count - 1, idx));
-		if (rowModel.getVisualRow(clamped)?.kind === 'data') return clamped;
-		const near = this.getNextDataRowIndex(clamped, preferDir);
+		if (isCellRow(rowModel.getVisualRow(clamped))) return clamped;
+		const near = this.getNextDataRowIndex(clamped, preferDir, true);
 		if (near !== -1) return near;
-		const far = this.getNextDataRowIndex(clamped, preferDir === 'up' ? 'down' : 'up');
+		const far = this.getNextDataRowIndex(clamped, preferDir === 'up' ? 'down' : 'up', true);
 		return far !== -1 ? far : clamped;
 	}
 
@@ -307,6 +319,41 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		this.rowSelectionAnchorId = pointer.rowId;
 	}
 
+	/**
+	 * Keys on the hierarchy cell (grouped and tree grids). ArrowRight opens a closed row, or steps into
+	 * an open one's first child; ArrowLeft closes an open row, or steps out to its parent; Enter
+	 * toggles. Leaves fall through to ordinary navigation. Returns whether the key was handled.
+	 */
+	private handleHierarchyKey(event: KeyboardEvent, rowIdx: number, colIdx: number): boolean {
+		if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+		if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft' && event.key !== 'Enter') return false;
+		if (!isHierarchyColumn(this.getDisplayedColumnAtIndex(colIdx))) return false;
+		const row = this.runtime.getVisualRow(rowIdx);
+		if (!row || !isCellRow(row)) return false;
+		const { hasChildren, expanded, parentId } = row.hierarchy;
+		const focusRow = (targetIdx: number) => {
+			const pointer = this.getPointerFromCoords(targetIdx, colIdx);
+			if (pointer) this.commands.selectCell(pointer, 'keyboard');
+		};
+		if (event.key === 'Enter') {
+			if (!hasChildren) return row.kind !== 'data'; // group / total rows never start an edit
+			this.runtime.setExpanded(row.id, !expanded);
+		} else if (event.key === 'ArrowRight') {
+			if (!hasChildren) return false;
+			if (!expanded) this.runtime.setExpanded(row.id, true);
+			else focusRow(rowIdx + 1);
+		} else {
+			if (hasChildren && expanded) this.runtime.setExpanded(row.id, false);
+			else if (parentId) {
+				const parentIdx = this.runtime.getRowModel()?.getVisualIndexById(parentId) ?? -1;
+				if (parentIdx < 0) return false;
+				focusRow(parentIdx);
+			} else return false;
+		}
+		event.preventDefault();
+		return true;
+	}
+
 	public handleKeyDown = (event: KeyboardEvent): void => {
 		const state = this.runtime.getStateSnapshot();
 		const interaction = readInteractionState(state);
@@ -329,18 +376,21 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 				void this.commands.pasteFromClipboard();
 				return;
 			}
+			if (this.handleHierarchyKey(event, row, col)) return;
+			const focusedRow = this.runtime.getVisualRow(row);
+			const onHierarchyRow = focusedRow?.kind === 'group' || focusedRow?.kind === 'total';
 			let nextRow = row;
 			let nextCol = col;
 			let handled = false;
 			switch (event.key) {
 				case 'ArrowUp': {
-					const prevDataRowIdx = this.getNextDataRowIndex(row, 'up');
+					const prevDataRowIdx = this.getNextDataRowIndex(row, 'up', true);
 					if (prevDataRowIdx !== -1) nextRow = prevDataRowIdx;
 					handled = true;
 					break;
 				}
 				case 'ArrowDown': {
-					const nextDataRowIdx = this.getNextDataRowIndex(row, 'down');
+					const nextDataRowIdx = this.getNextDataRowIndex(row, 'down', true);
 					if (nextDataRowIdx !== -1) nextRow = nextDataRowIdx;
 					handled = true;
 					break;
@@ -355,7 +405,7 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 					break;
 				case 'Tab': {
 					event.preventDefault();
-					const tabDest = this.getTabTarget(row, col, maxCol, !event.shiftKey);
+					const tabDest = this.getTabTarget(row, col, maxCol, !event.shiftKey, true);
 					if (tabDest) {
 						const ptr = this.getPointerFromCoords(tabDest.row, tabDest.col);
 						if (ptr) {
@@ -390,11 +440,13 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 				case 'F2':
 				case 'Enter':
 					event.preventDefault();
+					if (onHierarchyRow) return; // group and total cells are never edited
 					this.setCellEditing(active.rowId, this.getEditTargetColumnIdentity(active), true, 'keyboard');
 					return;
 				case 'Delete':
 				case 'Backspace':
 					event.preventDefault();
+					if (onHierarchyRow) return;
 					this.commands.setCellValue(active.rowId, active.colField, null);
 					return;
 				case 'Escape':
@@ -404,6 +456,7 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 				default:
 					if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
 						event.preventDefault();
+						if (onHierarchyRow) return;
 						this.setCellEditing(active.rowId, this.getEditTargetColumnIdentity(active), true, 'keyboard');
 					}
 					return;

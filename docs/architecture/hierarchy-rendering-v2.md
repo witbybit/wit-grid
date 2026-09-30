@@ -229,6 +229,14 @@ changes or the next group pushes it. `display: 'row'` keeps the adapter's full-w
   aggregate-only write invalidates just those rows — no blanket viewport. Until group and total rows are cell rows
   (phase 3), a row-range repaint goes through the viewport sync, where only portals whose rows changed re-render.)
 
+Implemented (phase 6): group / total rows are focus targets (pointer `rowId` = visual row id; the row model
+resolves it; `isCellSelectable` admits them, editing never does); the hierarchy cell keys above; hierarchy and
+aggregate cells get the same ARIA / tabindex / focused class / DOM focus move as data cells, and cell repaints
+rebind them. Treegrid ARIA on the root and every row. Copy and CSV as above (`api.getCsv`), via one text resolver
+shared with the renderers. `treeData.selectDescendants` cascades in the row selection reducer. The adapter no
+longer draws anything hierarchy-specific by default: core has built-in DOM renderers for every full-width kind,
+and adapters declare the rows they draw (`rowContent.rendersRow`).
+
 ## Against AG Grid
 
 | AG Grid                                                                | v2                                                                          |

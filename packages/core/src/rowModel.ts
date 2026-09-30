@@ -1648,7 +1648,12 @@ export class ClientRowModelController<TData = unknown>
 
 	public getVisualIndexByRowId = (rowId: string): number => {
 		const idx = this.rowIdToVisualIndex.get(rowId);
-		return idx !== undefined ? idx : -1;
+		if (idx !== undefined) return idx;
+		// Group and total rows are addressed by their visual row id (focus, selection ranges).
+		const visualIdx = this.visualRowIdToIndex.get(rowId);
+		if (visualIdx === undefined) return -1;
+		const kind = this.visualRows[visualIdx]?.kind;
+		return kind === 'group' || kind === 'total' ? visualIdx : -1;
 	};
 
 	public getRow = (index: number): TData | null => {

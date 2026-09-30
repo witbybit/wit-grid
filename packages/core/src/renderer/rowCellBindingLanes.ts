@@ -4,7 +4,7 @@ import { getColumnInstanceIdentity } from '../columnDef.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
 import { CellSlot, isDirectTextColumn, recordCellSlotMountedVisualVersions } from './cellSlot.js';
-import { bindHierarchyCell } from './hierarchyCellBinder.js';
+import { applyHierarchyCellFocus, bindHierarchyCell } from './hierarchyCellBinder.js';
 import type { GroupVisualRow, TotalVisualRow } from '../visualRow.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
@@ -877,7 +877,8 @@ function bindHierarchyRowCell<TRowData>(
 			text = String(value);
 		}
 	}
-	const className = `${buildCellPinClass(lane)} og-cell-aggregate${text === '' ? '' : ' og-cell-aggregate-value'}`;
+	const focusClass = applyHierarchyCellFocus(deps, cellSlot, row.id, rowIndex, colIndex, col, state);
+	const className = `${buildCellPinClass(lane)} og-cell-aggregate${text === '' ? '' : ' og-cell-aggregate-value'}${focusClass}`;
 	const didWrite = cellSlot.update(
 		colIndex,
 		col.field,

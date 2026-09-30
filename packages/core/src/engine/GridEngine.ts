@@ -1,4 +1,4 @@
-import { canEditCell, isDataCellSelectable } from '../visualRow.js';
+import { canEditCell, isCellSelectable } from '../visualRow.js';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { GridEventListener, GridEventPayloadMap } from '../api/GridEvents.js';
@@ -1514,7 +1514,7 @@ export class GridEngine<TRowData = unknown> {
 		const rowModel = this.getRowModel();
 		const rowIndex = rowModel ? rowModel.getVisualIndexByRowId(pointer.rowId) : -1;
 		const visualRow = rowIndex >= 0 && rowModel ? rowModel.getVisualRow(rowIndex) : null;
-		return isDataCellSelectable(
+		return isCellSelectable(
 			visualRow,
 			findColumnByCanonicalCellPointer(this.columns.getDisplayedColumns(), { columnInstanceId: pointer.columnInstanceId })
 		);

@@ -163,6 +163,11 @@ export function canFocusVisualRow<TRowData>(row: VisualRow<TRowData> | null | un
 	return !!row && row.kind !== 'loading' && row.kind !== 'failed' && row.kind !== 'placeholder';
 }
 
+/** Cells focus and range selection can rest on: data rows and the hierarchy's group / total rows. */
+export function isCellSelectable<TRowData>(row: VisualRow<TRowData> | null | undefined, column: ColumnDef<TRowData> | null | undefined): boolean {
+	return (row?.kind === 'data' || row?.kind === 'group' || row?.kind === 'total') && !!column;
+}
+
 export function isDataCellSelectable<TRowData>(row: VisualRow<TRowData> | null | undefined, column: ColumnDef<TRowData> | null | undefined): boolean {
 	return row?.kind === 'data' && !!column;
 }

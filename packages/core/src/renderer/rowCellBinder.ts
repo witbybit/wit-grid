@@ -846,7 +846,7 @@ function bindHierarchyCellFor<TRowData>(
 	const row = deps.engine.getVisualRowModel()?.getVisualRow(request.rowIndex);
 	if (!row) return false;
 	bindHierarchyCell(
-		{ engine: deps.engine, releaseCellPortal: (cell) => deps.releaseCellPortal(cell) },
+		{ engine: deps.engine, releaseCellPortal: (cell) => deps.releaseCellPortal(cell), cellBinderDeps: deps },
 		{ ...request, row, left, width, state: deps.engine.stateManager.getState(), isScrollFrameActive }
 	);
 	return true;

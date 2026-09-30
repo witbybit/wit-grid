@@ -130,5 +130,20 @@ Use `grouping` when groups come from repeated column values, and `treeData` when
 in the data; when both are set, grouping wins. With aggregation configured, tree parents carry the aggregate of
 their descendants (`treeData.aggregateParents`, default on).
 
+## Keyboard, accessibility, selection and export
+
+Group and total rows take focus like data rows. On the hierarchy cell, **ArrowRight** opens a closed row (or
+moves into an open one's first child), **ArrowLeft** closes an open row (or moves to its parent) and **Enter**
+toggles; group and total cells are never edited. While rows are grouped or tree-shaped the grid is a
+`treegrid`: each row carries `aria-level`, `aria-expanded`, `aria-posinset` and `aria-setsize`.
+
+The group checkbox (`hierarchyColumn.show.checkbox`) reflects and selects every row beneath the group, collapsed
+ones included — `api.getDescendantSelection(id)` and `api.setDescendantsSelected(id, selected)` expose the same.
+For tree data, `treeData.selectDescendants` makes selecting a parent select its whole subtree.
+
+Copying a range that spans group or total rows copies what they show (the label and formatted aggregates).
+`api.exportCsv()` / `api.getCsv()` export the whole hierarchy — every group expanded — with group and total rows
+(`includeGroups`, `includeTotals`) and the hierarchy column indented or as a path (`hierarchyText`).
+
 See [Events](/docs/next/events) for `groupingChanged`, `groupByChanged`, `groupColumnAdded/Removed/Moved`,
 `aggregationChanged`, `treeDataChanged` and `expansionChanged`.

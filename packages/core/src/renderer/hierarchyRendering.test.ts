@@ -518,3 +518,20 @@ describe('treegrid semantics', () => {
 		grid.destroy();
 	});
 });
+
+describe('focus on hierarchy rows', () => {
+	it('marks the focused group cell (and moves it) like a data cell', () => {
+		const grid = mountGrid({ grouping: { by: ['region'] } });
+		grid.store.selectCell({ rowId: 'group:region=EMEA', colField: '__hierarchy__' });
+		grid.renderer.fullPaint();
+		const cell = () => grid.cellOf(grid.rowAt(0), '__hierarchy__')!;
+		expect(cell().classList.contains('og-cell-focused')).toBe(true);
+		expect(cell().getAttribute('tabindex')).toBe('-1');
+
+		grid.store.selectCell({ rowId: 'group:region=APAC', colField: 'amount' });
+		grid.renderer.fullPaint();
+		expect(cell().classList.contains('og-cell-focused')).toBe(false);
+		expect(grid.cellOf(grid.rowAt(1), 'amount')!.classList.contains('og-cell-focused')).toBe(true);
+		grid.destroy();
+	});
+});

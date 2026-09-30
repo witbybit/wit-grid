@@ -1,3 +1,4 @@
+import type { GroupVisualRow, TotalVisualRow } from '../visualRow.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { CellRendererPhase, ColumnDef, InternalColumnDef } from '../columnDef.js';
@@ -44,6 +45,8 @@ export interface RowRenderMaintenanceDeps<TRowData = unknown> {
 	dirtyBuckets: [HTMLDivElement[], HTMLDivElement[], HTMLDivElement[], HTMLDivElement[]];
 	incrementPostScrollDirtyCellsDecorated: () => void;
 	bindCellFull: (request: RowCellBindRequest<TRowData>) => void;
+	/** Rebinds a group / total row's cells (focus, selection and value changes reach them here). */
+	rebindHierarchyRow?: (slot: RowSlot<TRowData>, row: GroupVisualRow<TRowData> | TotalVisualRow<TRowData>, rowIndex: number) => void;
 }
 
 export type PostScrollRepairLane = 'motion' | 'fidelity' | 'all';
@@ -245,6 +248,10 @@ export function repaintInvalidatedCells<TRowData>(deps: RowRenderMaintenanceDeps
 		if (rowIndex < 0) continue;
 		const slot = deps.activeRows.get(rowIndex);
 		const row = rowModel.getVisualRow(rowIndex);
+		if (slot && (row?.kind === 'group' || row?.kind === 'total')) {
+			deps.rebindHierarchyRow?.(slot, row, rowIndex);
+			continue;
+		}
 		if (!slot || row?.kind !== 'data') continue;
 
 		for (const colIdOrField of colFields) {

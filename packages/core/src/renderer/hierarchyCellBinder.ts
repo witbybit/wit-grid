@@ -5,6 +5,7 @@ import type { InternalGridState } from '../state/GridState.js';
 import type { VisualRow } from '../visualRow.js';
 import type { CellSlot } from './cellSlot.js';
 import type { GridEngine } from '../engine/GridEngine.js';
+import type { RowCellBinderDeps } from './rowCellBinder.js';
 import { buildCellPinClass } from './binders/binderShared.js';
 import { resolveHierarchyCellModel, writeHierarchyCell, type HierarchyCellDeps } from './hierarchyCell.js';
 
@@ -31,6 +32,44 @@ export interface HierarchyCellBinderDeps<TRowData> {
 	releaseCellPortal: (cell: HTMLDivElement) => void;
 	onScrollCellVisited?: () => void;
 	onScrollCellWritten?: () => void;
+	/** The cell binder's focus plumbing (DOM focus, deferral while scrolling). */
+	cellBinderDeps?: RowCellBinderDeps<TRowData>;
+}
+
+/**
+ * Focus and selection for cells of the hierarchy (the hierarchy cell, aggregate cells): the same
+ * ARIA / tabindex state, focused class and DOM focus move as data cells get from their controller.
+ * Returns the class names to add.
+ */
+export function applyHierarchyCellFocus<TRowData>(
+	deps: HierarchyCellBinderDeps<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	rowId: string,
+	rowIndex: number,
+	colIndex: number,
+	col: ColumnDef<TRowData>,
+	state: InternalGridState<TRowData>
+): string {
+	const selection = readInteractionState(state).cellSelection.selection;
+	const focus = selection.focus;
+	const focused = !!focus && focus.rowId === rowId && focus.colField === col.field;
+	const bounds = selection.bounds;
+	const selected = !!bounds && rowIndex >= bounds.minRow && rowIndex <= bounds.maxRow && colIndex >= bounds.minCol && colIndex <= bounds.maxCol;
+	cellSlot.syncAccessibilityState({ focused, selected, readOnly: true, invalid: false });
+	if (!focused) return '';
+	const binder = deps.cellBinderDeps;
+	const active = typeof document !== 'undefined' ? document.activeElement : null;
+	const viewport = binder?.getViewportContainer();
+	if (
+		binder &&
+		active &&
+		active !== cellSlot.element &&
+		(active === document.body || (viewport?.contains(active) && !binder.isEditorInteractiveElement(active)))
+	) {
+		if (binder.getIsScrolling()) binder.setDeferredFocusCell(cellSlot.element);
+		else binder.applyFocus(cellSlot.element);
+	}
+	return ' og-cell-focused';
 }
 
 function createDeps<TRowData>(deps: HierarchyCellBinderDeps<TRowData>, state: InternalGridState<TRowData>): HierarchyCellDeps<TRowData> {
@@ -80,6 +119,7 @@ export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowDa
 		return;
 	}
 	cellSlot.hierarchyParts = writeHierarchyCell(cellSlot.contentElement, cellSlot.hierarchyParts, model);
+	const focusClass = applyHierarchyCellFocus(deps, cellSlot, rowId, rowIndex, colIndex, col, state);
 	const didWrite = cellSlot.update(
 		colIndex,
 		col.field,
@@ -88,7 +128,7 @@ export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowDa
 		left,
 		-1,
 		width,
-		`${baseClass} ${model.cellClass}`,
+		`${baseClass} ${model.cellClass}${focusClass}`,
 		'custom',
 		undefined,
 		'',
