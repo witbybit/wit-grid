@@ -125,8 +125,8 @@ The following excerpts describe the live interaction architecture this plan repl
 
 ## Commands you will need
 
-| Purpose                   | Command                                                                                                                                                                                                                                        | Expected on success |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Purpose                   | Command                                                                                                                                                                                                                                       | Expected on success |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
 | Core build                | `corepack pnpm --filter @eregister/wit-grid-core build`                                                                                                                                                                                       | exit 0              |
 | React build               | `corepack pnpm --filter @eregister/wit-grid-react build`                                                                                                                                                                                      | exit 0              |
 | Core tests                | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                                                                                        | all pass            |

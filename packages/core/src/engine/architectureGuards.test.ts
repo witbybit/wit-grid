@@ -469,9 +469,7 @@ describe('Architecture guardrails', () => {
 		const files = ['Grid.tsx', 'GridView.tsx', 'GridPortal.tsx', 'hooks.ts', 'gridContext.tsx'];
 		for (const file of files) {
 			const content = readFileSync(resolve(REACT_ROOT, 'src', file), 'utf-8');
-			expect(content, `${file} must not import @eregister/wit-grid-core/internal directly`).not.toContain(
-				'@eregister/wit-grid-core/internal'
-			);
+			expect(content, `${file} must not import @eregister/wit-grid-core/internal directly`).not.toContain('@eregister/wit-grid-core/internal');
 		}
 	});
 

@@ -1,5 +1,7 @@
 packages:
     - 'packages/*'
     - 'demo'
+    - 'site'
 onlyBuiltDependencies:
     - esbuild
+    - workerd

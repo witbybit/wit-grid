@@ -31,7 +31,6 @@ import {
 	type PerformanceRow,
 	type SpreadsheetRow,
 } from '../components/GridShared';
-import { HeavyAnalyticsCell, LivePriceRenderer, SparklineRenderer, type DashboardStockRow } from '../components/FastRenderers';
 
 export type ServerAuditRow = {
 	id: string;
@@ -423,54 +422,6 @@ export function createSkinsColumns(): ColumnDef<PerformanceRow>[] {
 			renderer: { kind: 'react', component: RiskBadgeRenderer },
 			valueGetter: ({ row }) => (row.status === 'Active' ? 'LOW' : row.status === 'Pending' ? 'MEDIUM' : 'HIGH'),
 		},
-	];
-}
-
-const SEED_STOCKS = [
-	{ id: 'AAPL', name: 'Apple Inc.', price: 175.5 },
-	{ id: 'MSFT', name: 'Microsoft Corp.', price: 420.2 },
-	{ id: 'GOOGL', name: 'Alphabet Inc.', price: 150.1 },
-	{ id: 'NVDA', name: 'NVIDIA Corp.', price: 875 },
-	{ id: 'TSLA', name: 'Tesla Inc.', price: 170.3 },
-	{ id: 'AMZN', name: 'Amazon.com Inc.', price: 178.4 },
-	{ id: 'NFLX', name: 'Netflix Inc.', price: 610.5 },
-	{ id: 'AMD', name: 'Advanced Micro Devices', price: 180.2 },
-];
-
-export function createDashboardRows(): DashboardStockRow[] {
-	return Array.from({ length: 400 }, (_, index) => {
-		const stock = SEED_STOCKS[index % SEED_STOCKS.length];
-		const change = ((index * 13) % 120) / 10 - 6;
-		const volume = 5 + ((index * 17) % 120);
-		return {
-			id: `${stock.id}${index >= SEED_STOCKS.length ? `.${Math.floor(index / SEED_STOCKS.length)}` : ''}`,
-			symbol: stock.id,
-			name: stock.name,
-			price: (stock.price * (0.75 + ((index * 7) % 50) / 100)).toFixed(2),
-			change: `${change >= 0 ? '+' : ''}${change.toFixed(1)}`,
-			volume: volume.toFixed(1),
-			risk: stock.price > 500 || Math.abs(change) > 4 ? 'high' : Math.abs(change) > 2 ? 'medium' : 'low',
-		};
-	});
-}
-
-export function createDashboardColumns(): ColumnDef<DashboardStockRow>[] {
-	return [
-		{ field: 'symbol', header: 'Ticker', width: 80 },
-		{ field: 'name', header: 'Company', width: 160 },
-		{
-			field: 'price',
-			header: 'Price (DOM)',
-			width: 130,
-			renderer: {
-				kind: 'dom',
-				renderer: SparklineRenderer,
-				capabilities: { scrollPresentation: 'html-snapshot', htmlSnapshot: { allowShellWhenMissing: true } },
-			},
-		},
-		{ field: 'change', header: 'Change % (Imperative)', width: 165, renderer: { kind: 'imperativeReact', component: LivePriceRenderer } },
-		{ field: 'volume', header: 'Vol/Analytics (React)', width: 165, renderer: { kind: 'react', component: HeavyAnalyticsCell } },
-		{ field: 'risk', header: 'Risk', width: 90 },
 	];
 }
 

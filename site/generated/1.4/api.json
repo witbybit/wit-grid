@@ -1,0 +1,1374 @@
+{
+	"generatedAt": "build",
+	"source": "packages/react/src",
+	"extraction": "typescript-ast",
+	"exports": [
+		{
+			"name": "AggregationDef",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "AutoSizeAllColumnsOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "AutoSizeColumnOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "BUILT_IN_THEME_METADATA",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "BUILT_IN_THEME_ORDER",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "BUILT_IN_THEMES",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "BUILTIN_COLUMN_TYPES",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "BuiltinSidebarPanelId",
+			"kind": "type",
+			"source": "./sidebar/GridSidebar.js"
+		},
+		{
+			"name": "BuiltInThemeName",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CAPABILITY_ALLOWED",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CapabilityDiagnostics",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellEditorProps",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CellRendererCapabilities",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CellRendererPhase",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CellRendererProps",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CellStyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "CheckboxCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "ColumnDef",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "ColumnFilterDef",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ColumnFilterType",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ColumnTypeDefinition",
+			"kind": "type",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "ConflictResolutionResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createDropdownCellEditor",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "createDropdownCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "createLocalStorageAdapter",
+			"kind": "value",
+			"source": "./types.js"
+		},
+		{
+			"name": "createLocalStorageWorkspaceAdapter",
+			"kind": "value",
+			"source": "./types.js"
+		},
+		{
+			"name": "createMultiSelectCellEditor",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "createMultiSelectCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "createNumberCellEditor",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "createNumberCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "CsvExportOptions",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "customCellRule",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CustomFilterRendererParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DataVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "date",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateCellEditor",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "DateCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "DetailRowStyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "DetailVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "DomCellRenderer",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "DomCellRendererHandle",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "DomCellRendererParams",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "DomCellRendererRowRef",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "dropdownColumnType",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "DropdownOption",
+			"kind": "type",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "DropdownOptionColor",
+			"kind": "type",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "duplicateValueRule",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "email",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FailedVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "FilterFetchParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FilterFetchResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FilterModel",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "FilterPageParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FilterPageResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FilterSelectOption",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FilterSurface",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FloatingFilterRendererParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "FooterVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "getBuiltInTheme",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "Grid",
+			"kind": "value",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridApi",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridCapabilitiesConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCapabilityAction",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCapabilityCallback",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCapabilityParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCapabilityResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCellClickParams",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridCellConflict",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCellDiff",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCellIntegrityRule",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCellPointer",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridClientProps",
+			"kind": "type",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridConflictIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridContextMenuItem",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridContextMenuOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDataIntegrityConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDataQualityRule",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDiffAcceptResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDiffIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDiffModel",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridDiffResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridEventName",
+			"kind": "value",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridEventPayloadMap",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridInfiniteProps",
+			"kind": "type",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridInitialState",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridIntegrityApi",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityIssue",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityIssueFilter",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityIssueSource",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityIssueType",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityRuleResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityRunOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityRunResult",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegrityScope",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegritySeverity",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridIntegritySummary",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridLiveStreamIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridPaginationConfig",
+			"kind": "type",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridPersistenceAdapter",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridProps",
+			"kind": "type",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridQualityIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridReadyEvent",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridRowDataRef",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridRowIntegrityRule",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridServerSideProps",
+			"kind": "type",
+			"source": "./Grid.js"
+		},
+		{
+			"name": "GridSidebarConfig",
+			"kind": "type",
+			"source": "./sidebar/GridSidebar.js"
+		},
+		{
+			"name": "GridStateSnapshot",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridTransactionStreamHandle",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridTransactionStreamState",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridValidationIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridViewDefinition",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridWorkspaceAdapter",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridWorkspaceState",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GridWriteBlockedEventPayload",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GroupDef",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GroupRowStyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "GroupVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "HeaderCellStyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "HeaderMenuRendererProps",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ImperativeCellHandle",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "InfiniteDatasource",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "isBuiltInThemeName",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "isDomCellRenderer",
+			"kind": "value",
+			"source": "./types.js"
+		},
+		{
+			"name": "LoadingVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "max",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "min",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "missingRequiredRule",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "MultiSelectCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "multiSelectColumnType",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "normalizeCapabilityResult",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "number",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "NumberCellEditorOptions",
+			"kind": "type",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "NumberCellRendererOptions",
+			"kind": "type",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "numberColumnType",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "oneOf",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "parseMultiValue",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "PersistedGridState",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "PersistenceSaveStatus",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "PersistenceStatus",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "PlaceholderVisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "QuickFilterModel",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "regex",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "required",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "resolveColumnFilterDef",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ResolveConflictOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RowModelType",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "RowSelectionMode",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "RowSelectionOptions",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "RowSelectionScope",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "RowStyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "SaveViewOptions",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "SelectAllRowsOptions",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "SelectFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "SelectRowsOptions",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "ServerIntegrityReport",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ServerSideDatasource",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "ServerSideGetRowsRequest",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "ServerSideGetRowsResult",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "ServerSideStoreSnapshot",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "SidebarPanelDef",
+			"kind": "type",
+			"source": "./sidebar/GridSidebar.js"
+		},
+		{
+			"name": "SortModel",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "StyleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "TagsCellRenderer",
+			"kind": "value",
+			"source": "./renderers/CellTypes.js"
+		},
+		{
+			"name": "themeToCSSVariables",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ThemeTokens",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
+			"name": "TooltipParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "useGridApi",
+			"kind": "value",
+			"source": "./hooks.js"
+		},
+		{
+			"name": "useGridKeySelector",
+			"kind": "value",
+			"source": "./hooks.js"
+		},
+		{
+			"name": "useGridSelector",
+			"kind": "value",
+			"source": "./hooks.js"
+		},
+		{
+			"name": "VisualRow",
+			"kind": "type",
+			"source": "./types.js"
+		}
+	],
+	"interfaces": [
+		{
+			"name": "GridClientProps",
+			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
+				{
+					"name": "rowModelType",
+					"optional": true,
+					"type": "'client'"
+				},
+				{
+					"name": "rows",
+					"optional": false,
+					"type": "TRowData[]"
+				},
+				{
+					"name": "getRowHeight",
+					"optional": true,
+					"type": "(row: TRowData) => number | undefined",
+					"description": "Per-row height callback. Return a pixel height for each row, or `undefined` to use `defaultRowHeight`. Overridden by `api.setRowHeight()`. Initial-only."
+				}
+			]
+		},
+		{
+			"name": "GridInfiniteProps",
+			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
+				{
+					"name": "rowModelType",
+					"optional": false,
+					"type": "'infinite'"
+				},
+				{
+					"name": "datasource",
+					"optional": false,
+					"type": "InfiniteDatasource<TRowData>"
+				},
+				{
+					"name": "blockSize",
+					"optional": true,
+					"type": "number"
+				}
+			]
+		},
+		{
+			"name": "GridServerSideProps",
+			"props": [
+				{
+					"name": "columns",
+					"optional": false,
+					"type": "ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getRowId",
+					"optional": true,
+					"type": "(row: TRowData) => string"
+				},
+				{
+					"name": "initialState",
+					"optional": true,
+					"type": "Partial<GridInitialState<TRowData>>"
+				},
+				{
+					"name": "persistence",
+					"optional": true,
+					"type": "string | GridPersistenceAdapter"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceAdapter"
+				},
+				{
+					"name": "rowOverscanPx",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "colBuffer",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "overscanAdaptive",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "runtimeLimits",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['runtimeLimits']"
+				},
+				{
+					"name": "rendererOptions",
+					"optional": true,
+					"type": "GridInitialState<TRowData>['rendererOptions']",
+					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+				},
+				{
+					"name": "columnTypes",
+					"optional": true,
+					"type": "Record<string, ColumnTypeDefinition<TRowData>>"
+				},
+				{
+					"name": "styleRules",
+					"optional": true,
+					"type": "StyleRule<TRowData>[]"
+				},
+				{
+					"name": "dataIntegrity",
+					"optional": true,
+					"type": "import('@eregister/wit-grid-core').GridDataIntegrityConfig<TRowData>",
+					"description": "Unified Data Integrity pipeline — validation, quality, diff, live stream, conflict resolution."
+				},
+				{
+					"name": "capabilities",
+					"optional": true,
+					"type": "GridCapabilitiesConfig<TRowData>",
+					"description": "Grid-level capability rules. Control which actions are allowed per cell, column, or row."
+				},
+				{
+					"name": "detailRowHeight",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pagination",
+					"optional": true,
+					"type": "boolean | GridPaginationConfig",
+					"description": "Enable the core pagination bar (and, in client mode, page-window row slicing)."
+				},
+				{
+					"name": "rowSelection",
+					"optional": true,
+					"type": "RowSelectionMode | RowSelectionOptions"
+				},
+				{
+					"name": "showStatusBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the core status bar (row + selection counts)."
+				},
+				{
+					"name": "showFilterChipBar",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the filter chip bar above the header when filters are active."
+				},
+				{
+					"name": "showFloatingFilters",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowDragMode",
+					"optional": true,
+					"type": "'managed' | 'unmanaged'",
+					"description": "Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order)."
+				},
+				{
+					"name": "onGridReady",
+					"optional": true,
+					"type": "(event: GridReadyEvent<TRowData>) => void"
+				},
+				{
+					"name": "rowModelType",
+					"optional": false,
+					"type": "'server'"
+				},
+				{
+					"name": "datasource",
+					"optional": false,
+					"type": "ServerSideDatasource<TRowData>"
+				},
+				{
+					"name": "blockSize",
+					"optional": true,
+					"type": "number"
+				}
+			]
+		},
+		{
+			"name": "GridViewProps",
+			"props": [
+				{
+					"name": "api",
+					"optional": false,
+					"type": "GridApi<TRowData>"
+				},
+				{
+					"name": "pinLeftColumns",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinRightColumns",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinTopRows",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "pinBottomRows",
+					"optional": true,
+					"type": "number"
+				},
+				{
+					"name": "enableColumnReorder",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "enableNavigation",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "enableContextMenu",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "contextMenuOptions",
+					"optional": true,
+					"type": "GridContextMenuOptions<TRowData>"
+				},
+				{
+					"name": "onCellClick",
+					"optional": true,
+					"type": "(params: GridCellClickParams<TRowData>) => void"
+				},
+				{
+					"name": "onWriteBlocked",
+					"optional": true,
+					"type": "(event: GridEventPayloadMap<TRowData>[GridEventName.writeBlocked]) => void"
+				},
+				{
+					"name": "onCellValueChanged",
+					"optional": true,
+					"type": "(event: GridEventPayloadMap<TRowData>[GridEventName.cellValueChanged]) => void"
+				},
+				{
+					"name": "navigationOptions",
+					"optional": true,
+					"type": "{ editTrigger?: 'singleClick' | 'doubleClick'; arrowKeyNavigationEdit?: boolean; }"
+				},
+				{
+					"name": "groupRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "detailRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "footerRowRenderer",
+					"optional": true,
+					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode"
+				},
+				{
+					"name": "sidebar",
+					"optional": true,
+					"type": "GridSidebarConfig<TRowData>"
+				},
+				{
+					"name": "enableChart",
+					"optional": true,
+					"type": "boolean"
+				},
+				{
+					"name": "autoRowHeight",
+					"optional": true,
+					"type": "boolean"
+				}
+			]
+		}
+	]
+}

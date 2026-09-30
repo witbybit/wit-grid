@@ -4,13 +4,14 @@ Wit Grid is a lightweight, framework-agnostic grid engine for high-performance v
 
 ---
 
-## Alpha Status
+## Release Status
 
-Wit Grid is currently published as a pre-release alpha surface (`0.1.0-alpha.x`), not a stable `1.x` contract.
+Wit Grid is on the `1.4.x` line and does not yet guarantee strict semver stability — pin an exact version rather
+than a caret range, and check the docs site's Migration Notes page before upgrading.
 
 - Use `@eregister/wit-grid-react` for the supported React entrypoint and `@eregister/wit-grid-core` for the supported headless entrypoint.
 - Incubating helpers live under `@eregister/wit-grid-core/experimental` and `@eregister/wit-grid-react/experimental`.
-- Anything under an `experimental` entry may change or be removed between alpha releases without compatibility guarantees.
+- Anything under an `experimental` entry may change or be removed between releases without compatibility guarantees.
 
 ---
 

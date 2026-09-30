@@ -98,7 +98,7 @@
 | 086 | [Runtime Port Binding Lifecycle](./086-runtime-port-binding-lifecycle.md)                                                     | DONE                 | working tree |
 | 087 | [Store Compatibility Boundary Enforcement](./087-store-boundary-enforcement.md)                                               | DONE                 | working tree |
 | 088 | [Runtime Contract Comment Cleanup](./088-runtime-contract-comment-cleanup.md)                                                 | DONE                 | working tree |
-| 089 | [Wit Grid Core Architecture Target](./089-wit-grid-core-architecture-target.md)                                             | DONE                 | working tree |
+| 089 | [Wit Grid Core Architecture Target](./089-wit-grid-core-architecture-target.md)                                               | DONE                 | working tree |
 | 090 | [Feature Surface Triage and Quarantine](./090-feature-surface-triage-and-quarantine.md)                                       | DONE                 | working tree |
 | 091 | [Performance Baseline Laboratory](./091-performance-baseline-laboratory.md)                                                   | DONE                 | working tree |
 | 092 | [Aggregation Input Mutation Correctness](./092-aggregation-input-mutation-correctness.md)                                     | DONE                 | working tree |

@@ -1,0 +1,87 @@
+---
+title: Docs Architecture
+description: How Wit Grid documentation is versioned, generated, and checked.
+icon: Wrench
+---
+
+## Versioning model
+
+`next` tracks the current development line — content here can describe unreleased or in-progress work. A fixed
+version directory (e.g. [`1.4`](/docs/1.4)) is a frozen snapshot of `next` taken at release time; it is never
+edited afterward except for its own migration notes. `site/lib/versions.ts` is generated, not hand-edited — it's
+rebuilt automatically whenever a version is cut.
+
+## Cutting a new version
+
+<Steps>
+<Step>
+
+### Bump the package version
+
+Land the version bump in `packages/react/package.json` (and `packages/core/package.json` to match) on `main`
+first, so the release script has something real to read.
+
+</Step>
+<Step>
+
+### Run the release script
+
+```bash
+pnpm --filter wit-grid-site docs:release:from-package
+```
+
+This reads `packages/react/package.json`'s version, derives the `major.minor` (e.g. `1.4.1` → `1.4`), and:
+
+- copies `content/docs/1.4` → `content/docs/<version>`
+- copies `generated/next` → `generated/<version>`
+- rewrites that snapshot's `<ApiReference />`/`<EventsReference />` tags to pin `version="<version>"`, so the
+  frozen snapshot keeps showing the reference it shipped with even after `next`'s own reference changes
+- updates `content/docs/meta.json` and regenerates `site/lib/versions.ts` so the version switcher picks it up
+
+Pass an explicit version instead of `--from-package` (e.g. `pnpm --filter wit-grid-site docs:release 1.5`) for a
+version that doesn't match the package's current `major.minor`. Add `--force` to overwrite an existing snapshot,
+or `--dry-run` to preview the copy plan without writing anything.
+
+</Step>
+<Step>
+
+### Start a fresh "unreleased" section
+
+Clear out [Migration Notes](/docs/1.4/migration-notes)'s `next (unreleased)` section in the `next` line — the
+version you just cut keeps its own frozen copy of the notes that led up to it.
+
+</Step>
+<Step>
+
+### Verify and commit
+
+```bash
+pnpm run docs:check   # fails if any generated JSON is stale
+pnpm run docs:lint    # typechecks every embedded code snippet, across every version
+pnpm run build:site   # full production build, all versions
+```
+
+Commit the new `content/docs/<version>/`, `generated/<version>/`, updated `meta.json`, and regenerated
+`lib/versions.ts` together as one change.
+
+</Step>
+</Steps>
+
+## Truthfulness
+
+Generated pages are produced by `pnpm --filter wit-grid-site docs:generate`. CI runs `pnpm --filter wit-grid-site
+docs:check` and `docs:lint` before every deploy (see `.github/workflows/docs.yml`), so a push with stale
+generated output or a broken code sample fails before it ships.
+
+## Authored content
+
+Guides should explain concepts and workflows. Reference pages should come from source code wherever possible —
+[API reference](/docs/1.4/api-reference) and [Grid API](/docs/1.4/grid-api) are both generated via `ts-morph`
+directly from `packages/react/src` and `packages/core/src`, with a build-time guard that fails if the source
+interfaces they read drift out from under them. Examples should live as runnable files in
+`packages/examples`, not screenshots or copied snippets.
+
+## Licensing
+
+Wit Grid is proprietary, source-available software — see [Installation](/docs/1.4/installation#licensing).
+Docs content should never describe it as "open source" or imply free redistribution rights.

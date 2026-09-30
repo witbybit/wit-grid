@@ -28,13 +28,13 @@ The recorder differentiates Wit Grid only when its evidence is understandable. B
 
 ## Commands
 
-| Gate         | Command                                                                          | Expected |
-| ------------ | -------------------------------------------------------------------------------- | -------- |
+| Gate         | Command                                                                         | Expected |
+| ------------ | ------------------------------------------------------------------------------- | -------- |
 | Focused      | `corepack pnpm --filter @eregister/wit-grid-react exec vitest run src/devtools` | exit 0   |
 | React        | `corepack pnpm --filter @eregister/wit-grid-react test`                         | exit 0   |
-| Architecture | `corepack pnpm run test:architecture`                                            | exit 0   |
-| Packages     | `corepack pnpm run build:packages`                                               | exit 0   |
-| Demo         | `corepack pnpm --filter demo-app build`                                          | exit 0   |
+| Architecture | `corepack pnpm run test:architecture`                                           | exit 0   |
+| Packages     | `corepack pnpm run build:packages`                                              | exit 0   |
+| Demo         | `corepack pnpm --filter demo-app build`                                         | exit 0   |
 
 ## Scope
 

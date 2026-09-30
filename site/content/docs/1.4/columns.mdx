@@ -1,0 +1,247 @@
+---
+title: Columns
+description: Define fields, headers, sizing, renderers, and column behavior.
+icon: Columns3
+---
+
+Columns describe how row data is read, displayed, edited, filtered, and written back.
+
+```tsx
+import { Grid, type ColumnDef } from '@eregister/wit-grid-react';
+
+type Person = {
+	id: string;
+	name: string;
+	team: string;
+	score: number;
+};
+
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', width: 180 },
+	{ field: 'team', header: 'Team', width: 160 },
+	{ field: 'score', header: 'Score', type: 'number', width: 120 },
+];
+
+export function PeopleGrid({ rows }: { rows: Person[] }) {
+	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} />;
+}
+```
+
+## Required Shape
+
+Every column needs:
+
+| Field    | Type     | Notes                                                                            |
+| -------- | -------- | -------------------------------------------------------------------------------- |
+| `field`  | `string` | Stable data path and column identity. Dot paths are supported for nested values. |
+| `header` | `string` | Visible column header text.                                                      |
+
+Use stable `field` values. They are used by state, events, filtering, sorting, selection ranges, clipboard, and persistence. Use `colId` only when the public API identity needs to differ from the row data path.
+
+## Sizing And Visibility
+
+```tsx
+const columns = [
+	{ field: 'name', header: 'Name', width: 220, minWidth: 140, maxWidth: 360 },
+	{ field: 'internalNotes', header: 'Notes', hide: true },
+	{ field: 'status', header: 'Status', pinned: 'left' },
+];
+```
+
+`width` must be a positive finite number. `minWidth` and `maxWidth` constrain user resizing. `pinned` is an initial setting; use the grid API for runtime pin changes.
+
+## Values
+
+By default, the grid reads `row[field]`. Dot paths read nested data.
+
+```tsx
+const columns = [{ field: 'account.owner.name', header: 'Owner' }];
+```
+
+Use `valueGetter` when display data is derived.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'displayName',
+		header: 'Display name',
+		valueGetter: ({ row }) => `${row.name} (${row.team})`,
+		valueGetterDependencies: ['name', 'team'],
+	},
+];
+```
+
+Use `valueFormatter` when the raw value should stay unchanged, but display/export text should be formatted.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		valueFormatter: ({ value }) => `${Number(value).toFixed(1)} pts`,
+	},
+];
+```
+
+## Writing Values
+
+Use `valueSetter` to control edit commits.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		valueSetter: ({ row, value }) => {
+			const next = Number(value);
+			if (!Number.isFinite(next) || next < 0) return false;
+			row.score = next;
+			return true;
+		},
+	},
+];
+```
+
+Return `false` to reject a commit. Return a promise when validation depends on asynchronous work. Call `abort()` for an immediate rollback.
+
+## Column Types
+
+Wit Grid ships built-in type registry entries for:
+
+| Type       | Behavior                    |
+| ---------- | --------------------------- |
+| `checkbox` | Checkbox renderer.          |
+| `date`     | Date renderer and editor.   |
+| `number`   | Number renderer and editor. |
+
+Register custom types with the `columnTypes` grid prop.
+
+```tsx
+import { Grid, numberColumnType, dropdownColumnType } from '@eregister/wit-grid-react';
+
+const columnTypes = {
+	usd: numberColumnType({ prefix: '$', decimals: 2, locale: true }),
+	status: dropdownColumnType([
+		{ value: 'Active', color: 'emerald' },
+		{ value: 'Paused', color: 'amber' },
+	]),
+};
+
+const columns = [
+	{ field: 'revenue', header: 'Revenue', type: 'usd' },
+	{ field: 'status', header: 'Status', type: 'status' },
+];
+
+<Grid rows={rows} columns={columns} columnTypes={columnTypes} />;
+```
+
+Helper exports include `numberColumnType`, `multiSelectColumnType`, and `dropdownColumnType`.
+
+## Renderers And Editors
+
+Use `renderer` to control cell display. Use `cellEditor` to control edit UI.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'team',
+		header: 'Team',
+		renderer: { kind: 'react', component: TeamBadge },
+		cellEditor: TeamEditor,
+	},
+];
+```
+
+Renderer specs support text, DOM, React, and imperative React modes. For high-frequency cells, renderer capabilities control scroll behavior with `primitive`, `live`, `freeze`, `text-impostor`, or `html-snapshot` presentation — see [Renderer Capabilities](/docs/1.4/renderer-capabilities) for the full tradeoff and when to use each.
+
+## Filtering And Sorting
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', sortable: true, filterType: 'text' },
+	{ field: 'score', header: 'Score', sortable: true, filterType: 'number' },
+	{ field: 'team', header: 'Team', filterType: 'set' },
+];
+```
+
+Prefer `filterDef` for new filter UI. `filterType` and `filterValues` are still supported and normalized internally.
+
+## Clipboard
+
+Use `onCopy` and `onPaste` when clipboard text should not be the same as the raw cell value. See
+[Clipboard](/docs/1.4/clipboard) for the grid-level copy/paste API and event payloads.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		onCopy: ({ value }) => String(value ?? ''),
+		onPaste: ({ pastedText }) => Number(pastedText),
+	},
+];
+```
+
+## Header Groups
+
+Group related columns under a shared spanning header label with `headerGroup`. Columns with the same label at
+the same position are merged into one spanning header cell automatically — no separate registration step.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{ field: 'name', header: 'Name', width: 160 },
+	{ field: 'q1Revenue', header: 'Q1', headerGroup: 'Revenue', width: 100 },
+	{ field: 'q2Revenue', header: 'Q2', headerGroup: 'Revenue', width: 100 },
+	{ field: 'q1Cost', header: 'Q1', headerGroup: 'Costs', width: 100 },
+	{ field: 'q2Cost', header: 'Q2', headerGroup: 'Costs', width: 100 },
+];
+```
+
+<Callout title='Nesting groups' type='info'>
+	`headerGroup` also accepts an array for nested group levels, outermost to innermost — `headerGroup: ['Financials', 'Revenue']` renders Financials
+	&gt; Revenue &gt; the leaf column header. There is no separate `headerGroupLevel` field; the array's order **is** the nesting.
+</Callout>
+
+## Auto-sizing
+
+Double-click a column's resize handle to auto-size it to fit its content. The same behavior is available
+programmatically through `GridApi`:
+
+```typescript
+// Resize a single column to fit its widest cell (header included by default)
+api.autoSizeColumn('price');
+
+// Resize all visible columns at once
+api.autoSizeAllColumns();
+
+// With options
+api.autoSizeColumn('name', { padding: 24, includeHeader: true });
+api.autoSizeAllColumns({ padding: 16, minWidth: 60, maxWidth: 400 });
+```
+
+| Option          | Type      | Default | Description                                            |
+| :-------------- | :-------- | :------ | :----------------------------------------------------- |
+| `padding`       | `number`  | `16`    | Extra pixels added to the measured content width.      |
+| `includeHeader` | `boolean` | `true`  | Include the header cell text in the width measurement. |
+| `minWidth`      | `number`  | —       | Clamp the result to at least this many pixels.         |
+| `maxWidth`      | `number`  | —       | Clamp the result to at most this many pixels.          |
+
+`autoSizeAllColumns` accepts the same options and applies them uniformly to every visible column.
+
+## Capabilities
+
+Column capability callbacks allow per-cell or per-column rules.
+
+```tsx
+const columns: ColumnDef<Person>[] = [
+	{
+		field: 'score',
+		header: 'Score',
+		canEdit: ({ row }) => row.team !== 'Locked',
+		canSort: () => true,
+		canExport: () => true,
+	},
+];
+```
+
+Capability callbacks exist for editing, selection, copy, paste, grouping, fill, sort, filter, pin, resize, delete, expand, drag, column movement, and export.

@@ -1,0 +1,31 @@
+{
+	"title": "Next",
+	"root": true,
+	"pages": [
+		"index",
+		"installation",
+		"quick-start",
+		"migrating-from-ag-grid",
+		"columns",
+		"renderer-capabilities",
+		"row-models",
+		"selection",
+		"filtering",
+		"grouping",
+		"master-detail",
+		"styling",
+		"pagination",
+		"clipboard",
+		"formulas",
+		"persistence",
+		"theming",
+		"server-side-data",
+		"grid-api",
+		"events",
+		"examples",
+		"changelog",
+		"migration-notes",
+		"api-reference",
+		"docs-architecture"
+	]
+}

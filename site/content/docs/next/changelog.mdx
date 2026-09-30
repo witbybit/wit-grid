@@ -1,0 +1,26 @@
+---
+title: Changelog
+description: What shipped in each release.
+icon: Clock
+---
+
+<Callout title='Changelog vs. Migration Notes' type='info'>
+	This page is "what shipped." [Migration Notes](/docs/next/migration-notes) is "what breaks and how to fix it" — check that page before upgrading a
+	pinned version.
+</Callout>
+
+## `next` (unreleased)
+
+No changelog entries yet for the upcoming release. When a change ships, add an entry here in this shape:
+
+```md
+### Added / Changed / Fixed — short summary
+
+One or two sentences on what changed and why it matters to someone upgrading.
+```
+
+## Cutting a release
+
+Before running `pnpm --filter wit-grid-site docs:release:from-package` (see [Docs Architecture](/docs/next/docs-architecture)),
+turn this page's `next (unreleased)` heading into `## <version>` and start a fresh, empty `next (unreleased)` section —
+the same rhythm as [Migration Notes](/docs/next/migration-notes#cutting-a-release).

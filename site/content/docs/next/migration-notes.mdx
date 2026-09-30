@@ -1,0 +1,37 @@
+---
+title: Migration Notes
+description: Track breaking changes and release-specific upgrade notes.
+icon: GitBranch
+---
+
+<Callout title='Not on strict semver yet' type='warn'>
+	Public APIs (`GridApi`, `ColumnDef`, event payloads) can still change between releases without a formal deprecation cycle. Pin an exact version
+	rather than a caret range, and check this page before upgrading.
+</Callout>
+
+Migration notes are updated whenever a release changes public behavior, exported APIs, event payloads, or
+documented defaults. Each fixed version directory (e.g. [`1.4`](/docs/1.4/migration-notes)) carries its own copy
+of this page describing the delta from the version before it — that copy is frozen at release time and never
+edited afterward. For a plain list of what shipped in each release (not just breaking changes), see the
+[Changelog](/docs/next/changelog).
+
+## `next` (unreleased)
+
+Tracks work that will ship in the release after [1.4](/docs/1.4). No breaking changes are queued yet. When one
+lands, add an entry here in this shape:
+
+```md
+### `<old-api>` renamed to `<new-api>`
+
+**Why:** short reason for the change.
+**Before:** \`\`\`tsx ... \`\`\`
+**After:** \`\`\`tsx ... \`\`\`
+```
+
+## Cutting a release
+
+When a release is cut, maintainers run `pnpm --filter wit-grid-site docs:release:from-package` — it reads the
+version from `packages/react/package.json`, snapshots `next` into a fixed version directory named after the
+`major.minor`, and updates the version switcher automatically. See
+[Docs Architecture](/docs/next/docs-architecture) for the full mechanics. After cutting a release, start a fresh,
+empty "unreleased" section here.

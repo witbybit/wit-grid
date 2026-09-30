@@ -6,13 +6,7 @@
  */
 import React, { useMemo } from 'react';
 import type { ThemeTokens } from '@eregister/wit-grid-core';
-import type {
-	ColumnFilterDef,
-	CustomFilterRendererParams,
-	FilterSelectOption,
-	FilterSurface,
-	SelectFilterCondition,
-} from '@eregister/wit-grid-core';
+import type { ColumnFilterDef, CustomFilterRendererParams, FilterSelectOption, FilterSurface, SelectFilterCondition } from '@eregister/wit-grid-core';
 import { FilterOptionList, FilterSearchInput, FilterSelectAll, FilterStatusBar, LoadMoreButton, optionKey } from './FilterPrimitives.js';
 import { useFilterFetch } from './useFilterFetch.js';
 import { useFilterPage } from './useFilterPage.js';

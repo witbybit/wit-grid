@@ -43,12 +43,12 @@ The grid needs one explicit runtime story for drag: when it is allowed, how it i
 
 ## Commands you will need
 
-| Purpose            | Command                                                                                                                                                                                                   | Expected on success |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| Architecture gate  | `corepack pnpm run test:architecture`                                                                                                                                                                     | exit 0              |
+| Purpose            | Command                                                                                                                                                                                                  | Expected on success |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| Architecture gate  | `corepack pnpm run test:architecture`                                                                                                                                                                    | exit 0              |
 | Core tests         | `corepack pnpm --filter @eregister/wit-grid-core test`                                                                                                                                                   | exit 0              |
-| Workspace tests    | `corepack pnpm run test`                                                                                                                                                                                  | exit 0              |
-| Build/typecheck    | `corepack pnpm run build`                                                                                                                                                                                 | exit 0              |
+| Workspace tests    | `corepack pnpm run test`                                                                                                                                                                                 | exit 0              |
+| Build/typecheck    | `corepack pnpm run build`                                                                                                                                                                                | exit 0              |
 | Focused drag tests | `C:\Users\rishi\witbybit\wit-grid\node_modules\.bin\vitest.cmd run packages/core/src/features/RowDragController.test.ts packages/core/src/store.test.ts packages/core/src/renderer/renderEngine.test.ts` | all pass            |
 
 ## Scope

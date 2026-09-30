@@ -10,32 +10,34 @@ import type { GridPageType } from './components/GridShared';
 import { layoutColumnsFull, setInactiveRiskSideEffects } from './pages/demoGridConfigs';
 
 const CalculationsArena = lazy(() => import('./pages/CalculationsArena'));
-const InfiniteServerScroll = lazy(() => import('./pages/InfiniteServerScroll'));
+const InfiniteServerScroll = lazy(() => import('@eregister/wit-grid-examples/infinite-server-scroll'));
 const SpreadsheetWorkspace = lazy(() => import('./pages/SpreadsheetWorkspace'));
 const CustomEditorRenderer = lazy(() => import('./pages/CustomEditorRenderer'));
 const DynamicLayout = lazy(() => import('./pages/DynamicLayout'));
 const HeadlessSkinsPlayground = lazy(() => import('./pages/HeadlessSkinsPlayground'));
-const RealtimeDashboard = lazy(() => import('./pages/RealtimeDashboard'));
+const RealtimeDashboard = lazy(() => import('@eregister/wit-grid-examples/realtime-dashboard'));
 const GanttSchedulingWorkspace = lazy(() => import('./pages/GanttSchedulingWorkspace'));
 const NestedTablesGrouping = lazy(() => import('./pages/NestedTablesGrouping'));
 const PerformanceLab = lazy(() => import('./pages/PerformanceLab'));
 const FlightRecorderLab = lazy(() => import('./pages/FlightRecorderLab'));
 const SidebarPanelsDemo = lazy(() => import('./pages/SidebarPanelsDemo'));
-const NativeCellTypesDemo = lazy(() => import('./pages/NativeCellTypesDemo'));
-const RealtimeGroupingDemo = lazy(() => import('./pages/RealtimeGroupingDemo'));
+const NativeCellTypesDemo = lazy(() => import('@eregister/wit-grid-examples/native-cell-types'));
+const RealtimeGroupingDemo = lazy(() => import('@eregister/wit-grid-examples/realtime-grouping'));
 const RowMultiSelectDemo = lazy(() => import('./pages/RowMultiSelectDemo'));
 const CrudValidationDemo = lazy(() => import('./pages/CrudValidationDemo'));
 const WideGridDemo = lazy(() => import('./pages/WideGridDemo'));
 const ColumnGroupHeaderDemo = lazy(() => import('./pages/ColumnGroupHeaderDemo'));
-const ClipboardDemo = lazy(() => import('./pages/ClipboardDemo'));
+const ClipboardDemo = lazy(() => import('@eregister/wit-grid-examples/clipboard'));
 const FloatingFiltersDemo = lazy(() => import('./pages/FloatingFiltersDemo'));
-const RowDragDemo = lazy(() => import('./pages/RowDragDemo'));
-const AdvancedFiltersDemo = lazy(() => import('./pages/AdvancedFiltersDemo'));
-const DataIntegrityLab = lazy(() => import('./pages/DataIntegrityLab'));
+const RowDragDemo = lazy(() => import('@eregister/wit-grid-examples/row-drag'));
+const AdvancedFiltersDemo = lazy(() => import('@eregister/wit-grid-examples/advanced-filters'));
+const DataIntegrityLab = lazy(() => import('@eregister/wit-grid-examples/data-integrity'));
 const ProjectsComplianceDemo = lazy(() => import('./pages/ProjectsComplianceDemo'));
-const KanbanBoardDemo = lazy(() => import('./pages/KanbanBoardDemo'));
+const KanbanBoardDemo = lazy(() => import('@eregister/wit-grid-examples/kanban-board'));
+const DocsShowcase = lazy(() => import('./pages/DocsShowcase'));
 
 const PAGES: readonly GridPageType[] = [
+	'docs',
 	'devtools',
 	'perf',
 	'server',
@@ -229,6 +231,7 @@ export default function App() {
 	};
 
 	const activePageContent = (() => {
+		if (activePage === 'docs') return <DocsShowcase />;
 		if (activePage === 'perf') return <CalculationsArena {...commonGridProps} massiveColumns={massiveColumns} />;
 		if (activePage === 'server') return <InfiniteServerScroll {...commonGridProps} />;
 		if (activePage === 'ranges') return <SpreadsheetWorkspace {...commonGridProps} />;
@@ -261,6 +264,7 @@ export default function App() {
 
 	const showRightSidebar = !(
 		[
+			'docs',
 			'crud',
 			'projects',
 			'integrity',

@@ -1,0 +1,48 @@
+name: Deploy docs
+on:
+    push:
+        branches: [main, wit-grid-site-docs]
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  # Full history: fumadocs-mdx's `lastModified: true` reads each doc's last-touching
+                  # commit via `git log`, which needs more than the latest commit's history to resolve.
+                  fetch-depth: 0
+
+            - name: Enable pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.0
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build packages
+              run: pnpm run build:packages
+
+            - name: Verify generated docs are up to date
+              run: pnpm run docs:check
+
+            - name: Lint docs (typecheck embedded code snippets)
+              run: pnpm run docs:lint
+
+            - name: Build the docs for Cloudflare Workers
+              run: pnpm run cf:build
+              working-directory: site
+
+            - uses: cloudflare/wrangler-action@v3
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  workingDirectory: site
+                  command: deploy

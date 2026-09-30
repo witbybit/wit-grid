@@ -1,0 +1,899 @@
+{
+	"generatedAt": "build",
+	"source": "packages/core/src/api/GridApiSurfaces.ts",
+	"groups": [
+		{
+			"title": "State, Rows & Cells",
+			"interfaceName": "GridDataApi",
+			"methods": [
+				{
+					"name": "getStateSnapshot",
+					"optional": false,
+					"signature": "(): GridStateSnapshot<TRowData>"
+				},
+				{
+					"name": "getRowId",
+					"optional": false,
+					"signature": "(row: TRowData): string"
+				},
+				{
+					"name": "isRowLoading",
+					"optional": false,
+					"signature": "(rowId: string): boolean"
+				},
+				{
+					"name": "getDataRowAtVisualIndex",
+					"optional": false,
+					"signature": "(index: number): TRowData | null"
+				},
+				{
+					"name": "setRows",
+					"optional": false,
+					"signature": "(rows: TRowData[]): GridWriteResult"
+				},
+				{
+					"name": "updateRows",
+					"optional": false,
+					"signature": "(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult"
+				},
+				{
+					"name": "applyTransaction",
+					"optional": false,
+					"signature": "(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null"
+				},
+				{
+					"name": "getRowOrder",
+					"optional": false,
+					"signature": "(): string[]"
+				},
+				{
+					"name": "setRowOrder",
+					"optional": false,
+					"signature": "(rowIds: string[]): GridWriteResult"
+				},
+				{
+					"name": "refreshRows",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "setRowHeights",
+					"optional": false,
+					"signature": "(rowHeights: Record<string, number> | undefined) => void"
+				},
+				{
+					"name": "setDefaultRowHeight",
+					"optional": false,
+					"signature": "(defaultRowHeight?: number | undefined) => void"
+				},
+				{
+					"name": "getRowModelType",
+					"optional": false,
+					"signature": "(): RowModelType"
+				},
+				{
+					"name": "getRowModelCapabilities",
+					"optional": false,
+					"signature": "(): RowModelCapabilities"
+				},
+				{
+					"name": "supportsRowModelCapability",
+					"optional": false,
+					"signature": "(capability: RowModelCapability): boolean"
+				},
+				{
+					"name": "purgeCache",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "setInfiniteDatasource",
+					"optional": false,
+					"signature": "(datasource: InfiniteDatasource<TRowData>, blockSize?: number): void"
+				},
+				{
+					"name": "setServerSideDatasource",
+					"optional": false,
+					"signature": "(datasource: ServerSideDatasource<TRowData>): void"
+				},
+				{
+					"name": "refreshServerSide",
+					"optional": false,
+					"signature": "(options?: ServerSideRefreshOptions): void"
+				},
+				{
+					"name": "purgeServerSide",
+					"optional": false,
+					"signature": "(options?: Omit<ServerSideRefreshOptions, 'purge'>): void"
+				},
+				{
+					"name": "getServerSideStoreState",
+					"optional": false,
+					"signature": "(): readonly ServerSideStoreSnapshot[]"
+				},
+				{
+					"name": "getCellValue",
+					"optional": false,
+					"signature": "(rowId: string, colField: string): unknown"
+				},
+				{
+					"name": "getFormula",
+					"optional": false,
+					"signature": "(rowId: string, colField: string): string | undefined"
+				},
+				{
+					"name": "hasFormula",
+					"optional": false,
+					"signature": "(rowId: string, colField: string): boolean"
+				},
+				{
+					"name": "setFormula",
+					"optional": false,
+					"signature": "(rowId: string, colField: string, formula: string): void"
+				},
+				{
+					"name": "clearFormula",
+					"optional": false,
+					"signature": "(rowId: string, colField: string): void"
+				},
+				{
+					"name": "setCellValue",
+					"optional": false,
+					"signature": "(rowId: string, colField: string, value: unknown): GridWriteResult"
+				},
+				{
+					"name": "setCellValueAsync",
+					"optional": false,
+					"signature": "(rowId: string, colField: string, value: unknown): Promise<GridWriteResult>"
+				},
+				{
+					"name": "batchCellValues",
+					"optional": false,
+					"signature": "(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): GridWriteResult"
+				},
+				{
+					"name": "batchCellValuesAsync",
+					"optional": false,
+					"signature": "(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): Promise<GridWriteResult>"
+				},
+				{
+					"name": "getRowNode",
+					"optional": false,
+					"signature": "(rowId: string): GridRowNode<TRowData> | undefined"
+				},
+				{
+					"name": "getDisplayedRowAtIndex",
+					"optional": false,
+					"signature": "(index: number): GridRowNode<TRowData> | undefined"
+				},
+				{
+					"name": "getRowIndexById",
+					"optional": false,
+					"signature": "(rowId: string): number | undefined"
+				},
+				{
+					"name": "forEachNode",
+					"optional": false,
+					"signature": "(callback: (node: GridRowNode<TRowData>, index: number) => void): void"
+				},
+				{
+					"name": "forEachDisplayedNode",
+					"optional": false,
+					"signature": "(callback: (node: GridRowNode<TRowData>, index: number) => void): void"
+				},
+				{
+					"name": "getRowLoadState",
+					"optional": false,
+					"signature": "(index: number): RowLoadState"
+				},
+				{
+					"name": "getRawRowById",
+					"optional": false,
+					"signature": "(rowId: string): TRowData | null"
+				},
+				{
+					"name": "rows",
+					"optional": false,
+					"signature": "(): GridRowsAccessor<TRowData>"
+				}
+			]
+		},
+		{
+			"title": "Selection & Editing",
+			"interfaceName": "GridSelectionEditingApi",
+			"methods": [
+				{
+					"name": "selectCell",
+					"optional": false,
+					"signature": "(pointer: GridCellPointer | null, source?: GridSelectionSource): void"
+				},
+				{
+					"name": "selectRange",
+					"optional": false,
+					"signature": "(start: GridCellPointer | null, end: GridCellPointer | null, source?: GridSelectionSource): void"
+				},
+				{
+					"name": "extendSelection",
+					"optional": false,
+					"signature": "(end: GridCellPointer, source?: GridSelectionSource): void"
+				},
+				{
+					"name": "applyRowSelectionGesture",
+					"optional": false,
+					"signature": "(gesture: RowSelectionGesture): RowSelectionChangeResult | null"
+				},
+				{
+					"name": "selectRows",
+					"optional": false,
+					"signature": "(rowIds: string[], options?: SelectRowsOptions): void"
+				},
+				{
+					"name": "deselectRows",
+					"optional": false,
+					"signature": "(rowIds: string[]): void"
+				},
+				{
+					"name": "toggleRowSelection",
+					"optional": false,
+					"signature": "(rowId: string): void"
+				},
+				{
+					"name": "selectAllRows",
+					"optional": false,
+					"signature": "(options?: SelectAllRowsOptions): void"
+				},
+				{
+					"name": "clearRowSelection",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "getSelectedRowIds",
+					"optional": false,
+					"signature": "(): string[]"
+				},
+				{
+					"name": "isRowNodeSelected",
+					"optional": false,
+					"signature": "(rowId: string): boolean"
+				},
+				{
+					"name": "getSelectedRowCount",
+					"optional": false,
+					"signature": "(): number"
+				},
+				{
+					"name": "startEditing",
+					"optional": false,
+					"signature": "(rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api'): void"
+				},
+				{
+					"name": "updateEditDraft",
+					"optional": false,
+					"signature": "(rowId: string, colFieldOrInstanceId: string, value: unknown): void"
+				},
+				{
+					"name": "stopEditing",
+					"optional": false,
+					"signature": "(cancel?: boolean): void"
+				},
+				{
+					"name": "commitEdit",
+					"optional": false,
+					"signature": "(rowId: string, colFieldOrInstanceId: string, value: unknown): Promise<boolean>"
+				}
+			]
+		},
+		{
+			"title": "Columns, Sort, Filter & Grouping",
+			"interfaceName": "GridStructureApi",
+			"methods": [
+				{
+					"name": "setColumns",
+					"optional": false,
+					"signature": "(columns: ColumnDef<TRowData>[]): void"
+				},
+				{
+					"name": "setColumnWidth",
+					"optional": false,
+					"signature": "(colField: string, width: number): void"
+				},
+				{
+					"name": "autoSizeColumn",
+					"optional": false,
+					"signature": "(colField: string, options?: AutoSizeColumnOptions): void"
+				},
+				{
+					"name": "autoSizeAllColumns",
+					"optional": false,
+					"signature": "(options?: AutoSizeAllColumnsOptions): void"
+				},
+				{
+					"name": "copySelectedRange",
+					"optional": false,
+					"signature": "(): Promise<void>"
+				},
+				{
+					"name": "pasteFromClipboard",
+					"optional": false,
+					"signature": "(): Promise<void>"
+				},
+				{
+					"name": "copyRange",
+					"optional": false,
+					"signature": "(minRow: number, maxRow: number, minCol: number, maxCol: number): Promise<void>"
+				},
+				{
+					"name": "setColumnVisible",
+					"optional": false,
+					"signature": "(colField: string, visible: boolean): void"
+				},
+				{
+					"name": "setColumnsVisible",
+					"optional": false,
+					"signature": "(colFields: string[], visible: boolean): void"
+				},
+				{
+					"name": "getColumns",
+					"optional": false,
+					"signature": "(): ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "getDisplayedColumns",
+					"optional": false,
+					"signature": "(): ColumnDef<TRowData>[]"
+				},
+				{
+					"name": "setPinnedColumns",
+					"optional": false,
+					"signature": "(pins: { left?: number; right?: number }): void"
+				},
+				{
+					"name": "getPinnedColumns",
+					"optional": false,
+					"signature": "(): { left: number; right: number }"
+				},
+				{
+					"name": "moveColumn",
+					"optional": false,
+					"signature": "(colField: string, toIndex: number): void"
+				},
+				{
+					"name": "setColumnOrder",
+					"optional": false,
+					"signature": "(colFields: string[]): void"
+				},
+				{
+					"name": "setColumnReorderEnabled",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "setRowHeight",
+					"optional": false,
+					"signature": "(rowId: string, height: number): void"
+				},
+				{
+					"name": "setSortModel",
+					"optional": false,
+					"signature": "(sortModel: SortModel | null): void"
+				},
+				{
+					"name": "setFilterModel",
+					"optional": false,
+					"signature": "(filterModel: FilterModel | null): void"
+				},
+				{
+					"name": "getQuickFilter",
+					"optional": false,
+					"signature": "(): QuickFilterModel | null"
+				},
+				{
+					"name": "setQuickFilter",
+					"optional": false,
+					"signature": "(text: string, columnIds?: string[]): void",
+					"description": "Search a single string across multiple columns (or every column). See `QuickFilterModel`."
+				},
+				{
+					"name": "getQueryModel",
+					"optional": false,
+					"signature": "(): GridQueryModel | null"
+				},
+				{
+					"name": "setQueryModel",
+					"optional": false,
+					"signature": "(model: GridQueryModel | null): void"
+				},
+				{
+					"name": "clearQueryModel",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "evaluateQueryForRow",
+					"optional": false,
+					"signature": "(rowId: string): boolean"
+				},
+				{
+					"name": "getColumnDistinctValues",
+					"optional": false,
+					"signature": "(colField: string): (string | number | null)[]"
+				},
+				{
+					"name": "getColumnDistinctValueSummary",
+					"optional": false,
+					"signature": "(colField: string): GridDistinctValueSummary"
+				},
+				{
+					"name": "setStyleRules",
+					"optional": false,
+					"signature": "(styleRules: GridStyleRule<TRowData>[] | undefined): void"
+				},
+				{
+					"name": "setGroupBy",
+					"optional": false,
+					"signature": "(colIds: string[]): void"
+				},
+				{
+					"name": "getGroupBy",
+					"optional": false,
+					"signature": "(): string[]"
+				},
+				{
+					"name": "addGroupBy",
+					"optional": false,
+					"signature": "(colId: string, atIndex?: number): void"
+				},
+				{
+					"name": "removeGroupBy",
+					"optional": false,
+					"signature": "(colId: string): void"
+				},
+				{
+					"name": "moveGroupBy",
+					"optional": false,
+					"signature": "(colId: string, toIndex: number): void"
+				},
+				{
+					"name": "setAggDefs",
+					"optional": false,
+					"signature": "(defs: AggregationDef<TRowData>[]): void"
+				},
+				{
+					"name": "getAggDefs",
+					"optional": false,
+					"signature": "(): AggregationDef<TRowData>[]"
+				},
+				{
+					"name": "expandAllGroups",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "collapseAllGroups",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "setShowGroupFooter",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "setStickyGroupRows",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "setShowGroupPanel",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "setShowFloatingFilters",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "setShowFilterChipBar",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "toggleGroupExpanded",
+					"optional": false,
+					"signature": "(groupId: string): void"
+				},
+				{
+					"name": "toggleDetailExpanded",
+					"optional": false,
+					"signature": "(rowId: string): void"
+				},
+				{
+					"name": "isGroupExpanded",
+					"optional": false,
+					"signature": "(groupId: string): boolean"
+				},
+				{
+					"name": "isDetailExpanded",
+					"optional": false,
+					"signature": "(rowId: string): boolean"
+				},
+				{
+					"name": "getVisibleColumnRange",
+					"optional": false,
+					"signature": "(): { colStart: number; colEnd: number; total: number }"
+				},
+				{
+					"name": "getColumnState",
+					"optional": false,
+					"signature": "(): ColumnState[]"
+				},
+				{
+					"name": "applyColumnState",
+					"optional": false,
+					"signature": "(states: ColumnState[], opts?: { applyOrder?: boolean }): void"
+				},
+				{
+					"name": "getGridState",
+					"optional": false,
+					"signature": "(): PersistedGridState"
+				},
+				{
+					"name": "applyGridState",
+					"optional": false,
+					"signature": "(state: PersistedGridState): void"
+				},
+				{
+					"name": "getColumnIndex",
+					"optional": false,
+					"signature": "(colField: string): number"
+				},
+				{
+					"name": "getColumnField",
+					"optional": false,
+					"signature": "(colIndex: number): string | null"
+				},
+				{
+					"name": "getColumnDef",
+					"optional": false,
+					"signature": "(colField: string): ColumnDef<TRowData> | undefined"
+				},
+				{
+					"name": "scrollToRow",
+					"optional": false,
+					"signature": "(rowId: string, options?: ScrollToRowOptions): void"
+				},
+				{
+					"name": "scrollToCell",
+					"optional": false,
+					"signature": "(rowId: string, colField: string, options?: ScrollToCellOptions): void"
+				}
+			]
+		},
+		{
+			"title": "Events, Subscriptions & Theming",
+			"interfaceName": "GridRuntimeSubscriptionApi",
+			"methods": [
+				{
+					"name": "addEventListener",
+					"optional": false,
+					"signature": "<K extends keyof GridEventPayloadMap<TRowData>>( type: K, callback: GridEventListener<GridEventPayloadMap<TRowData>[K]> ): () => void"
+				},
+				{
+					"name": "dispatchEvent",
+					"optional": false,
+					"signature": "<K extends keyof GridEventPayloadMap<TRowData>>(type: K, payload: GridEventPayloadMap<TRowData>[K]): void"
+				},
+				{
+					"name": "subscribe",
+					"optional": false,
+					"signature": "(listener: GridSnapshotListener<TRowData>): () => void"
+				},
+				{
+					"name": "subscribeToKey",
+					"optional": false,
+					"signature": "<K extends keyof GridStateSnapshot<TRowData>>(key: K, listener: GridSnapshotKeyListener<TRowData, K>): () => void"
+				},
+				{
+					"name": "subscribeToSnapshotSelector",
+					"optional": false,
+					"signature": "<K extends keyof GridStateSnapshot<TRowData>, TValue>( keys: readonly K[], selector: GridSnapshotSelector<TRowData, TValue>, listener: GridSnapshotSelectorListener<TValue>, isEqual?: GridSnapshotSelectorEquality<TValue> ): () => void"
+				},
+				{
+					"name": "subscribeToIntegrity",
+					"optional": false,
+					"signature": "(listener: (integrity: GridIntegrityState<TRowData>) => void): () => void"
+				},
+				{
+					"name": "subscribeToCell",
+					"optional": false,
+					"signature": "(rowId: string, colField: string, listener: () => void): () => void"
+				},
+				{
+					"name": "subscribeToDomainVersions",
+					"optional": false,
+					"signature": "(listener: (v: GridDomainVersions) => void): () => void"
+				},
+				{
+					"name": "subscribeDomain",
+					"optional": false,
+					"signature": "(domain: keyof GridDomainVersions, listener: (version: number) => void): () => void"
+				},
+				{
+					"name": "getRuntimeFaults",
+					"optional": false,
+					"signature": "(): RuntimeFault[]"
+				},
+				{
+					"name": "clearRuntimeFaults",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "flushCellUpdatesSync",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "getInstrumentation",
+					"optional": false,
+					"signature": "(): GridInstrumentation"
+				},
+				{
+					"name": "setInstrumentation",
+					"optional": false,
+					"signature": "(inst: GridInstrumentation): void"
+				},
+				{
+					"name": "getTheme",
+					"optional": false,
+					"signature": "(): ThemeTokens"
+				},
+				{
+					"name": "getThemeName",
+					"optional": false,
+					"signature": "(): BuiltInThemeName | null"
+				},
+				{
+					"name": "getAvailableThemes",
+					"optional": false,
+					"signature": "(): BuiltInThemeName[]"
+				},
+				{
+					"name": "switchTheme",
+					"optional": false,
+					"signature": "(themeName: string): void"
+				},
+				{
+					"name": "mergeTheme",
+					"optional": false,
+					"signature": "(partial: Partial<ThemeTokens>): void"
+				},
+				{
+					"name": "setTheme",
+					"optional": false,
+					"signature": "(theme: ThemeTokens): void",
+					"description": "Apply a full, self-composed theme (e.g. `{ ...getBuiltInTheme('light'), focusRing: '#...' }`)."
+				},
+				{
+					"name": "onThemeChange",
+					"optional": false,
+					"signature": "(listener: (theme: ThemeTokens) => void): () => void"
+				},
+				{
+					"name": "getContainer",
+					"optional": false,
+					"signature": "(): HTMLElement | null"
+				},
+				{
+					"name": "getInsightDiagnostics",
+					"optional": false,
+					"signature": "(): Record<string, unknown>"
+				}
+			]
+		},
+		{
+			"title": "Persistence & Workspace Views",
+			"interfaceName": "GridPersistenceWorkspaceApi",
+			"methods": [
+				{
+					"name": "hasPersistence",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "clearPersistedState",
+					"optional": false,
+					"signature": "(): void | Promise<void>"
+				},
+				{
+					"name": "setAutoSave",
+					"optional": false,
+					"signature": "(enabled: boolean): void"
+				},
+				{
+					"name": "isAutoSaveEnabled",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "getPersistenceStatus",
+					"optional": false,
+					"signature": "(): PersistenceStatus"
+				},
+				{
+					"name": "subscribeToPersistenceStatus",
+					"optional": false,
+					"signature": "(listener: (status: PersistenceStatus) => void): () => void"
+				},
+				{
+					"name": "saveNow",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "hasWorkspace",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "getWorkspaceState",
+					"optional": false,
+					"signature": "(): GridWorkspaceState"
+				},
+				{
+					"name": "subscribeToWorkspaceState",
+					"optional": false,
+					"signature": "(listener: (state: GridWorkspaceState) => void): () => void"
+				},
+				{
+					"name": "listViews",
+					"optional": false,
+					"signature": "(): Promise<readonly GridViewDefinition[]>"
+				},
+				{
+					"name": "saveView",
+					"optional": false,
+					"signature": "(name: string, options?: SaveViewOptions): Promise<GridViewDefinition>"
+				},
+				{
+					"name": "updateView",
+					"optional": false,
+					"signature": "(id: string, state?: PersistedGridState): Promise<void>"
+				},
+				{
+					"name": "applyView",
+					"optional": false,
+					"signature": "(id: string): Promise<void>"
+				},
+				{
+					"name": "deleteView",
+					"optional": false,
+					"signature": "(id: string): Promise<void>"
+				},
+				{
+					"name": "duplicateView",
+					"optional": false,
+					"signature": "(id: string, name: string): Promise<GridViewDefinition>"
+				},
+				{
+					"name": "renameView",
+					"optional": false,
+					"signature": "(id: string, name: string): Promise<void>"
+				},
+				{
+					"name": "setDefaultView",
+					"optional": false,
+					"signature": "(id: string | null): Promise<void>"
+				}
+			]
+		},
+		{
+			"title": "History, Panels & Capabilities",
+			"interfaceName": "GridDiagnosticsCapabilityApi",
+			"methods": [
+				{
+					"name": "integrity",
+					"optional": false,
+					"signature": "GridIntegrityApi<TRowData>"
+				},
+				{
+					"name": "undo",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "redo",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "canUndo",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "canRedo",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "openPanel",
+					"optional": false,
+					"signature": "(panelId: string): void"
+				},
+				{
+					"name": "closePanel",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "togglePanel",
+					"optional": false,
+					"signature": "(panelId: string): void"
+				},
+				{
+					"name": "getOpenPanel",
+					"optional": false,
+					"signature": "(): string | null"
+				},
+				{
+					"name": "openChart",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "closeChart",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "toggleChart",
+					"optional": false,
+					"signature": "(): void"
+				},
+				{
+					"name": "isChartOpen",
+					"optional": false,
+					"signature": "(): boolean"
+				},
+				{
+					"name": "exportCsv",
+					"optional": false,
+					"signature": "(options?: CsvExportOptions): void"
+				},
+				{
+					"name": "can",
+					"optional": false,
+					"signature": "(action: GridCapabilityAction, params?: Partial<GridCapabilityParams<TRowData>>): GridCapabilityResult"
+				},
+				{
+					"name": "canEdit",
+					"optional": false,
+					"signature": "(rowId: string, colField: string): boolean"
+				},
+				{
+					"name": "canCopy",
+					"optional": false,
+					"signature": "(rowId?: string, colField?: string): boolean"
+				},
+				{
+					"name": "canPaste",
+					"optional": false,
+					"signature": "(rowId?: string, colField?: string): boolean"
+				},
+				{
+					"name": "canExport",
+					"optional": false,
+					"signature": "(colField?: string): boolean"
+				},
+				{
+					"name": "destroy",
+					"optional": false,
+					"signature": "(): void"
+				}
+			]
+		}
+	]
+}

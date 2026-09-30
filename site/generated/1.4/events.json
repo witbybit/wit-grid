@@ -1,0 +1,288 @@
+{
+	"generatedAt": "build",
+	"source": "packages/core/src/api/GridEvents.ts",
+	"events": [
+		{
+			"name": "aggDefsChanged",
+			"value": "aggDefsChanged",
+			"payload": "{ aggDefs: AggregationDef<TRowData>[] | undefined }",
+			"category": "Aggregation"
+		},
+		{
+			"name": "cellClicked",
+			"value": "cellClicked",
+			"payload": "GridCellClickParams<TRowData>",
+			"category": "Cells"
+		},
+		{
+			"name": "cellInvalidated",
+			"value": "cellInvalidated",
+			"payload": "{ rowId: string; colField: string }",
+			"category": "Cells"
+		},
+		{
+			"name": "cellsCopied",
+			"value": "cellsCopied",
+			"payload": "{ cells: Array<{ rowId: string; colField: string }>; rowCount: number; colCount: number; text: string }",
+			"category": "Clipboard"
+		},
+		{
+			"name": "cellsPasted",
+			"value": "cellsPasted",
+			"payload": "{ rowCount: number; colCount: number }",
+			"category": "Clipboard"
+		},
+		{
+			"name": "cellValueChanged",
+			"value": "cellValueChanged",
+			"payload": "{ rowId: string; colField: string; oldValue: unknown; newValue: unknown }",
+			"category": "Editing"
+		},
+		{
+			"name": "writeBlocked",
+			"value": "writeBlocked",
+			"payload": "GridWriteBlockedEventPayload",
+			"category": "Editing"
+		},
+		{
+			"name": "columnOrderChanged",
+			"value": "columnOrderChanged",
+			"payload": "{ columns: ColumnDef<TRowData>[]; columnFields: string[] }",
+			"category": "Columns"
+		},
+		{
+			"name": "columnReorderToggled",
+			"value": "columnReorderToggled",
+			"payload": "{ enabled: boolean }",
+			"category": "Columns"
+		},
+		{
+			"name": "columnResized",
+			"value": "columnResized",
+			"payload": "{ colField: string; width: number }",
+			"category": "Columns"
+		},
+		{
+			"name": "columnsChanged",
+			"value": "columnsChanged",
+			"payload": "{ columns: ColumnDef<TRowData>[]; columnFields: string[] }",
+			"category": "Columns"
+		},
+		{
+			"name": "editStarted",
+			"value": "editStarted",
+			"payload": "{ rowId: string; colField: string }",
+			"category": "Editing"
+		},
+		{
+			"name": "editStopped",
+			"value": "editStopped",
+			"payload": "{ rowId: string; colField: string; cancel: boolean }",
+			"category": "Editing"
+		},
+		{
+			"name": "enableStickyGroupRowsChanged",
+			"value": "enableStickyGroupRowsChanged",
+			"payload": "{ enableStickyGroupRows: boolean | undefined }",
+			"category": "Rows"
+		},
+		{
+			"name": "filterChanged",
+			"value": "filterChanged",
+			"payload": "{ filterModel: FilterModel | null }",
+			"category": "Filtering"
+		},
+		{
+			"name": "quickFilterChanged",
+			"value": "quickFilterChanged",
+			"payload": "{ quickFilterModel: QuickFilterModel | null }",
+			"category": "Filtering"
+		},
+		{
+			"name": "focusChanged",
+			"value": "focusChanged",
+			"payload": "{ focus: GridCellPointer | null; selection: GridSelectionState }",
+			"category": "Navigation"
+		},
+		{
+			"name": "groupByChanged",
+			"value": "groupByChanged",
+			"payload": "{ groupBy: string[] | undefined }",
+			"category": "Grouping"
+		},
+		{
+			"name": "groupColumnAdded",
+			"value": "groupColumnAdded",
+			"payload": "{ colId: string; index: number; groupBy: string[] }",
+			"category": "Grouping"
+		},
+		{
+			"name": "groupColumnRemoved",
+			"value": "groupColumnRemoved",
+			"payload": "{ colId: string; groupBy: string[] }",
+			"category": "Grouping"
+		},
+		{
+			"name": "groupColumnMoved",
+			"value": "groupColumnMoved",
+			"payload": "{ colId: string; fromIndex: number; toIndex: number; groupBy: string[] }",
+			"category": "Grouping"
+		},
+		{
+			"name": "layoutTransitionCaptureRequested",
+			"value": "layoutTransitionCaptureRequested",
+			"payload": "{ reason: LayoutTransitionCaptureReason }",
+			"category": "Rendering"
+		},
+		{
+			"name": "renderInvalidated",
+			"value": "renderInvalidated",
+			"payload": "{ reason: string }",
+			"category": "Rendering"
+		},
+		{
+			"name": "rowResized",
+			"value": "rowResized",
+			"payload": "{ rowId: string; height: number }",
+			"category": "Rows"
+		},
+		{
+			"name": "rowSelectionChanged",
+			"value": "rowSelectionChanged",
+			"payload": "RowSelectionChangeResult",
+			"category": "Selection"
+		},
+		{
+			"name": "rowsUpdated",
+			"value": "rowsUpdated",
+			"payload": "{ changedValuesByRow: Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>; changedNodes: GridRowNode<TRowData>[]; addedNodes?: GridRowNode<TRowData>[]; removedNodes?: GridRowNode<TRowData>[]; }",
+			"category": "Rows"
+		},
+		{
+			"name": "runtimeFault",
+			"value": "runtimeFault",
+			"payload": "RuntimeFault",
+			"category": "Diagnostics"
+		},
+		{
+			"name": "selectionChanged",
+			"value": "selectionChanged",
+			"payload": "{ selection: GridSelectionState; result: SelectionChangeResult }",
+			"category": "Selection"
+		},
+		{
+			"name": "paginationChanged",
+			"value": "paginationChanged",
+			"payload": "{ page: number; pageCount: number; totalRows: number; pageSize: number; }",
+			"category": "Pagination"
+		},
+		{
+			"name": "infiniteBlockLoaded",
+			"value": "infiniteBlockLoaded",
+			"payload": "{ blockIndex: number; loadedBlockStart: number; loadedBlockEnd: number; totalRecords: number; durationMs: number; }",
+			"category": "Infinite row model"
+		},
+		{
+			"name": "infiniteBlockLoadFailed",
+			"value": "infiniteBlockLoadFailed",
+			"payload": "{ blockIndex: number; startRow: number; endRow: number; message: string; }",
+			"category": "Infinite row model"
+		},
+		{
+			"name": "serverSideStateChanged",
+			"value": "serverSideStateChanged",
+			"payload": "{ loading: boolean; error: string | null; storeStates: readonly import('../serverSideRowModel.js').ServerSideStoreSnapshot[]; }",
+			"category": "Server row model"
+		},
+		{
+			"name": "showGroupFooterChanged",
+			"value": "showGroupFooterChanged",
+			"payload": "{ showGroupFooter: boolean | undefined }",
+			"category": "Grouping"
+		},
+		{
+			"name": "sortChanged",
+			"value": "sortChanged",
+			"payload": "{ sortModel: SortModel | null }",
+			"category": "Sorting"
+		},
+		{
+			"name": "cellValidationChanged",
+			"value": "cellValidationChanged",
+			"payload": "{ rowId: string; colField: string; error: string | null }",
+			"category": "Validation"
+		},
+		{
+			"name": "gridValidated",
+			"value": "gridValidated",
+			"payload": "{ errors: Array<{ rowId: string; colField: string; error: string }>; hasErrors: boolean }",
+			"category": "Validation"
+		},
+		{
+			"name": "rowDragStart",
+			"value": "rowDragStart",
+			"payload": "{ rowId: string; rowData: unknown; visualIndex: number }",
+			"category": "Row drag"
+		},
+		{
+			"name": "rowDragMove",
+			"value": "rowDragMove",
+			"payload": "{ rowId: string; overRowId: string | null; overVisualIndex: number | null }",
+			"category": "Row drag"
+		},
+		{
+			"name": "rowDragEnd",
+			"value": "rowDragEnd",
+			"payload": "{ rowId: string; overRowId: string | null; overVisualIndex: number | null }",
+			"category": "Row drag"
+		},
+		{
+			"name": "rowDragCancelled",
+			"value": "rowDragCancelled",
+			"payload": "{ rowId: string }",
+			"category": "Row drag"
+		},
+		{
+			"name": "rowOrderChanged",
+			"value": "rowOrderChanged",
+			"payload": "{ rowIds: string[] }",
+			"category": "Row drag"
+		},
+		{
+			"name": "queryModelChanged",
+			"value": "queryModelChanged",
+			"payload": "{ queryModel: import('../query/GridQueryModel.js').GridQueryModel | null }",
+			"category": "Query model"
+		},
+		{
+			"name": "viewSaved",
+			"value": "viewSaved",
+			"payload": "{ view: GridViewDefinition }",
+			"category": "Workspace"
+		},
+		{
+			"name": "viewApplied",
+			"value": "viewApplied",
+			"payload": "{ view: GridViewDefinition }",
+			"category": "Workspace"
+		},
+		{
+			"name": "viewDeleted",
+			"value": "viewDeleted",
+			"payload": "{ id: string }",
+			"category": "Workspace"
+		},
+		{
+			"name": "viewRenamed",
+			"value": "viewRenamed",
+			"payload": "{ id: string; name: string }",
+			"category": "Workspace"
+		},
+		{
+			"name": "workspaceStateChanged",
+			"value": "workspaceStateChanged",
+			"payload": "{ state: GridWorkspaceState }",
+			"category": "Workspace"
+		}
+	]
+}
