@@ -55,6 +55,20 @@ describe('ViewportPlanner', () => {
 		expect(second.frame).toBe(first.frame + 1);
 	});
 
+	it('reuses unchanged column lists across vertical frames and refreshes them when the column window moves', () => {
+		const planner = new ViewportPlanner();
+		const topology = compileColumnTopology(makePlan([makeCol('a'), makeCol('b'), makeCol('c')], 0, 0, 1));
+		const first = planner.computePlan({ ...windowWithRows(0, 9), colEnd: 1, visibleColStart: 0, visibleColEnd: 1 }, topology);
+		const vertical = planner.computePlan({ ...windowWithRows(10, 19), colEnd: 1, visibleColStart: 0, visibleColEnd: 1 }, topology);
+		expect(vertical.visibleCenterColumns).toBe(first.visibleCenterColumns);
+		expect(vertical.renderedCenterColumns).toBe(first.renderedCenterColumns);
+		expect(vertical.pinnedLeftColumns).toBe(first.pinnedLeftColumns);
+		expect(vertical.liveCenterColumnWindow).toBe(vertical.visibleCenterColumns);
+		const horizontal = planner.computePlan({ ...windowWithRows(10, 19), colStart: 1, visibleColStart: 1 }, topology);
+		expect(horizontal.visibleCenterColumns).not.toBe(vertical.visibleCenterColumns);
+		expect(horizontal.renderedCenterColumns).not.toBe(vertical.renderedCenterColumns);
+	});
+
 	it('routine horizontal scroll (same topology version) computes ColumnInstanceId entered/stayed/exited without marking the delta structural', () => {
 		const planner = new ViewportPlanner();
 		const topology = compileColumnTopology(makePlan([makeCol('a'), makeCol('b'), makeCol('c')], 0, 0, 1));

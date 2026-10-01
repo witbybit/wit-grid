@@ -26,6 +26,7 @@ export class CellRenderer {
 
 	public showPortalContent(cell: HTMLElement): void {
 		const slot = CellSlot.fromElement(cell as HTMLDivElement);
+		if (slot.lastContentMode === 'portal') return;
 		slot.element.dataset.contentMode = 'portal';
 		slot.lastContentMode = 'portal';
 	}

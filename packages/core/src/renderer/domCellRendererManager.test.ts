@@ -64,6 +64,35 @@ function scrollForwardThenBack(manager: DomCellRendererManager<Row>, renderer: D
 }
 
 describe('DomCellRendererManager warm cache sizing', () => {
+	it('rebinds in place without a sibling scan, handing each update its own params, and retires the old cell key', () => {
+		const parent = document.createElement('div');
+		const updates: Array<{ params: object; value: unknown }> = [];
+		let initialParams: { value: unknown } | undefined;
+		const renderer: DomCellRenderer<Row> = {
+			mount: (_container, params) => {
+				initialParams = params;
+				return { update: (next) => updates.push({ params: next, value: next.value }) };
+			},
+		};
+		const manager = new DomCellRendererManager<Row>(makeEngineStub());
+		const retired = vi.fn();
+		manager.onCellKeyRetired = retired;
+		const first = acquireParams(0, 0, parent, renderer);
+		manager.acquire(first);
+		const siblingScan = vi.spyOn(manager as any, 'removeSiblingContainers');
+		manager.acquire({ ...first, value: 'second' });
+		manager.acquire({ ...first, cellKey: 'r1c0', value: 'third' });
+		expect(siblingScan).not.toHaveBeenCalled();
+		expect(updates.map((update) => update.value)).toEqual(['second', 'third']);
+		// Renderers may keep params past update(): each call gets its own object.
+		expect(updates[0].params).not.toBe(updates[1].params);
+		expect((updates[0].params as { value: unknown }).value).toBe('second');
+		expect(initialParams?.value).toBe('v0-0');
+		expect(retired).toHaveBeenCalledWith('r0c0');
+		expect(manager.hasActiveDomRenderer('r0c0')).toBe(false);
+		expect(manager.hasActiveDomRenderer('r1c0')).toBe(true);
+		expect(parent.querySelectorAll('.og-dom-renderer-container')).toHaveLength(1);
+	});
 	it('thrashes (remounts) on scroll-back when the cache is undersized', () => {
 		const mountSpy = vi.fn();
 		const renderer = makeRenderer(mountSpy);
