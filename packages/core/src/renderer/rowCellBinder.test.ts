@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { applyCellTitlesAndValidation } from './binders/binderShared.js';
 import { describe, expect, it, vi } from 'vitest';
 import { CellSlot } from './cellSlot.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
@@ -818,8 +819,8 @@ describe('bindCellDuringScroll', () => {
 	it('does not promote buffered primitive DOM state into snapshot truth during scroll', () => {
 		const cellSlot = new CellSlot(document.createElement('div'));
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell warm-class', 'text', undefined, 'Name 1', undefined);
-		cellSlot.element.title = 'Warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Warm title', '', 'Needs review');
 		const snapshotSet = vi.fn();
 
 		const deps: RowCellBinderDeps<{ id: string; name: string }> = {
@@ -910,8 +911,8 @@ describe('bindCellDuringScroll', () => {
 		cellSlot.element.appendChild(host);
 		cellSlot.portalHostElement = host;
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell portal-warm', 'portal', undefined, '', portalKey);
-		cellSlot.element.title = 'Portal warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Portal warm title', '', 'Needs review');
 		cellSlot.lastMountedInsightVersion = 0;
 		cellSlot.lastMountedStyleVersion = 0;
 		cellSlot.lastMountedLoadingVersion = 0;
@@ -1994,8 +1995,8 @@ describe('bindCellDuringScroll', () => {
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell custom-class', 'portal', undefined, '', portalKey);
 		cellSlot.lastMountedGlobalVersion = 1;
 		cellSlot.lastMountedRowVersion = 2;
-		cellSlot.element.title = 'Portal warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Portal warm title', '', 'Needs review');
 		cellSlot.lastMountedInsightVersion = 0;
 		cellSlot.lastMountedStyleVersion = 0;
 		cellSlot.lastMountedLoadingVersion = 0;

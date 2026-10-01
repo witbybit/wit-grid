@@ -24,7 +24,7 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 	if (presentation.kind === 'frozen-portal') {
 		deps.cellRenderer.showPortalContent(cellSlot.element);
 		const portalHost = deps.getCellPortalHost(cellSlot.element);
-		applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+		applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 		applyCellAccessibilityState(cellSlot, cellCtrl);
 		if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
 
@@ -91,7 +91,7 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 	}
 	if (input.phase === 'scroll') deps.incrementHtmlSnapshotHitsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	// Inject the static clone of the last fidelity render into the portal host so the cell looks
 	// identical to its settled state during scroll. The host is inert — no React fiber, no event

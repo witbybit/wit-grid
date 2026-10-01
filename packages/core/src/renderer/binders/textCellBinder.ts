@@ -71,7 +71,7 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 	}
 
 	if (isScroll && markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,

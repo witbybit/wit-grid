@@ -35,26 +35,27 @@ export function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {
 	return 'og-cell';
 }
 
-export function applyCellTitlesAndValidation(
-	element: HTMLDivElement,
+export function applyCellTitlesAndValidation<TRowData>(
+	cellSlot: CellSlot<TRowData>,
 	tooltipText: string | null,
 	insightTitle: string,
 	validationError?: string
 ): void {
-	const prevValidationAttr = element.dataset.validationError;
-	if (validationError) {
-		if (prevValidationAttr !== validationError) element.dataset.validationError = validationError;
-	} else if (prevValidationAttr !== undefined) {
-		delete element.dataset.validationError;
+	// Compared with what this slot last wrote, not read back from the DOM: every writer of these two
+	// attributes goes through here, and a dataset/attribute read per cell per frame is not free.
+	const element = cellSlot.element;
+	const nextValidation = validationError || undefined;
+	if (cellSlot.writtenValidationError !== nextValidation) {
+		cellSlot.writtenValidationError = nextValidation;
+		if (nextValidation) element.dataset.validationError = nextValidation;
+		else delete element.dataset.validationError;
 	}
 
 	const title = mergeCellSnapshotTitle(tooltipText, insightTitle);
-	if (title) {
-		// Diffed rather than blind-written: an attribute write invalidates style and notifies
-		// observers even when the value is unchanged.
-		if (element.title !== title) element.title = title;
-	} else if (element.title) {
-		element.removeAttribute('title');
+	if (cellSlot.writtenTitle !== title) {
+		cellSlot.writtenTitle = title;
+		if (title) element.title = title;
+		else element.removeAttribute('title');
 	}
 }
 

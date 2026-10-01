@@ -34,7 +34,7 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 	const standIn = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
 	deps.incrementLiveReactEmergencyShellsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,
@@ -66,7 +66,7 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 	const presentation = cellCtrl.presentationState;
 	const mountRuntime = runtime.mount;
 	if (!mountRuntime) throw new Error('DOM update presentation requires mount runtime.');
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 
 	if (!(deps.tryConsumeDomUpdateBudget?.() ?? true)) {
@@ -196,7 +196,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		recordHeldPortal(cellSlot, presentation.portalKey!);
 		cellSlot.lastMountedRowVersion = rowVersion;
 		cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
-		applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+		applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 		applyCellAccessibilityState(cellSlot, cellCtrl);
 		const didWrite = cellSlot.update(
 			geometry.colIndex,
@@ -278,7 +278,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 			colWidth: runtime.colWidth,
 		});
 	}
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,

@@ -22,7 +22,7 @@ import {
 	type WarmVisibleCellStatusDeps,
 } from './warmCellStatus.js';
 import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
-import { buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
+import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
 import { reportRendererFault } from './rendererFaults.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
@@ -404,22 +404,12 @@ function applyLoadingInsightState<TRowData>(
 	colField: string
 ): string {
 	if (deps.engine.insights.size === 0) {
-		if (cellSlot.element.dataset.validationError !== undefined) delete cellSlot.element.dataset.validationError;
-		if (cellSlot.element.title) cellSlot.element.removeAttribute('title');
+		applyCellTitlesAndValidation(cellSlot, null, '', undefined);
 		return '';
 	}
 
 	const decorationMetadata = collectCellDecorationSnapshotMetadata(deps.engine.insights.getCellDecorations(rowId, colField));
-	if (decorationMetadata.validationError) {
-		cellSlot.element.dataset.validationError = decorationMetadata.validationError;
-	} else if (cellSlot.element.dataset.validationError !== undefined) {
-		delete cellSlot.element.dataset.validationError;
-	}
-	if (decorationMetadata.insightTitle) {
-		cellSlot.element.title = decorationMetadata.insightTitle;
-	} else if (cellSlot.element.title) {
-		cellSlot.element.removeAttribute('title');
-	}
+	applyCellTitlesAndValidation(cellSlot, null, decorationMetadata.insightTitle, decorationMetadata.validationError);
 	return decorationMetadata.classNameSuffix;
 }
 
@@ -457,10 +447,15 @@ interface DataRowBindState<TRowData> {
 function getWarmVisibleCellStatus<TRowData>(row: DataRowBindState<TRowData>, cellSlot: CellSlot<TRowData>): WarmVisibleCellStatus {
 	const warmContext = row.warmContext;
 	if (!warmContext) return NO_WARM_REFRESH;
+	// The slot's bound controller is the store's for this (row, column) while it is alive — the
+	// store never replaces a live controller under its key — so skip the key build + map lookup.
+	const bound = cellSlot.boundCellCtrl;
 	const cellCtrl =
-		cellSlot.columnInstanceId !== ''
-			? row.deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(row.request.node.id, cellSlot.columnInstanceId)
-			: undefined;
+		cellSlot.columnInstanceId === ''
+			? undefined
+			: bound && !bound.lifecycle.destroyed && bound.rowId === row.request.node.id && bound.columnInstanceId === cellSlot.columnInstanceId
+				? bound
+				: row.deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(row.request.node.id, cellSlot.columnInstanceId);
 	if (!cellCtrl) return WARM_CELL_UNTRACKED;
 	warmContext.cellCtrl = cellCtrl;
 	return resolveWarmVisibleCellStatus(getWarmStatusDeps(row.deps), cellSlot, warmContext);
