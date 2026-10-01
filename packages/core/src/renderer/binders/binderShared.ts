@@ -1,4 +1,4 @@
-import type { ColumnDef } from '../../columnDef.js';
+import { compilePathGetter, type ColumnDef } from '../../columnDef.js';
 import type { RowNode } from '../../rowNode.js';
 import { recordCellSlotMountedVisualVersions, type CellSlot } from '../cellSlot.js';
 import { mergeCellSnapshotTitle, type CellDisplaySnapshot } from '../cellDisplaySnapshot.js';
@@ -76,20 +76,30 @@ export function stampMountedVersions<TRowData>(
 	recordCellSlotMountedVisualVersions(cellSlot, source);
 }
 
+const pathGetters = new Map<string, (data: unknown) => unknown>();
+function getPathGetter(field: string): (data: unknown) => unknown {
+	let getter = pathGetters.get(field);
+	if (!getter) pathGetters.set(field, (getter = compilePathGetter(field)));
+	return getter;
+}
+
 /** Best-effort value to hand a live-mounted renderer when no authoritative computed value is
  *  available on the scroll hot path (mount happens outside the normal semantic-read pipeline). */
 export function getScrollMountValue<TRowData>(
 	deps: RowCellBinderDeps<TRowData>,
 	node: RowNode<TRowData>,
 	col: ColumnDef<TRowData>,
-	cellSlot?: CellSlot<TRowData>
+	cellSlot?: CellSlot<TRowData>,
+	isRowLoading = false
 ): unknown {
-	const cachedVal = deps.engine.data.getCachedDisplayValue(node.id, col.field);
-	if (cachedVal !== undefined) return cachedVal;
+	const data = deps.engine.data;
+	// Renderers get the value itself, as on a full bind — never its display string ("17", not 17).
 	if (col.valueGetter || deps.engine.hasFormula(node.id, col.field)) {
-		return '';
+		if (data.getCachedDisplayValue(node.id, col.field) === undefined) return '';
+		return data.getCachedCellValue(node.id, col.field) ?? '';
 	}
-	if (node.data) return (node.data as Record<string, unknown>)[col.field];
+	if (isRowLoading) return '';
+	if (node.data) return col.field.includes('.') ? getPathGetter(col.field)(node.data) : (node.data as Record<string, unknown>)[col.field];
 	// No row data at all (e.g. a loading placeholder row) — warm DOM may only stand in for this
 	// exact row/column identity, never for whatever row previously occupied this slot.
 	const isSameIdentity = !!cellSlot && cellSlot.rowId === node.id && cellSlot.colField === col.field;

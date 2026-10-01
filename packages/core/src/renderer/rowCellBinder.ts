@@ -925,7 +925,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				rowCtrl,
 				rowVersion,
 				cellCtrl.presentationState.kind === 'live-renderer' || cellCtrl.presentationState.kind === 'dom-update'
-					? getScrollMountValue(deps, request.node, request.col, request.cellSlot)
+					? getScrollMountValue(deps, request.node, request.col, request.cellSlot, request.isRowLoading)
 					: undefined
 			)
 		);
