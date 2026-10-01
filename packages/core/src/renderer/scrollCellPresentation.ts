@@ -145,7 +145,8 @@ export type ScrollCellPresentation =
 			portalKey: string | undefined;
 			title: string | null;
 			validationError: string | undefined;
-			recordVersionsFrom: CellDisplaySnapshot | undefined;
+			/** A snapshot, or this frame's freshness when the cell was filled with its final direct text. */
+			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness | undefined;
 	  }
 	| {
 			kind: 'primitive';
@@ -384,7 +385,20 @@ export function resolveScrollCellPresentation<TRowData>(
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
-			recordVersionsFrom: snapshot,
+			// Direct text is the cell's final content: record it as fresh, so the row entering the
+			// viewport can keep it instead of binding every cell a second time.
+			recordVersionsFrom:
+				snapshot ??
+				(directText !== undefined && preservedContentMode === 'text'
+					? {
+							rowVersion: input.rowVersion,
+							globalVersion: ctx.globalVersion,
+							insightVersion: ctx.insightVersion,
+							styleVersion: ctx.styleVersion,
+							loadingVersion: ctx.loadingVersion,
+							selectionVersion: ctx.selectionVersion,
+						}
+					: undefined),
 		};
 	}
 

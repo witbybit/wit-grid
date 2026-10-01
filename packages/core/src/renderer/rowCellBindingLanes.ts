@@ -467,6 +467,26 @@ function getWarmVisibleCellStatus<TRowData>(row: DataRowBindState<TRowData>, cel
 }
 
 /**
+ * A row entering the viewport from the overscan band normally re-binds every cell (its buffered
+ * content may be a placeholder). A plain primitive cell the buffered bind filled with its final
+ * text, still fresh for every version and neither focused nor edited, already shows exactly what
+ * the visible bind would write — keep it instead of binding it a second time.
+ */
+function canKeepCellEnteringView<TRowData>(
+	row: DataRowBindState<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	colIndex: number,
+	warmStatus: WarmVisibleCellStatus
+): boolean {
+	const ctx = row.request.ctx;
+	if (!ctx || !row.warmContext || warmStatus.needsDeferredRefresh) return false;
+	if (cellSlot.lastContentMode !== 'text' || cellSlot.lastFormattedValue === '...' || cellSlot.lastMountedRowVersion === -1) return false;
+	if (ctx.plan.columnPlans[colIndex]?.mode !== 'primitive') return false;
+	const rowId = row.request.node.id;
+	return ctx.focusedCell?.rowId !== rowId && ctx.activeEdit?.rowId !== rowId;
+}
+
+/**
  * Binds one data cell of a lane, or skips it when it is stable this scroll frame. Behaviour is the
  * former per-lane loop body verbatim; the warm status is shared between the refresh and skip checks.
  */
@@ -510,14 +530,17 @@ function bindDataCell<TRowData>(
 
 	// shouldSkipStableCellDuringScroll
 	let skip = false;
-	if (isScrollFrameActive && !forceCellRefresh && !isRowRebind) {
+	if (isScrollFrameActive && !isRowRebind && (!forceCellRefresh || isVisibleContent)) {
 		if (cellSlot.colIndex === colIndex && cellSlot.rowId === node.id && cellSlot.rowIndex === rowIndex) {
 			if (!isVisibleContent) {
 				const instanceId = (request.columns[colIndex] as InternalColumnDef<TRowData> | undefined)?.instanceId;
 				skip = !(instanceId && viewportPlan && isOverscanLiveCell(viewportPlan.liveCells.overscan, rowIndex, instanceId));
 			} else {
 				warmStatus ??= getWarmVisibleCellStatus(row, cellSlot);
-				skip = !warmStatus.needsImmediateWake && !refreshVisibleColumns?.has(colIndex);
+				skip =
+					!warmStatus.needsImmediateWake &&
+					!refreshVisibleColumns?.has(colIndex) &&
+					(!forceCellRefresh || canKeepCellEnteringView(row, cellSlot, colIndex, warmStatus));
 			}
 		}
 	}

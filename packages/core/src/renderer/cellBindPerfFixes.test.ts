@@ -233,6 +233,13 @@ describe('scroll presentation fixes', () => {
 		expect(presentation.contentMode).toBe('fallback');
 	});
 
+	it('a buffered plain primitive cell filled with its final text is recorded fresh', () => {
+		const presentation = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput({ isInVisibleContent: false }));
+		if (presentation.kind !== 'buffered') throw new Error(`expected buffered, got ${presentation.kind}`);
+		expect(presentation.contentMode).toBe('text');
+		expect(presentation.recordVersionsFrom).toMatchObject({ rowVersion: 3, globalVersion: 7 });
+	});
+
 	it('a plain primitive column shows its field value (not "...") during scroll with no snapshot', () => {
 		const presentation = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput());
 		if (presentation.kind !== 'primitive') throw new Error('unreachable');
