@@ -75,6 +75,13 @@ const SCENARIOS = [
 		wheel: { dy: 2400, events: 90 },
 	},
 	{
+		name: 'vertical-formatted',
+		title: 'Vertical scroll, formatted numbers',
+		description: 'The plain-text grid with a valueFormatter on every numeric column ($<value>).',
+		query: { rows: 100_000, cols: 50, domCols: 0, fmt: 1 },
+		wheel: { dy: 360, events: 150 },
+	},
+	{
 		name: 'vertical-react-renderers',
 		title: 'Vertical scroll, React cell renderers',
 		description:

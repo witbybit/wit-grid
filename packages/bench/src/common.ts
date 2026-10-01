@@ -24,8 +24,15 @@ function cellValue(rowId: string, colId: string): string | number {
 }
 
 /** What a fully drawn cell shows: its text, plus the bar's width for renderer columns. */
+/** ?fmt=1: numeric columns carry a valueFormatter (`$<value>`) in both grids. */
+export const formatNumbers = new URLSearchParams(location.search).get('fmt') === '1';
+export function formatBenchValue(value: unknown): string {
+	return `$${String(value)}`;
+}
+
 export function expectedSignature(rowId: string, colId: string, domCols: number): string {
 	const value = cellValue(rowId, colId);
+	if (formatNumbers && typeof value === 'number' && Number(colId.slice(1)) >= domCols) return formatBenchValue(value);
 	return Number(colId.slice(1)) < domCols ? `${value}|${(typeof value === 'number' ? value : 0) / 10}%` : String(value);
 }
 

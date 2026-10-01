@@ -59,6 +59,30 @@ function readPrimitiveDisplayText<TRowData>(deps: ScrollCellPresentationDeps, no
 	return raw == null ? '' : String(raw);
 }
 
+/**
+ * Display text the scroll path can produce without a semantic read: a plain column's own field, or
+ * a plain field through its valueFormatter — exactly what the full bind writes for it, so a cell
+ * shows its final text during scroll instead of a '...' placeholder. Getters and formulas still
+ * wait for the full bind.
+ */
+function readScrollDisplayText<TRowData>(
+	deps: ScrollCellPresentationDeps,
+	node: RowNode<TRowData>,
+	col: ColumnDef<TRowData>,
+	mode: string | undefined
+): string | undefined {
+	if (mode === 'primitive') return readPrimitiveDisplayText(deps, node, col.field);
+	if (mode !== 'primitive-formatted' || col.valueGetter || !col.valueFormatter) return undefined;
+	if (!deps.hasFormula || !node.data || col.field.indexOf('.') !== -1 || deps.hasFormula(node.id, col.field)) return undefined;
+	const value = (node.data as Record<string, unknown>)[col.field];
+	if (typeof value === 'string' && value.startsWith('=')) return undefined;
+	try {
+		return col.valueFormatter({ value, rowData: node.data as TRowData, colDef: col, rowId: node.id }) ?? '';
+	} catch {
+		return undefined;
+	}
+}
+
 export function isPrimitiveSnapshotContent(snapshot: CellDisplaySnapshot | undefined): snapshot is CellDisplaySnapshot {
 	return !!snapshot && (snapshot.contentMode === 'text' || snapshot.contentMode === 'empty' || snapshot.contentMode === 'fallback');
 }
@@ -362,8 +386,8 @@ export function resolveScrollCellPresentation<TRowData>(
 		// than clearing it, so the row enters the viewport already correct. Clearing meant a second
 		// write, a text-node replacement and a content-mode flip (a style recalc) per cell on entry.
 		const directText =
-			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive' && compiledPlan?.mode === 'primitive'
-				? readPrimitiveDisplayText(deps, node, col.field)
+			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive'
+				? readScrollDisplayText(deps, node, col, compiledPlan?.mode)
 				: undefined;
 		const preservedContentMode: CellContentMode = canReuseSnapshotPortal
 			? 'portal'
@@ -417,7 +441,7 @@ export function resolveScrollCellPresentation<TRowData>(
 		} else {
 			// A plain primitive column's value is a direct field read — show it rather than a
 			// placeholder. Anything needing a valueGetter/formatter/formula keeps the placeholder.
-			const directText = compiledPlan?.mode === 'primitive' ? readPrimitiveDisplayText(deps, node, col.field) : undefined;
+			const directText = readScrollDisplayText(deps, node, col, compiledPlan?.mode);
 			if (directText !== undefined) {
 				formattedValue = directText;
 				contentMode = directText === '' ? 'empty' : 'text';

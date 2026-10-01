@@ -240,6 +240,27 @@ describe('scroll presentation fixes', () => {
 		expect(presentation.recordVersionsFrom).toMatchObject({ rowVersion: 3, globalVersion: 7 });
 	});
 
+	it('a plain field with a valueFormatter shows its formatted text (not "...") during scroll and while buffered', () => {
+		const col = { field: 'name', valueFormatter: ({ value }: { value: unknown }) => `<${String(value)}>` } as any;
+		const ctx = { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: false, mode: 'primitive-formatted' }] } } as any;
+		const visible = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput({ col, ctx }));
+		if (visible.kind !== 'primitive') throw new Error(`expected primitive, got ${visible.kind}`);
+		expect(visible.formattedValue).toBe('<Name 1>');
+		const buffered = resolveScrollCellPresentation(
+			makeScrollDeps({ hasFormula: () => false }),
+			scrollInput({ col, ctx, isInVisibleContent: false })
+		);
+		if (buffered.kind !== 'buffered') throw new Error(`expected buffered, got ${buffered.kind}`);
+		expect(buffered.formattedValue).toBe('<Name 1>');
+		// A getter still waits for the full bind.
+		const getter = resolveScrollCellPresentation(
+			makeScrollDeps({ hasFormula: () => false }),
+			scrollInput({ col: { ...col, valueGetter: () => 'x' }, ctx })
+		);
+		if (getter.kind !== 'primitive') throw new Error(`expected primitive, got ${getter.kind}`);
+		expect(getter.formattedValue).toBe('...');
+	});
+
 	it('a plain primitive column shows its field value (not "...") during scroll with no snapshot', () => {
 		const presentation = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput());
 		if (presentation.kind !== 'primitive') throw new Error('unreachable');

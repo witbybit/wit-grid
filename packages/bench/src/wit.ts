@@ -1,13 +1,25 @@
 import { createClientGrid, type ColumnDef } from '../../core/src/index.js';
 import { mountGridHost } from '../../core/src/internal.js';
-import { createBarElements, rendererCalls, installMeasurement, makeRows, markReady, paintBar, readScenario, type BenchRow } from './common.js';
+import {
+	createBarElements,
+	formatBenchValue,
+	formatNumbers,
+	rendererCalls,
+	installMeasurement,
+	makeRows,
+	markReady,
+	paintBar,
+	readScenario,
+	type BenchRow,
+} from './common.js';
 
 const scenario = readScenario();
 const container = document.getElementById('grid')!;
 
 const columns: ColumnDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_, c) => {
 	const base = { field: `c${c}`, header: `Col ${c}`, width: 110 };
-	if (c >= scenario.domCols) return base;
+	if (c >= scenario.domCols)
+		return formatNumbers && c % 3 !== 0 ? { ...base, valueFormatter: ({ value }: { value: unknown }) => formatBenchValue(value) } : base;
 	return {
 		...base,
 		renderer: {
