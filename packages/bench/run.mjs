@@ -86,7 +86,8 @@ const SCENARIOS = [
 	},
 ]
 	.filter((s) => !args.only || s.name === args.only)
-	.filter((s) => fidelity || !s.fidelityOnly);
+	// Fidelity-only scenarios have no AG counterpart; they still time on request (--only=<name>), Wit alone.
+	.filter((s) => fidelity || !s.fidelityOnly || args.only === s.name);
 
 async function bundle() {
 	mkdirSync(out, { recursive: true });
@@ -144,6 +145,9 @@ async function runOnce(browser, grid, scenario) {
 	for (const [key, value] of Object.entries(scenario.query)) url.searchParams.set(key, String(value));
 	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
 	if (fidelity) url.searchParams.set('fidelity', '1');
+	// --react-mode=<live|html-snapshot|freeze> sets the React cells' scroll presentation (wit-react page).
+	if (args['react-mode'] && grid === 'wit-react') url.searchParams.set('reactMode', args['react-mode']);
+	if (args['react-mounts'] && grid === 'wit-react') url.searchParams.set('reactMounts', args['react-mounts']);
 	await page.goto(url.href);
 	await page.waitForFunction(() => window.benchReady === true, null, { timeout: 60_000 });
 	await page.mouse.move(600, 360);

@@ -30,11 +30,19 @@ function BarCell({ value }: { value: unknown }) {
 
 const columns: ColumnDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_, c) => {
 	const base = { field: `c${c}`, header: `Col ${c}`, width: 110 };
-	return c < scenario.domCols ? { ...base, renderer: { kind: 'react' as const, component: BarCell } } : base;
+	if (c >= scenario.domCols) return base;
+	// ?reactMode=live|html-snapshot|freeze picks the scroll presentation; default: none declared.
+	const mode = new URLSearchParams(location.search).get('reactMode');
+	const capabilities = mode ? { capabilities: { scrollPresentation: mode as 'live' | 'html-snapshot' | 'freeze' } } : {};
+	return { ...base, renderer: { kind: 'react' as const, component: BarCell, ...capabilities } };
 });
 const rows = makeRows(scenario);
 
-createRoot(container).render(<Grid<BenchRow> columns={columns} rows={rows} getRowId={(row) => row.id} />);
+// ?reactMounts=<n> caps live React mounts per frame (rendererOptions.liveReact.maxMountsPerFrame).
+const reactMounts = new URLSearchParams(location.search).get('reactMounts');
+const rendererOptions = reactMounts ? { liveReact: { maxMountsPerFrame: Number(reactMounts) } } : undefined;
+
+createRoot(container).render(<Grid<BenchRow> columns={columns} rows={rows} getRowId={(row) => row.id} rendererOptions={rendererOptions} />);
 
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.og-scroll-viewport'),
