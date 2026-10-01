@@ -108,6 +108,17 @@ export function canFreezeExistingPortalForIdentity<TRowData>(
  * acceptable mode set genuinely differs per call site — e.g. exactly text/fallback vs. merely
  * not-portal), so this deliberately does not make that filtering decision itself.
  */
+/**
+ * Warm text a stand-in may reuse: text the slot actually showed for this identity. An overscan
+ * row's portal cell is buffered empty, so reusing its "fresh" empty text would leave the cell blank
+ * on entry until the real renderer mounts; the current cheap value is shown instead.
+ */
+function isShownWarmText(
+	warm: { formattedValue: string; contentMode: CellContentMode } | undefined
+): warm is { formattedValue: string; contentMode: CellContentMode } {
+	return !!warm && (warm.contentMode === 'text' || warm.contentMode === 'fallback');
+}
+
 export function canReuseWarmTextForIdentity<TRowData>(
 	cellSlot: Pick<CellSlot<TRowData>, 'lastContentMode' | 'lastFormattedValue'>,
 	isWarmBindingVersionFresh: boolean
@@ -644,7 +655,7 @@ export function resolveScrollCellPresentation<TRowData>(
 			if (allowTextFallbackWhenMissing) {
 				const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
 				const warmSyntheticText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-				const cheapValue = warmSyntheticText && warmSyntheticText.contentMode !== 'portal' ? warmSyntheticText.formattedValue : genericCheap;
+				const cheapValue = isShownWarmText(warmSyntheticText) ? warmSyntheticText.formattedValue : genericCheap;
 				return {
 					kind: 'text-impostor',
 					className: cellClassName,
@@ -666,7 +677,7 @@ export function resolveScrollCellPresentation<TRowData>(
 		}
 		const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
 		const warmSyntheticText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-		const cheapValue = warmSyntheticText && warmSyntheticText.contentMode !== 'portal' ? warmSyntheticText.formattedValue : genericCheap;
+		const cheapValue = isShownWarmText(warmSyntheticText) ? warmSyntheticText.formattedValue : genericCheap;
 		const syntheticMode: CellContentMode = cheapValue !== '' ? 'fallback' : 'empty';
 		return {
 			kind: 'shell',
@@ -733,7 +744,7 @@ export function resolveScrollCellPresentation<TRowData>(
 	// real renderer later.
 	const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
 	const warmFallbackText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-	const fallbackCheapValue = warmFallbackText && warmFallbackText.contentMode !== 'portal' ? warmFallbackText.formattedValue : genericCheap;
+	const fallbackCheapValue = isShownWarmText(warmFallbackText) ? warmFallbackText.formattedValue : genericCheap;
 	const fallbackSyntheticMode: CellContentMode = fallbackCheapValue !== '' ? 'fallback' : 'empty';
 	return {
 		kind: 'shell',

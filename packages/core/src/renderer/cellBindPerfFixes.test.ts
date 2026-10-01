@@ -215,6 +215,24 @@ describe('scroll presentation fixes', () => {
 		expect(presentation.formattedValue).toBe('new row');
 	});
 
+	it('a portal cell entering view shows its value, not the empty text it was buffered with', () => {
+		// An overscan row's portal cell is buffered empty; that empty text is still version-fresh.
+		const cellSlot = new CellSlot(document.createElement('div'));
+		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', 'empty', undefined, '', undefined);
+		const presentation = resolveScrollCellPresentation(
+			makeScrollDeps({ getCheapDisplayValue: () => '513' }),
+			scrollInput({
+				cellSlot,
+				isWarmBindingVersionFresh: true,
+				col: { field: 'name', cellRenderer: () => null } as any,
+				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
+			})
+		);
+		if (presentation.kind !== 'shell') throw new Error(`expected a shell, got ${presentation.kind}`);
+		expect(presentation.formattedValue).toBe('513');
+		expect(presentation.contentMode).toBe('fallback');
+	});
+
 	it('a plain primitive column shows its field value (not "...") during scroll with no snapshot', () => {
 		const presentation = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput());
 		if (presentation.kind !== 'primitive') throw new Error('unreachable');
