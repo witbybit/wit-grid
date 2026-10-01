@@ -199,3 +199,40 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 		},
 	};
 }
+
+/**
+ * Re-points a detached controller at another row of the same column, leaving it exactly as
+ * createCellCtrl(input) would build it (only the physical attachment is kept). Used when a slot is
+ * recycled to a new row, instead of releasing one controller and allocating another. The key and
+ * row id change, so a work token issued for the previous row stays invalid.
+ */
+export function rekeyCellCtrl(cellCtrl: CellCtrl, input: CreateCellCtrlInput): void {
+	const target = cellCtrl as { -readonly [K in keyof CellCtrl]: CellCtrl[K] };
+	target.key = createCellControllerKey(input.rowId, input.columnInstanceId);
+	target.rowId = input.rowId;
+	target.rowIndex = input.rowIndex ?? -1;
+	target.rowCtrlKey = input.rowCtrlKey ?? input.rowId;
+	target.colIndex = input.colIndex ?? -1;
+	target.scrollPresentation = input.scrollPresentation ?? 'primitive';
+	target.freshness = input.freshness;
+	const value = target.valueState;
+	value.value = undefined;
+	value.formattedValue = '';
+	value.displayText = '';
+	value.loading = false;
+	value.empty = true;
+	target.visualState = { className: '', title: null, selected: false, focused: false, editing: false, readOnly: false };
+	const lifecycle = target.lifecycle;
+	lifecycle.destroyed = false;
+	lifecycle.stale = false;
+	lifecycle.retainedBecause = undefined;
+	target.presentationState = {
+		kind: 'primitive',
+		className: '',
+		title: null,
+		requiresFidelity: false,
+		freshness: input.freshness ?? createDefaultFreshness(),
+		formattedValue: '',
+		contentMode: 'empty',
+	};
+}

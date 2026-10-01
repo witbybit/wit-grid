@@ -1,6 +1,6 @@
 import { createRowCtrl, type RowCtrl } from './RowCtrl.js';
 import { CellCtrlStore } from './CellCtrlStore.js';
-import type { CellCtrl } from './CellCtrl.js';
+import type { CellCtrl, CreateCellCtrlInput } from './CellCtrl.js';
 
 export interface RowCtrlStoreStats {
 	created: number;
@@ -11,6 +11,8 @@ export interface RowCtrlStoreStats {
 	 *  rather than on a separate store since CellCtrl lifecycle is entirely a function of RowCtrl. */
 	cellCtrlsCreated: number;
 	cellCtrlsReused: number;
+	/** Controllers handed from a slot's previous row to its new one (rekeyDetachedCellCtrl). */
+	cellCtrlsRekeyed: number;
 }
 
 /**
@@ -34,12 +36,12 @@ export interface RowCtrlStoreStats {
 export class RowCtrlStore<TRowData = unknown> {
 	private readonly byRowId = new Map<string, RowCtrl<TRowData>>();
 	public readonly cellCtrls = new CellCtrlStore<TRowData>();
-	public stats: RowCtrlStoreStats = { created: 0, reused: 0, evicted: 0, cellCtrlsCreated: 0, cellCtrlsReused: 0 };
+	public stats: RowCtrlStoreStats = { created: 0, reused: 0, evicted: 0, cellCtrlsCreated: 0, cellCtrlsReused: 0, cellCtrlsRekeyed: 0 };
 
 	/** Resets all counters to zero — mirrors resetRenderTelemetry()'s Object.assign(stats,
 	 *  createXStats()) convention used for RenderRuntimeStats elsewhere in the renderer. */
 	public resetStats(): void {
-		this.stats = { created: 0, reused: 0, evicted: 0, cellCtrlsCreated: 0, cellCtrlsReused: 0 };
+		this.stats = { created: 0, reused: 0, evicted: 0, cellCtrlsCreated: 0, cellCtrlsReused: 0, cellCtrlsRekeyed: 0 };
 	}
 
 	public getOrCreate(rowId: string): RowCtrl<TRowData> {
@@ -77,6 +79,30 @@ export class RowCtrlStore<TRowData = unknown> {
 		if (!rowCtrl.isFocused && !rowCtrl.isEditing && this.cellCtrls.sizeForRow(rowCtrl.rowId) === 0) {
 			this.byRowId.delete(rowCtrl.rowId);
 		}
+		return true;
+	}
+
+	/**
+	 * A slot recycled to another row hands its controller to the new row instead of releasing it and
+	 * allocating another — allowed exactly when releaseDetachedCellCtrl would release it (attached to
+	 * this slot, not focused or editing) and the new row has no controller for the column yet.
+	 */
+	public rekeyDetachedCellCtrl(cellCtrl: CellCtrl, slotInstanceId: string, input: CreateCellCtrlInput): boolean {
+		if (cellCtrl.lifecycle.destroyed) return false;
+		if (cellCtrl.lifecycle.attachedSlotInstanceId !== slotInstanceId) return false;
+		if (cellCtrl.visualState.focused || cellCtrl.visualState.editing) return false;
+		const previousRowCtrl = this.byRowId.get(cellCtrl.rowId);
+		const previousKey = cellCtrl.key;
+		if (!this.cellCtrls.rekey(cellCtrl, input)) return false;
+		if (previousRowCtrl) {
+			if (previousRowCtrl.cellKeysByColumnInstanceId.get(cellCtrl.columnInstanceId) === previousKey) {
+				previousRowCtrl.cellKeysByColumnInstanceId.delete(cellCtrl.columnInstanceId);
+			}
+			if (!previousRowCtrl.isFocused && !previousRowCtrl.isEditing && this.cellCtrls.sizeForRow(previousRowCtrl.rowId) === 0) {
+				this.byRowId.delete(previousRowCtrl.rowId);
+			}
+		}
+		this.stats.cellCtrlsRekeyed++;
 		return true;
 	}
 

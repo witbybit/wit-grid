@@ -356,18 +356,31 @@ function attachCellCtrl<TRowData>(
 			cellCtrlStore = new CellCtrlStore<TRowData>();
 			fallbackCellCtrlStores.set(rowCtrl as object, cellCtrlStore);
 		}
-		const result = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, {
+		const metadata = {
 			rowIndex: request.rowIndex,
 			rowCtrlKey: rowCtrl.rowId,
 			colId: col.colId ?? col.field,
 			colField: col.field,
 			colIndex: request.colIndex,
 			scrollPresentation: getCellScrollPresentation(col as InternalColumnDef<TRowData>),
-		});
-		cellCtrl = result.cellCtrl;
-		if (rowCtrlStore) {
-			if (result.created) rowCtrlStore.stats.cellCtrlsCreated++;
-			else rowCtrlStore.stats.cellCtrlsReused++;
+		};
+		// A slot recycled to another row: hand its controller over rather than releasing it and
+		// allocating a new one (only where the release would have happened anyway).
+		if (
+			rowCtrlStore &&
+			bound &&
+			bound.columnInstanceId === instanceId &&
+			rowCtrlStore.rekeyDetachedCellCtrl(bound, cellSlot.cellInstanceId, { ...metadata, rowId: rowCtrl.rowId, columnInstanceId: instanceId })
+		) {
+			cellCtrl = bound;
+			rowCtrl.cellKeysByColumnInstanceId.set(instanceId, cellCtrl.key);
+		} else {
+			const result = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, metadata);
+			cellCtrl = result.cellCtrl;
+			if (rowCtrlStore) {
+				if (result.created) rowCtrlStore.stats.cellCtrlsCreated++;
+				else rowCtrlStore.stats.cellCtrlsReused++;
+			}
 		}
 	}
 	// Hand the previously presented controller (another row's) back to its store — this is what
