@@ -14,7 +14,7 @@ import type { CompiledColumnTopology } from './columnTopology.js';
 import type { ViewportPlan } from './viewportPlanner.js';
 import { GridMetric, type GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { collectCellDecorationSnapshotMetadata, createCellDisplaySnapshot } from './cellDisplaySnapshot.js';
-import { applyCellSlotRetentionPolicy, stampNewCellSlotForRetention } from './cellSlotRetention.js';
+import { applyCellSlotRetentionPolicy, stampNewCellSlotForRetention, takeRecycledCell } from './cellSlotRetention.js';
 import {
 	resolveWarmVisibleCellStatus,
 	type WarmVisibleCellStatus,
@@ -306,15 +306,22 @@ function reconcileCellTopologyForScroll<TRowData>(
 		function ensureCell(instanceId: ColumnInstanceId, col: ColumnDef<TRowData>): CellSlot<TRowData> {
 			let cell = slot.cellsByColumnInstanceId.get(instanceId);
 			if (!cell) {
-				const el = document.createElement('div');
-				if (isDirectTextColumn(col)) el.dataset.textCell = '';
-				initFn(el);
-				cell = CellSlot.fromElement<TRowData>(el);
+				const directText = isDirectTextColumn(col);
+				const recycled = takeRecycledCell(slot, directText);
+				if (recycled) {
+					cell = recycled;
+					if (retentionStats) retentionStats.cellSlotsReusedDuringTopology++;
+				} else {
+					const el = document.createElement('div');
+					if (directText) el.dataset.textCell = '';
+					initFn(el);
+					cell = CellSlot.fromElement<TRowData>(el);
+					instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
+					if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
+				}
 				cell.columnInstanceId = instanceId;
 				slot.cellsByColumnInstanceId.set(instanceId, cell);
 				stampNewCellSlotForRetention(cell);
-				instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
-				if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
 			} else if (retentionStats) {
 				retentionStats.cellSlotsReusedDuringTopology++;
 			}

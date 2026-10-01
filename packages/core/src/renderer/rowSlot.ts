@@ -57,6 +57,9 @@ export class RowSlot<TRowData = unknown> {
 	// Keyed by ColumnInstanceId, not field — a field that is semantically replaced (different
 	// renderer/valueGetter reusing the same field) gets a new instance id and therefore a fresh cell.
 	public readonly cellsByColumnInstanceId: Map<ColumnInstanceId, CellSlot<TRowData>> = new Map();
+	/** Plain cells the retention policy evicted, kept detached for the next column entering this
+	 *  row (horizontal scroll) instead of destroying one cell and creating another. */
+	public readonly recycledCells: CellSlot<TRowData>[] = [];
 
 	// ── Lane-based cell slots (derived from cellsByColumnInstanceId) ─────────────────
 	// Three ordered arrays — one per pin lane. Rebuilt each frame by reconcileTopology.
@@ -261,6 +264,7 @@ export class RowSlot<TRowData = unknown> {
 		for (const cell of this.rightCells) allCells.add(cell);
 		for (const cell of allCells) cell.unbindCold();
 		this.cellsByColumnInstanceId.clear();
+		this.recycledCells.length = 0;
 		this.leftCells.length = 0;
 		this.centerCells.length = 0;
 		this.rightCells.length = 0;
