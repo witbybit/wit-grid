@@ -20,14 +20,14 @@ is actively scrolling, independent of what it shows at rest.
 `scrollPresentation` is the one field that chooses the mode; each mode has its own config sub-object, valid only
 alongside that mode.
 
-| Mode            | What shows during active scroll                                                            | Cost    |
-| --------------- | ------------------------------------------------------------------------------------------ | ------- |
-| `primitive`     | N/A — default for columns with no custom renderer. Fast text/class presentation always.    | Lowest  |
-| `update`        | DOM renderers only: entering cells are redrawn in place, within a per-frame budget.        | Low     |
-| `freeze`        | The existing rendered cell stays visually frozen. New/cold cells show a shell placeholder. | Low     |
-| `text-impostor` | An explicit cheap text/chip stand-in you provide (`textImpostor.render`).                  | Low     |
-| `html-snapshot` | A captured inert HTML clone of the cell, replayed during scroll.                           | Medium  |
-| `live`          | The real renderer is mounted/updated on every scroll frame. No fallback, no placeholder.   | Highest |
+| Mode            | What shows during active scroll                                                          | Cost    |
+| --------------- | ---------------------------------------------------------------------------------------- | ------- |
+| `primitive`     | N/A — default for columns with no custom renderer. Fast text/class presentation always.  | Lowest  |
+| `update`        | DOM renderers only: entering cells are redrawn in place, within a per-frame budget.      | Low     |
+| `freeze`        | The existing rendered cell stays visually frozen. New/cold cells show the cell's text.   | Low     |
+| `text-impostor` | An explicit cheap text/chip stand-in you provide (`textImpostor.render`).                | Low     |
+| `html-snapshot` | A captured inert HTML clone of the cell, replayed during scroll.                         | Medium  |
+| `live`          | The real renderer is mounted/updated on every scroll frame. No fallback, no placeholder. | Highest |
 
 With no explicit `scrollPresentation`, a DOM renderer (`kind: 'dom'`) uses `update` and a React renderer uses
 `freeze`. `primitive` is the default for columns with no renderer at all — there's nothing to freeze or snapshot.
@@ -192,9 +192,10 @@ because it's about total frame budget across every visible cell:
 ```
 
 <Callout title='Tune this before you need to' type='warn'>
-	The defaults are conservative. If a dashboard with many `live` columns feels like it's dropping frames under heavy scroll,
-	`liveReact.maxMountsPerFrame` / `maxUpdatesPerFrame` are usually the first things to raise — the tradeoff is exactly the one `scrollPresentation`
-	exists to make explicit: more fidelity per frame costs more per frame.
+	`liveReact` is unlimited by default: every visible `live` cell mounts and updates on every frame. If a dashboard with many `live` columns drops
+	frames under heavy scroll, cap `liveReact.maxMountsPerFrame` / `maxUpdatesPerFrame`; a cell over the cap shows its text for that frame (never
+	another row's content) and is redrawn when scrolling settles. The tradeoff is exactly the one `scrollPresentation` exists to make explicit: more
+	fidelity per frame costs more per frame.
 </Callout>
 
 ## The rendering window
@@ -241,7 +242,11 @@ margin shrinks.
 
 - Nothing custom on the cell → don't set `scrollPresentation` at all (`primitive`).
 - DOM renderer → leave the default (`update`): cells are drawn in place during scroll.
-- React renderer, appearance rarely changes → leave the default (`freeze`).
+- React renderer, appearance rarely changes → leave the default (`freeze`). Cells entering view during scroll show
+  their text until scrolling settles, then the component.
+- React renderer whose component must show while scrolling (bars, badges, avatars) → `live`. In the bench
+  (100,000 rows, 10 React columns, real wheel input) this draws every visible cell correctly on every frame, for about
+  28% more main-thread time than `freeze`; the cost is the React re-renders, so a mount cap saves little.
 - Custom renderer, expensive to mount, appearance mostly static mid-scroll → `html-snapshot`.
 - Custom renderer, cheap plain-text equivalent exists → `text-impostor`.
 - Data changes multiple times per second and staleness would mislead → `live`, with `update: 'imperative'` only
