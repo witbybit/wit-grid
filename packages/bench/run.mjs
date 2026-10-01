@@ -178,7 +178,8 @@ async function runOnce(browser, grid, scenario) {
 	// page.mouse.wheel resolves once the page has handled the event, so time beyond the fixed
 	// 16ms pacing is main-thread work spent handling that input.
 	const inputOverheadMs = (performance.now() - inputStart) / events - 16;
-	await page.waitForTimeout(400);
+	if (fidelity) await page.evaluate(() => window.bench.markInputEnd());
+	await page.waitForTimeout(fidelity ? 1500 : 400);
 	const raw = await page.evaluate(() => window.bench.stop());
 	const after = await readMetrics();
 	const rest = fidelity ? await page.evaluate(() => window.bench.restFidelity()) : null;
@@ -275,6 +276,8 @@ function summarizeFidelity(stats, rest, grid) {
 		blankPct: (100 * stats.blank) / Math.max(1, stats.cellFrames),
 		incompletePct: (100 * stats.incomplete) / Math.max(1, stats.cellFrames),
 		otherContentPct: (100 * stats.otherContent) / Math.max(1, stats.cellFrames),
+		// After the last input, until every visible cell is final (-1: not within the 1.5 s tail).
+		settleMs: stats.settleMs,
 		// Must be 0: once scrolling settles every visible cell is right (validates the measure).
 		wrongAtRest: rest.wrongCells,
 		restCells: rest.cellFrames,
@@ -404,6 +407,7 @@ const fidelityTable = () =>
 		'frames with wrong %': fmt(r.framesWithWrongPct),
 		'changes in view /1k': fmt(r.changesPer1k, 2),
 		'blank / incomplete / other %': `${fmt(r.blankPct, 2)} / ${fmt(r.incompletePct, 2)} / ${fmt(r.otherContentPct, 2)}`,
+		'settle ms': fmt(r.settleMs, 0),
 		'wrong at rest': fmt(r.wrongAtRest, 0),
 		'cell-frames': fmt(r.cellFrames, 0),
 	}));

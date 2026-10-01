@@ -90,6 +90,8 @@ interface FidelityStats {
 	blank: number;
 	incomplete: number;
 	otherContent: number;
+	/** ms from the last input until the first frame with every visible cell final (-1: never). */
+	settleMs: number;
 	wrongExamples: string[];
 }
 
@@ -102,6 +104,7 @@ const emptyFidelity = (): FidelityStats => ({
 	blank: 0,
 	incomplete: 0,
 	otherContent: 0,
+	settleMs: -1,
 	wrongExamples: [],
 });
 
@@ -133,6 +136,7 @@ export function installMeasurement(options: {
 	const fidelityMode = new URLSearchParams(location.search).get('fidelity') === '1';
 	const domCols = readScenario().domCols;
 	let lastSeen = new Map<string, string>();
+	let inputEndedAt = -1;
 
 	function bodyBox() {
 		const viewport = options.viewport();
@@ -181,6 +185,8 @@ export function installMeasurement(options: {
 		stats.frames++;
 		stats.wrongCells += wrong;
 		if (wrong > 0) stats.framesWithWrong++;
+		if (inputEndedAt >= 0 && stats.settleMs < 0 && wrong === 0) stats.settleMs = performance.now() - inputEndedAt;
+		else if (inputEndedAt >= 0 && wrong > 0) stats.settleMs = -1;
 	}
 
 	function sampleCoverage(): number {
@@ -218,6 +224,7 @@ export function installMeasurement(options: {
 			m.coverage = [];
 			m.fidelity = emptyFidelity();
 			lastSeen = new Map();
+			inputEndedAt = -1;
 			m.running = true;
 			observer = new PerformanceObserver((list) => {
 				for (const entry of list.getEntries()) m.longTasks.push(entry.duration);
@@ -260,6 +267,10 @@ export function installMeasurement(options: {
 			m.running = false;
 			observer?.disconnect();
 			return { frames: m.frames, longTasks: m.longTasks, coverage: m.coverage, fidelity: m.fidelity };
+		},
+		/** The runner sent its last input: fidelity measures how long the grid takes to settle from here. */
+		markInputEnd() {
+			inputEndedAt = performance.now();
 		},
 		/** Fidelity of the grid at rest: after the scroll has settled every visible cell must be right. */
 		restFidelity() {
