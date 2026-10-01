@@ -47,6 +47,8 @@ const cssVariant = new URLSearchParams(location.search).get('css');
 const CSS_VARIANTS: Record<string, string> = {
 	cell: '.og-cell{contain:strict}',
 	cellrow: '.og-cell{contain:strict}.og-row{contain:strict}',
+	// Rows as layout boundaries without size containment (row heights stay measurable).
+	rowlayout: '.og-row{contain:layout style}',
 	// Renderer containers as layout boundaries: a change inside stops there instead of dirtying the cell, row and rows container.
 	hoststrict: '.og-dom-renderer-container,.og-custom-renderer-container{contain:strict}',
 	// The portal host without a box of its own.
