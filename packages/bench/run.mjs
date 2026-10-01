@@ -267,6 +267,10 @@ function summarizeFidelity(stats, rest, grid) {
 		// Content changes of a cell that stayed in view, per 1,000 visible cell-frames.
 		changesPer1k: (1000 * stats.changes) / Math.max(1, stats.cellFrames),
 		changes: stats.changes,
+		// Wrong cells by kind, as % of visible cell-frames.
+		blankPct: (100 * stats.blank) / Math.max(1, stats.cellFrames),
+		incompletePct: (100 * stats.incomplete) / Math.max(1, stats.cellFrames),
+		otherContentPct: (100 * stats.otherContent) / Math.max(1, stats.cellFrames),
 		// Must be 0: once scrolling settles every visible cell is right (validates the measure).
 		wrongAtRest: rest.wrongCells,
 		restCells: rest.cellFrames,
@@ -395,6 +399,7 @@ const fidelityTable = () =>
 		'wrong cells % (min-max)': `${fmt(r.wrongCellPct, 2)} (${fmt(r.spread.wrongCellPct.min, 2)}-${fmt(r.spread.wrongCellPct.max, 2)})`,
 		'frames with wrong %': fmt(r.framesWithWrongPct),
 		'changes in view /1k': fmt(r.changesPer1k, 2),
+		'blank / incomplete / other %': `${fmt(r.blankPct, 2)} / ${fmt(r.incompletePct, 2)} / ${fmt(r.otherContentPct, 2)}`,
 		'wrong at rest': fmt(r.wrongAtRest, 0),
 		'cell-frames': fmt(r.cellFrames, 0),
 	}));

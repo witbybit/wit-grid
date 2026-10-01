@@ -86,10 +86,24 @@ interface FidelityStats {
 	wrongCells: number;
 	framesWithWrong: number;
 	changes: number;
+	/** Wrong cells by kind: nothing shown; the right text without the renderer's output; anything else (stale, another row's). */
+	blank: number;
+	incomplete: number;
+	otherContent: number;
 	wrongExamples: string[];
 }
 
-const emptyFidelity = (): FidelityStats => ({ frames: 0, cellFrames: 0, wrongCells: 0, framesWithWrong: 0, changes: 0, wrongExamples: [] });
+const emptyFidelity = (): FidelityStats => ({
+	frames: 0,
+	cellFrames: 0,
+	wrongCells: 0,
+	framesWithWrong: 0,
+	changes: 0,
+	blank: 0,
+	incomplete: 0,
+	otherContent: 0,
+	wrongExamples: [],
+});
 
 /** Visible text plus the visible bar's width: what a viewer actually sees in the cell. */
 function readSignature(cell: HTMLElement): string {
@@ -153,6 +167,9 @@ export function installMeasurement(options: {
 				const expected = expectedSignature(rowId, colId, domCols);
 				if (signature !== expected) {
 					wrong++;
+					if (signature === '') stats.blank++;
+					else if (signature === expected.split('|')[0]) stats.incomplete++;
+					else stats.otherContent++;
 					if (stats.wrongExamples.length < 8)
 						stats.wrongExamples.push(`${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`);
 				}
