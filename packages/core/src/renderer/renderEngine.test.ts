@@ -160,7 +160,7 @@ describe('RenderEngine', () => {
 		// A toggle changes state.expansion (→ captureSnapshot, sync) and invalidates the
 		// viewport with reason 'group expansion'. Running the gated flush then plays it.
 		animateMock.mockClear();
-		store.engine.groupingFeature.toggleGroupExpanded('group:category=A');
+		store.engine.groupingFeature.toggleExpanded('group:category=A');
 		(renderer as unknown as { flushPaint: () => void }).flushPaint();
 
 		expect(animateMock).toHaveBeenCalled();
@@ -716,7 +716,7 @@ describe('RenderEngine', () => {
 			resizedEvents++;
 		});
 		const stateCommits = vi.spyOn(store.engine.stateManager, 'commitState');
-		const projectionGeometryRebuilds = vi.spyOn(store.engine.geometry, 'updateRows');
+		const projectionGeometryRebuilds = vi.spyOn(store.engine.geometry, 'syncRows');
 
 		// Drive one measurement delivery directly: work assertions use commits/rebuilds, never time.
 		(renderer as unknown as { measureAndUpdateRowHeights(): void }).measureAndUpdateRowHeights();
@@ -2899,7 +2899,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('defers row portal work for detail rows during active scroll', () => {
+	it('defers row portal work for detail rows during active scroll once the mount budget is spent', () => {
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 			callbacks.push(cb);
@@ -2914,11 +2914,11 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
+			// Budget 0: every full-width row waits for scroll to settle (the deferral path).
+			rendererOptions: { fullWidth: { maxMountsPerScrollFrame: 0 } },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`row-${index}`, true])),
 			},
 		});
@@ -2988,11 +2988,9 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: { 'row-0': true },
 			},
 		});
@@ -3054,12 +3052,10 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			styleRules: [{ kind: 'detailRow', rowClass: 'custom-detail-row' }],
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: Object.fromEntries(Array.from({ length: 80 }, (_, index) => [`row-${index}`, true])),
 			},
 		});
@@ -3106,11 +3102,9 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: {
 					'row-0': true,
 					'row-1': true,
@@ -4295,7 +4289,7 @@ describe('RenderEngine', () => {
 
 		cell = container.querySelector('.og-cell') as HTMLDivElement;
 		expect(cell.className).not.toContain('og-cell-loading');
-		expect(cell.querySelector('.og-cell-content')?.textContent).toBe('A0');
+		expect(cell.textContent).toBe('A0');
 
 		renderer.unmount();
 		store.destroy();
@@ -4312,8 +4306,7 @@ describe('RenderEngine', () => {
 			defaultRowHeight: 40,
 			defaultColWidth: 180,
 			getRowId: (row) => row.id,
-			masterDetailEnabled: true,
-			detailRowHeight: 40,
+			detail: { height: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [{ id: 'row-0', name: 'Row 0' }],
@@ -4345,7 +4338,7 @@ describe('RenderEngine', () => {
 		expect(onMountRow).not.toHaveBeenCalled();
 
 		// Expand the row
-		store.toggleDetailExpanded('row-0');
+		store.toggleDetailOpen('row-0');
 
 		// Wait for render scheduler frame
 		await Promise.resolve();

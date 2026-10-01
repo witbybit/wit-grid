@@ -98,8 +98,30 @@ describe('PortalMountManager', () => {
 		expect(releaseMenu).toHaveBeenCalledTimes(1);
 	});
 
-	it('defers row portal mounts and releases while scrolling', () => {
+	it('mounts full-width rows during scroll up to the per-frame budget, and defers the rest', () => {
 		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 1;
+		const mountRow = vi.fn();
+		const releaseRow = vi.fn();
+		manager.onMountRowContent = mountRow;
+		manager.onUnmountRowContent = releaseRow;
+		manager.setRuntimeState(makeScrollingRuntimeState());
+		const detail = (id: string) => ({ kind: 'detail', id: `detail:${id}`, parentId: id, depth: 0, height: 40, render: null }) as never;
+
+		manager.mountRow({ rowKey: 'detail:1', container: document.createElement('div'), visualRow: detail('1') });
+		manager.mountRow({ rowKey: 'detail:2', container: document.createElement('div'), visualRow: detail('2') });
+		// Within budget: mounted in-frame. Over budget: waits for scroll to settle.
+		expect(mountRow.mock.calls.map(([mount]) => mount.rowKey)).toEqual(['detail:1']);
+
+		manager.setRuntimeState(makeIdleRuntimeState());
+		manager.flushDeferred();
+		expect(mountRow.mock.calls.map(([mount]) => mount.rowKey)).toEqual(['detail:1', 'detail:2']);
+		expect(releaseRow).not.toHaveBeenCalled();
+	});
+
+	it('defers row portal mounts and releases while scrolling when the budget is spent', () => {
+		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 0;
 		const mountRow = vi.fn();
 		const releaseRow = vi.fn();
 		manager.onMountRowContent = mountRow;
@@ -146,12 +168,11 @@ describe('PortalMountManager', () => {
 			id: 'group:dept:A',
 			field: 'dept',
 			key: 'A',
-			depth: 0,
-			expanded: false,
-			childCount: 2,
+			hierarchy: { level: 0, parentId: null, hasChildren: true, expanded: false, childCount: 2, leafCount: 2, posInSet: 1, setSize: 1 },
+			aggregates: {},
 			height: 40,
 		};
-		const expanded = { ...collapsed, expanded: true };
+		const expanded = { ...collapsed, hierarchy: { ...collapsed.hierarchy, expanded: true } };
 
 		manager.mountRow({ rowKey: collapsed.id, container, visualRow: collapsed });
 		manager.mountRow({ rowKey: collapsed.id, container, visualRow: collapsed });
@@ -159,6 +180,32 @@ describe('PortalMountManager', () => {
 
 		expect(mountRow).toHaveBeenCalledTimes(2);
 		expect(mountRow.mock.calls[1][0].visualRow).toBe(expanded);
+	});
+
+	it('re-renders a group row when only its aggregates change', () => {
+		const manager = new PortalMountManager();
+		const mountRow = vi.fn();
+		manager.onMountRowContent = mountRow;
+		const container = document.createElement('div');
+		const hierarchy = { level: 0, parentId: null, hasChildren: true, expanded: true, childCount: 2, leafCount: 2, posInSet: 1, setSize: 1 };
+		const before = {
+			kind: 'group' as const,
+			id: 'group:dept=A',
+			groupId: 'group:dept=A',
+			field: 'dept',
+			key: 'A',
+			keyString: 'A',
+			path: [],
+			hierarchy,
+			aggregates: { revenue: 100 },
+		};
+		// A new pipeline run rebuilds the aggregates object: equal values must not remount...
+		manager.mountRow({ rowKey: before.id, container, visualRow: before });
+		manager.mountRow({ rowKey: before.id, container, visualRow: { ...before, aggregates: { revenue: 100 } } });
+		expect(mountRow).toHaveBeenCalledTimes(1);
+		// ...but a changed value must, or a live total never updates on screen.
+		manager.mountRow({ rowKey: before.id, container, visualRow: { ...before, aggregates: { revenue: 150 } } });
+		expect(mountRow).toHaveBeenCalledTimes(2);
 	});
 
 	it('defers cell portal mounts while scrolling and drops transient cells before flush', () => {
@@ -725,5 +772,119 @@ describe('PortalMountManager', () => {
 
 			expect(release).toHaveBeenCalledTimes(1);
 		});
+	});
+});
+
+describe('PortalMountManager – cancelDeferredMount', () => {
+	const mountFor = (container: HTMLElement) => ({
+		cellKey: 'r1:name',
+		container,
+		rowSlotId: 'slot-0',
+		slotGeneration: 0,
+		value: 'A',
+		node: {} as never,
+		col: { field: 'name', header: 'Name' },
+		isEditing: false,
+		isLoading: false,
+	});
+
+	it('drops a mount queued during scroll so it never lands after the cell is released', () => {
+		const manager = new PortalMountManager();
+		const rs = makeScrollingRuntimeState();
+		manager.setRuntimeState(rs);
+		const mount = vi.fn();
+		manager.onMountCellContent = mount;
+		const container = document.createElement('div');
+
+		manager.mountCell(mountFor(container));
+		expect(manager.getActiveIdentity('r1:name')).toBeUndefined();
+		expect(manager.cancelDeferredMount('r1:name')).toBe(true);
+
+		rs.transitionTo('idle');
+		manager.flushDeferred();
+		expect(mount).not.toHaveBeenCalled();
+		expect(manager.getStats().cells).toBe(0);
+	});
+
+	it('leaves really-mounted cells alone', () => {
+		const manager = new PortalMountManager();
+		manager.setRuntimeState(makeIdleRuntimeState());
+		manager.onMountCellContent = vi.fn();
+		manager.mountCell(mountFor(document.createElement('div')));
+
+		expect(manager.getActiveIdentity('r1:name')).toBeDefined();
+		expect(manager.cancelDeferredMount('r1:name')).toBe(false);
+	});
+});
+
+describe('PortalMountManager – row-anchored key moving slots inside a release transaction', () => {
+	it('does not let the old slot’s queued release unmount the new slot’s mount', () => {
+		const manager = new PortalMountManager();
+		manager.setRuntimeState(makeIdleRuntimeState());
+		const mount = vi.fn();
+		const unmount = vi.fn();
+		manager.onMountCellContent = mount;
+		manager.onUnmountCellContent = unmount;
+		const oldHost = document.createElement('div');
+		const newHost = document.createElement('div');
+		const base = {
+			cellKey: 'E5:IBM.35:coli3',
+			value: 1,
+			node: {} as never,
+			col: { field: 'change', header: 'Change' },
+			isEditing: false,
+			isLoading: false,
+		};
+
+		manager.mountCell({ ...base, container: oldHost, rowSlotId: 'slot-2', slotGeneration: 1 });
+
+		// A live re-sort moves the focused row from slot-2 to slot-5 within one recycle pass.
+		manager.beginCellReleaseTransaction();
+		manager.releaseCell({ cellKey: base.cellKey, container: oldHost, flushSync: false, rowSlotId: 'slot-2', slotGeneration: 1 });
+		manager.mountCell({ ...base, container: newHost, rowSlotId: 'slot-5', slotGeneration: 3 });
+		manager.endCellReleaseTransaction();
+
+		expect(unmount).not.toHaveBeenCalled();
+		expect(manager.isCellMounted(base.cellKey)).toBe(true);
+		expect(manager.getActiveIdentity(base.cellKey)?.rowSlotId).toBe('slot-5');
+	});
+});
+
+describe('PortalMountManager – warm-cache eviction forgets the portal record', () => {
+	it('drops the record of a warm-parked renderer once the warm cache evicts it', () => {
+		const manager = new PortalMountManager();
+		const rs = makeIdleRuntimeState();
+		manager.setRuntimeState(rs);
+		manager.onMountCellContent = vi.fn();
+		manager.onUnmountCellContent = vi.fn();
+		manager.customRendererManager.setLimits(1, 0);
+		const col = { field: 'name', header: 'Name', cellRenderer: () => null };
+		const park = (n: number) => {
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			const cellKey = `C${n}:name`;
+			manager.mountCell({
+				cellKey,
+				container,
+				rowSlotId: `slot-${n}`,
+				slotGeneration: 1,
+				cellInstanceId: `ci${n}`,
+				value: n,
+				node: { id: `r${n}` } as never,
+				col,
+				isEditing: false,
+				isLoading: false,
+			});
+			rs.transitionTo('scroll-pending');
+			manager.releaseCellForScroll({ cellKey, container, flushSync: false, rowSlotId: `slot-${n}`, slotGeneration: 1 });
+			rs.transitionTo('idle');
+		};
+
+		park(1);
+		expect(manager.getOwnershipSnapshot().trackedCellPortals).toBe(1); // parked warm, identity kept
+		park(2); // warm cache holds 1: parking #2 evicts #1
+		park(3);
+		expect(manager.getOwnershipSnapshot().trackedCellPortals).toBeLessThanOrEqual(1);
+		expect(manager.checkCellPortalInvariants()).toEqual([]);
 	});
 });

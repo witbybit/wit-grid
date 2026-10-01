@@ -42,6 +42,18 @@
 					"signature": "(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null"
 				},
 				{
+					"name": "applyTransactionAsync",
+					"optional": false,
+					"signature": "(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void",
+					"description": "Queues a transaction to apply with others before the next frame, in call order. Independent\ntransactions are applied together as one commit and one render, which suits high-frequency\nfeeds. The callback receives this transaction's own result. Any synchronous write (including\napplyTransaction) applies the queue first, so writes always land in the order they were made."
+				},
+				{
+					"name": "flushAsyncTransactions",
+					"optional": false,
+					"signature": "(): void",
+					"description": "Applies queued applyTransactionAsync transactions immediately."
+				},
+				{
 					"name": "getRowOrder",
 					"optional": false,
 					"signature": "(): string[]"
@@ -430,14 +442,34 @@
 					"signature": "(styleRules: GridStyleRule<TRowData>[] | undefined): void"
 				},
 				{
+					"name": "getGrouping",
+					"optional": false,
+					"signature": "(): GroupingConfig<TRowData> | undefined",
+					"description": "The grouping configuration, or undefined when none is set."
+				},
+				{
+					"name": "setGrouping",
+					"optional": false,
+					"signature": "(grouping: GroupingConfig<TRowData> | undefined): void",
+					"description": "Replaces the grouping configuration. Changing the levels resets group expansion."
+				},
+				{
+					"name": "updateGrouping",
+					"optional": false,
+					"signature": "(patch: Partial<GroupingConfig<TRowData>>): void",
+					"description": "Merges into the grouping configuration (creating one with no levels if absent)."
+				},
+				{
 					"name": "setGroupBy",
 					"optional": false,
-					"signature": "(colIds: string[]): void"
+					"signature": "(by: ReadonlyArray<string | GroupDef<TRowData>>): void",
+					"description": "Sets the grouping levels. Existing levels keep their GroupDef (keyCreator, comparator)."
 				},
 				{
 					"name": "getGroupBy",
 					"optional": false,
-					"signature": "(): string[]"
+					"signature": "(): string[]",
+					"description": "Column ids of the grouping levels, outermost first."
 				},
 				{
 					"name": "addGroupBy",
@@ -455,34 +487,107 @@
 					"signature": "(colId: string, toIndex: number): void"
 				},
 				{
-					"name": "setAggDefs",
+					"name": "getTreeData",
 					"optional": false,
-					"signature": "(defs: AggregationDef<TRowData>[]): void"
+					"signature": "(): TreeDataConfig<TRowData> | undefined"
 				},
 				{
-					"name": "getAggDefs",
+					"name": "setTreeData",
+					"optional": false,
+					"signature": "(treeData: TreeDataConfig<TRowData> | undefined): void"
+				},
+				{
+					"name": "getAggregation",
 					"optional": false,
 					"signature": "(): AggregationDef<TRowData>[]"
 				},
 				{
-					"name": "expandAllGroups",
+					"name": "setAggregation",
 					"optional": false,
-					"signature": "(): void"
+					"signature": "(defs: AggregationDef<TRowData>[]): void"
 				},
 				{
-					"name": "collapseAllGroups",
+					"name": "getHierarchyColumn",
 					"optional": false,
-					"signature": "(): void"
+					"signature": "(): HierarchyColumnConfig<TRowData> | false | undefined"
 				},
 				{
-					"name": "setShowGroupFooter",
+					"name": "setHierarchyColumn",
 					"optional": false,
-					"signature": "(enabled: boolean): void"
+					"signature": "(config: HierarchyColumnConfig<TRowData> | false | undefined): void",
+					"description": "Configures the auto hierarchy column (or turns it off with `false`)."
 				},
 				{
-					"name": "setStickyGroupRows",
+					"name": "getDetail",
 					"optional": false,
-					"signature": "(enabled: boolean): void"
+					"signature": "(): DetailConfig<TRowData> | undefined"
+				},
+				{
+					"name": "setDetail",
+					"optional": false,
+					"signature": "(detail: DetailConfig<TRowData> | undefined): void"
+				},
+				{
+					"name": "setExpanded",
+					"optional": false,
+					"signature": "(id: string, expanded: boolean): void",
+					"description": "Opens or closes a group or tree row, by visual row id (`visualRow.id`)."
+				},
+				{
+					"name": "toggleExpanded",
+					"optional": false,
+					"signature": "(id: string): void"
+				},
+				{
+					"name": "isExpanded",
+					"optional": false,
+					"signature": "(id: string): boolean"
+				},
+				{
+					"name": "expandAll",
+					"optional": false,
+					"signature": "(options?: ExpandAllOptions): void",
+					"description": "Opens every group and tree row, or only levels up to `maxLevel` (closing deeper ones). Replaces individual choices."
+				},
+				{
+					"name": "collapseAll",
+					"optional": false,
+					"signature": "(): void",
+					"description": "Closes every group and tree row. Replaces individual choices."
+				},
+				{
+					"name": "setDetailOpen",
+					"optional": false,
+					"signature": "(rowId: string, open: boolean): void",
+					"description": "Opens or closes a row's detail, by row id. Rows `detail.isMaster` rejects never open."
+				},
+				{
+					"name": "toggleDetailOpen",
+					"optional": false,
+					"signature": "(rowId: string): void"
+				},
+				{
+					"name": "isDetailOpen",
+					"optional": false,
+					"signature": "(rowId: string): boolean"
+				},
+				{
+					"name": "getDescendantRowIds",
+					"optional": false,
+					"signature": "(id: string): readonly string[]",
+					"description": "Data rows beneath a group or tree row (visual row id), collapsed ones included."
+				},
+				{
+					"name": "getDescendantSelection",
+					"optional": false,
+					"signature": "(id: string): DescendantSelection",
+					"description": "Whether `all`, `some` or `none` of a group's or tree parent's rows are selected, with counts."
+				},
+				{
+					"name": "setDescendantsSelected",
+					"optional": false,
+					"signature": "(id: string, selected: boolean): void",
+					"description": "Selects or deselects every data row beneath a group or tree row."
 				},
 				{
 					"name": "setShowGroupPanel",
@@ -498,26 +603,6 @@
 					"name": "setShowFilterChipBar",
 					"optional": false,
 					"signature": "(enabled: boolean): void"
-				},
-				{
-					"name": "toggleGroupExpanded",
-					"optional": false,
-					"signature": "(groupId: string): void"
-				},
-				{
-					"name": "toggleDetailExpanded",
-					"optional": false,
-					"signature": "(rowId: string): void"
-				},
-				{
-					"name": "isGroupExpanded",
-					"optional": false,
-					"signature": "(groupId: string): boolean"
-				},
-				{
-					"name": "isDetailExpanded",
-					"optional": false,
-					"signature": "(rowId: string): boolean"
 				},
 				{
 					"name": "getVisibleColumnRange",
@@ -862,6 +947,12 @@
 					"name": "exportCsv",
 					"optional": false,
 					"signature": "(options?: CsvExportOptions): void"
+				},
+				{
+					"name": "getCsv",
+					"optional": false,
+					"signature": "(options?: CsvExportOptions): string",
+					"description": "The CSV text `exportCsv` would download."
 				},
 				{
 					"name": "can",

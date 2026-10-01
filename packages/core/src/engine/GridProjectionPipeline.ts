@@ -29,7 +29,8 @@ export interface GridProjectionPipelineDeps<TRowData = unknown> {
 	selection: SelectionModel;
 	cellNotifications: CellNotificationController<TRowData>;
 	getRowModel: () => RowModel<TRowData> | null;
-	getRowHeightsList: (rowModel: RowModel<TRowData>, rowHeightsRecord: Record<string, number>, defaultRowHeight: number) => number[];
+	/** Syncs row geometry in place; returns the first changed row index, or -1 when unchanged. */
+	syncRowGeometry: (rowModel: RowModel<TRowData>, rowHeightsRecord: Record<string, number>, defaultRowHeight: number) => number;
 	notifyCellChange: (rowId: string, colField: string, includeRenderInvalidation?: boolean, renderColId?: string) => void;
 }
 
@@ -53,10 +54,24 @@ export class GridProjectionPipeline<TRowData = unknown> {
 		return findColumnByCellPointer(this.deps.columns.getDisplayedColumns(), pointer);
 	}
 
+	/** First visible scrollable row index, or -1 when anchoring should not apply (scrollTop 0). */
+	private captureScrollAnchor(): number {
+		if (this.deps.viewport.scrollTop <= 0 || this.deps.geometry.getRowCount() === 0) return -1;
+		return this.deps.viewport.getScrollAnchorRowIndex();
+	}
+
 	public run({ phase }: GridProjectionRunInput<TRowData>): void {
 		let currState = phase.getState();
 		const updatedSet = new Set(phase.getChangedKeys());
 		const prevState = phase.prevState;
+
+		// Pinned lanes follow state, so a commit that adds a pinned column (the hierarchy column) moves
+		// the lane boundary with it.
+		if (updatedSet.has('pinnedColumns')) {
+			const pins = currState.pinnedColumns;
+			this.deps.viewport.pinLeftColumns = pins?.left ?? 0;
+			this.deps.viewport.pinRightColumns = pins?.right ?? 0;
+		}
 
 		if (updatedSet.has('columns') || updatedSet.has('columnWidths') || updatedSet.has('defaultColWidth')) {
 			this.deps.columns.updateColumns(currState.columns, currState.columnWidths, currState.defaultColWidth);
@@ -66,7 +81,13 @@ export class GridProjectionPipeline<TRowData = unknown> {
 			this.deps.data.clearValueGetterCache();
 		}
 
-		if (updatedSet.has('sortModel') || updatedSet.has('filterModel') || updatedSet.has('groupBy') || updatedSet.has('expansion')) {
+		if (
+			updatedSet.has('sortModel') ||
+			updatedSet.has('filterModel') ||
+			updatedSet.has('grouping') ||
+			updatedSet.has('treeData') ||
+			updatedSet.has('expansion')
+		) {
 			this.pendingStructuralBoundsUpdate = true;
 		}
 
@@ -80,10 +101,20 @@ export class GridProjectionPipeline<TRowData = unknown> {
 				updatedSet.has('globalVersion') ||
 				rowCountChanged)
 		) {
-			this.deps.geometry.updateRows(
-				this.deps.getRowHeightsList(rowModel, currState.rowHeights, currState.defaultRowHeight),
-				currState.defaultRowHeight
-			);
+			// Scroll anchoring applies only to pure row-height edits (setRowHeight / auto-height):
+			// a sort, filter, transaction or load reorders rows, so an index anchor means nothing.
+			const heightOnlyChange =
+				updatedSet.has('rowHeights') &&
+				!updatedSet.has('defaultRowHeight') &&
+				!updatedSet.has('loading') &&
+				!updatedSet.has('globalVersion') &&
+				!rowCountChanged;
+			const anchor = heightOnlyChange ? this.captureScrollAnchor() : -1;
+			const anchorTopBefore = anchor >= 0 ? this.deps.geometry.rowTops[anchor] : 0;
+			const firstChanged = this.deps.syncRowGeometry(rowModel, currState.rowHeights, currState.defaultRowHeight);
+			if (anchor >= 0 && firstChanged >= this.deps.viewport.pinTopRows && firstChanged < anchor) {
+				this.deps.viewport.requestScrollAnchor(this.deps.geometry.rowTops[anchor] - anchorTopBefore);
+			}
 		}
 
 		if (rowModel) {

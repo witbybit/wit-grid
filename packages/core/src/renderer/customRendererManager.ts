@@ -1,4 +1,4 @@
-import { getColumnInstanceIdentity, type ColumnDef, type CellRendererPhase } from '../columnDef.js';
+import { getColumnInstanceIdentity, type ColumnDef, type CellRendererPhase, type InternalColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridCellContentMount, GridCellContentUnmount, RendererLifecycleOperation } from './IGridRenderer.js';
 import type { GridEngine } from '../engine/GridEngine.js';
@@ -11,6 +11,13 @@ export interface RendererInstance<TRowData = unknown> {
 	rowSlotId: string;
 	slotGeneration: number;
 	cellRowBindingGeneration: number;
+	/**
+	 * Physical CellSlot identity last sent to the adapter. Forwarded on every mount, update and
+	 * unmount so the adapter's strict identity check (React portal store) matches — an unmount
+	 * without it is silently rejected, leaking the React subtree in a detached container.
+	 */
+	cellInstanceId?: string;
+	portalHostId?: string;
 	container: HTMLDivElement;
 	value: unknown;
 	node: RowNode<TRowData>;
@@ -31,6 +38,7 @@ export interface AcquireRendererParams<TRowData = unknown> {
 	slotGeneration: number;
 	cellRowBindingGeneration: number;
 	cellInstanceId?: string;
+	portalHostId?: string;
 	parentContainer: HTMLElement;
 	value: unknown;
 	node: RowNode<TRowData>;
@@ -64,12 +72,18 @@ export interface CustomRendererStats {
 export class CustomRendererManager<TRowData = unknown> {
 	public onMountCellContent?: (mount: GridCellContentMount<TRowData>) => void;
 	public onUnmountCellContent?: (unmount: GridCellContentUnmount) => void;
+	/**
+	 * Fired when an instance stops representing a cell key: it was destroyed (including warm-cache
+	 * eviction) or rebound to a different key. PortalMountManager uses it to forget that key's
+	 * portal record, which a warm-parked instance otherwise keeps forever.
+	 */
+	public onCellKeyRetired?: (cellKey: string) => void;
 
 	private activeRenderersByCellKey = new Map<string, RendererInstance<TRowData>>();
 	private activeRenderersByRendererKey = new Map<string, RendererInstance<TRowData>>();
 	private activeRendererKeyByParentContainer = new Map<HTMLElement, string>();
+	/** Warm cache in LRU order: Map insertion order, touched via delete+set, evicted from the front. */
 	private warmRenderersByRendererKey = new Map<string, RendererInstance<TRowData>>();
-	private lruOrder = new Map<string, number>();
 	private lruCounter = 0;
 
 	// Limits
@@ -105,7 +119,9 @@ export class CustomRendererManager<TRowData = unknown> {
 	};
 
 	// Warm DOM moves deferred during scroll — flushed in budgeted chunks after scroll idle.
-	private pendingWarmMoves: RendererInstance<TRowData>[] = [];
+	// Only the count matters (containers already moved in releaseInstance) — a counter avoids
+	// retaining released instances and the per-flush splice() array allocation.
+	private pendingWarmMoves = 0;
 	private runtimeStats: RenderRuntimeStats | null = null;
 
 	private hiddenContainer: HTMLDivElement | null = null;
@@ -129,7 +145,7 @@ export class CustomRendererManager<TRowData = unknown> {
 	public getStats(): CustomRendererStats {
 		this.stats.activeCount = this.activeRenderersByRendererKey.size;
 		this.stats.warmCount = this.warmRenderersByRendererKey.size;
-		this.stats.pendingWarmMoveCount = this.pendingWarmMoves.length;
+		this.stats.pendingWarmMoveCount = this.pendingWarmMoves;
 		return { ...this.stats };
 	}
 
@@ -137,7 +153,7 @@ export class CustomRendererManager<TRowData = unknown> {
 		this.stats = {
 			activeCount: this.activeRenderersByRendererKey.size,
 			warmCount: this.warmRenderersByRendererKey.size,
-			pendingWarmMoveCount: this.pendingWarmMoves.length,
+			pendingWarmMoveCount: this.pendingWarmMoves,
 			totalAcquires: 0,
 			warmHits: 0,
 			warmMisses: 0,
@@ -201,7 +217,6 @@ export class CustomRendererManager<TRowData = unknown> {
 				this.engine.customRendererWarmHits++;
 			}
 			this.warmRenderersByRendererKey.delete(params.rendererKey);
-			this.lruOrder.delete(params.rendererKey);
 			this.rebindInstance(instance, params, 'restore');
 			return instance;
 		}
@@ -223,6 +238,8 @@ export class CustomRendererManager<TRowData = unknown> {
 			rowSlotId: params.rowSlotId,
 			slotGeneration: params.slotGeneration,
 			cellRowBindingGeneration: params.cellRowBindingGeneration,
+			cellInstanceId: params.cellInstanceId,
+			portalHostId: params.portalHostId,
 			container,
 			value: params.value,
 			node: params.node,
@@ -248,6 +265,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			slotGeneration: params.slotGeneration,
 			cellRowBindingGeneration: params.cellRowBindingGeneration,
 			cellInstanceId: params.cellInstanceId,
+			portalHostId: params.portalHostId,
 			container,
 			value: params.value,
 			node: params.node,
@@ -299,7 +317,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			if (this.engine?.isScrolling) {
 				// During scroll, defer pruneWarmCache (LRU eviction work) to avoid extra
 				// style recalculations caused by destroying instances mid-scroll.
-				this.pendingWarmMoves.push(instance);
+				this.pendingWarmMoves++;
 				this.stats.warmMovesDeferred++;
 			} else {
 				this.pruneWarmCache();
@@ -322,9 +340,9 @@ export class CustomRendererManager<TRowData = unknown> {
 	public flushPendingWarmMoves(maxItems = 16): number {
 		// Containers were already moved to hiddenContainer in releaseInstance.
 		// This flush just runs the deferred pruneWarmCache (LRU eviction) work.
-		if (this.pendingWarmMoves.length === 0) return 0;
-		const count = Math.min(maxItems, this.pendingWarmMoves.length);
-		this.pendingWarmMoves.splice(0, count);
+		if (this.pendingWarmMoves === 0) return 0;
+		const count = Math.min(maxItems, this.pendingWarmMoves);
+		this.pendingWarmMoves -= count;
 		this.stats.warmMovesFlushed += count;
 		if (!this.engine?.isScrolling) {
 			this.pruneWarmCache();
@@ -346,12 +364,17 @@ export class CustomRendererManager<TRowData = unknown> {
 		return { warmMovesFlushed: moved };
 	}
 
+	/** Number of scroll-time warm releases whose deferred pruneWarmCache work has not flushed yet. */
+	public getPendingWarmMoveCount(): number {
+		return this.pendingWarmMoves;
+	}
+
 	public hasActiveRenderer(cellKey: string): boolean {
 		return this.activeRenderersByCellKey.has(cellKey);
 	}
 
 	public releaseAll(): void {
-		this.pendingWarmMoves.length = 0;
+		this.pendingWarmMoves = 0;
 		for (const instance of this.activeRenderersByRendererKey.values()) {
 			this.destroyInstance(instance);
 		}
@@ -363,7 +386,6 @@ export class CustomRendererManager<TRowData = unknown> {
 			this.destroyInstance(instance);
 		}
 		this.warmRenderersByRendererKey.clear();
-		this.lruOrder.clear();
 		this.lruCounter = 0;
 		this.hiddenContainer?.remove();
 		this.hiddenContainer = null;
@@ -394,6 +416,9 @@ export class CustomRendererManager<TRowData = unknown> {
 	): void {
 		// Detect whether any props the renderer cares about actually changed before
 		// notifying React — avoids a reconciliation round trip on stayed cells.
+		// isScrolling/phase changes alone re-render a renderer only when it opts in (capabilities
+		// .scrollState); otherwise every mounted React cell re-rendered at each scroll start and end.
+		const receivesScrollState = (params.col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollState === true;
 		const needsUpdate =
 			instance.value !== params.value ||
 			instance.node !== params.node ||
@@ -402,18 +427,27 @@ export class CustomRendererManager<TRowData = unknown> {
 			instance.isLoading !== params.isLoading ||
 			instance.isFocused !== params.isFocused ||
 			instance.isSelected !== params.isSelected ||
-			instance.phase !== params.phase ||
-			instance.isScrolling !== params.isScrolling ||
+			(receivesScrollState && (instance.phase !== params.phase || instance.isScrolling !== params.isScrolling)) ||
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey ||
-			instance.cellRowBindingGeneration !== params.cellRowBindingGeneration;
+			instance.cellRowBindingGeneration !== params.cellRowBindingGeneration ||
+			// Physical identity changes must reach the adapter too: it rejects any later update or
+			// unmount whose identity differs from the one it last stored.
+			instance.rowSlotId !== params.rowSlotId ||
+			instance.slotGeneration !== params.slotGeneration ||
+			instance.cellInstanceId !== params.cellInstanceId ||
+			instance.portalHostId !== params.portalHostId;
 
 		this.unregisterActive(instance);
+		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
+		if (instance.cellKey !== params.cellKey) this.onCellKeyRetired?.(instance.cellKey);
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.rowSlotId = params.rowSlotId;
 		instance.slotGeneration = params.slotGeneration;
 		instance.cellRowBindingGeneration = params.cellRowBindingGeneration;
+		instance.cellInstanceId = params.cellInstanceId;
+		instance.portalHostId = params.portalHostId;
 		instance.value = params.value;
 		instance.node = params.node;
 		instance.col = params.col;
@@ -424,8 +458,11 @@ export class CustomRendererManager<TRowData = unknown> {
 		instance.isFocused = params.isFocused;
 		instance.isSelected = params.isSelected;
 		instance.lastAccessTime = Date.now();
-		instance.container.dataset.rendererKey = params.rendererKey;
-		instance.container.dataset.cellKey = params.cellKey;
+		// Attribute writes are DOM mutations even with an unchanged value; skip them on a same-key rebind.
+		if (keysChanged) {
+			instance.container.dataset.rendererKey = params.rendererKey;
+			instance.container.dataset.cellKey = params.cellKey;
+		}
 
 		if (instance.container.parentElement !== params.parentContainer) {
 			params.parentContainer.appendChild(instance.container);
@@ -441,6 +478,9 @@ export class CustomRendererManager<TRowData = unknown> {
 				cellKey: params.cellKey,
 				rowSlotId: params.rowSlotId,
 				slotGeneration: params.slotGeneration,
+				cellRowBindingGeneration: params.cellRowBindingGeneration,
+				cellInstanceId: params.cellInstanceId,
+				portalHostId: params.portalHostId,
 				container: instance.container,
 				value: params.value,
 				node: params.node,
@@ -477,8 +517,9 @@ export class CustomRendererManager<TRowData = unknown> {
 	}
 
 	private touchWarm(instance: RendererInstance<TRowData>): void {
+		// delete+set moves the key to the back of the Map's insertion order (most recently used).
+		this.warmRenderersByRendererKey.delete(instance.rendererKey);
 		this.warmRenderersByRendererKey.set(instance.rendererKey, instance);
-		this.lruOrder.set(instance.rendererKey, this.lruCounter++);
 	}
 
 	private destroyInstance(instance: RendererInstance<TRowData>): void {
@@ -490,11 +531,15 @@ export class CustomRendererManager<TRowData = unknown> {
 				flushSync: false,
 				rowSlotId: instance.rowSlotId,
 				slotGeneration: instance.slotGeneration,
+				cellRowBindingGeneration: instance.cellRowBindingGeneration,
+				cellInstanceId: instance.cellInstanceId,
+				portalHostId: instance.portalHostId,
 			});
 		}
 		delete instance.container.dataset.rendererKey;
 		delete instance.container.dataset.cellKey;
 		instance.container.remove();
+		this.onCellKeyRetired?.(instance.cellKey);
 	}
 
 	private pruneWarmCache(): void {
@@ -505,27 +550,14 @@ export class CustomRendererManager<TRowData = unknown> {
 		// during post-scroll decoration (when many new slots are created), causing legitimate
 		// scroll-released entries to be falsely destroyed and firing onUnmountCellContent
 		// during what should be a deferred-unmount window. Size-based LRU eviction is
-		// sufficient to bound memory.
-		while (this.warmRenderersByRendererKey.size > this.maxWarm && this.lruOrder.size > 0) {
-			let oldestKey: string | null = null;
-			let minVal = Infinity;
-			for (const [key, val] of this.lruOrder.entries()) {
-				if (val < minVal) {
-					minVal = val;
-					oldestKey = key;
-				}
-			}
-			if (oldestKey) {
-				const instance = this.warmRenderersByRendererKey.get(oldestKey);
-				this.lruOrder.delete(oldestKey);
-				if (instance) {
-					this.warmRenderersByRendererKey.delete(oldestKey);
-					this.stats.evictions++;
-					this.destroyInstance(instance);
-				}
-			} else {
-				break;
-			}
+		// sufficient to bound memory. The Map's first entry is the least recently used — O(1).
+		while (this.warmRenderersByRendererKey.size > this.maxWarm) {
+			const oldest = this.warmRenderersByRendererKey.entries().next();
+			if (oldest.done) break;
+			const [oldestKey, instance] = oldest.value;
+			this.warmRenderersByRendererKey.delete(oldestKey);
+			this.stats.evictions++;
+			this.destroyInstance(instance);
 		}
 	}
 }

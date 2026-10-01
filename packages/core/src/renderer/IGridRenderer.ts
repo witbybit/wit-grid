@@ -106,6 +106,8 @@ export interface GridRowContentMount<TRowData = unknown> {
 	rowKey: string;
 	container: HTMLElement;
 	visualRow: VisualRow<TRowData>;
+	/** The configured renderer for this row (`detail.renderer` / `grouping.rowRenderer`), when not a DOM one core mounts itself. */
+	renderer?: import('../rows/hierarchyConfig.js').RowRendererSpec<TRowData>;
 }
 
 export interface GridRowContentUnmount {

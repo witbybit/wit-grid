@@ -5,6 +5,7 @@ import type { CellEditorProps, CellRendererProps, HeaderMenuRendererProps, GridS
 import type { GroupVisualRow, DetailVisualRow } from './visualRow.js';
 import type { GridCapabilityCallback } from './capabilities/capabilityTypes.js';
 import type { GridRowDataRef } from './publicRowRef.js';
+import type { GridApi as PublicGridApi } from './api/GridApiSurfaces.js';
 
 // ─── Value getter / setter / validator params ─────────────────────────────────
 
@@ -74,11 +75,30 @@ export type CellRendererPhase = 'initial' | 'scroll' | 'scroll-force-live' | 'sc
  * - `'html-snapshot'`— Replays a captured inert HTML clone during scroll. Missing HTML shows a
  *                       shell/pending placeholder, not raw text, unless explicitly allowed.
  */
-export type CellScrollPresentation = 'primitive' | 'live' | 'freeze' | 'text-impostor' | 'html-snapshot';
+/**
+ * What a renderer column's cells show while the grid is actively scrolling.
+ * - `'update'` (DOM renderers only, and their default): a cell entering during scroll calls the
+ *   renderer's `update()` in place, within the per-frame budget (`GridRendererOptions.domUpdate`).
+ *   The cell is final when drawn, so nothing is redone when scrolling settles; only cells beyond
+ *   the budget show a stand-in until then.
+ * - `'freeze'` (React renderers' default): mounted content stays frozen; entering cells show a
+ *   cheap stand-in and the real renderer mounts once scrolling settles.
+ * - `'live'`: the renderer mounts/updates on every scroll frame.
+ * - `'text-impostor'`, `'html-snapshot'`: explicit stand-ins, see their capabilities.
+ */
+export type CellScrollPresentation = 'primitive' | 'live' | 'freeze' | 'update' | 'text-impostor' | 'html-snapshot';
 
 export interface CellRendererCapabilities {
 	/** Chooses what this column's cells show while the grid is actively scrolling. */
 	scrollPresentation?: CellScrollPresentation;
+
+	/**
+	 * When true, the renderer is also updated when only `isScrolling` or `phase` changes, e.g. to
+	 * draw a lighter version while scrolling. Default false: a renderer is updated only when its
+	 * value, row, column, or editing / focus / selection state changes, so scroll start and end
+	 * cost nothing.
+	 */
+	scrollState?: boolean;
 
 	/** Only valid for `scrollPresentation: 'live'`. */
 	live?: {
@@ -123,7 +143,29 @@ export interface NormalizedCellRendererCapabilities extends CellRendererCapabili
  * presentation modes. Deliberately NOT part of ColumnDef: windowing/budget/cache policy is a grid-
  * wide concern, not a per-column one.
  */
+/** What an aggregate renderer receives. */
+export interface AggregateRendererParams<TRowData = unknown> {
+	value: unknown;
+	/** `value` through the column's `valueFormatter` (or String). */
+	formattedValue: string;
+	/** The group or total row. */
+	row: import('./visualRow.js').GroupVisualRow<TRowData> | import('./visualRow.js').TotalVisualRow<TRowData>;
+	col: ColumnDef<TRowData>;
+}
+
+export interface DomAggregateRenderer<TRowData = unknown> {
+	mount(
+		container: HTMLElement,
+		params: AggregateRendererParams<TRowData>
+	): { update?(params: AggregateRendererParams<TRowData>): void; destroy?(): void } | void;
+}
+
 export interface GridRendererOptions {
+	/** Per-frame budget for DOM renderers updating in place during scroll (`scrollPresentation: 'update'`). */
+	domUpdate?: {
+		/** Milliseconds of in-frame DOM renderer work allowed per frame before cells fall back to a stand-in. Default 4. */
+		maxMsPerFrame?: number;
+	};
 	liveReact?: {
 		rowOverscan?: number;
 		columnOverscan?: number;
@@ -141,6 +183,11 @@ export interface GridRendererOptions {
 	};
 	textImpostor?: {
 		allowRawValueFallback?: boolean;
+	};
+	/** Full-width rows (detail rows, full-width group rows) entering during scroll. */
+	fullWidth?: {
+		/** Adapter row mounts allowed per scroll frame; the rest wait for scroll to settle. Default 4. */
+		maxMountsPerScrollFrame?: number;
 	};
 }
 
@@ -164,6 +211,8 @@ export interface DomCellRendererParams<TRowData = unknown> {
 	phase: CellRendererPhase;
 	isFocused: boolean;
 	isSelected: boolean;
+	/** The grid's api — the same object React cell renderers receive as `api`. */
+	api: PublicGridApi<TRowData>;
 }
 
 /** Handle returned by DomCellRenderer.mount() — grid calls update() directly in the paint loop */
@@ -325,6 +374,11 @@ export interface ColumnDef<TRowData = unknown> {
 	 */
 	valueSetter?: (params: ValueSetterParams<TRowData>) => boolean | Promise<boolean>;
 	renderer?: ColumnRendererSpec<TRowData>;
+	/**
+	 * Draws this column's aggregate on group and total rows (a sparkline, a badge…). Without one the
+	 * aggregate is text through `valueFormatter`. Mounted by the grid directly, on every bind.
+	 */
+	aggregateRenderer?: { kind: 'dom'; renderer: DomAggregateRenderer<TRowData> };
 	cellEditor?: (props: CellEditorProps<TRowData>) => unknown;
 	headerMenuRenderer?: (props: HeaderMenuRendererProps<TRowData>) => void;
 	headerMenuComponent?: any;

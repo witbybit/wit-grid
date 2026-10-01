@@ -1,0 +1,67 @@
+---
+title: Performance vs AG Grid
+description: Head-to-head scroll benchmarks against AG Grid Community, generated from the benchmark's latest run.
+icon: Gauge
+---
+
+import { BenchmarkEnvironment, BenchmarkFindings, BenchmarkScenarios, BenchmarkScoreboard } from '@/components/benchmarks/benchmark-comparison';
+
+This page is our scoreboard against AG Grid. Everything on it comes from the latest run of the benchmark in
+`packages/bench`: the numbers, the spread between rounds, the trend, and the list of problems the comparison
+turned up. When the grid gets faster, re-running the benchmark updates this page. When AG Grid wins a
+scenario, it says so.
+
+<Callout title='What these numbers are, and are not' type='info'>
+	Both grids run in the same Chrome, with the same data, driven by real mouse-wheel input. We measure main-thread work (script, layout, style),
+	input handling, frame intervals and blank area. The benchmark does not measure GPU rasterization, compositor-only checkerboarding, memory, or
+	anything other than scrolling. Absolute milliseconds depend on the machine; compare the ratio between the grids, not the raw numbers across
+	machines.
+</Callout>
+
+## Scoreboard
+
+A ratio below 1.00× means Wit Grid did less main-thread work than AG Grid for the same scroll. The verdict uses
+the whole spread of paired rounds, so a scenario is only called a win when every round agrees.
+
+<BenchmarkScoreboard />
+
+## Scenarios
+
+Each grid runs with its own defaults: we do not tune either one for the benchmark. The custom-renderer scenario
+uses the closest equivalent in each grid: a DOM renderer with `mount`/`update` in Wit Grid, and a cell renderer
+component with `refresh()` in AG Grid.
+
+<BenchmarkScenarios />
+
+## What the comparison found
+
+Every issue the head-to-head surfaced, fixed or not. A problem stays on this list after it is fixed, so the
+history of what we learned from AG Grid stays visible.
+
+<BenchmarkFindings />
+
+## Method
+
+<BenchmarkEnvironment />
+
+Each round runs both grids back to back on the same scenario and alternates which one goes first, so machine
+drift, such as thermal throttling or background work, affects both equally. The ratio shown for a scenario is
+the median of the per-round ratios, with the lowest and highest round beside it.
+
+## Run it yourself
+
+The benchmark drives your locally installed Chrome, so it needs no browser download.
+
+```bash
+pnpm bench:browser
+```
+
+Useful flags:
+
+- `--runs=9` runs more paired rounds for a tighter spread.
+- `--only=vertical-dom-renderers` runs a single scenario.
+- `--headed` opens the browser so you can watch.
+- `--publish` writes the results into this page's data and adds a point to the trend.
+
+Close other heavy applications first: a busy machine widens the spread between rounds, and the page shows that
+spread rather than hiding it.

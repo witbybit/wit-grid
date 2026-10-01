@@ -24,6 +24,9 @@ export const CELL_SLOT_RETENTION_CONFIG = {
 	preferEvictPortalCells: true,
 };
 
+/** Monotonic recency counter shared by all row slots — a larger stamp means touched more recently. */
+let retentionTouchCounter = 0;
+
 export interface CellSlotRetentionResult {
 	retainedAfter: number;
 	evicted: number;
@@ -49,15 +52,13 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 ): CellSlotRetentionResult {
 	const cells = slot.cellsByColumnInstanceId;
 
-	// Touch every kept instance so it moves to the most-recently-used end of the map's iteration
-	// order (Map preserves insertion order; delete+set re-inserts at the end). Anything left
-	// un-touched ages toward the front, which is exactly the eviction candidate pool below.
+	// Touch every kept instance by stamping it with an increasing recency counter (in keep-set
+	// iteration order). This reproduces exactly the LRU order the previous Map delete+set re-insertion
+	// produced, but as a field write per kept cell instead of two Map mutations; the ordering is only
+	// materialized below, and only when the map is actually over budget.
 	for (const instanceId of keepInstanceIds) {
 		const cell = cells.get(instanceId);
-		if (cell) {
-			cells.delete(instanceId);
-			cells.set(instanceId, cell);
-		}
+		if (cell) cell.retentionStamp = ++retentionTouchCounter;
 	}
 
 	const totalBudget =
@@ -71,6 +72,10 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 		for (const instanceId of cells.keys()) {
 			if (!keepInstanceIds.has(instanceId)) evictable.push(instanceId);
 		}
+		// Oldest-touched first. Never-touched cells keep stamp 0 and their map (insertion) order,
+		// matching the prior behaviour where untouched entries aged toward the front; Array sort is
+		// stable, so equal stamps keep map order.
+		evictable.sort((a, b) => cells.get(a)!.retentionStamp - cells.get(b)!.retentionStamp);
 
 		const ordered = CELL_SLOT_RETENTION_CONFIG.preferEvictPortalCells ? stablePartitionPortalFirst(evictable, cells) : evictable;
 
@@ -89,7 +94,14 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 	return { retainedAfter: cells.size, evicted };
 }
 
+/** Stamps a newly created cell slot as the most recently touched — the equivalent of its Map
+ *  insertion position under the previous delete+set LRU ordering. */
+export function stampNewCellSlotForRetention<TRowData>(cell: CellSlot<TRowData>): void {
+	cell.retentionStamp = ++retentionTouchCounter;
+}
+
 /** Stable partition: portal-mode cells first (in their original relative order), then the rest. */
+
 function stablePartitionPortalFirst<TRowData>(
 	instanceIds: ColumnInstanceId[],
 	cells: ReadonlyMap<ColumnInstanceId, CellSlot<TRowData>>

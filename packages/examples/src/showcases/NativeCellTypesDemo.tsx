@@ -407,120 +407,122 @@ function NativeCellTypesDemoInner({
 
 			{/* ── Info sidebar ── */}
 			{!compact && (
-			<div className='w-full xl:w-[308px] flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
-				{/* Cell type reference */}
-				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
-					<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-purple-600/5 rounded-full blur-2xl pointer-events-none' />
-					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5'>
-						<Tag className='w-3.5 h-3.5 text-purple-400' />
-						Cell Type Reference
-					</h3>
-
-					{CELL_TYPES.map((ct, idx) => {
-						const Icon = ct.icon;
-						const isOpen = activeType === idx;
-						return (
-							<div
-								key={ct.field}
-								className='rounded-lg border cursor-pointer transition-all duration-150'
-								style={{
-									border: isOpen ? `1px solid ${ct.accentBorder}` : '1px solid rgba(30,41,59,0.7)',
-									background: isOpen ? ct.accentBg : 'rgba(3,7,18,0.3)',
-								}}
-								onClick={() => setActiveType(isOpen ? null : idx)}
-							>
-								<div className='flex items-center gap-2.5 px-3 py-2.5'>
-									<span
-										className='p-1.5 rounded-md'
-										style={{
-											background: isOpen ? ct.accentBg : 'rgba(15,23,42,0.6)',
-											border: `1px solid ${isOpen ? ct.accentBorder : 'rgba(30,41,59,0.8)'}`,
-										}}
-									>
-										<Icon className='w-3 h-3' style={{ color: ct.accent }} />
-									</span>
-									<div className='flex-1 min-w-0'>
-										<div className='text-[11px] font-bold leading-tight' style={{ color: isOpen ? ct.accent : '#cbd5e1' }}>
-											{ct.label}
-										</div>
-										{!isOpen && <div className='text-[9px] text-slate-500 font-medium leading-tight mt-0.5'>{ct.tagline}</div>}
-									</div>
-									<ChevronRight
-										className='w-3 h-3 shrink-0 transition-transform duration-150'
-										style={{ color: isOpen ? ct.accent : '#475569', transform: isOpen ? 'rotate(90deg)' : 'none' }}
-									/>
-								</div>
-
-								{isOpen && (
-									<div className='px-3 pb-3 flex flex-col gap-2'>
-										<p className='text-[10px] leading-relaxed' style={{ color: '#94a3b8' }}>
-											{ct.description}
-										</p>
-										<div
-											className='rounded-md p-2 flex flex-col gap-1.5 font-mono'
-											style={{ background: 'rgba(3,7,18,0.5)', border: '1px solid rgba(30,41,59,0.8)' }}
-										>
-											<div className='flex items-start gap-2 text-[9px]'>
-												<span className='text-slate-500 uppercase font-bold tracking-wider shrink-0 pt-0.5 w-3'>R</span>
-												<span className='text-slate-300 break-all'>{ct.renderer}</span>
-											</div>
-											<div className='flex items-start gap-2 text-[9px]'>
-												<span className='text-slate-500 uppercase font-bold tracking-wider shrink-0 pt-0.5 w-3'>E</span>
-												<span className='text-slate-400 break-all'>{ct.editor}</span>
-											</div>
-										</div>
-									</div>
-								)}
-							</div>
-						);
-					})}
-				</div>
-
-				{/* Architecture notes */}
-				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
-					<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-indigo-600/5 rounded-full blur-2xl pointer-events-none' />
-					<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5'>
-						<Sparkles className='w-3.5 h-3.5 text-indigo-400' />
-						Design Notes
-					</h3>
-					{[
-						{ dot: 'bg-indigo-500', t: 'All renderers are memo-wrapped — React bails out when props are unchanged' },
-						{ dot: 'bg-purple-500', t: 'Multi-select dropdown uses createPortal — escapes grid overflow:hidden entirely' },
-						{ dot: 'bg-cyan-500', t: 'Checkbox toggles via api directly on mousedown — zero editor overhead' },
-						{ dot: 'bg-emerald-500', t: 'Factory functions create stable renderer identity — never inside a component' },
-						{ dot: 'bg-amber-500', t: 'Theme via CSS vars: override --og-ct-* on any ancestor element' },
-						{
-							dot: 'bg-rose-500',
-							t: "scrollPresentation: 'freeze' freezes the portal during scroll — re-renders only when data version changes",
-						},
-					].map((n, i) => (
-						<div key={i} className='flex items-start gap-2 text-[10px] text-slate-500 leading-relaxed'>
-							<span className={`w-1.5 h-1.5 rounded-full ${n.dot} mt-1 shrink-0`} />
-							{n.t}
-						</div>
-					))}
-				</div>
-
-				{/* Usage snippet */}
-				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
-					<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-emerald-600/5 rounded-full blur-2xl pointer-events-none' />
-					<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>
-						<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
-							<Code2 className='w-3.5 h-3.5 text-emerald-400' />
-							Usage Snippet
+				<div className='w-full xl:w-[308px] flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
+					{/* Cell type reference */}
+					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
+						<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-purple-600/5 rounded-full blur-2xl pointer-events-none' />
+						<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5'>
+							<Tag className='w-3.5 h-3.5 text-purple-400' />
+							Cell Type Reference
 						</h3>
-						<ChevronRight
-							className='w-3 h-3 text-slate-500 transition-transform duration-150'
-							style={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}
-						/>
-					</button>
-					{showSnippet && (
-						<pre className='text-[9px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap'>
-							{SNIPPET}
-						</pre>
-					)}
+
+						{CELL_TYPES.map((ct, idx) => {
+							const Icon = ct.icon;
+							const isOpen = activeType === idx;
+							return (
+								<div
+									key={ct.field}
+									className='rounded-lg border cursor-pointer transition-all duration-150'
+									style={{
+										border: isOpen ? `1px solid ${ct.accentBorder}` : '1px solid rgba(30,41,59,0.7)',
+										background: isOpen ? ct.accentBg : 'rgba(3,7,18,0.3)',
+									}}
+									onClick={() => setActiveType(isOpen ? null : idx)}
+								>
+									<div className='flex items-center gap-2.5 px-3 py-2.5'>
+										<span
+											className='p-1.5 rounded-md'
+											style={{
+												background: isOpen ? ct.accentBg : 'rgba(15,23,42,0.6)',
+												border: `1px solid ${isOpen ? ct.accentBorder : 'rgba(30,41,59,0.8)'}`,
+											}}
+										>
+											<Icon className='w-3 h-3' style={{ color: ct.accent }} />
+										</span>
+										<div className='flex-1 min-w-0'>
+											<div className='text-[11px] font-bold leading-tight' style={{ color: isOpen ? ct.accent : '#cbd5e1' }}>
+												{ct.label}
+											</div>
+											{!isOpen && (
+												<div className='text-[9px] text-slate-500 font-medium leading-tight mt-0.5'>{ct.tagline}</div>
+											)}
+										</div>
+										<ChevronRight
+											className='w-3 h-3 shrink-0 transition-transform duration-150'
+											style={{ color: isOpen ? ct.accent : '#475569', transform: isOpen ? 'rotate(90deg)' : 'none' }}
+										/>
+									</div>
+
+									{isOpen && (
+										<div className='px-3 pb-3 flex flex-col gap-2'>
+											<p className='text-[10px] leading-relaxed' style={{ color: '#94a3b8' }}>
+												{ct.description}
+											</p>
+											<div
+												className='rounded-md p-2 flex flex-col gap-1.5 font-mono'
+												style={{ background: 'rgba(3,7,18,0.5)', border: '1px solid rgba(30,41,59,0.8)' }}
+											>
+												<div className='flex items-start gap-2 text-[9px]'>
+													<span className='text-slate-500 uppercase font-bold tracking-wider shrink-0 pt-0.5 w-3'>R</span>
+													<span className='text-slate-300 break-all'>{ct.renderer}</span>
+												</div>
+												<div className='flex items-start gap-2 text-[9px]'>
+													<span className='text-slate-500 uppercase font-bold tracking-wider shrink-0 pt-0.5 w-3'>E</span>
+													<span className='text-slate-400 break-all'>{ct.editor}</span>
+												</div>
+											</div>
+										</div>
+									)}
+								</div>
+							);
+						})}
+					</div>
+
+					{/* Architecture notes */}
+					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
+						<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-indigo-600/5 rounded-full blur-2xl pointer-events-none' />
+						<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-0.5'>
+							<Sparkles className='w-3.5 h-3.5 text-indigo-400' />
+							Design Notes
+						</h3>
+						{[
+							{ dot: 'bg-indigo-500', t: 'All renderers are memo-wrapped — React bails out when props are unchanged' },
+							{ dot: 'bg-purple-500', t: 'Multi-select dropdown uses createPortal — escapes grid overflow:hidden entirely' },
+							{ dot: 'bg-cyan-500', t: 'Checkbox toggles via api directly on mousedown — zero editor overhead' },
+							{ dot: 'bg-emerald-500', t: 'Factory functions create stable renderer identity — never inside a component' },
+							{ dot: 'bg-amber-500', t: 'Theme via CSS vars: override --og-ct-* on any ancestor element' },
+							{
+								dot: 'bg-rose-500',
+								t: "scrollPresentation: 'freeze' freezes the portal during scroll — re-renders only when data version changes",
+							},
+						].map((n, i) => (
+							<div key={i} className='flex items-start gap-2 text-[10px] text-slate-500 leading-relaxed'>
+								<span className={`w-1.5 h-1.5 rounded-full ${n.dot} mt-1 shrink-0`} />
+								{n.t}
+							</div>
+						))}
+					</div>
+
+					{/* Usage snippet */}
+					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
+						<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-emerald-600/5 rounded-full blur-2xl pointer-events-none' />
+						<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>
+							<h3 className='text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5'>
+								<Code2 className='w-3.5 h-3.5 text-emerald-400' />
+								Usage Snippet
+							</h3>
+							<ChevronRight
+								className='w-3 h-3 text-slate-500 transition-transform duration-150'
+								style={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}
+							/>
+						</button>
+						{showSnippet && (
+							<pre className='text-[9px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre-wrap'>
+								{SNIPPET}
+							</pre>
+						)}
+					</div>
 				</div>
-			</div>
 			)}
 		</div>
 	);

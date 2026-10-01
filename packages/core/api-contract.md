@@ -6,10 +6,13 @@ This checked report locks the emitted declaration content and exported symbol ki
 
 ## `.` — stable
 
-Declaration SHA-256: `1a83099f9e29a2bf0ffd96648c31b74f070de4d6a43314865e3ecd61b5f7e565`
-Exports (284):
+Declaration SHA-256: `a6dd8ca7a70aa49adff767c7377f41010f6589368cb97f988e3c0b6029da5255`
+Exports (310):
 
 - `ActiveEditState` — type
+- `AggregateContext` — type
+- `AggregateRendererParams` — type
+- `AggregationConfig` — type
 - `AggregationDef` — type
 - `AllDataNodesCapableRowModel` — type
 - `applyFilterToModel` — value
@@ -24,6 +27,7 @@ Exports (284):
 - `BUILT_IN_THEME_METADATA` — value
 - `BUILT_IN_THEME_ORDER` — value
 - `BUILT_IN_THEMES` — value
+- `BuiltInAggFunc` — type
 - `BuiltInThemeName` — type
 - `CAPABILITY_ALLOWED` — value
 - `CapabilityDiagnostics` — type
@@ -69,18 +73,27 @@ Exports (284):
 - `DATE_OPS` — value
 - `DateFilterCondition` — type
 - `DateFilterOperator` — type
+- `DefaultExpanded` — type
 - `defaultOpForType` — value
+- `DescendantSelection` — type
+- `DescendantSelectionState` — type
+- `DetailConfig` — type
 - `DetailRowStyleRule` — type
 - `DetailVisualRow` — type
 - `doesCanonicalCellPointerMatchColumn` — value
 - `doesCellPointerMatchColumn` — value
+- `DomAggregateRenderer` — type
 - `DomCellRenderer` — type
 - `DomCellRendererHandle` — type
 - `DomCellRendererParams` — type
 - `DomCellRendererRowRef` — type
+- `DomRowRenderer` — type
+- `DomRowRendererHandle` — type
 - `duplicateValueRule` — value
 - `email` — value
 - `evaluateQueryModel` — value
+- `ExpandAllOptions` — type
+- `ExpansionState` — type
 - `FailedVisualRow` — type
 - `FallbackMetric` — type
 - `FilterCondition` — type
@@ -93,7 +106,6 @@ Exports (284):
 - `FilterSelectOption` — type
 - `FilterSurface` — type
 - `FloatingFilterRendererParams` — type
-- `FooterVisualRow` — type
 - `FrameMetrics` — type
 - `getBuiltInTheme` — value
 - `getCellPointerColumnKey` — value
@@ -188,10 +200,16 @@ Exports (284):
 - `GridWriteBlockedSource` — type
 - `GridWriteBlockedStatus` — type
 - `GroupDef` — type
+- `GroupInfo` — type
+- `GroupingConfig` — type
 - `GroupRowStyleRule` — type
 - `GroupVisualRow` — type
 - `HeaderCellStyleRule` — type
 - `HeaderMenuRendererProps` — type
+- `HIERARCHY_COLUMN_FIELD` — value
+- `HierarchyCellContext` — type
+- `HierarchyColumnConfig` — type
+- `hierarchyColumnGroupColId` — value
 - `HIGH_CONTRAST_DARK_THEME` — value
 - `HIGH_CONTRAST_LIGHT_THEME` — value
 - `ImperativeCellHandle` — type
@@ -204,6 +222,7 @@ Exports (284):
 - `isBuiltInThemeName` — value
 - `isDomCellRenderer` — value
 - `isFilterableColumn` — value
+- `isHierarchyColumn` — value
 - `isQueryModelActive` — value
 - `isRootServerSideRoute` — value
 - `LIGHT_THEME` — value
@@ -242,14 +261,16 @@ Exports (284):
 - `ResolveServerSideRowCountStateInput` — type
 - `RowCountKind` — type
 - `RowDataTransaction` — type
+- `RowHierarchy` — type
 - `RowLoadState` — type
-- `RowModelConfig` — type
 - `RowModelType` — type
 - `RowModelViewportAccess` — type
 - `RowNodeKind` — type
 - `RowNodeSelectionOptions` — type
 - `RowNodeTransaction` — type
 - `RowRangeLoadState` — type
+- `RowRendererParams` — type
+- `RowRendererSpec` — type
 - `RowSelectionMode` — type
 - `RowSelectionOptions` — type
 - `RowSelectionScope` — type
@@ -286,6 +307,11 @@ Exports (284):
 - `themeToCSSVariables` — value
 - `ThemeTokens` — type
 - `TooltipParams` — type
+- `TotalPlacement` — type
+- `TotalsConfig` — type
+- `TotalVisualRow` — type
+- `TreeDataConfig` — type
+- `TreeRowInfo` — type
 - `validateSchemaVersion` — value
 - `ValueFormatterParams` — type
 - `ValueGetterParams` — type
@@ -296,26 +322,44 @@ Exports (284):
 
 ## `./experimental` — experimental
 
-Declaration SHA-256: `5590297f72982ce0db60741357ac37992ec44273278bfe8836737d7187252cbd`
-Exports (28):
+Declaration SHA-256: `00b195437e6f43b10eff0e61e176725ec8d9dd8c0185263535046e6d887e7114`
+Exports (47):
 
 - `canEditCell` — value
 - `canFocusVisualRow` — value
 - `clearFlightRecorder` — value
 - `compileStyleRules` — value
+- `createGridTraceReplay` — value
 - `explainFlightRecorderCell` — value
 - `getFlightRecorderSnapshot` — value
+- `GRID_TRACE_REPLAY_LIMITS` — value
+- `GRID_TRACE_REPLAY_VERSION` — value
 - `GridCausalEvent` — type
 - `GridCausalTraceEnvelope` — type
 - `GridCausalTraceSnapshot` — type
 - `GridCellExplanation` — type
 - `GridFlightRecorderOptions` — type
+- `GridReplayCheckpoint` — type
+- `GridReplayCheckpointExpectation` — type
+- `GridReplayCommand` — type
+- `GridReplayDivergence` — type
+- `GridReplayExpectedFacts` — type
+- `GridReplayInitialFixture` — type
+- `GridReplayObservation` — type
+- `GridReplayObservationKind` — type
+- `GridReplayScheduler` — type
+- `GridReplaySemanticFacts` — type
+- `GridReplayTrace` — type
+- `GridReplayValidation` — type
+- `GridTraceReplay` — value + type
+- `GridTraceReplayStatus` — type
 - `GroupPathItem` — type
 - `isDataCellSelectable` — value
 - `isDataVisualRow` — value
 - `isEditableVisualRow` — value
 - `isFullWidthVisualRow` — value
 - `isSelectableVisualRow` — value
+- `JsonValue` — type
 - `NOOP_INSTRUMENTATION` — value
 - `NoopGridInstrumentation` — value + type
 - `parseVisualRowId` — value
@@ -324,9 +368,10 @@ Exports (28):
 - `stopFlightRecorder` — value
 - `toDataVisualRowId` — value
 - `toDetailVisualRowId` — value
-- `toFooterVisualRowId` — value
 - `toGroupVisualRowId` — value
 - `toLoadingVisualRowId` — value
+- `toTotalVisualRowId` — value
+- `validateGridReplayTrace` — value
 
 ## `./internal` — adapter-only
 

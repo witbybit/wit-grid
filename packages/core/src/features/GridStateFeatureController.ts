@@ -127,14 +127,15 @@ export class GridStateFeatureController<TRowData = unknown> {
 	 * resize events as individual non-undoable resizeRow calls so renderer anchoring and
 	 * row-level invalidation continue to work.
 	 */
-	public applyAutoRowHeightBatch(measuredHeights: ReadonlyMap<string, number>): void {
+	/** `baseline`: the height a row has before any measurement is recorded (default: the grid row height). */
+	public applyAutoRowHeightBatch(measuredHeights: ReadonlyMap<string, number>, baseline?: (rowId: string) => number | undefined): void {
 		if (measuredHeights.size === 0) return;
 
 		const state = this.deps.stateManager.getState();
 		const nextRowHeights = { ...state.rowHeights };
 		const changed: Array<{ rowId: string; height: number }> = [];
 		for (const [rowId, height] of measuredHeights) {
-			const currentHeight = state.rowHeights[rowId] ?? state.defaultRowHeight;
+			const currentHeight = state.rowHeights[rowId] ?? baseline?.(rowId) ?? state.defaultRowHeight;
 			if (Math.abs(height - currentHeight) <= 1) continue;
 			nextRowHeights[rowId] = height;
 			changed.push({ rowId, height });

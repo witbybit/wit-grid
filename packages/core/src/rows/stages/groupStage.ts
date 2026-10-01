@@ -70,9 +70,9 @@ function groupRecursively<TData>(
 			depth,
 			path,
 			children: childNodes,
-			childCount: leafCount,
+			childCount: childNodes.length,
 			leafCount,
-			aggregateValues: {},
+			aggregates: {},
 		});
 	}
 

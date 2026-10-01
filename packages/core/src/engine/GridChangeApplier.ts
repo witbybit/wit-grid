@@ -28,9 +28,11 @@ export type GridCommitReason =
 	| 'grouping:add-group-by'
 	| 'grouping:remove-group-by'
 	| 'grouping:move-group-by'
-	| 'grouping:set-agg-defs'
-	| 'grouping:set-footer'
-	| 'grouping:set-sticky-rows'
+	| 'grouping:set'
+	| 'hierarchy:set-tree-data'
+	| 'hierarchy:set-aggregation'
+	| 'hierarchy:set-detail'
+	| 'hierarchy:set-column'
 	| 'grouping:set-panel'
 	| 'selection:set-range'
 	| 'selection:rows'
@@ -189,6 +191,8 @@ export interface GridCommitKernelDeps<TRowData = unknown> {
 	projectStateChange?: (phase: StateCommitPhase<TRowData>) => void;
 	faultReporter?: RuntimeFaultReporter<TRowData>;
 	flightRecorder?: GridCausalTraceSink;
+	/** Runs before every commit: flushes queued async row transactions so writes stay in call order. */
+	beforeCommit?: () => void;
 }
 
 export type GridChangeApplierDeps<TRowData = unknown> = GridCommitKernelDeps<TRowData>;
@@ -208,6 +212,7 @@ export class GridCommitKernel<TRowData = unknown> {
 	}
 
 	commitDetailed(change: GridCommit<TRowData>): GridCommitExecution<TRowData> {
+		this.deps.beforeCommit?.();
 		const attemptId = this.deps.flightRecorder?.beginCommitAttempt(change.reason);
 		const validation = this.validate(change);
 		if (validation.status === 'rejected') {

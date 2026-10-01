@@ -1,5 +1,5 @@
 import { RenderEngine } from './renderer/renderEngine.js';
-import type { RenderStats } from './renderer/renderOrchestrator.js';
+import type { RenderStats } from './renderer/renderTelemetry.js';
 import type {
 	GridCellContentMount,
 	GridCellContentUnmount,
@@ -11,7 +11,6 @@ import type {
 import type { CellState, GridApi, GridCellAccess, GridCellPointer } from './api/GridApi.js';
 import type { GridCellClickParams } from './api/GridApi.js';
 import type { ColumnDef, ColumnInstanceId, InternalColumnDef } from './columnDef.js';
-import { asGroupMetaCapableRowModel } from './rowModel.js';
 import { resolveGridInteractionController, resolveGridRuntimeComposition } from './internal/apiInternalBridge.js';
 import { createGridInteractionEventRouter } from './interaction/GridInteractionEventRouter.js';
 import type { GridNavigationOptions } from './interaction/GridInteractionController.js';
@@ -30,6 +29,11 @@ export interface GridCellContentAdapter<TRowData = unknown> {
 export interface GridRowContentAdapter<TRowData = unknown> {
 	mountRowContent?: (mount: GridRowContentMount<TRowData>) => void;
 	unmountRowContent?: (unmount: GridRowContentUnmount) => void;
+	/**
+	 * Which full-width rows (detail, full-width group / total, failed, placeholder) the adapter draws
+	 * with its own renderers. Rows it does not draw get core's built-in renderers. Unset: all.
+	 */
+	rendersRow?: (row: import('./visualRow.js').VisualRow<TRowData>) => boolean;
 }
 
 export interface GridHeaderMenuAdapter<TRowData = unknown> {
@@ -86,8 +90,6 @@ export interface GridAdapterHandle<TRowData = unknown> {
 	getCellAccessByPointer(pointer: GridCellPointer): GridCellAccess<TRowData> | null;
 	/** Get full cell access data by row id and column field. */
 	getCellAccess(rowId: string, colField: string): GridCellAccess<TRowData> | null;
-	/** Get the visible descendant row ids for a group row. */
-	getGroupVisibleDescendantRowIds(groupId: string): string[];
 	/** Returns true when the column uses the imperative-update renderer protocol. */
 	isImperativeRendererColumn(column: import('./columnDef.js').ColumnDef<TRowData>): boolean;
 }
@@ -167,6 +169,7 @@ export function mountGridHost<TRowData>(
 	renderEngine.portalMountManager.onFlushCellContent = options.cellContent?.flushCellContent;
 	renderEngine.onMountRowContent = options.rowContent?.mountRowContent;
 	renderEngine.onUnmountRowContent = options.rowContent?.unmountRowContent;
+	renderEngine.portalMountManager.rendersRow = options.rowContent?.rendersRow;
 	renderEngine.onMountHeaderMenu = options.headerMenu?.mountHeaderMenu;
 	renderEngine.onUnmountHeaderMenu = options.headerMenu?.unmountHeaderMenu;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);
@@ -262,9 +265,6 @@ export function mountGridHost<TRowData>(
 		},
 		getCellAccess(rowId: string, colField: string) {
 			return internalApi.getCellAccess(rowId, colField);
-		},
-		getGroupVisibleDescendantRowIds(groupId: string) {
-			return asGroupMetaCapableRowModel(internalApi.getRowModel())?.getGroupMeta(groupId)?.visibleDescendantRowIds ?? [];
 		},
 		isImperativeRendererColumn(column) {
 			return hasImperativeRendererCapability(column);

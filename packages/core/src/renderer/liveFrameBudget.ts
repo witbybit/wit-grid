@@ -15,17 +15,46 @@ export class LiveFrameBudget {
 	private emergencyShellAllowed = true;
 	private mountsThisFrame = 0;
 	private updatesThisFrame = 0;
+	private domUpdateMsPerFrame = 4;
+	private domUpdateSpentMs = 0;
+	private domUpdateStartedAt = -1;
+	private readonly now: () => number;
 
-	public configure(options: GridRendererOptions['liveReact'] | undefined): void {
+	constructor(now: () => number = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
+		this.now = now;
+	}
+
+	public configure(options: GridRendererOptions['liveReact'] | undefined, domUpdate?: GridRendererOptions['domUpdate']): void {
 		this.maxMountsPerFrame = options?.maxMountsPerFrame ?? Infinity;
 		this.maxUpdatesPerFrame = options?.maxUpdatesPerFrame ?? Infinity;
 		this.emergencyShellAllowed = options?.allowEmergencyShell ?? true;
+		this.domUpdateMsPerFrame = domUpdate?.maxMsPerFrame ?? 4;
 	}
 
 	/** Call once per render frame, before any live-mount binding happens this frame. */
 	public resetFrame(): void {
 		this.mountsThisFrame = 0;
 		this.updatesThisFrame = 0;
+		this.domUpdateSpentMs = 0;
+		this.domUpdateStartedAt = -1;
+	}
+
+	/**
+	 * Admits one in-frame DOM renderer update ('update' presentation) while this frame's DOM renderer
+	 * work is inside the budget, and starts timing it; pair with endDomUpdate(). The budget counts
+	 * only DOM renderer time (a count cannot bound a renderer's own DOM work, and elapsed frame time
+	 * would let unrelated work starve it), so every frame makes progress on a slow device too.
+	 */
+	public beginDomUpdate(): boolean {
+		if (this.domUpdateSpentMs >= this.domUpdateMsPerFrame) return false;
+		this.domUpdateStartedAt = this.now();
+		return true;
+	}
+
+	public endDomUpdate(): void {
+		if (this.domUpdateStartedAt < 0) return;
+		this.domUpdateSpentMs += this.now() - this.domUpdateStartedAt;
+		this.domUpdateStartedAt = -1;
 	}
 
 	/** Returns true if this mount/update may proceed within budget, consuming budget if so. */

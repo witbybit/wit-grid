@@ -4,7 +4,7 @@ import type { ViewportRenderer } from './viewportRenderer.js';
 import type { ColumnInteractionController } from './columnInteractionController.js';
 import type { FillDragController, OverlayBox } from './fillDragController.js';
 import { readInteractionState } from '../interaction/interactionState.js';
-import { getRightPinnedLaneScreenLeft, LEAF_HEADER_HEIGHT } from './layoutPlan.js';
+import { getRightPinnedLaneScreenLeft, LEAF_HEADER_HEIGHT, snapToDevicePixel } from './layoutPlan.js';
 
 export class OverlayRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
@@ -55,8 +55,41 @@ export class OverlayRenderer<TRowData = unknown> {
 
 	public syncScrollPosition(hasVisibleSelectionOverlay = this.hasVisibleSelectionOverlay()): void {
 		if (hasVisibleSelectionOverlay) {
+			// finishScrolling still runs the full repaint (selection changes, fill preview,
+			// column overlays); this frame only moves the already-painted box with the content.
 			this.overlayDirtyDuringScroll = true;
+			this.repositionSelectionForScroll();
 		}
+	}
+
+	/**
+	 * Cheap per-scroll-frame follow for the selection border (and the fill handle inside it):
+	 * recompute the clamped box for the last painted bounds and update its transform/size only.
+	 * No DOM is created, reparented or reattached here.
+	 */
+	private repositionSelectionForScroll(): void {
+		const selectionBorder = this.selectionBorder;
+		const bounds = this.selectionDragBounds;
+		if (!selectionBorder || !bounds || selectionBorder.parentNode !== this.viewportRenderer.overlayLayer) return;
+		const box = this.getClampedOverlayBox(bounds.minRow, bounds.maxRow, bounds.minCol, bounds.maxCol);
+		if (!box) {
+			// Scrolled fully out of the clamped viewport: hide without dropping the painted bounds,
+			// so the box reappears when it scrolls back in.
+			if (selectionBorder.style.display !== 'none') selectionBorder.style.display = 'none';
+			return;
+		}
+		this.writeSelectionBox(selectionBorder, box);
+	}
+
+	private writeSelectionBox(selectionBorder: HTMLDivElement, box: OverlayBox): void {
+		const transform = `translate3d(${snapToDevicePixel(box.left)}px, ${snapToDevicePixel(box.top)}px, 0)`;
+		const width = `${box.width}px`;
+		const height = `${box.height}px`;
+		const style = selectionBorder.style;
+		if (style.transform !== transform) style.transform = transform;
+		if (style.width !== width) style.width = width;
+		if (style.height !== height) style.height = height;
+		if (style.display !== 'block') style.display = 'block';
 	}
 
 	public syncPosition(): void {
@@ -103,10 +136,7 @@ export class OverlayRenderer<TRowData = unknown> {
 		const selectionBorder = this.ensureSelectionBorder();
 		this.selectionDragBounds = { minRow, maxRow, minCol, maxCol };
 
-		selectionBorder.style.transform = `translate3d(${box.left}px, ${box.top}px, 0)`;
-		selectionBorder.style.width = `${box.width}px`;
-		selectionBorder.style.height = `${box.height}px`;
-		selectionBorder.style.display = 'block';
+		this.writeSelectionBox(selectionBorder, box);
 
 		if (selectionBorder.parentNode !== this.viewportRenderer.overlayLayer) {
 			this.viewportRenderer.overlayLayer.appendChild(selectionBorder);
@@ -121,7 +151,6 @@ export class OverlayRenderer<TRowData = unknown> {
 	}
 
 	public getClampedOverlayBox(minRow: number, maxRow: number, minCol: number, maxCol: number): OverlayBox | null {
-		const state = this.engine.stateManager.getState();
 		const rowModel = this.engine.getRowModel();
 		const rowCount = rowModel ? rowModel.getVisualRowCount() : 0;
 		const colCount = this.engine.columns.getDisplayedColumnCount();
@@ -193,7 +222,9 @@ export class OverlayRenderer<TRowData = unknown> {
 				return { top: rowTop, bottom: rowTop + rowHeight };
 			}
 			if (r >= rowCount - pinBottomRows) {
-				const totalHeight = this.engine.geometry.getTotalHeight(state.defaultRowHeight);
+				// State is read only for pinned-bottom rows, keeping the per-scroll-frame reposition
+				// free of state reads in the common case.
+				const totalHeight = this.engine.geometry.getTotalHeight(this.engine.stateManager.getState().defaultRowHeight);
 				const bottomOffset = totalHeight - rowTop;
 				const top = overlayViewportHeight - bottomOffset;
 				return { top, bottom: top + rowHeight };

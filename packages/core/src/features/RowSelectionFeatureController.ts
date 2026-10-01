@@ -1,7 +1,8 @@
+import { toDataVisualRowId } from '../rows/visualRowIds.js';
 import type { RowSelectionGesture, RowSelectionGestureSource, RowSelectionChangeResult, RowSelectionScope } from '../api/GridApi.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { GridFeatureContext } from './GridFeatureContext.js';
-import { asSelectableDataRowModel, type RowModel } from '../rowModel.js';
+import { asRowHierarchyReadableModel, asSelectableDataRowModel, type RowModel } from '../rowModel.js';
 import { isDataCellSelectable } from '../visualRow.js';
 
 export class RowSelectionFeatureController<TRowData = unknown> {
@@ -95,6 +96,7 @@ export class RowSelectionFeatureController<TRowData = unknown> {
 				return null;
 		}
 
+		newIds = this.cascadeToDescendants(current.selectedRowIds, newIds);
 		const prevSet = new Set(current.selectedRowIds);
 		const newSet = new Set(newIds);
 		const addedRowIds = newIds.filter((id) => !prevSet.has(id));
@@ -109,6 +111,27 @@ export class RowSelectionFeatureController<TRowData = unknown> {
 			removedRowIds,
 			source: gesture.source ?? 'api',
 		};
+	}
+
+	/**
+	 * `treeData.selectDescendants`: a row that became selected brings every row beneath it (collapsed
+	 * ones included), and one that became deselected takes them with it.
+	 */
+	private cascadeToDescendants(previous: readonly string[], next: string[]): string[] {
+		const state = this.ctx.getState();
+		if (!state.treeData?.selectDescendants || state.rowSelection?.mode === 'single') return next;
+		const index = asRowHierarchyReadableModel(this.getRowModel())?.getHierarchyIndex();
+		if (!index) return next;
+		const prevSet = new Set(previous);
+		const nextSet = new Set(next);
+		const result = new Set(next);
+		for (const id of nextSet) {
+			if (!prevSet.has(id)) for (const descendant of index.getDescendantRowIds(toDataVisualRowId(id))) result.add(descendant);
+		}
+		for (const id of prevSet) {
+			if (!nextSet.has(id)) for (const descendant of index.getDescendantRowIds(toDataVisualRowId(id))) result.delete(descendant);
+		}
+		return result.size === next.length && next.every((id) => result.has(id)) ? next : [...result];
 	}
 
 	public applyRowSelectionGesture(gesture: RowSelectionGesture): RowSelectionChangeResult | null {

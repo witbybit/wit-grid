@@ -1,6 +1,5 @@
 import { HeaderMenuController } from './headerMenuController.js';
 import { ScrollEngine } from './scrollEngine.js';
-import { createEmptyRenderWindow, type RenderWindow } from './renderWindow.js';
 import { ColumnInteractionController } from './columnInteractionController.js';
 import { FillDragController, type OverlayBox } from './fillDragController.js';
 import { createCellKey } from '../ids.js';
@@ -15,12 +14,10 @@ import type {
 	GridHeaderMenuMount,
 	GridHeaderMenuUnmount,
 } from './IGridRenderer.js';
-import { RenderOrchestrator, type RenderStats } from './renderOrchestrator.js';
 import { DefaultFrameCoordinator } from './frameCoordinator.js';
 import { PortalMountManager } from './portalMountManager.js';
 import { ViewportRenderer } from './viewportRenderer.js';
 import { RowRenderer } from './rowRenderer.js';
-import type { ScrollRenderContext } from './scrollRenderContext.js';
 import { CellRenderer } from './cellRenderer.js';
 import { HeaderRenderer } from './headerRenderer.js';
 import { OverlayRenderer } from './overlayRenderer.js';
@@ -31,11 +28,10 @@ import { FloatingFilterRenderer } from './floatingFilterRenderer.js';
 import { StatusBarRenderer } from './statusBarRenderer.js';
 import { PaginationBarRenderer } from './paginationBarRenderer.js';
 import { StickyGroupRenderer } from './stickyGroupRenderer.js';
-import { RenderInvalidationCoordinator } from './RenderInvalidationCoordinator.js';
 import { ValidationTooltipController } from './ValidationTooltipController.js';
-import { collectRenderStats, createRenderRuntimeStats, resetRenderTelemetry } from './renderTelemetry.js';
-import { RenderPaintCoordinator, type RenderPaintCoordinatorState } from './renderPaintCoordinator.js';
-import { RenderScrollCoordinator, type RenderScrollCoordinatorState } from './renderScrollCoordinator.js';
+import { collectRenderStats, createRenderRuntimeStats, resetRenderTelemetry, type RenderStats } from './renderTelemetry.js';
+import { RenderPaintPipeline } from './renderPaintPipeline.js';
+import { RenderScrollPipeline } from './renderScrollPipeline.js';
 import { RenderViewportCoordinator } from './renderViewportCoordinator.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { ColumnInstanceId } from '../columnDef.js';
@@ -59,11 +55,13 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	private readonly scrollEngine: ScrollEngine<TRowData>;
 	private readonly columnInteractions: ColumnInteractionController<TRowData>;
 	private readonly fillDrag: FillDragController<TRowData>;
+	// Frame pipeline: the frame coordinator decides when frames run; the paint and scroll
+	// pipelines own what each kind of frame does; the viewport coordinator is the layout step
+	// both share.
 	private readonly frameCoordinator: DefaultFrameCoordinator;
-	private readonly orchestrator: RenderOrchestrator;
-	private readonly paintCoordinator!: RenderPaintCoordinator<TRowData>;
-	private readonly scrollCoordinator!: RenderScrollCoordinator<TRowData>;
-	private readonly viewportCoordinator!: RenderViewportCoordinator<TRowData>;
+	private readonly paintPipeline: RenderPaintPipeline<TRowData>;
+	private readonly scrollPipeline: RenderScrollPipeline<TRowData>;
+	private readonly viewportCoordinator: RenderViewportCoordinator<TRowData>;
 
 	public readonly portalMountManager: PortalMountManager<TRowData>;
 	public readonly viewportRenderer: ViewportRenderer<TRowData>;
@@ -77,46 +75,22 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	public readonly statusBarRenderer: StatusBarRenderer<TRowData>;
 	public readonly paginationBarRenderer: PaginationBarRenderer<TRowData>;
 	public readonly stickyGroupRenderer: StickyGroupRenderer<TRowData>;
-	private readonly invalidationCoordinator: RenderInvalidationCoordinator<TRowData>;
 	private readonly headerMenu: HeaderMenuController<TRowData>;
 	private readonly viewportInteractionRouter: ReturnType<typeof createGridViewportInteractionRouter>;
 
 	private readonly layoutTransition: LayoutTransitionController<TRowData>;
 	private readonly rowDrag: RowDragController<TRowData>;
 	private readonly interactionController: GridInteractionHandle | null;
-	private _pendingTransition = false;
 
 	// Authoritative render lifecycle phase. Initialized first in constructor.
 	private runtimeState!: RenderRuntimeState;
 
-	private lastStyleRules: unknown = undefined;
-	private lastLoading: unknown = undefined;
-
-	// Cached geometry values so the raw DOM scroll handler (120/sec on high-refresh
-	// displays) and same-window fast path never need to call getState() or geometry.
-	private cachedMaxScrollLeft = 0;
-	private cachedTotalWidth = 0;
-	private cachedTotalHeight = 0;
-	private cachedDefaultRowHeight = 40;
-	private cachedHasSelectionOverlay = false;
-
-	// Reusable ScrollRenderContext updated in-place each scroll frame to avoid allocation.
-	private _scrollCtx!: ScrollRenderContext<TRowData>;
-
-	// Double-buffered RenderWindow — alternated each frame to avoid per-frame allocation.
-	// _activeRenderWindowBufIdx points to the buffer currently stored as currentWindow.
-	// The candidate (next) buffer is always the OTHER slot.
-	private readonly _renderWindowBufs: [RenderWindow, RenderWindow] = [createEmptyRenderWindow(), createEmptyRenderWindow()];
-	private _activeRenderWindowBufIdx = 0;
-
-	private readonly portalFlushBudget = 24;
-	private readonly postScrollDecorationBudget = 32;
-	private readonly postScrollFidelityBudget = 12;
-
 	private autoRowHeightEnabled = false;
-	private readonly scrollPrewarmBudget = 48;
-	private readonly scrollPrewarmRowPadding = 2;
-	private readonly scrollPrewarmColPadding = 2;
+	/** Auto-height: row id → row version it was last measured at (bounded; cleared on layout change). */
+	private readonly measuredRowVersions = new Map<string, number>();
+	private measuredRowPlan: unknown = null;
+	private measuredRowColWindowKey = '';
+	private static readonly MAX_MEASURED_ROW_STAMPS = 20_000;
 
 	private renderStats = createRenderRuntimeStats();
 
@@ -175,35 +149,12 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			interactionController ??
 			(api as (InternalGridApi<TRowData> & { interactionController?: GridInteractionHandle | null }) | undefined)?.interactionController ??
 			null;
-		this._scrollCtx = {
-			isScrolling: true,
-			stateVersion: 0,
-			rowVersions: this.engine.rowVersions,
-			globalVersion: 0,
-			insightVersion: 0,
-			styleVersion: 0,
-			loadingVersion: 0,
-			selectionVersion: 0,
-			styleChangedDuringScroll: false,
-			loadingChangedDuringScroll: false,
-			selectionChangedDuringScroll: false,
-			globalChangedDuringScroll: false,
-			activeEdit: null,
-			hasDeferredCellStyleRules: false,
-			hasCustomRenderers: false,
-			hasInsightDecorations: false,
-			plan: this.engine.columns.getCompiledPlan(),
-			visibleRowRange: { startIdx: 0, endIdx: 0 },
-			visibleColRange: { startIdx: 0, endIdx: 0 },
-			focusedCell: null,
-			selectionBounds: undefined,
-			canUseCachedDisplayValues: true,
-		};
 		// Initialize first — other renderer components query it during construction.
 		this.runtimeState = new RenderRuntimeState((msg) =>
 			engine.runtimeFaults.report({ source: 'renderer', operation: 'runtime-phase-transition', error: new Error(msg) })
 		);
 		this.portalMountManager = new PortalMountManager<TRowData>(engine);
+		this.portalMountManager.maxRowMountsPerScrollFrame = engine.rendererOptions?.fullWidth?.maxMountsPerScrollFrame ?? 4;
 		this.headerMenu = new HeaderMenuController<TRowData>(
 			engine,
 			this.portalMountManager,
@@ -229,10 +180,19 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 					engine.flightRecorder.finishExecutingFrame(frameToken, 'post-scroll');
 				}
 			},
-			onScrollEnd: () => this.scrollCoordinator.finishScrolling(),
+			onScrollEnd: () => {
+				this.scrollEngine.settleVelocity();
+				this.scrollPipeline.finishScrolling();
+				// Rows bound by scroll frames were never measured (no reads mid-scroll): measure
+				// the newly bound ones once, now that the runtime is idle.
+				this.measureAndUpdateRowHeights(true);
+			},
 			onFault: (msg) => engine.runtimeFaults.report({ source: 'renderer', operation: 'frame-reentry', error: new Error(msg) }),
 			runtimeState: this.runtimeState,
 			gridScheduler: defaultGridScheduler,
+			// Time-based fallback for browsers without native scrollend: a fixed frame count
+			// ends the gesture after ~12ms on 240Hz displays, i.e. mid-gesture.
+			scrollEndQuietMs: 100,
 		});
 
 		this.viewportRenderer = new ViewportRenderer<TRowData>(engine, this.geometryController);
@@ -276,24 +236,6 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		);
 		this.overlayRenderer.renderStats = this.renderStats;
 
-		this.orchestrator = new RenderOrchestrator({
-			recomputeGeometry: () => this.geometryController.recomputeIfNeeded(),
-			syncViewport: (_frame) => {
-				// Sync DOM-measured scroll viewport width before computing layout — ensures
-				// scrollViewportClientWidth is fresh after container resizes (e.g. sidebar open/close)
-				// without needing a full paint cycle.
-				this.viewportRenderer.syncViewportScrollFromDom();
-				const layoutPlan = this.viewportCoordinator.syncLayoutPlan();
-				this.viewportCoordinator.recycleViewport(false, undefined, layoutPlan.renderWindow);
-				this.stickyGroupRenderer.sync(layoutPlan);
-			},
-			syncHeaders: (frame) => this.headerRenderer.sync(frame),
-			syncOverlay: (frame) => this.overlayRenderer.sync(frame),
-			syncRows: (frame) => this.rowRenderer.repaintInvalidatedRows(frame),
-			syncCells: (frame) => this.rowRenderer.repaintInvalidatedCells(frame),
-			fullPaint: () => this.fullPaint(),
-		});
-
 		this.columnInteractions = new ColumnInteractionController<TRowData>({
 			engine,
 			getOverlayLayer: () => this.viewportRenderer.overlayLayer,
@@ -325,118 +267,75 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.statusBarRenderer = new StatusBarRenderer<TRowData>(engine);
 		this.paginationBarRenderer = new PaginationBarRenderer<TRowData>(engine);
 		this.stickyGroupRenderer = new StickyGroupRenderer<TRowData>(engine, this.portalMountManager);
-		this.rowDrag = new RowDragController<TRowData>(engine);
-		const scrollState: RenderScrollCoordinatorState<TRowData> = {
-			viewportDirtyAfterScroll: false,
-			flushPendingAfterScroll: false,
-			needsPostScrollPortalFlush: false,
-			portalFlushScheduled: false,
-			prewarmScheduled: false,
-			prewarmTimer: null,
-			prewarmRequest: null,
-			lastPrewarmRequest: null,
-			postScrollDecorationScheduled: false,
-			postScrollDecorationTimer: null,
-			postScrollDecorationGeneration: 0,
-			postScrollFidelityScheduled: false,
-			postScrollFidelityTimer: null,
-			postScrollFidelityGeneration: 0,
-			fidelityEpoch: 0,
-			cachedMaxScrollLeft: this.cachedMaxScrollLeft,
-			cachedTotalWidth: this.cachedTotalWidth,
-			cachedTotalHeight: this.cachedTotalHeight,
-			cachedDefaultRowHeight: this.cachedDefaultRowHeight,
-			cachedHasSelectionOverlay: this.cachedHasSelectionOverlay,
-			scrollCtx: this._scrollCtx,
-			renderWindowBufs: this._renderWindowBufs,
-			activeRenderWindowBufIdx: this._activeRenderWindowBufIdx,
-			portalFlushBudget: this.portalFlushBudget,
-			postScrollDecorationBudget: this.postScrollDecorationBudget,
-			postScrollFidelityBudget: this.postScrollFidelityBudget,
-			scrollPrewarmBudget: this.scrollPrewarmBudget,
-			scrollPrewarmRowPadding: this.scrollPrewarmRowPadding,
-			scrollPrewarmColPadding: this.scrollPrewarmColPadding,
+		this.stickyGroupRenderer.cellRowBinder = {
+			bind: (request) => this.rowRenderer.detachedRowBinder.bind(request),
+			release: (slot) => this.rowRenderer.detachedRowBinder.release(slot),
 		};
-		this.scrollCoordinator = new RenderScrollCoordinator<TRowData>(
-			{
-				engine,
-				viewportRenderer: this.viewportRenderer,
-				rowRenderer: this.rowRenderer,
-				headerRenderer: this.headerRenderer,
-				floatingFilterRenderer: this.floatingFilterRenderer,
-				overlayRenderer: this.overlayRenderer,
-				stickyGroupRenderer: this.stickyGroupRenderer,
-				portalMountManager: this.portalMountManager,
-				frameCoordinator: this.frameCoordinator,
-				gridScheduler: defaultGridScheduler,
-				requestScrollFrame: () => this.frameCoordinator.requestScrollFrame(),
-				layoutTransition: this.layoutTransition,
-				renderStats: this.renderStats,
-				runtimeState: this.runtimeState,
-				recycleViewport: (isScrollFrameActive, ctx, precomputedWindow) =>
-					this.viewportCoordinator.recycleViewport(isScrollFrameActive, ctx, precomputedWindow),
-				syncLayoutPlan: (renderWindow) => this.viewportCoordinator.syncLayoutPlan(renderWindow),
-			},
-			scrollState
-		);
+		this.rowDrag = new RowDragController<TRowData>(engine);
 		this.viewportCoordinator = new RenderViewportCoordinator<TRowData>({
 			engine,
 			viewportRenderer: this.viewportRenderer,
 			rowRenderer: this.rowRenderer,
 			scrollEngine: this.scrollEngine,
 			renderStats: this.renderStats,
-			requestScrollFrame: () => this.frameCoordinator.requestScrollFrame(),
-		});
-		const paintState: RenderPaintCoordinatorState = {
-			pendingTransition: this._pendingTransition,
-			lastStyleRules: this.lastStyleRules,
-			lastLoading: this.lastLoading,
-		};
-		this.paintCoordinator = new RenderPaintCoordinator<TRowData>(
-			{
-				engine,
-				viewportRenderer: this.viewportRenderer,
-				rowRenderer: this.rowRenderer,
-				headerRenderer: this.headerRenderer,
-				floatingFilterRenderer: this.floatingFilterRenderer,
-				overlayRenderer: this.overlayRenderer,
-				stickyGroupRenderer: this.stickyGroupRenderer,
-				portalMountManager: this.portalMountManager,
-				orchestrator: this.orchestrator,
-				scrollCoordinator: this.scrollCoordinator,
-				layoutTransition: this.layoutTransition,
-				recycleViewport: (isScrollFrameActive, ctx, precomputedWindow) =>
-					this.viewportCoordinator.recycleViewport(isScrollFrameActive, ctx, precomputedWindow),
-				syncLayoutPlan: (renderWindow) => this.viewportCoordinator.syncLayoutPlan(renderWindow),
-				updateCachedGeometryBoundsFromState: (defaultColWidth, defaultRowHeight) =>
-					this.updateCachedGeometryBoundsFromState(defaultColWidth, defaultRowHeight),
-				onAfterViewportPaint: () => this.measureAndUpdateRowHeights(),
+			// Programmatic scroll (scrollCellIntoView/scrollRowIntoView) opens a scroll session like a
+			// user scroll does, so the owed frame never runs from idle.
+			requestScrollFrame: () => {
+				this.scrollPipeline.markScrolling();
+				this.frameCoordinator.requestScrollFrame();
 			},
-			paintState
-		);
-		this.invalidationCoordinator = new RenderInvalidationCoordinator<TRowData>({
+		});
+		this.scrollPipeline = new RenderScrollPipeline<TRowData>({
 			engine,
+			viewportRenderer: this.viewportRenderer,
+			rowRenderer: this.rowRenderer,
+			headerRenderer: this.headerRenderer,
+			floatingFilterRenderer: this.floatingFilterRenderer,
+			overlayRenderer: this.overlayRenderer,
+			stickyGroupRenderer: this.stickyGroupRenderer,
+			portalMountManager: this.portalMountManager,
+			frameCoordinator: this.frameCoordinator,
+			gridScheduler: defaultGridScheduler,
+			requestScrollFrame: () => this.frameCoordinator.requestScrollFrame(),
+			layoutTransition: this.layoutTransition,
+			renderStats: this.renderStats,
+			runtimeState: this.runtimeState,
+			viewportLayout: this.viewportCoordinator,
+		});
+		this.paintPipeline = new RenderPaintPipeline<TRowData>({
+			engine,
+			runtimeState: this.runtimeState,
+			renderStats: this.renderStats,
+			frameCoordinator: this.frameCoordinator,
 			geometryController: this.geometryController,
 			portalMountManager: this.portalMountManager,
 			layoutTransition: this.layoutTransition,
-			frameCoordinator: this.frameCoordinator,
-			runtimeState: this.runtimeState,
-			syncLayoutPlan: () => {
-				this.viewportCoordinator.syncLayoutPlan();
-			},
-			scrollCellIntoView: (pointer) => this.viewportCoordinator.scrollCellPointerIntoView(pointer),
+			viewportRenderer: this.viewportRenderer,
+			rowRenderer: this.rowRenderer,
+			headerRenderer: this.headerRenderer,
+			floatingFilterRenderer: this.floatingFilterRenderer,
+			overlayRenderer: this.overlayRenderer,
+			stickyGroupRenderer: this.stickyGroupRenderer,
+			viewportLayout: this.viewportCoordinator,
+			scrollLane: this.scrollPipeline,
 			resetScroll: () => this.scrollEngine.scrollTo(0, this.engine.viewport.scrollLeft),
-			updateCachedGeometryBounds: () => this.updateCachedGeometryBounds(),
-			markFlushPendingAfterScroll: (changeIds) => {
-				this.scrollCoordinator.markFlushPendingAfterScroll(changeIds);
-			},
-			markViewportDirtyAfterScroll: () => {
-				this.scrollCoordinator.markViewportDirtyAfterScroll();
-			},
+			onAfterViewportPaint: () => this.measureAndUpdateRowHeights(),
+			onAfterIncrementalPaint: () => this.measureAndUpdateRowHeights(true),
 		});
 		this.viewportInteractionRouter = createGridViewportInteractionRouter({
 			getInteraction: () => this.interactionController,
 			resolveCellPointer: (target) => this.resolveViewportInteractionPointer(target),
+			onHierarchyToggle: (id) => this.engine.groupingFeature.toggleExpanded(id),
+			onHierarchySelect: (id, selected) => {
+				// A group cell selects the rows beneath it; a data row's cell selects that row (the
+				// descendant cascade for tree parents is `selectDescendants`, a later phase).
+				const rowModel = this.engine.getVisualRowModel();
+				const row = rowModel?.getVisualRow(rowModel.getVisualIndexById(id));
+				const rowIds = row?.kind === 'data' ? [row.rowId] : [...this.engine.groupingFeature.getDescendantRowIds(id)];
+				if (rowIds.length === 0) return;
+				if (selected) this.engine.selectRowIds(rowIds, 'checkbox');
+				else this.engine.deselectRowIds(rowIds, 'checkbox');
+			},
 		});
 	}
 
@@ -452,7 +351,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			scrollViewport.addEventListener('mouseleave', this.onRowMouseLeave);
 			scrollViewport.addEventListener('click', this.onViewportInteractionClick);
 			scrollViewport.addEventListener('mousedown', this.onViewportInteractionMouseDown);
-			this.scrollEngine.bind(scrollViewport, this.onScroll);
+			this.scrollEngine.bind(scrollViewport, this.onScroll, this.onNativeScrollEnd);
 		}
 
 		if (this.viewportRenderer.headerLayer && this.viewportRenderer.headerLeftLayer && this.viewportRenderer.headerRightLayer) {
@@ -516,7 +415,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 
 		this.validationTooltip = new ValidationTooltipController(container);
 
-		this.invalidationCoordinator.bind();
+		this.paintPipeline.bind();
 
 		// Prime the max-scroll cache so the first scroll events don't see a stale 0
 		this.updateCachedGeometryBounds();
@@ -535,7 +434,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.validationTooltip?.destroy();
 		this.validationTooltip = null;
 
-		this.invalidationCoordinator.destroy();
+		this.paintPipeline.destroy();
 		this.scrollEngine.unbind();
 		const scrollViewport = this.viewportRenderer.scrollViewport;
 		if (scrollViewport) {
@@ -569,42 +468,62 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.viewportRenderer.unmount();
 	}
 
-	/**
-	 * Scroll hot path â€” zero allocations, zero state reads.
-	 * cachedMaxScrollLeft is updated in flushScrollFrame/fullPaintInternal/geometry callbacks.
-	 */
+	/** Scroll hot path: zero allocations, zero state reads (see RenderScrollPipeline.onScroll). */
 	private onScroll = (scrollTop: number, scrollLeft: number, timestamp?: number): void => {
-		this.scrollCoordinator.onScroll(scrollTop, scrollLeft, timestamp);
+		this.scrollPipeline.onScroll(scrollTop, scrollLeft, timestamp);
+	};
+
+	private onNativeScrollEnd = (): void => {
+		this.frameCoordinator.notifyScrollEnd();
 	};
 
 	private clearPostScrollDecorationTimer(): void {
-		this.scrollCoordinator.clearPostScrollDecorationTimer();
+		this.scrollPipeline.clearPostScrollDecorationTimer();
 	}
 
 	private flushScrollFrame(): void {
-		this.scrollCoordinator.flushScrollFrame();
+		this.scrollPipeline.flushScrollFrame();
 	}
 
 	private updateCachedGeometryBoundsFromState(defaultColWidth: number, defaultRowHeight: number): void {
-		this.scrollCoordinator.updateCachedGeometryBoundsFromState(defaultColWidth, defaultRowHeight);
+		this.scrollPipeline.updateGeometryBounds(defaultColWidth, defaultRowHeight);
 	}
 
 	private updateCachedGeometryBounds(): void {
 		const state = this.engine.stateManager.getState();
-		this.scrollCoordinator.updateCachedGeometryBoundsFromState(state.defaultColWidth, state.defaultRowHeight);
+		this.scrollPipeline.updateGeometryBounds(state.defaultColWidth, state.defaultRowHeight);
 	}
 
 	public setAutoRowHeight(enabled: boolean): void {
 		this.autoRowHeightEnabled = enabled;
 	}
 
-	private measureAndUpdateRowHeights(): void {
+	/**
+	 * Auto row height. `onlyUnmeasured` (viewport paints, scroll end) skips rows already
+	 * measured at their current row version under the current column layout/window, so the
+	 * per-cell scrollHeight reads stay bounded to rows that newly entered the viewport.
+	 * A full paint (`onlyUnmeasured = false`) re-measures every bound row, as before.
+	 * Never runs inside a scroll frame; callers invoke it after all paint writes.
+	 */
+	private measureAndUpdateRowHeights(onlyUnmeasured = false): void {
 		if (!this.autoRowHeightEnabled) return;
 		if (!this.engine.getRowModel()) return;
+		if (this.runtimeState.phase === 'scroll-frame') return;
 
 		const state = this.engine.stateManager.getState();
 		const slots = this.rowRenderer.rowSlotPool?.getSlots() ?? [];
 		const measuredHeights = new Map<string, number>();
+
+		// Column layout or the rendered column window changes cell wrapping: re-measure then.
+		const plan = this.engine.columns.getCompiledPlan();
+		const win = this.rowRenderer.currentWindow;
+		const colWindowKey = win ? `${win.colStart}:${win.colEnd}` : '';
+		const stamps = this.measuredRowVersions;
+		if (plan !== this.measuredRowPlan || colWindowKey !== this.measuredRowColWindowKey || stamps.size > RenderEngine.MAX_MEASURED_ROW_STAMPS) {
+			stamps.clear();
+			this.measuredRowPlan = plan;
+			this.measuredRowColWindowKey = colWindowKey;
+		}
 
 		for (const slot of slots) {
 			if (slot.rowKind !== 'data') continue;
@@ -612,6 +531,9 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			if (!visualRowId.startsWith('row:')) continue;
 
 			const rawRowId = decodeURIComponent(visualRowId.slice(4));
+			const rowVersion = this.engine.rowVersions.get(rawRowId) ?? 0;
+			if (onlyUnmeasured && stamps.get(rawRowId) === rowVersion) continue;
+			stamps.set(rawRowId, rowVersion);
 			// Cells typically use h-full (height:100%) so the row's own scrollHeight
 			// reflects only its explicit height. Instead, take the maximum scrollHeight
 			// across all cells — a cell whose content overflows its h-full container will
@@ -632,49 +554,48 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	}
 
 	public schedulePaint(): void {
-		this.invalidationCoordinator.schedulePaint();
+		this.paintPipeline.scheduleFullPaint('api');
 	}
 
 	public scheduleFullPaint(reason = 'api'): void {
-		this.invalidationCoordinator.scheduleFullPaint(reason);
+		this.paintPipeline.scheduleFullPaint(reason);
 	}
 
 	public scheduleViewportPaint(reason = 'viewport'): void {
-		this.invalidationCoordinator.scheduleViewportPaint(reason);
+		this.paintPipeline.scheduleViewportPaint(reason);
 	}
 
 	public scheduleHeaderPaint(reason = 'headers'): void {
-		this.invalidationCoordinator.scheduleHeaderPaint(reason);
+		this.paintPipeline.scheduleHeaderPaint(reason);
 	}
 
 	public scheduleOverlayPaint(reason = 'overlay'): void {
-		this.invalidationCoordinator.scheduleOverlayPaint(reason);
+		this.paintPipeline.scheduleOverlayPaint(reason);
 	}
 
 	public scheduleCellPaint(rowId: string, colId: string, reason = 'cell'): void {
-		this.invalidationCoordinator.scheduleCellPaint(rowId, colId, reason);
+		this.paintPipeline.scheduleCellPaint(rowId, colId, reason);
 	}
 
 	public scheduleRowPaint(rowId: string, reason = 'row'): void {
-		this.invalidationCoordinator.scheduleRowPaint(rowId, reason);
+		this.paintPipeline.scheduleRowPaint(rowId, reason);
 	}
 
 	public scheduleColumnPaint(colId: string, reason = 'column'): void {
-		this.invalidationCoordinator.scheduleColumnPaint(colId, reason);
+		this.paintPipeline.scheduleColumnPaint(colId, reason);
 	}
 
 	public scheduleGeometryPaint(reason = 'geometry'): void {
-		this.invalidationCoordinator.scheduleGeometryPaint(reason);
+		this.paintPipeline.scheduleGeometryPaint(reason);
 	}
 
 	private flushPaint(): void {
-		this.paintCoordinator.flushPaint();
+		this.paintPipeline.flushPaint();
 	}
 
 	public getRenderStats(): RenderStats {
 		return collectRenderStats({
 			engine: this.engine,
-			orchestrator: this.orchestrator,
 			portalMountManager: this.portalMountManager,
 			rowRenderer: this.rowRenderer,
 			runtimeStats: this.renderStats,
@@ -682,11 +603,11 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	}
 
 	public resetRenderStats(): void {
-		resetRenderTelemetry(this.engine, this.orchestrator, this.portalMountManager, this.rowRenderer, this.renderStats);
+		resetRenderTelemetry(this.engine, this.portalMountManager, this.rowRenderer, this.renderStats);
 	}
 
 	public fullPaint(): void {
-		this.paintCoordinator.fullPaint();
+		this.paintPipeline.fullPaint();
 	}
 
 	public scrollCellIntoView(rowId: string, colField: string): void {
@@ -701,7 +622,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		// During scroll the viewport is moving — hover state would flicker across every
 		// row the pointer passes over and trigger className writes + style recalcs on each.
 		// Suppress until scrolling stops; finishScrolling clears the hovered row anyway.
-		if (this.scrollCoordinator.getIsScrolling()) return;
+		if (this.scrollPipeline.getIsScrolling()) return;
 
 		const rowEl = (event.target as HTMLElement).closest('.og-row') as HTMLElement | null;
 		const rowIndexText = rowEl?.dataset.rowIndex;

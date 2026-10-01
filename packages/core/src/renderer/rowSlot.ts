@@ -1,5 +1,7 @@
+import type { RowHierarchy } from '../visualRow.js';
 import { CellSlot, toPx } from './cellSlot.js';
 import type { ColumnInstanceId } from '../columnDef.js';
+import type { VisualRow } from '../visualRow.js';
 
 export const rowSlotWriteStats = {
 	rowClassWrites: 0,
@@ -19,7 +21,7 @@ export class RowSlot<TRowData = unknown> {
 
 	public visualIndex = -1;
 	public visualRowId = '';
-	public rowKind: 'data' | 'group' | 'detail' | 'loading' | 'failed' | 'placeholder' | 'footer' | '' = '';
+	public rowKind: VisualRow['kind'] | '' = '';
 	public rowTop = -1;
 	public rowHeight = -1;
 
@@ -31,6 +33,9 @@ export class RowSlot<TRowData = unknown> {
 	public lastVisualRowId = '\0'; // guaranteed != any real rowId on first update
 
 	public keepAlive = false;
+	/** Mirrors the inline `visibility: hidden` unbindHot() writes (the only writer), so update()
+	 *  doesn't read the style back on every bind. */
+	private hiddenByUnbind = false;
 	public lastPortalRowKey: string | undefined = undefined;
 
 	/**
@@ -76,6 +81,36 @@ export class RowSlot<TRowData = unknown> {
 		this.element = element;
 		if (element.getAttribute('role') !== 'row') element.setAttribute('role', 'row');
 		element.dataset.rowSlotId = id;
+		this.hiddenByUnbind = element.style.visibility === 'hidden';
+	}
+
+	private lastHierarchyAria = '';
+
+	/**
+	 * Treegrid semantics for grouped / tree grids: aria-level (1-based), aria-expanded on rows with
+	 * children, aria-posinset / aria-setsize among siblings. `null` (flat grids) clears them.
+	 */
+	public applyHierarchyAria(hierarchy: RowHierarchy | null): void {
+		const key = hierarchy
+			? `${hierarchy.level}|${hierarchy.hasChildren ? (hierarchy.expanded ? 1 : 0) : -1}|${hierarchy.posInSet}|${hierarchy.setSize}`
+			: '';
+		if (key === this.lastHierarchyAria) return;
+		this.lastHierarchyAria = key;
+		const el = this.element;
+		if (!hierarchy) {
+			for (const name of ['aria-level', 'aria-expanded', 'aria-posinset', 'aria-setsize']) el.removeAttribute(name);
+			return;
+		}
+		el.setAttribute('aria-level', String(hierarchy.level + 1));
+		if (hierarchy.hasChildren) el.setAttribute('aria-expanded', String(hierarchy.expanded));
+		else el.removeAttribute('aria-expanded');
+		if (hierarchy.setSize > 0) {
+			el.setAttribute('aria-posinset', String(hierarchy.posInSet));
+			el.setAttribute('aria-setsize', String(hierarchy.setSize));
+		} else {
+			el.removeAttribute('aria-posinset');
+			el.removeAttribute('aria-setsize');
+		}
 	}
 
 	// ── Lookup ───────────────────────────────────────────────────────────────────────
@@ -114,7 +149,7 @@ export class RowSlot<TRowData = unknown> {
 	public update(
 		visualIndex: number,
 		visualRowId: string,
-		rowKind: 'data' | 'group' | 'detail' | 'loading' | 'failed' | 'placeholder' | 'footer',
+		rowKind: VisualRow['kind'],
 		rowTop: number,
 		rowHeight: number,
 		className: string
@@ -127,7 +162,8 @@ export class RowSlot<TRowData = unknown> {
 		this.rowTop = rowTop;
 		this.rowHeight = rowHeight;
 
-		if (this.element.style.visibility === 'hidden') {
+		if (this.hiddenByUnbind) {
+			this.hiddenByUnbind = false;
 			this.element.style.visibility = '';
 			domUpdated = true;
 		}
@@ -192,6 +228,7 @@ export class RowSlot<TRowData = unknown> {
 		this.keepAlive = false;
 		this.lastPortalRowKey = undefined;
 		this.element.style.visibility = 'hidden';
+		this.hiddenByUnbind = true;
 		// Keep dataset/ARIA mirrors warm as well as the DOM subtree. A rebound to the same
 		// visual row should not need to rewrite debug mirrors we just tore down.
 	}
@@ -230,6 +267,8 @@ export class RowSlot<TRowData = unknown> {
 
 		this.element.className = '';
 		this.element.removeAttribute('style');
+		this.hiddenByUnbind = false;
+
 		delete this.element.dataset.rowIndex;
 		delete this.element.dataset.rowId;
 		delete this.element.dataset.rowKey;

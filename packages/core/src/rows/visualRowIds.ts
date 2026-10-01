@@ -41,8 +41,8 @@ export function toGroupVisualRowId(path: GroupPathItem[] | string): string {
 	return `group:${stablePath}`;
 }
 
-export function toFooterVisualRowId(groupId: string): string {
-	return `footer:${encodeIdPart(groupId)}`;
+export function toTotalVisualRowId(groupId: string | null): string {
+	return groupId === null ? 'total:grand' : `total:${encodeIdPart(groupId)}`;
 }
 
 export function toLoadingVisualRowId(index: number): string {

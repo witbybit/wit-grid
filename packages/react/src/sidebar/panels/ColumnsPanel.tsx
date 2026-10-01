@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { isHierarchyColumn } from '@eregister/wit-grid-core';
 import type { GridApi, ColumnDef } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';
 
@@ -90,14 +91,16 @@ const EMPTY_GROUP_BY: string[] = [];
 
 export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 	const stateColumns = useGridKeySelector<ColumnDef<any>[]>('columns', (s) => s.columns as ColumnDef<any>[]);
-	const stateGroupBy = useGridKeySelector<string[] | undefined>('groupBy', (s) => (s.groupBy ? [...s.groupBy] : undefined));
-	const showGroupFooter = useGridKeySelector<boolean>('showGroupFooter', (s) => !!s.showGroupFooter);
-	const enableStickyGroupRows = useGridKeySelector<boolean>('enableStickyGroupRows', (s) => !!s.enableStickyGroupRows);
+	const grouping = useGridKeySelector('grouping', (s) => s.grouping);
+	const stateGroupBy = useMemo(() => (grouping && grouping.by.length > 0 ? api.getGroupBy() : undefined), [grouping, api]);
+	const showGroupTotals = !!grouping?.totals?.groups;
+	const stickyGroupHeaders = !!grouping?.stickyHeaders;
 	// Subscribe to themeName so the panel re-renders when the theme changes.
 	useGridKeySelector('themeName', (s) => s.themeName);
 	const theme = api.getTheme();
 
-	const allCols = api.getColumns();
+	// The hierarchy column belongs to grouping / tree data, not to the user's column list.
+	const allCols = api.getColumns().filter((column) => !isHierarchyColumn(column));
 	const groupBy: string[] = stateGroupBy ?? EMPTY_GROUP_BY;
 	const visibleCount = allCols.filter((c) => !c.hide).length;
 
@@ -140,8 +143,7 @@ export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 		setDropTargetIdx(null);
 		if (fromIndex === null || fromIndex === toIndex) return;
 
-		const cols = api.getColumns();
-		const reordered = [...cols];
+		const reordered = [...allCols];
 		const [moved] = reordered.splice(fromIndex, 1);
 		reordered.splice(toIndex, 0, moved);
 		api.setColumnOrder(reordered.map((c) => c.field));
@@ -442,14 +444,14 @@ export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 									}}
 								>
 									<button
-										onClick={() => api.expandAllGroups?.()}
+										onClick={() => api.expandAll()}
 										style={{ ...makeIconBtnStyle(theme.headerText), fontSize: 11, width: 'auto', padding: '0 4px' }}
 										title='Expand all groups'
 									>
 										Expand
 									</button>
 									<button
-										onClick={() => api.collapseAllGroups?.()}
+										onClick={() => api.collapseAll()}
 										style={{ ...makeIconBtnStyle(theme.headerText), fontSize: 11, width: 'auto', padding: '0 4px' }}
 										title='Collapse all groups'
 									>
@@ -574,17 +576,17 @@ export function ColumnsPanel({ api, onClose }: ColumnsPanelProps) {
 									<ToggleRow
 										icon={<FooterIcon />}
 										label='Show subtotals'
-										description='Footer row with aggregates below each leaf group'
-										checked={showGroupFooter}
-										onChange={(v) => api.setShowGroupFooter(v)}
+										description='Total row with aggregates below each group'
+										checked={showGroupTotals}
+										onChange={(v) => api.updateGrouping({ totals: { ...grouping?.totals, groups: v ? 'bottom' : false } })}
 										theme={theme}
 									/>
 									<ToggleRow
 										icon={<StickyIcon />}
 										label='Sticky group headers'
 										description='Group header rows stay visible while scrolling'
-										checked={enableStickyGroupRows}
-										onChange={(v) => api.setStickyGroupRows(v)}
+										checked={stickyGroupHeaders}
+										onChange={(v) => api.updateGrouping({ stickyHeaders: v })}
 										theme={theme}
 									/>
 								</div>

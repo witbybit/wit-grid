@@ -1,3 +1,5 @@
+import { freezeGroupingConfig, groupByColIds, type GroupingConfig } from '../rows/hierarchyConfig.js';
+import type { TotalPlacement } from '../visualRow.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
 import type { SortModel, FilterModel } from '../rowModel.js';
@@ -13,7 +15,7 @@ import { isBuiltInThemeName, type BuiltInThemeName } from '../renderer/themes.js
  * Migration path: add a `migrateV{N}toV{N+1}` function and call it in the
  * version-dispatch chain before incrementing this constant.
  */
-export const GRID_STATE_SCHEMA_VERSION = 2;
+export const GRID_STATE_SCHEMA_VERSION = 3;
 
 export interface SerializedGridState {
 	columnWidths?: Record<string, number>;
@@ -24,10 +26,15 @@ export interface SerializedGridState {
 	filterModel?: FilterModel | null;
 	queryModel?: GridQueryModel | null;
 	themeName?: BuiltInThemeName;
-	groupBy?: string[];
-	showGroupFooter?: boolean;
-	enableStickyGroupRows?: boolean;
+	/** The serializable part of the grouping configuration. */
+	grouping?: PersistedGrouping;
 	pinnedColumns?: { left: number; right: number };
+}
+
+export interface PersistedGrouping {
+	by: string[];
+	totals?: { groups?: TotalPlacement | false; grand?: TotalPlacement | false };
+	stickyHeaders?: boolean;
 }
 
 export interface PersistedGridState {
@@ -78,6 +85,52 @@ export function validateSchemaVersion(state: { v?: unknown } | null | undefined)
 	);
 }
 
+function isPlacement(value: unknown): boolean {
+	return value === undefined || value === false || value === 'top' || value === 'bottom';
+}
+
+function isPersistedGrouping(value: unknown): value is PersistedGrouping {
+	if (!isRecord(value)) return false;
+	if (!Array.isArray(value.by) || !value.by.every((entry) => typeof entry === 'string')) return false;
+	if (value.stickyHeaders !== undefined && typeof value.stickyHeaders !== 'boolean') return false;
+	if (value.totals !== undefined && (!isRecord(value.totals) || !isPlacement(value.totals.groups) || !isPlacement(value.totals.grand)))
+		return false;
+	return Object.keys(value).every((key) => key === 'by' || key === 'totals' || key === 'stickyHeaders');
+}
+
+/** The serializable part of a grouping configuration; per-level total functions are not persisted. */
+function toPersistedGrouping<TRowData>(grouping: GroupingConfig<TRowData> | undefined): PersistedGrouping | undefined {
+	if (!grouping) return undefined;
+	const out: PersistedGrouping = { by: groupByColIds(grouping) };
+	const totals = grouping.totals;
+	if (totals && (typeof totals.groups !== 'function' || totals.grand !== undefined)) {
+		out.totals = {};
+		if (totals.groups !== undefined && typeof totals.groups !== 'function') out.totals.groups = totals.groups;
+		if (totals.grand !== undefined) out.totals.grand = totals.grand;
+	}
+	if (grouping.stickyHeaders !== undefined) out.stickyHeaders = grouping.stickyHeaders;
+	return out;
+}
+
+/**
+ * Restores persisted grouping over the configured one: the configured GroupDefs (key creators,
+ * comparators) and everything not persisted are kept; levels on removed columns are dropped.
+ */
+function restoreGrouping<TRowData>(
+	persisted: PersistedGrouping,
+	configured: GroupingConfig<TRowData> | undefined,
+	knownFields: ReadonlySet<string>
+): GroupingConfig<TRowData> {
+	const defs = new Map((configured?.by ?? []).map((entry) => [typeof entry === 'string' ? entry : entry.colId, entry] as const));
+	const by = persisted.by.filter((colId) => knownFields.has(colId)).map((colId) => defs.get(colId) ?? colId);
+	return {
+		...configured,
+		by,
+		...(persisted.totals ? { totals: { ...configured?.totals, ...persisted.totals } } : {}),
+		...(persisted.stickyHeaders !== undefined ? { stickyHeaders: persisted.stickyHeaders } : {}),
+	};
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -103,9 +156,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		'filterModel',
 		'queryModel',
 		'themeName',
-		'groupBy',
-		'showGroupFooter',
-		'enableStickyGroupRows',
+		'grouping',
 		'pinnedColumns',
 	]);
 	for (const key of Object.keys(raw)) {
@@ -140,14 +191,11 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 	if (raw.themeName !== undefined && typeof raw.themeName !== 'string') {
 		return { ok: false, error: '[wit-grid] persisted grid state field `state.themeName` must be a string.' };
 	}
-	if (raw.groupBy !== undefined && (!Array.isArray(raw.groupBy) || !raw.groupBy.every((entry) => typeof entry === 'string'))) {
-		return { ok: false, error: '[wit-grid] persisted grid state field `state.groupBy` must be a string array.' };
-	}
-	if (raw.showGroupFooter !== undefined && typeof raw.showGroupFooter !== 'boolean') {
-		return { ok: false, error: '[wit-grid] persisted grid state field `state.showGroupFooter` must be a boolean.' };
-	}
-	if (raw.enableStickyGroupRows !== undefined && typeof raw.enableStickyGroupRows !== 'boolean') {
-		return { ok: false, error: '[wit-grid] persisted grid state field `state.enableStickyGroupRows` must be a boolean.' };
+	if (raw.grouping !== undefined && !isPersistedGrouping(raw.grouping)) {
+		return {
+			ok: false,
+			error: '[wit-grid] persisted grid state field `state.grouping` must be `{ by: string[], totals?: { groups?, grand? }, stickyHeaders?: boolean }` with placements `top`, `bottom` or false.',
+		};
 	}
 	if (
 		raw.pinnedColumns !== undefined &&
@@ -173,9 +221,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		filterModel: raw.filterModel as SerializedGridState['filterModel'],
 		queryModel: raw.queryModel as SerializedGridState['queryModel'],
 		themeName: raw.themeName as SerializedGridState['themeName'],
-		groupBy: raw.groupBy as SerializedGridState['groupBy'],
-		showGroupFooter: raw.showGroupFooter as SerializedGridState['showGroupFooter'],
-		enableStickyGroupRows: raw.enableStickyGroupRows as SerializedGridState['enableStickyGroupRows'],
+		grouping: raw.grouping as SerializedGridState['grouping'],
 		pinnedColumns: raw.pinnedColumns as SerializedGridState['pinnedColumns'],
 	};
 	return {
@@ -317,9 +363,7 @@ function extractSerializedGridState<TRowData>(state: InternalGridState<TRowData>
 		filterModel: state.filterModel,
 		queryModel: state.queryModel,
 		themeName: state.themeName,
-		groupBy: state.groupBy,
-		showGroupFooter: state.showGroupFooter,
-		enableStickyGroupRows: state.enableStickyGroupRows,
+		grouping: toPersistedGrouping(state.grouping),
 		pinnedColumns: pins && (pins.left > 0 || pins.right > 0) ? pins : undefined,
 	};
 }
@@ -404,14 +448,8 @@ export function applyPersistedState<TRowData>(
 		result.themeName = serializedState.themeName as GridInitialState<TRowData>['themeName'];
 	}
 
-	// Group by — only restore fields that still exist in schema
-	if (serializedState.groupBy !== undefined) {
-		result.groupBy = serializedState.groupBy.filter((f) => knownFields.has(f));
-	}
-
-	// Group display settings
-	if (serializedState.showGroupFooter !== undefined) result.showGroupFooter = serializedState.showGroupFooter;
-	if (serializedState.enableStickyGroupRows !== undefined) result.enableStickyGroupRows = serializedState.enableStickyGroupRows;
+	// Grouping — merged over the configured grouping, restoring only columns that still exist.
+	if (serializedState.grouping !== undefined) result.grouping = restoreGrouping(serializedState.grouping, initial.grouping, knownFields);
 
 	// Column pin counts
 	if (serializedState.pinnedColumns !== undefined) result.pinnedColumns = serializedState.pinnedColumns;
@@ -449,18 +487,7 @@ function debounce(fn: () => void, ms: number): (() => void) & { flush(): void; c
  * Scroll position, selection, active edit, etc. are intentionally excluded to
  * avoid flooding network adapters on every pointer event.
  */
-const PERSISTENCE_KEYS = [
-	'columns',
-	'columnWidths',
-	'sortModel',
-	'filterModel',
-	'queryModel',
-	'themeName',
-	'groupBy',
-	'showGroupFooter',
-	'enableStickyGroupRows',
-	'pinnedColumns',
-];
+const PERSISTENCE_KEYS = ['columns', 'columnWidths', 'sortModel', 'filterModel', 'queryModel', 'themeName', 'grouping', 'pinnedColumns'];
 
 /**
  * Wire persistence to the grid via key-specific subscriptions.
@@ -623,14 +650,8 @@ export function preparePersistedGridStateRestore<TRowData>(
 	if (s.themeName !== undefined && isBuiltInThemeName(s.themeName)) {
 		stateMutation.themeName = s.themeName;
 	}
-	if (s.groupBy !== undefined) {
-		stateMutation.groupBy = s.groupBy.filter((f) => knownFields.has(f));
-	}
-	if (s.showGroupFooter !== undefined) {
-		stateMutation.showGroupFooter = s.showGroupFooter;
-	}
-	if (s.enableStickyGroupRows !== undefined) {
-		stateMutation.enableStickyGroupRows = s.enableStickyGroupRows;
+	if (s.grouping !== undefined) {
+		stateMutation.grouping = freezeGroupingConfig(restoreGrouping(s.grouping, current.grouping, knownFields));
 	}
 	if (s.pinnedColumns !== undefined) {
 		stateMutation.pinnedColumns = s.pinnedColumns;

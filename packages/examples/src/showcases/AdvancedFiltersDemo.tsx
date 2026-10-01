@@ -636,77 +636,156 @@ export default function AdvancedFiltersDemo({ compact = false }: Props = {}) {
 
 			{/* ── Workspace control panel ───────────────────────────────── */}
 			{!compact && (
-			<div
-				style={{
-					display: 'grid',
-					gridTemplateColumns: '1fr 1fr',
-					gap: 10,
-					flexShrink: 0,
-				}}
-			>
-				{/* Left: active view + quick-apply chips */}
 				<div
 					style={{
-						background: 'rgba(15,23,42,0.7)',
-						border: '1px solid #1e293b',
-						borderRadius: 8,
-						padding: '10px 12px',
-						display: 'flex',
-						flexDirection: 'column',
-						gap: 8,
+						display: 'grid',
+						gridTemplateColumns: '1fr 1fr',
+						gap: 10,
+						flexShrink: 0,
 					}}
 				>
-					{/* Active view row */}
-					<div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-						<div
-							style={{
-								width: 8,
-								height: 8,
-								borderRadius: '50%',
-								background: isDirty ? '#f59e0b' : activeView ? '#22c55e' : '#475569',
-								flexShrink: 0,
-								boxShadow: isDirty ? '0 0 6px #f59e0b80' : activeView ? '0 0 6px #22c55e60' : 'none',
-								transition: 'background 0.3s, box-shadow 0.3s',
-							}}
-						/>
-						<span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{activeView ? activeView.name : 'No active view'}</span>
-						{activeView && (
-							<span
+					{/* Left: active view + quick-apply chips */}
+					<div
+						style={{
+							background: 'rgba(15,23,42,0.7)',
+							border: '1px solid #1e293b',
+							borderRadius: 8,
+							padding: '10px 12px',
+							display: 'flex',
+							flexDirection: 'column',
+							gap: 8,
+						}}
+					>
+						{/* Active view row */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+							<div
+								style={{
+									width: 8,
+									height: 8,
+									borderRadius: '50%',
+									background: isDirty ? '#f59e0b' : activeView ? '#22c55e' : '#475569',
+									flexShrink: 0,
+									boxShadow: isDirty ? '0 0 6px #f59e0b80' : activeView ? '0 0 6px #22c55e60' : 'none',
+									transition: 'background 0.3s, box-shadow 0.3s',
+								}}
+							/>
+							<span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{activeView ? activeView.name : 'No active view'}</span>
+							{activeView && (
+								<span
+									style={{
+										fontSize: 9,
+										fontWeight: 700,
+										letterSpacing: '0.07em',
+										padding: '1px 5px',
+										borderRadius: 3,
+										background: `${SCOPE_COLORS[activeView.scope]}18`,
+										border: `1px solid ${SCOPE_COLORS[activeView.scope]}40`,
+										color: SCOPE_COLORS[activeView.scope],
+										textTransform: 'uppercase',
+									}}
+								>
+									{SCOPE_LABELS[activeView.scope]}
+								</span>
+							)}
+							{isDirty && (
+								<span
+									style={{
+										fontSize: 9,
+										fontWeight: 700,
+										padding: '1px 6px',
+										borderRadius: 3,
+										background: 'rgba(245,158,11,0.12)',
+										border: '1px solid rgba(245,158,11,0.35)',
+										color: '#f59e0b',
+									}}
+								>
+									UNSAVED CHANGES
+								</span>
+							)}
+							{wsState?.loading && <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>Loading…</span>}
+						</div>
+
+						{/* Quick-apply chips */}
+						<div>
+							<div
 								style={{
 									fontSize: 9,
 									fontWeight: 700,
-									letterSpacing: '0.07em',
-									padding: '1px 5px',
-									borderRadius: 3,
-									background: `${SCOPE_COLORS[activeView.scope]}18`,
-									border: `1px solid ${SCOPE_COLORS[activeView.scope]}40`,
-									color: SCOPE_COLORS[activeView.scope],
+									letterSpacing: '0.08em',
 									textTransform: 'uppercase',
+									color: '#475569',
+									marginBottom: 5,
 								}}
 							>
-								{SCOPE_LABELS[activeView.scope]}
-							</span>
-						)}
-						{isDirty && (
-							<span
+								Quick Apply
+							</div>
+							<div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+								{SEED_VIEWS.map((v) => {
+									const isActive = wsState?.activeViewId === v.id;
+									const col = SCOPE_COLORS[v.scope];
+									return (
+										<button
+											key={v.id}
+											onClick={() => applyView(v.id)}
+											title={v.description}
+											style={{
+												fontSize: 10,
+												fontWeight: 600,
+												padding: '3px 9px',
+												borderRadius: 5,
+												border: isActive ? `1px solid ${col}70` : `1px solid ${col}30`,
+												background: isActive ? `${col}20` : 'transparent',
+												color: isActive ? col : '#64748b',
+												cursor: 'pointer',
+												transition: 'all 0.15s',
+											}}
+										>
+											{v.name}
+										</button>
+									);
+								})}
+							</div>
+						</div>
+
+						{/* Error injection */}
+						<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+							<button
+								onClick={() => {
+									adapter.triggerSaveError();
+									pushLog(makeEntry('⚠', 'Next save will fail', 'simulated error injected'));
+								}}
 								style={{
-									fontSize: 9,
-									fontWeight: 700,
-									padding: '1px 6px',
-									borderRadius: 3,
-									background: 'rgba(245,158,11,0.12)',
-									border: '1px solid rgba(245,158,11,0.35)',
-									color: '#f59e0b',
+									fontSize: 10,
+									fontWeight: 600,
+									padding: '3px 10px',
+									borderRadius: 5,
+									border: '1px solid rgba(239,68,68,0.3)',
+									background: 'rgba(239,68,68,0.06)',
+									color: '#f87171',
+									cursor: 'pointer',
 								}}
 							>
-								UNSAVED CHANGES
-							</span>
-						)}
-						{wsState?.loading && <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>Loading…</span>}
+								Inject save error
+							</button>
+							<span style={{ fontSize: 10, color: '#475569' }}>then save a view to observe error handling in the panel</span>
+						</div>
 					</div>
 
-					{/* Quick-apply chips */}
-					<div>
+					{/* Right: event log */}
+					<div
+						style={{
+							background: 'rgba(15,23,42,0.7)',
+							border: '1px solid #1e293b',
+							borderRadius: 8,
+							padding: '10px 12px',
+							display: 'flex',
+							flexDirection: 'column',
+							gap: 6,
+							minHeight: 0,
+							overflow: 'auto',
+							maxHeight: 150,
+						}}
+					>
 						<div
 							style={{
 								fontSize: 9,
@@ -714,172 +793,110 @@ export default function AdvancedFiltersDemo({ compact = false }: Props = {}) {
 								letterSpacing: '0.08em',
 								textTransform: 'uppercase',
 								color: '#475569',
-								marginBottom: 5,
+								flexShrink: 0,
 							}}
 						>
-							Quick Apply
+							Event Log
 						</div>
-						<div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-							{SEED_VIEWS.map((v) => {
-								const isActive = wsState?.activeViewId === v.id;
-								const col = SCOPE_COLORS[v.scope];
-								return (
-									<button
-										key={v.id}
-										onClick={() => applyView(v.id)}
-										title={v.description}
+						{log.length === 0 ? (
+							<div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic' }}>Workspace events will appear here…</div>
+						) : (
+							<div style={{ display: 'flex', flexDirection: 'column', gap: 3, overflowY: 'auto' }}>
+								{log.map((entry, i) => (
+									<div
+										key={entry.key}
 										style={{
-											fontSize: 10,
-											fontWeight: 600,
-											padding: '3px 9px',
-											borderRadius: 5,
-											border: isActive ? `1px solid ${col}70` : `1px solid ${col}30`,
-											background: isActive ? `${col}20` : 'transparent',
-											color: isActive ? col : '#64748b',
-											cursor: 'pointer',
-											transition: 'all 0.15s',
+											display: 'flex',
+											alignItems: 'baseline',
+											gap: 6,
+											opacity: i === 0 ? 1 : Math.max(0.25, 1 - i * 0.12),
+											transition: 'opacity 0.2s',
 										}}
 									>
-										{v.name}
-									</button>
-								);
-							})}
-						</div>
-					</div>
-
-					{/* Error injection */}
-					<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-						<button
-							onClick={() => {
-								adapter.triggerSaveError();
-								pushLog(makeEntry('⚠', 'Next save will fail', 'simulated error injected'));
-							}}
-							style={{
-								fontSize: 10,
-								fontWeight: 600,
-								padding: '3px 10px',
-								borderRadius: 5,
-								border: '1px solid rgba(239,68,68,0.3)',
-								background: 'rgba(239,68,68,0.06)',
-								color: '#f87171',
-								cursor: 'pointer',
-							}}
-						>
-							Inject save error
-						</button>
-						<span style={{ fontSize: 10, color: '#475569' }}>then save a view to observe error handling in the panel</span>
+										<span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', flexShrink: 0 }}>
+											{new Date(entry.ts).toLocaleTimeString(undefined, {
+												hour: '2-digit',
+												minute: '2-digit',
+												second: '2-digit',
+											})}
+										</span>
+										<span style={{ fontSize: 10, color: '#60a5fa', fontFamily: 'monospace', flexShrink: 0 }}>{entry.icon}</span>
+										<span
+											style={{
+												fontSize: 10,
+												color: '#cbd5e1',
+												whiteSpace: 'nowrap',
+												overflow: 'hidden',
+												textOverflow: 'ellipsis',
+											}}
+										>
+											{entry.msg}
+										</span>
+										{entry.sub && <span style={{ fontSize: 9, color: '#475569', flexShrink: 0 }}>{entry.sub}</span>}
+									</div>
+								))}
+							</div>
+						)}
 					</div>
 				</div>
-
-				{/* Right: event log */}
-				<div
-					style={{
-						background: 'rgba(15,23,42,0.7)',
-						border: '1px solid #1e293b',
-						borderRadius: 8,
-						padding: '10px 12px',
-						display: 'flex',
-						flexDirection: 'column',
-						gap: 6,
-						minHeight: 0,
-						overflow: 'auto',
-						maxHeight: 150,
-					}}
-				>
-					<div
-						style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#475569', flexShrink: 0 }}
-					>
-						Event Log
-					</div>
-					{log.length === 0 ? (
-						<div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic' }}>Workspace events will appear here…</div>
-					) : (
-						<div style={{ display: 'flex', flexDirection: 'column', gap: 3, overflowY: 'auto' }}>
-							{log.map((entry, i) => (
-								<div
-									key={entry.key}
-									style={{
-										display: 'flex',
-										alignItems: 'baseline',
-										gap: 6,
-										opacity: i === 0 ? 1 : Math.max(0.25, 1 - i * 0.12),
-										transition: 'opacity 0.2s',
-									}}
-								>
-									<span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', flexShrink: 0 }}>
-										{new Date(entry.ts).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-									</span>
-									<span style={{ fontSize: 10, color: '#60a5fa', fontFamily: 'monospace', flexShrink: 0 }}>{entry.icon}</span>
-									<span
-										style={{ fontSize: 10, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-									>
-										{entry.msg}
-									</span>
-									{entry.sub && <span style={{ fontSize: 9, color: '#475569', flexShrink: 0 }}>{entry.sub}</span>}
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-			</div>
 			)}
 
 			{/* ── Filter type legend ────────────────────────────────────── */}
 			{!compact && (
-			<div
-				style={{
-					display: 'flex',
-					flexWrap: 'wrap',
-					gap: 6,
-					padding: '5px 10px',
-					background: 'rgba(30,41,59,0.5)',
-					borderRadius: 8,
-					border: '1px solid #1e293b',
-					flexShrink: 0,
-				}}
-			>
-				{[
-					{ col: 'Department', type: 'async-multi-select', color: '#818cf8' },
-					{ col: 'Location', type: 'multi-select', color: '#34d399' },
-					{ col: 'Status', type: 'single-select', color: '#fbbf24' },
-					{ col: 'Level', type: 'multi-select', color: '#34d399' },
-					{ col: 'Salary', type: 'custom range', color: '#f472b6' },
-					{ col: 'Skills', type: 'infinite-multi-select', color: '#60a5fa' },
-				].map(({ col, type, color }) => (
-					<div key={col} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+				<div
+					style={{
+						display: 'flex',
+						flexWrap: 'wrap',
+						gap: 6,
+						padding: '5px 10px',
+						background: 'rgba(30,41,59,0.5)',
+						borderRadius: 8,
+						border: '1px solid #1e293b',
+						flexShrink: 0,
+					}}
+				>
+					{[
+						{ col: 'Department', type: 'async-multi-select', color: '#818cf8' },
+						{ col: 'Location', type: 'multi-select', color: '#34d399' },
+						{ col: 'Status', type: 'single-select', color: '#fbbf24' },
+						{ col: 'Level', type: 'multi-select', color: '#34d399' },
+						{ col: 'Salary', type: 'custom range', color: '#f472b6' },
+						{ col: 'Skills', type: 'infinite-multi-select', color: '#60a5fa' },
+					].map(({ col, type, color }) => (
+						<div key={col} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
+							<span
+								style={{
+									padding: '1px 6px',
+									background: `${color}18`,
+									border: `1px solid ${color}40`,
+									borderRadius: 4,
+									color,
+									fontWeight: 600,
+									fontFamily: 'monospace',
+								}}
+							>
+								{type}
+							</span>
+							<span style={{ color: '#94a3b8' }}>{col}</span>
+						</div>
+					))}
+					<div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, marginLeft: 'auto' }}>
 						<span
 							style={{
 								padding: '1px 6px',
-								background: `${color}18`,
-								border: `1px solid ${color}40`,
+								background: '#60a5fa18',
+								border: '1px solid #60a5fa40',
 								borderRadius: 4,
-								color,
+								color: '#60a5fa',
 								fontWeight: 600,
 								fontFamily: 'monospace',
 							}}
 						>
-							{type}
+							quickFilter
 						</span>
-						<span style={{ color: '#94a3b8' }}>{col}</span>
+						<span style={{ color: '#94a3b8' }}>Search box above — matches any column, ANDed with the per-column filters</span>
 					</div>
-				))}
-				<div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, marginLeft: 'auto' }}>
-					<span
-						style={{
-							padding: '1px 6px',
-							background: '#60a5fa18',
-							border: '1px solid #60a5fa40',
-							borderRadius: 4,
-							color: '#60a5fa',
-							fontWeight: 600,
-							fontFamily: 'monospace',
-						}}
-					>
-						quickFilter
-					</span>
-					<span style={{ color: '#94a3b8' }}>Search box above — matches any column, ANDed with the per-column filters</span>
 				</div>
-			</div>
 			)}
 
 			{/* ── Grid ──────────────────────────────────────────────────── */}

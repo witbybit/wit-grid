@@ -1,4 +1,4 @@
-import type { AggregationDef } from '../rows/stages/aggregateStage.js';
+import type { AggregationDef, DetailConfig, GroupingConfig, HierarchyColumnConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 import type { FilterModel, QuickFilterModel, SortModel } from '../rowModel.js';
 import type { GridCellPointer, GridSelectionState, SelectionChangeResult, RowSelectionChangeResult, GridCellClickParams } from './GridApi.js';
 import type { ColumnDef } from '../columnDef.js';
@@ -15,7 +15,7 @@ export interface GridEvent<T = unknown> {
 export type GridEventListener<T = unknown> = (event: GridEvent<T>) => void;
 
 export enum GridEventName {
-	aggDefsChanged = 'aggDefsChanged',
+	aggregationChanged = 'aggregationChanged',
 	cellClicked = 'cellClicked',
 	cellInvalidated = 'cellInvalidated',
 	cellsCopied = 'cellsCopied',
@@ -28,11 +28,14 @@ export enum GridEventName {
 	columnsChanged = 'columnsChanged',
 	editStarted = 'editStarted',
 	editStopped = 'editStopped',
-	enableStickyGroupRowsChanged = 'enableStickyGroupRowsChanged',
+	detailChanged = 'detailChanged',
+	expansionChanged = 'expansionChanged',
 	filterChanged = 'filterChanged',
 	quickFilterChanged = 'quickFilterChanged',
 	focusChanged = 'focusChanged',
 	groupByChanged = 'groupByChanged',
+	groupingChanged = 'groupingChanged',
+	hierarchyColumnChanged = 'hierarchyColumnChanged',
 	groupColumnAdded = 'groupColumnAdded',
 	groupColumnRemoved = 'groupColumnRemoved',
 	groupColumnMoved = 'groupColumnMoved',
@@ -49,8 +52,8 @@ export enum GridEventName {
 	infiniteBlockLoadFailed = 'infiniteBlockLoadFailed',
 	// ── Server-page row model events ──────────────────────────────────────────
 	serverSideStateChanged = 'serverSideStateChanged',
-	showGroupFooterChanged = 'showGroupFooterChanged',
 	sortChanged = 'sortChanged',
+	treeDataChanged = 'treeDataChanged',
 	cellValidationChanged = 'cellValidationChanged',
 	gridValidated = 'gridValidated',
 	rowDragStart = 'rowDragStart',
@@ -83,7 +86,7 @@ export interface GridWriteBlockedEventPayload {
 }
 
 export interface GridEventPayloadMap<TRowData = unknown> {
-	[GridEventName.aggDefsChanged]: { aggDefs: AggregationDef<TRowData>[] | undefined };
+	[GridEventName.aggregationChanged]: { defs: AggregationDef<TRowData>[] };
 	[GridEventName.cellClicked]: GridCellClickParams<TRowData>;
 	[GridEventName.cellInvalidated]: { rowId: string; colField: string };
 	[GridEventName.cellsCopied]: { cells: Array<{ rowId: string; colField: string }>; rowCount: number; colCount: number; text: string };
@@ -96,11 +99,15 @@ export interface GridEventPayloadMap<TRowData = unknown> {
 	[GridEventName.columnsChanged]: { columns: ColumnDef<TRowData>[]; columnFields: string[] };
 	[GridEventName.editStarted]: { rowId: string; colField: string };
 	[GridEventName.editStopped]: { rowId: string; colField: string; cancel: boolean };
-	[GridEventName.enableStickyGroupRowsChanged]: { enableStickyGroupRows: boolean | undefined };
+	[GridEventName.detailChanged]: { detail: DetailConfig<TRowData> | undefined };
+	/** A group, tree row or detail opened or closed; `target: 'all'` for expandAll / collapseAll. */
+	[GridEventName.expansionChanged]: { target: 'row' | 'detail' | 'all'; id: string | null; expanded: boolean; maxLevel?: number };
 	[GridEventName.filterChanged]: { filterModel: FilterModel | null };
 	[GridEventName.quickFilterChanged]: { quickFilterModel: QuickFilterModel | null };
 	[GridEventName.focusChanged]: { focus: GridCellPointer | null; selection: GridSelectionState };
-	[GridEventName.groupByChanged]: { groupBy: string[] | undefined };
+	[GridEventName.groupByChanged]: { groupBy: string[] };
+	[GridEventName.groupingChanged]: { grouping: GroupingConfig<TRowData> | undefined };
+	[GridEventName.hierarchyColumnChanged]: { hierarchyColumn: HierarchyColumnConfig<TRowData> | false | undefined };
 	[GridEventName.groupColumnAdded]: { colId: string; index: number; groupBy: string[] };
 	[GridEventName.groupColumnRemoved]: { colId: string; groupBy: string[] };
 	[GridEventName.groupColumnMoved]: { colId: string; fromIndex: number; toIndex: number; groupBy: string[] };
@@ -140,7 +147,7 @@ export interface GridEventPayloadMap<TRowData = unknown> {
 		error: string | null;
 		storeStates: readonly import('../serverSideRowModel.js').ServerSideStoreSnapshot[];
 	};
-	[GridEventName.showGroupFooterChanged]: { showGroupFooter: boolean | undefined };
+	[GridEventName.treeDataChanged]: { treeData: TreeDataConfig<TRowData> | undefined };
 	[GridEventName.sortChanged]: { sortModel: SortModel | null };
 	[GridEventName.cellValidationChanged]: { rowId: string; colField: string; error: string | null };
 	[GridEventName.gridValidated]: { errors: Array<{ rowId: string; colField: string; error: string }>; hasErrors: boolean };

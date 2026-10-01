@@ -22,8 +22,8 @@ export class CellAccessModel<TRowData = unknown> {
 				getVisualIndexByRowId: (targetRowId) => this.runtime.getRowModel()?.getVisualIndexByRowId(targetRowId) ?? null,
 				getVisualRowCount: () => this.runtime.getRowModel()?.getVisualRowCount() ?? 0,
 				getSelectedRowIds: () => this.runtime.getState().selectedRowIds,
-				isGroupExpanded: () => false,
-				isDetailExpanded: this.runtime.isDetailExpanded,
+				isExpanded: () => false,
+				isDetailOpen: this.runtime.isDetailOpen,
 				selectRows: this.runtime.selectRows,
 				deselectRows: this.runtime.deselectRows,
 				scrollToRow: this.runtime.scrollToRow,
@@ -36,8 +36,8 @@ export class CellAccessModel<TRowData = unknown> {
 								: result,
 						{ status: 'noop' }
 					),
-				toggleGroupExpanded: () => {},
-				toggleDetailExpanded: () => {},
+				setExpanded: () => {},
+				setDetailOpen: () => {},
 				refreshRows: this.runtime.refreshRows,
 				retryRowLoad: () => ({ status: 'rejected', reason: 'Row retry is not available from cell access.' }),
 				getRowIssues: () => [],
@@ -53,7 +53,7 @@ export class CellAccessModel<TRowData = unknown> {
 				selectable: true,
 				selected: this.runtime.isRowSelected(rowIndex),
 				expandable: false,
-				expanded: this.runtime.isDetailExpanded(rowId),
+				expanded: this.runtime.isDetailOpen(rowId),
 				editable: true,
 			}
 		);

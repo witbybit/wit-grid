@@ -1,3 +1,4 @@
+import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
 import { CORE_STYLES } from './styles.js';
@@ -53,6 +54,12 @@ export class ViewportRenderer<TRowData = unknown> {
 	// assigned from this map after mount for the renderers that hold references.
 	private readonly layers = new Map<string, HTMLDivElement>();
 
+	// Every plan scalar the container custom properties and layer `apply()` descriptors read.
+	// None of them depend on scroll position, so on a scroll frame they are almost always
+	// unchanged; comparing them lets syncLayoutPlan skip ~30 style writes per frame.
+	private readonly appliedLayoutScalars: number[] = [];
+	private hasAppliedLayout = false;
+
 	constructor(engine: GridEngine<TRowData>, geometryController: GeometryController<TRowData>) {
 		this.engine = engine;
 		this.geometryController = geometryController;
@@ -101,6 +108,7 @@ export class ViewportRenderer<TRowData = unknown> {
 	 */
 	private buildLayers(): void {
 		this.layers.clear();
+		this.hasAppliedLayout = false;
 		for (const d of LAYER_REGISTRY) {
 			const el = document.createElement('div');
 			el.className = d.className;
@@ -182,6 +190,7 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.overlayLayer = null;
 		this.styleTag = null;
 		this.layers.clear();
+		this.hasAppliedLayout = false;
 	}
 
 	public syncViewportScrollFromDom(): void {
@@ -199,8 +208,48 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.container?.classList.toggle('og-is-scrolling', scrolling);
 	}
 
+	/**
+	 * Records the plan's layout scalars and reports whether any differ from the last applied set.
+	 * Keep in sync with the fields read below and by LAYER_REGISTRY `apply()` descriptors.
+	 */
+	private layoutScalarsChanged(plan: GridLayoutPlan): boolean {
+		const { chrome, origins, dimensions, columns } = plan;
+		let changed = !this.hasAppliedLayout;
+		// Each call runs unconditionally (call first, then `||`) so every slot stays current.
+		changed = this.recordLayoutScalar(0, chrome.leafHeaderHeight) || changed;
+		changed = this.recordLayoutScalar(1, chrome.totalHeaderHeight) || changed;
+		changed = this.recordLayoutScalar(2, chrome.groupPanelHeight) || changed;
+		changed = this.recordLayoutScalar(3, chrome.filterChipBarHeight) || changed;
+		changed = this.recordLayoutScalar(4, chrome.floatingFilterHeight) || changed;
+		changed = this.recordLayoutScalar(5, chrome.statusBarHeight) || changed;
+		changed = this.recordLayoutScalar(6, chrome.paginationHeight) || changed;
+		changed = this.recordLayoutScalar(7, chrome.bottomChromeHeight) || changed;
+		changed = this.recordLayoutScalar(8, origins.headerTop) || changed;
+		changed = this.recordLayoutScalar(9, origins.overlayTop) || changed;
+		changed = this.recordLayoutScalar(10, origins.stickyGroupLayerTop) || changed;
+		changed = this.recordLayoutScalar(11, origins.statusBarTop) || changed;
+		changed = this.recordLayoutScalar(12, origins.paginationTop) || changed;
+		changed = this.recordLayoutScalar(13, dimensions.contentWidth) || changed;
+		changed = this.recordLayoutScalar(14, dimensions.contentHeight) || changed;
+		changed = this.recordLayoutScalar(15, columns.pinLeftWidth) || changed;
+		changed = this.recordLayoutScalar(16, columns.pinRightWidth) || changed;
+		this.hasAppliedLayout = true;
+		return changed;
+	}
+
+	private recordLayoutScalar(index: number, value: number): boolean {
+		if (this.appliedLayoutScalars[index] === value) return false;
+		this.appliedLayoutScalars[index] = value;
+		return true;
+	}
+
 	public syncLayoutPlan(plan: GridLayoutPlan): void {
 		this.layoutPlan = plan;
+
+		this.syncAriaCounts();
+
+		// Layout styles are a pure function of the scalars above; skip every write when none moved.
+		if (!this.layoutScalarsChanged(plan)) return;
 
 		// Container-level CSS custom properties (consumed by stylesheet rules, not a layer).
 		this.container?.style.setProperty('--og-leaf-header-height', `${plan.chrome.leafHeaderHeight}px`);
@@ -211,8 +260,24 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.container?.style.setProperty('--og-bottom-chrome-height', `${plan.chrome.bottomChromeHeight}px`);
 		this.container?.style.setProperty('--og-content-width', `${plan.dimensions.contentWidth}px`);
 
+		// Every structural layer positions itself from the plan via its descriptor.
+		for (const d of LAYER_REGISTRY) {
+			if (!d.apply) continue;
+			const el = this.layers.get(d.id);
+			if (el) d.apply(el, plan);
+		}
+	}
+
+	private lastAriaRole = 'grid';
+
+	private syncAriaCounts(): void {
 		// ARIA counts — guarded so we only touch the DOM when they actually change.
 		if (this.container) {
+			const role = isHierarchyActive(this.engine.stateManager.getState()) ? 'treegrid' : 'grid';
+			if (this.lastAriaRole !== role) {
+				this.lastAriaRole = role;
+				this.container.setAttribute('role', role);
+			}
 			const rowCount = this.engine.getRowModel()?.getVisualRowCount() ?? 0;
 			const colCount = this.engine.columns.getCompiledPlan().displayedColumns.length;
 			if (this.lastAriaRowCount !== rowCount) {
@@ -223,13 +288,6 @@ export class ViewportRenderer<TRowData = unknown> {
 				this.lastAriaColCount = colCount;
 				this.container.setAttribute('aria-colcount', String(colCount));
 			}
-		}
-
-		// Every structural layer positions itself from the plan via its descriptor.
-		for (const d of LAYER_REGISTRY) {
-			if (!d.apply) continue;
-			const el = this.layers.get(d.id);
-			if (el) d.apply(el, plan);
 		}
 	}
 

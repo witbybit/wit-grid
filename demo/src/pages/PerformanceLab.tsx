@@ -263,6 +263,9 @@ export default function PerformanceLab({ onGridReady }: PerformanceLabProps) {
 					pagination={{ pageSize: PAGE_SIZE }}
 					rowOverscanPx={100}
 					colBuffer={1}
+					// Glide drives the scroll from script, one large step per frame: grow the leading
+					// edge with velocity so each step lands on rendered rows.
+					overscanAdaptive
 					runtimeLimits={{ maxRenderedRows: 36, maxRenderedCells: 900 }}
 					getRowId={(row) => row.id}
 					pinLeftColumns={2}

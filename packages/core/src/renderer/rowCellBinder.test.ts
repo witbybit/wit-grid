@@ -44,7 +44,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -130,7 +129,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: wrote,
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -226,7 +224,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -321,7 +318,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 		};
 
@@ -396,7 +392,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -434,7 +429,7 @@ describe('bindCellDuringScroll', () => {
 		});
 
 		expect(getCachedDisplayValue).not.toHaveBeenCalled();
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 		expect(markCellDirtyAfterScroll).toHaveBeenCalledWith(cellSlot.element);
 	});
 
@@ -491,7 +486,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll,
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -585,7 +579,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll,
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 5, loadingVersion: 0 }),
 		};
@@ -681,7 +674,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll,
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 5, loadingVersion: 0 }),
 		};
@@ -783,7 +775,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -867,7 +858,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -904,8 +894,10 @@ describe('bindCellDuringScroll', () => {
 		});
 
 		expect(snapshotSet).not.toHaveBeenCalled();
-		expect(cellSlot.lastContentMode).toBe('empty');
-		expect(cellSlot.lastFormattedValue).toBe('');
+		// The text comes from the row itself (a plain primitive field read), not from the warm DOM,
+		// so the buffered cell is already correct when it scrolls into view.
+		expect(cellSlot.lastContentMode).toBe('text');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 		expect(cellSlot.element.title).toBe('');
 		expect(cellSlot.element.dataset.validationError).toBeUndefined();
 	});
@@ -962,7 +954,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1068,7 +1059,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1164,7 +1154,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1239,7 +1228,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1318,7 +1306,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1408,7 +1395,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1499,7 +1485,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1573,7 +1558,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1652,7 +1636,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1748,7 +1731,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1787,7 +1769,7 @@ describe('bindCellDuringScroll', () => {
 		expect(cellSlot.element.title).toBe('');
 		expect(snapshotSet).not.toHaveBeenCalled();
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Name 1');
 	});
 
 	it('keeps warm visible primitive text as a temporary compatibility edge but still marks it dirty when snapshots are missing', () => {
@@ -1849,7 +1831,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -1959,7 +1940,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2057,7 +2037,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2163,7 +2142,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2268,7 +2246,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2381,7 +2358,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2502,7 +2478,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2606,7 +2581,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2704,7 +2678,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2792,7 +2765,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -2867,7 +2839,6 @@ describe('bindCellDuringScroll', () => {
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			incrementForceLiveMountsDuringScroll,
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
@@ -2956,7 +2927,6 @@ describe('bindCellFull', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -3044,7 +3014,6 @@ describe('bindCellFull', () => {
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -3113,7 +3082,6 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 			markCellDirtyAfterScroll: dirty,
 			releaseCellPortal: vi.fn(),
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -3152,10 +3120,10 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 			isInVisibleContent: true,
 		});
 
-		// Row A's warm text must never leak into row B's slot. With no fresh snapshot, the
-		// renderer must fall back to a deterministic placeholder, not the cached DOM value.
+		// Row A's warm text must never leak into row B's slot. With no fresh snapshot, a plain
+		// primitive column shows row B's own field value (a direct read), never the cached DOM value.
 		expect(cellSlot.lastFormattedValue).not.toBe('Stale Row A Value');
-		expect(cellSlot.lastFormattedValue).toBe('...');
+		expect(cellSlot.lastFormattedValue).toBe('Row B Value');
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 	});
 
@@ -3193,7 +3161,6 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 			markCellDirtyAfterScroll: vi.fn(),
 			releaseCellPortal,
 			incrementStyleHookCallsDuringScroll: vi.fn(),
-			incrementCellsBoundDuringScroll: vi.fn(),
 			incrementCurrentScrollCellsWritten: vi.fn(),
 			getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		};
@@ -3231,7 +3198,7 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 		});
 
 		// The stale row-A portal must be released, not frozen in place for row B.
-		expect(releaseCellPortal).toHaveBeenCalledWith(cellSlot.element, false, 'invalidated');
+		expect(releaseCellPortal).toHaveBeenCalledWith(cellSlot.element, false, 'invalidated', expect.any(String));
 		// The slot must land on a deterministic placeholder (empty, since no cheap value is
 		// available either) rather than continuing to display row A's live portal content.
 		expect(cellSlot.lastContentMode).not.toBe('portal');

@@ -1242,11 +1242,12 @@ function statusConfig(status: ProjectRow['status']) {
 
 const ProjectNameRenderer = ({ row, rowId, value, api }: CellRendererProps<ProjectRow>) => {
 	const isProject = !row.parentId;
-	const isExpanded = isProject ? api.isGroupExpanded(rowId) : false;
+	const visualRow = api.rows().getVisualRowById(rowId);
+	const isExpanded = isProject ? (visualRow?.hierarchy.expanded ?? false) : false;
 
 	const handleToggle = (e: React.MouseEvent) => {
 		e.stopPropagation();
-		if (isProject) api.toggleGroupExpanded(rowId);
+		if (isProject && visualRow) api.toggleExpanded(visualRow.id);
 	};
 
 	const cfg = statusConfig(row.status);
@@ -1517,18 +1518,8 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 	const treeInitialState = useMemo(
 		() =>
 			({
-				rowModelConfig: {
-					type: 'client',
-					treeData: {
-						enabled: true,
-						getParentId: (row: ProjectRow) => row.parentId,
-					},
-				},
-				expansion: {
-					groups: {},
-					treeRows: { p1: true } as Record<string, true>,
-					details: {},
-				},
+				// The first project starts open.
+				treeData: { getParentId: (row: ProjectRow) => row.parentId, defaultExpanded: (info) => info.rowId === 'p1' },
 			}) as GridInitialState<ProjectRow>,
 		[]
 	);
@@ -1541,19 +1532,9 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 		[onGridReady]
 	);
 
-	const handleExpandAll = () => {
-		if (!api) return;
-		PROJECT_ROWS.forEach((r) => {
-			if (!api.isGroupExpanded(r.id)) api.toggleGroupExpanded(r.id);
-		});
-	};
+	const handleExpandAll = () => api?.expandAll();
 
-	const handleCollapseAll = () => {
-		if (!api) return;
-		PROJECT_ROWS.forEach((r) => {
-			if (api.isGroupExpanded(r.id)) api.toggleGroupExpanded(r.id);
-		});
-	};
+	const handleCollapseAll = () => api?.collapseAll();
 
 	return (
 		<div className='flex flex-col xl:flex-row h-full w-full gap-5 overflow-hidden font-sans'>

@@ -12,6 +12,9 @@ export type CellDisplayContentKind = CellContentMode | 'portal-live' | 'portal-f
  */
 export const DEFAULT_CELL_DISPLAY_SNAPSHOT_CAPACITY = 1024;
 
+/** Upper bound for render-window-driven growth (see CellDisplaySnapshotStore.ensureCapacity). */
+export const MAX_CELL_DISPLAY_SNAPSHOT_CAPACITY = 16384;
+
 /**
  * Extends VisualFreshness (rowVersion/globalVersion/insightVersion/styleVersion/loadingVersion/
  * selectionVersion) so a snapshot's freshness can be judged by the same canonical predicate
@@ -56,7 +59,29 @@ export function mergeCellSnapshotTitle(tooltipText: string | null, insightTitle:
 	return tooltipText || insightTitle || '';
 }
 
+/** True when `className` is already in normalized form: single ASCII spaces between tokens, no leading or
+ *  trailing whitespace, no tabs/newlines. The renderer's own class strings always are. */
+function isNormalizedClassName(className: string): boolean {
+	const length = className.length;
+	if (length === 0) return true;
+	if (className.charCodeAt(0) === 32 || className.charCodeAt(length - 1) === 32) return false;
+	let previousWasSpace = false;
+	for (let i = 0; i < length; i++) {
+		const code = className.charCodeAt(i);
+		if (code === 32) {
+			if (previousWasSpace) return false;
+			previousWasSpace = true;
+		} else {
+			// Any other whitespace (or non-ASCII, which may be Unicode whitespace) takes the slow path.
+			if (code < 33 || code > 126) return false;
+			previousWasSpace = false;
+		}
+	}
+	return true;
+}
+
 function normalizeClassNameSegment(className: string): string {
+	if (isNormalizedClassName(className)) return className;
 	return className.trim().split(/\s+/).filter(Boolean).join(' ');
 }
 
@@ -130,7 +155,17 @@ export class CellDisplaySnapshotStore {
 	private readonly snapshots = new Map<string, CellDisplaySnapshot>();
 	private evictedSnapshotCount = 0;
 
-	constructor(private readonly maxEntries = DEFAULT_CELL_DISPLAY_SNAPSHOT_CAPACITY) {}
+	constructor(private maxEntries = DEFAULT_CELL_DISPLAY_SNAPSHOT_CAPACITY) {}
+
+	/**
+	 * Grows (never shrinks) the working-set bound so it covers at least `minEntries` — the renderer
+	 * calls this with ~3x its rendered cell count, since a fixed 1024 is smaller than a large
+	 * viewport plus overscan. Capped at MAX_CELL_DISPLAY_SNAPSHOT_CAPACITY.
+	 */
+	public ensureCapacity(minEntries: number): void {
+		if (minEntries <= this.maxEntries) return;
+		this.maxEntries = Math.max(this.maxEntries, Math.min(MAX_CELL_DISPLAY_SNAPSHOT_CAPACITY, Math.ceil(minEntries)));
+	}
 
 	public get(rowId: string, columnInstanceId: ColumnInstanceId | string): CellDisplaySnapshot | undefined {
 		return this.snapshots.get(buildCellSnapshotKey(rowId, columnInstanceId));

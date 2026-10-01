@@ -800,14 +800,29 @@ export const CORE_STYLES = `
     transition: none;
   }
 
+  /* Full-width row content: viewport-wide and horizontally fixed (see --og-viewport-width). */
   .og-row-portal-host {
-    width: 100%;
+    position: sticky;
+    left: 0;
+    flex: 0 0 auto;
+    width: var(--og-viewport-width, 100%);
+    max-width: 100%;
     height: 100%;
   }
 
   .og-row-portal-host > * {
     width: 100%;
     height: 100%;
+  }
+
+  /* detail.height: 'auto' — the host takes its content's height, which the grid measures. */
+  .og-row-portal-host-auto {
+    height: auto;
+    align-self: flex-start;
+  }
+
+  .og-row-portal-host-auto > * {
+    height: auto;
   }
 
   .og-row-selected {
@@ -890,6 +905,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox,
+  .og-hierarchy-checkbox,
   .og-header-checkbox {
     appearance: none;
     -webkit-appearance: none;
@@ -908,6 +924,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:hover,
+  .og-hierarchy-checkbox:hover,
   .og-header-checkbox:hover {
     border-color: #93c5fd;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
@@ -920,6 +937,8 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:checked,
+  .og-hierarchy-checkbox:checked,
+  .og-hierarchy-checkbox:indeterminate,
   .og-header-checkbox:checked,
   .og-header-checkbox:indeterminate {
     border-color: #60a5fa;
@@ -927,6 +946,7 @@ export const CORE_STYLES = `
   }
 
   .og-row-checkbox:checked::after,
+  .og-hierarchy-checkbox:checked::after,
   .og-header-checkbox:checked::after {
     content: '';
     width: 8px;
@@ -936,12 +956,157 @@ export const CORE_STYLES = `
     transform: rotate(-45deg) translateY(-1px);
   }
 
+  .og-hierarchy-checkbox:indeterminate::after,
   .og-header-checkbox:indeterminate::after {
     content: '';
     width: 8px;
     height: 2px;
     border-radius: 2px;
     background: #ffffff;
+  }
+
+  /* ── Hierarchy column: indent | toggle | checkbox | label | count ── */
+  .og-hierarchy {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .og-hierarchy-toggle {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    color: currentColor;
+    opacity: 0.8;
+    cursor: pointer;
+    transition: background-color 0.12s ease, opacity 0.12s ease;
+  }
+
+  /* A drawn chevron: crisp at any zoom, inherits the row's text colour. */
+  .og-hierarchy-toggle::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateX(-1px) rotate(-45deg);
+    transition: transform 0.15s ease;
+  }
+
+  .og-hierarchy-toggle-open::before {
+    transform: translateY(-2px) rotate(45deg);
+  }
+
+  .og-hierarchy-toggle:hover {
+    opacity: 1;
+    background: var(--og-group-badge-bg, rgba(167, 139, 250, 0.14));
+  }
+
+  .og-hierarchy-toggle-none::before {
+    content: none;
+  }
+
+  /* No children: keeps the slot so labels at one level align. */
+  .og-hierarchy-toggle-none {
+    cursor: default;
+    visibility: hidden;
+  }
+
+  .og-hierarchy-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .og-hierarchy-count {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--og-group-badge-bg);
+    border: 1px solid var(--og-group-badge-border);
+    color: var(--og-group-badge-text);
+  }
+
+  .og-cell-hierarchy-group .og-hierarchy-label,
+  .og-cell-hierarchy-total .og-hierarchy-label {
+    font-weight: 600;
+  }
+
+  /* Core's built-in full-width rows (display: 'row' groups and totals, detail / failed / placeholder). */
+  .og-full-width-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    height: 100%;
+    min-width: 0;
+    padding: 0 12px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .og-full-width-group {
+    background: var(--og-group-row-bg);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
+  }
+
+  .og-full-width-total {
+    font-weight: 600;
+  }
+
+  .og-full-width-hierarchy {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .og-full-width-aggregates {
+    display: flex;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .og-full-width-aggregate {
+    display: inline-flex;
+    gap: 5px;
+    font-size: 11px;
+    color: var(--og-group-badge-text);
+  }
+
+  .og-full-width-aggregate > span {
+    opacity: 0.7;
+  }
+
+  .og-full-width-detail,
+  .og-full-width-placeholder {
+    color: var(--og-header-text);
+    opacity: 0.75;
+  }
+
+  .og-full-width-failed {
+    color: #fca5a5;
+    font-weight: 600;
+  }
+
+  /* Group and total rows drawn as cell rows. */
+  .og-row.og-row-group:not(.og-row-group-sticky) {
+    background: var(--og-group-row-bg);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
+  }
+
+  .og-row.og-row-total {
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 var(--og-group-badge-border, rgba(148, 163, 184, 0.3));
   }
 
   .og-row-node-selected .og-row-checkbox {
@@ -1027,27 +1192,63 @@ export const CORE_STYLES = `
     background: linear-gradient(var(--og-row-hover-bg), var(--og-row-hover-bg)), var(--og-bg-color);
   }
 
+  /*
+   * Cell text: a plain block, vertically centred by the .og-cell flex parent. Not a flex
+   * container itself — text in a flex container is wrapped in an anonymous flex item (one more
+   * layout object per cell, re-laid out whenever the text changes) and text-overflow: ellipsis
+   * does not apply to it, so long values were cut off without the ellipsis.
+   */
   .og-cell-content {
     width: 100%;
-    height: 100%;
     min-width: 0;
-    display: flex;
-    align-items: center;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .og-cell-portal-host {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
+  /*
+   * Direct-text cells (columns with no custom renderer): the text is the cell's own child, with no
+   * .og-cell-content wrapper — one element and one text box per cell. Block layout keeps
+   * text-overflow: ellipsis working; align-content centres the line vertically.
+   */
+  .og-cell[data-text-cell] {
+    display: block;
+    align-content: center;
   }
 
-  .og-custom-renderer-container {
+  /* An editor (portal host) or a skeleton is a box, not text: centre it like wrapped cells do. */
+  .og-cell[data-text-cell][data-content-mode="portal"],
+  .og-cell[data-text-cell][data-content-mode="pending"],
+  .og-cell[data-text-cell][data-content-mode="loading"] {
+    display: flex;
+    align-items: center;
+  }
+
+  .og-cell-readonly[data-text-cell] {
+    color: color-mix(in srgb, currentColor calc(var(--og-readonly-cell-opacity, 0.65) * 100%), transparent);
+  }
+
+  /* Content that is not text centres a child box: the row-selector checkbox, loading skeletons. */
+  .og-cell-row-selector .og-cell-content,
+  .og-cell[data-content-mode="pending"] > .og-cell-content,
+  .og-cell[data-content-mode="loading"] > .og-cell-content {
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  /*
+   * The portal host is a DOM anchor for renderer containers, not a box: display: contents lets its
+   * children (which size themselves 100% x 100% and clip) lay out directly in the flex cell. A host
+   * box of its own was one more flex container per rich cell for every layout to walk through.
+   */
+  .og-cell-portal-host {
+    display: contents;
+  }
+
+  .og-custom-renderer-container,
+  .og-dom-renderer-container {
     width: 100%;
     height: 100%;
     min-width: 0;
@@ -1065,7 +1266,8 @@ export const CORE_STYLES = `
     display: none;
   }
 
-  .og-cell[data-content-mode="pending"] > .og-cell-content::before {
+  .og-cell[data-content-mode="pending"] > .og-cell-content::before,
+  .og-cell[data-text-cell][data-content-mode="pending"]::before {
     content: '';
     width: min(72%, 120px);
     height: 16px;
@@ -1073,7 +1275,8 @@ export const CORE_STYLES = `
     background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.22), rgba(148, 163, 184, 0.12));
   }
 
-  .og-cell[data-content-mode="loading"] > .og-cell-content::before {
+  .og-cell[data-content-mode="loading"] > .og-cell-content::before,
+  .og-cell[data-text-cell][data-content-mode="loading"]::before {
     content: '';
     width: var(--og-skeleton-width);
     height: var(--og-skeleton-height);

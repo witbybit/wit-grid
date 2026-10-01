@@ -142,3 +142,29 @@ describe('CustomRendererManager scroll-time mount counter separation', () => {
 		expect(engine.customRendererMountsDuringScroll).toBe(0);
 	});
 });
+
+describe('CustomRendererManager – scroll state is opt-in', () => {
+	function rebindCount(scrollState: boolean): number {
+		const manager = new CustomRendererManager<Row>(makeEngineStub());
+		let notifications = 0;
+		manager.onMountCellContent = () => {
+			notifications++;
+		};
+		const parent = document.createElement('div');
+		const base = acquireParams(0, 0, parent);
+		const col = { field: 'c0', cellRendererCapabilities: { scrollPresentation: 'freeze', ...(scrollState ? { scrollState: true } : {}) } } as any;
+		manager.acquire({ ...base, col, isScrolling: true, phase: 'scroll' });
+		notifications = 0;
+		// Scroll ends: only isScrolling and phase change.
+		manager.acquire({ ...base, col, isScrolling: false, phase: 'initial' });
+		return notifications;
+	}
+
+	it('does not re-render a renderer on scroll start/end unless it opts in', () => {
+		expect(rebindCount(false)).toBe(0);
+	});
+
+	it('re-renders an opted-in renderer when scroll state changes', () => {
+		expect(rebindCount(true)).toBe(1);
+	});
+});

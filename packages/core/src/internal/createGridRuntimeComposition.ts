@@ -1,6 +1,6 @@
 import type { GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { registerGridRuntimeComposition } from './apiInternalBridge.js';
-import { exportToCsv, type CsvExportOptions } from '../export/csvExport.js';
+import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
 import type { GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
@@ -64,6 +64,9 @@ export function createGridRuntimeComposition<TRowData>({
 		setRows: (rows: TRowData[]) => runtime.setRows(rows),
 		updateRows: (updater: (rows: TRowData[]) => TRowData[]) => runtime.updateRows(updater),
 		applyTransaction: (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => runtime.applyTransaction(transaction),
+		applyTransactionAsync: (transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void) =>
+			runtime.applyTransactionAsync(transaction, callback),
+		flushAsyncTransactions: () => runtime.flushAsyncTransactions(),
 		getRowOrder: () => runtime.getRowOrder(),
 		setRowOrder: (rowIds: string[]) => runtime.setRowOrder(rowIds),
 		refreshRows: () => runtime.refreshRows(),
@@ -116,21 +119,38 @@ export function createGridRuntimeComposition<TRowData>({
 		setFilterModel: (filterModel: FilterModel | null) => runtime.setFilterModel(filterModel),
 		getQuickFilter: () => runtime.getQuickFilter(),
 		setQuickFilter: (text: string, columnIds?: string[]) => runtime.setQuickFilter(text, columnIds),
-		setGroupBy: (colIds: string[]) => runtime.setGroupBy(colIds),
+		getGrouping: () => runtime.getGrouping(),
+		setGrouping: (grouping: Parameters<typeof runtime.setGrouping>[0]) => runtime.setGrouping(grouping),
+		updateGrouping: (patch: Parameters<typeof runtime.updateGrouping>[0]) => runtime.updateGrouping(patch),
+		setGroupBy: (by: Parameters<typeof runtime.setGroupBy>[0]) => runtime.setGroupBy(by),
 		getGroupBy: () => runtime.getGroupBy(),
 		addGroupBy: (colId: string, atIndex?: number) => runtime.addGroupBy(colId, atIndex),
 		removeGroupBy: (colId: string) => runtime.removeGroupBy(colId),
 		moveGroupBy: (colId: string, toIndex: number) => runtime.moveGroupBy(colId, toIndex),
-		setAggDefs: (defs: Parameters<typeof runtime.setAggDefs>[0]) => runtime.setAggDefs(defs),
-		getAggDefs: () => runtime.getAggDefs(),
-		expandAllGroups: () => runtime.expandAllGroups(),
-		collapseAllGroups: () => runtime.collapseAllGroups(),
-		setShowGroupFooter: (enabled: boolean) => runtime.setShowGroupFooter(enabled),
-		setStickyGroupRows: (enabled: boolean) => runtime.setStickyGroupRows(enabled),
+		getTreeData: () => runtime.getTreeData(),
+		setTreeData: (treeData: Parameters<typeof runtime.setTreeData>[0]) => runtime.setTreeData(treeData),
+		getAggregation: () => runtime.getAggregation(),
+		setAggregation: (defs: Parameters<typeof runtime.setAggregation>[0]) => runtime.setAggregation(defs),
+		getHierarchyColumn: () => runtime.getHierarchyColumn(),
+		setHierarchyColumn: (config: Parameters<typeof runtime.setHierarchyColumn>[0]) => runtime.setHierarchyColumn(config),
+		getDetail: () => runtime.getDetail(),
+		setDetail: (detail: Parameters<typeof runtime.setDetail>[0]) => runtime.setDetail(detail),
+		setExpanded: (id: string, expanded: boolean) => runtime.setExpanded(id, expanded),
+		toggleExpanded: (id: string) => runtime.toggleExpanded(id),
+		isExpanded: (id: string) => runtime.isExpanded(id),
+		expandAll: (options?: Parameters<typeof runtime.expandAll>[0]) => runtime.expandAll(options),
+		collapseAll: () => runtime.collapseAll(),
+		setDetailOpen: (rowId: string, open: boolean) => runtime.setDetailOpen(rowId, open),
+		toggleDetailOpen: (rowId: string) => runtime.toggleDetailOpen(rowId),
+		isDetailOpen: (rowId: string) => runtime.isDetailOpen(rowId),
+		getDescendantRowIds: (id: string) => runtime.getDescendantRowIds(id),
+		getDescendantSelection: (id: string) => runtime.getDescendantSelection(id),
+		setDescendantsSelected: (id: string, selected: boolean) => runtime.setDescendantsSelected(id, selected),
 		setShowGroupPanel: (enabled: boolean) => runtime.setShowGroupPanel(enabled),
 		setShowFloatingFilters: (enabled: boolean) => runtime.setShowFloatingFilters(enabled),
 		setShowFilterChipBar: (enabled: boolean) => runtime.setShowFilterChipBar(enabled),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
+		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
 		setStyleRules: (styleRules: GridInitialState<TRowData>['styleRules']) => runtime.setStyleRules(styleRules),
 		addEventListener: runtime.addEventListener,
 		dispatchEvent: runtime.dispatchEvent,
@@ -146,10 +166,6 @@ export function createGridRuntimeComposition<TRowData>({
 		getGridState: () => runtime.getGridState(),
 		applyGridState: (state: PersistedGridState) =>
 			persistenceController ? persistenceController.suspendAutoSave(() => runtime.applyGridState(state)) : runtime.applyGridState(state),
-		toggleGroupExpanded: (groupId: string) => runtime.toggleGroupExpanded(groupId),
-		toggleDetailExpanded: (rowId: string) => runtime.toggleDetailExpanded(rowId),
-		isGroupExpanded: (groupId: string) => runtime.isGroupExpanded(groupId),
-		isDetailExpanded: (rowId: string) => runtime.isDetailExpanded(rowId),
 		getRawRowById: (rowId: string) => runtime.getRawRowById(rowId),
 		applyRowSelectionGesture: (gesture: RowSelectionGesture) => runtime.applyRowSelectionGesture(gesture),
 		selectRows: (rowIds: string[], options?: SelectRowsOptions) => runtime.selectRows(rowIds, options),
@@ -272,6 +288,8 @@ export function createGridRuntimeComposition<TRowData>({
 	};
 
 	const frozen = Object.freeze(api) as GridApi<TRowData>;
+	// Renderers get the public api, not the runtime behind it: DOM cells see what React cells see.
+	runtime.engine.setApiRef(frozen);
 	registerGridRuntimeComposition(frozen, {
 		host: {
 			engine: runtime.engine,

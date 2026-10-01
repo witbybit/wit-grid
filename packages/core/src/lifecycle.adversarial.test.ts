@@ -165,8 +165,8 @@ describe('ClientRowModelController — lifecycle hardening', () => {
 
 	it('each mount/dispose cycle installs and removes the same number of event listeners', () => {
 		// Use a spy on addEventListener to confirm symmetric registration.
-		// 5 listeners are registered per constructor (sort, filter, groupBy, aggDefs,
-		// showGroupFooter, enableStickyGroupRows, paginationChanged) — 7 total.
+		// At least 5 listeners are registered per constructor (sort, filter, quickFilter, queryModel,
+		// grouping, treeData, aggregation, detail, paginationChanged) — 9 total.
 		// After dispose(), unsubscribers list must be empty.
 		for (let i = 0; i < 5; i++) {
 			const store = new GridStore<TestRow>({

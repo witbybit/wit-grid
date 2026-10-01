@@ -1,4 +1,4 @@
-import tseslint from 'typescript-eslint';
+import { tseslint } from '@eregister/wit-grid-eslint';
 
 export default [
 	{
@@ -15,8 +15,9 @@ export default [
 			// Re-enable each rule as its mechanical backlog is retired; lint never writes source.
 			'@typescript-eslint/no-unused-vars': 'off',
 			'prefer-const': 'off',
-			// Controlled baseline: 3 `{}` compatibility types in internal generic utilities.
-			'@typescript-eslint/ban-types': 'off',
+			// Controlled baseline: `{}` compatibility types in internal generic utilities
+			// (typescript-eslint 8 split this out of the former `ban-types` rule).
+			'@typescript-eslint/no-empty-object-type': 'off',
 		},
 	},
 ];

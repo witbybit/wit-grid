@@ -230,6 +230,25 @@ export function compileColumnTopology<TRowData>(plan: CompiledGridPlan<TRowData>
 	};
 }
 
+// Compiled plans are immutable per version (ColumnModel builds a new object whenever the
+// version bumps), so a weak cache keyed by the plan object shares one topology between every
+// per-frame consumer without pinning retired plans in memory. The version check guards
+// against a caller mutating a plan object in place.
+const memoizedTopologies = new WeakMap<object, CompiledColumnTopology>();
+
+/**
+ * Memoized {@link compileColumnTopology}: returns the same topology object for the same compiled
+ * plan, recompiling only for a new plan object or version. Hot paths (layout plan per scroll
+ * frame, post-scroll repair per idle chunk) must use this instead of the O(columns) compiler.
+ */
+export function getMemoizedColumnTopology<TRowData>(plan: CompiledGridPlan<TRowData>): CompiledColumnTopology {
+	const cached = memoizedTopologies.get(plan);
+	if (cached && cached.version === plan.version) return cached;
+	const topology = compileColumnTopology(plan);
+	memoizedTopologies.set(plan, topology);
+	return topology;
+}
+
 // ── Diff (WS8) ────────────────────────────────────────────────────────────────
 
 /**

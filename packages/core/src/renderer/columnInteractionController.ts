@@ -259,7 +259,7 @@ export class ColumnInteractionController<TRowData = unknown> {
 				this.columnDragOverGroupPanel = overPanel;
 				if (overPanel) {
 					this.groupPanel.onHeaderDragEnter(colField);
-					this.columnDropIndicator && (this.columnDropIndicator.style.display = 'none');
+					if (this.columnDropIndicator) this.columnDropIndicator.style.display = 'none';
 					// Drop the live-reorder preview while over the panel; recompute on return.
 					this.dragShifts = null;
 					this.shiftInsertionIndex = -2;
@@ -267,7 +267,7 @@ export class ColumnInteractionController<TRowData = unknown> {
 					this.schedulePaint();
 				} else {
 					this.groupPanel.onHeaderDragLeave();
-					this.columnDropIndicator && (this.columnDropIndicator.style.display = '');
+					if (this.columnDropIndicator) this.columnDropIndicator.style.display = '';
 				}
 			}
 			if (overPanel) {

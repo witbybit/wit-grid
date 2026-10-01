@@ -40,9 +40,15 @@ export interface GridViewProps<TRowData = unknown> {
 		editTrigger?: 'singleClick' | 'doubleClick';
 		arrowKeyNavigationEdit?: boolean;
 	};
+	/**
+	 * Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row
+	 * display — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence.
+	 */
 	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	/** Detail rows (master-detail). Without one the grid draws a placeholder; `detail.renderer` takes precedence. */
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
-	footerRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	/** Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid. */
+	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
 	enableChart?: boolean;
 	autoRowHeight?: boolean;
@@ -71,12 +77,15 @@ export function GridView<TRowData = unknown>({
 	navigationOptions = {},
 	groupRowRenderer,
 	detailRowRenderer,
-	footerRowRenderer,
+	totalRowRenderer,
 	sidebar,
 	enableChart = false,
 	autoRowHeight,
 }: GridViewProps<TRowData>) {
 	const portalStore = useMemo(() => createPortalStore<TRowData>(), []);
+	// Which full-width rows React draws: only kinds the user gave a renderer for. Core draws the rest.
+	const userRowRenderersRef = useRef({ group: false, detail: false, total: false });
+	userRowRenderersRef.current = { group: !!groupRowRenderer, detail: !!detailRowRenderer, total: !!totalRowRenderer };
 	const containerRef = useRef<HTMLDivElement>(null);
 	const hostRef = useRef<GridHostWithAdapter<TRowData> | null>(null);
 	const [adapterHandle, setAdapterHandle] = useState<GridAdapterHandle<unknown> | null>(null);
@@ -178,8 +187,9 @@ export function GridView<TRowData = unknown>({
 				flushCellContent: () => {},
 			},
 			rowContent: {
+				rendersRow: (row) => (userRowRenderersRef.current as Record<string, boolean>)[row.kind] ?? false,
 				mountRowContent: (mount) => {
-					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow);
+					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow, mount.renderer);
 				},
 				unmountRowContent: (unmount) => {
 					portalStore.unmountRow(unmount.rowKey, unmount.container);
@@ -327,7 +337,7 @@ export function GridView<TRowData = unknown>({
 				api={api}
 				groupRowRenderer={groupRowRenderer}
 				detailRowRenderer={detailRowRenderer}
-				footerRowRenderer={footerRowRenderer}
+				totalRowRenderer={totalRowRenderer}
 			/>
 		</div>
 	);

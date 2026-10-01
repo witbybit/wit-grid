@@ -17,6 +17,18 @@ import type { GridLayoutPlan } from './layoutPlan.js';
  */
 
 /** A parent is one of the two DOM roots, or another layer's `id`. */
+/**
+ * `--og-viewport-width`: the scrollport's visible width. Full-width row content (detail rows,
+ * full-width group rows) is sized to it and pinned with `position: sticky; left: 0`, so it stays in
+ * view during horizontal scroll instead of spanning (and sliding with) the whole content width.
+ */
+function setViewportWidthVar(el: HTMLElement, plan: GridLayoutPlan): void {
+	const width = `${plan.viewport.clientWidth}px`;
+	if (el.dataset.ogViewportWidth === width) return;
+	el.dataset.ogViewportWidth = width;
+	el.style.setProperty('--og-viewport-width', width);
+}
+
 export type LayerParentRef = 'scroll-viewport' | 'container' | string;
 
 export interface LayerDescriptor {
@@ -162,6 +174,7 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		apply(el, plan) {
 			el.style.width = `${plan.dimensions.contentWidth}px`;
 			el.style.transform = `translate3d(0, ${plan.origins.stickyGroupLayerTop}px, 0)`;
+			setViewportWidthVar(el, plan);
 		},
 	},
 	{
@@ -172,6 +185,7 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		apply(el, plan) {
 			el.style.height = `${plan.dimensions.contentHeight}px`;
 			el.style.width = `${plan.dimensions.contentWidth}px`;
+			setViewportWidthVar(el, plan);
 		},
 	},
 	// Exit-animation overlay — holds short-lived clone "ghosts" of rows that left the model

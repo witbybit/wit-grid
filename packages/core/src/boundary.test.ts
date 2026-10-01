@@ -81,6 +81,7 @@ describe('Public/internal boundary', () => {
 				'GridEventName',
 				'GridInsightRegistry',
 				'GridMetric',
+				'HIERARCHY_COLUMN_FIELD',
 				'HIGH_CONTRAST_DARK_THEME',
 				'HIGH_CONTRAST_LIGHT_THEME',
 				'LIGHT_THEME',
@@ -121,9 +122,11 @@ describe('Public/internal boundary', () => {
 				'getOpsForType',
 				'getQueryOperator',
 				'getQueryOperatorsForType',
+				'hierarchyColumnGroupColId',
 				'isBuiltInThemeName',
 				'isDomCellRenderer',
 				'isFilterableColumn',
+				'isHierarchyColumn',
 				'isQueryModelActive',
 				'isRootServerSideRoute',
 				'max',
@@ -162,9 +165,9 @@ describe('Public/internal boundary', () => {
 				'parseVisualRowId',
 				'toDataVisualRowId',
 				'toDetailVisualRowId',
-				'toFooterVisualRowId',
 				'toGroupVisualRowId',
 				'toLoadingVisualRowId',
+				'toTotalVisualRowId',
 			]) {
 				expect((publicApi as Record<string, unknown>)[name], `${name} must not be in public entry`).toBeUndefined();
 			}
@@ -214,9 +217,9 @@ describe('Public/internal boundary', () => {
 				'stopFlightRecorder',
 				'toDataVisualRowId',
 				'toDetailVisualRowId',
-				'toFooterVisualRowId',
 				'toGroupVisualRowId',
 				'toLoadingVisualRowId',
+				'toTotalVisualRowId',
 				'validateGridReplayTrace',
 			]);
 		});

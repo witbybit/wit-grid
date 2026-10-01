@@ -747,7 +747,7 @@ describe('Runtime Performance & Granular Versioning', () => {
 		(renderer as any).flushScrollFrame();
 
 		expect(renderer.getRenderStats().sameWindowBailouts).toBe(1);
-		expect(((renderer as any).scrollCoordinator as any).state.flushPendingAfterScroll).toBe(true);
+		expect((renderer as any).scrollPipeline.flushPendingAfterScroll).toBe(true);
 		const frame = store.engine.invalidation.consume();
 		expect(frame.viewport).toBe(true);
 		expect(frame.reasons).toContain('scroll-idle');

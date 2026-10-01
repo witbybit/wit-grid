@@ -12,15 +12,15 @@ export interface PublicRowNodeDispatchDeps<TRowData = unknown> {
 	getVisualIndexByRowId(rowId: string): number | null;
 	getVisualRowCount(): number;
 	getSelectedRowIds(): string[];
-	isGroupExpanded(groupId: string): boolean;
-	isDetailExpanded(rowId: string): boolean;
+	isExpanded(id: string): boolean;
+	isDetailOpen(rowId: string): boolean;
 	selectRows(rowIds: string[], options?: { mode?: 'add' | 'replace' }): void;
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, field: string, value: unknown): GridWriteResult;
 	batchCellValues(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
-	toggleGroupExpanded(groupId: string): void;
-	toggleDetailExpanded(rowId: string): void;
+	setExpanded(id: string, expanded: boolean): void;
+	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
 	retryRowLoad(rowIndex: number | null, loadState: import('../rowModel.js').RowLoadState): GridWriteResult;
 	getRowIssues(rowId: string): readonly import('../features/dataIntegrity/integrityTypes.js').GridIntegrityIssue[];
@@ -39,7 +39,7 @@ export function createPublicRowNodeFromInternal<TRowData>(deps: PublicRowNodeDis
 		selectable: true,
 		selected: deps.getSelectedRowIds().includes(rowId),
 		expandable: false,
-		expanded: deps.isDetailExpanded(rowId),
+		expanded: deps.isDetailOpen(rowId),
 		editable: true,
 	});
 }

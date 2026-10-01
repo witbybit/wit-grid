@@ -1,101 +1,121 @@
 import type { RowTreeNode } from './types.js';
 import type { SortModel } from '../../rowModel.js';
 import { type ColumnDef, RowNode } from '../../store.js';
+import type { GroupDef } from '../RowPipeline.js';
 import { createRowPipelineContext } from '../pipelineContext.js';
+import { compareSortKeys, toSortKey, type SortKey } from '../sortKeys.js';
 
-export function sortTreeStage<TData>(roots: RowTreeNode<TData>[], sortModel: SortModel | null, columns: ColumnDef<TData>[]): void {
-	if (!sortModel || sortModel.length === 0) return;
-
-	const context = createRowPipelineContext(columns, { groups: new Set(), treeRows: new Set(), details: new Set() });
-	const precompiledSortGetters = sortModel.map((sortItem) => {
-		return (node: RowNode<TData>) => context.getValue(node, sortItem.colId);
-	});
-
-	// Sort roots
-	sortChildren(roots, sortModel, precompiledSortGetters);
-
-	// Recursively sort children
-	for (const root of roots) {
-		sortTreeRecursively(root, sortModel, precompiledSortGetters);
-	}
-}
-
-function sortTreeRecursively<TData>(
-	node: RowTreeNode<TData>,
-	sortModel: SortModel,
-	precompiledSortGetters: ((node: RowNode<TData>) => unknown)[]
+/**
+ * Sorts every sibling list of the tree in place.
+ *
+ * - Leaf siblings follow the sort model (same comparison as the flat sort).
+ * - Group siblings compare by `keyString`, or by `GroupDef.comparator(a.key, b.key)` when the
+ *   group level declares one; a desc sort on the group's field reverses either.
+ * - Groups precede leaves in mixed lists.
+ *
+ * Sort keys are extracted once per sibling list (not per comparison), and ties fall back to the
+ * original sibling position, which is exactly what the stable `Array.prototype.sort` produced.
+ *
+ * With no active sort model, only group levels that declare a comparator are reordered.
+ */
+export function sortTreeStage<TData>(
+	roots: RowTreeNode<TData>[],
+	sortModel: SortModel | null,
+	columns: ColumnDef<TData>[],
+	groupDefs?: readonly GroupDef<TData>[]
 ): void {
-	if (node.kind === 'data' && !node.children?.length) return;
-
-	if (node.children?.length) {
-		sortChildren(node.children, sortModel, precompiledSortGetters);
+	const activeSort = sortModel && sortModel.length > 0 ? sortModel : null;
+	const comparatorByField = new Map<string, (a: unknown, b: unknown) => number>();
+	for (const def of groupDefs ?? []) {
+		if (def.comparator && !comparatorByField.has(def.colId)) comparatorByField.set(def.colId, def.comparator);
 	}
+	if (!activeSort && comparatorByField.size === 0) return;
 
-	for (const child of node.children ?? []) {
-		sortTreeRecursively(child, sortModel, precompiledSortGetters);
+	const context = createRowPipelineContext(columns);
+	const descByField = new Map<string, boolean>();
+	for (const sortItem of activeSort ?? []) {
+		if (!descByField.has(sortItem.colId)) descByField.set(sortItem.colId, sortItem.sort === 'desc');
 	}
-}
+	const sorter: TreeSorter<TData> = {
+		sortModel: activeSort ?? [],
+		getters: (activeSort ?? []).map((sortItem) => (node: RowNode<TData>) => context.getValue(node, sortItem.colId)),
+		descByField,
+		comparatorByField,
+	};
 
-function compareValues(a: unknown, b: unknown): number {
-	if (a === b) return 0;
-	if (a == null) return -1;
-	if (b == null) return 1;
-
-	if (typeof a === 'number' && typeof b === 'number') {
-		return a - b;
-	}
-
-	const aNumber = Number(a);
-	const bNumber = Number(b);
-	if (!Number.isNaN(aNumber) && !Number.isNaN(bNumber)) {
-		return aNumber - bNumber;
-	}
-
-	const aStr = String(a);
-	const bStr = String(b);
-	if (aStr < bStr) return -1;
-	if (aStr > bStr) return 1;
-	return 0;
-}
-
-function sortChildren<TData>(
-	children: RowTreeNode<TData>[],
-	sortModel: SortModel,
-	precompiledSortGetters: ((node: RowNode<TData>) => unknown)[]
-): void {
-	children.sort((a, b) => {
-		// If both are group nodes, compare by key
-		if (a.kind === 'group' && b.kind === 'group') {
-			let comp = 0;
-			const aVal = a.keyString;
-			const bVal = b.keyString;
-			if (aVal < bVal) comp = -1;
-			else if (aVal > bVal) comp = 1;
-
-			// Find the sort direction for the field of this group node, if any
-			const fieldSort = sortModel.find((s) => s.colId === a.field);
-			if (fieldSort && fieldSort.sort === 'desc') {
-				return -comp;
-			}
-			return comp;
+	// Iterative walk: deep trees must not overflow the call stack.
+	const stack: RowTreeNode<TData>[][] = [roots];
+	while (stack.length > 0) {
+		const siblings = stack.pop()!;
+		sortSiblings(siblings, sorter);
+		for (const node of siblings) {
+			if (node.children?.length) stack.push(node.children);
 		}
+	}
+}
 
-		// If both are leaf nodes, compare using standard sort model
-		if (a.kind === 'data' && b.kind === 'data') {
-			for (let i = 0; i < sortModel.length; i++) {
-				const sortItem = sortModel[i];
-				const aVal = precompiledSortGetters[i](a.node);
-				const bVal = precompiledSortGetters[i](b.node);
+interface TreeSorter<TData> {
+	sortModel: SortModel;
+	getters: Array<(node: RowNode<TData>) => unknown>;
+	/** First sort-model entry per field decides the group direction (mirrors `sortModel.find`). */
+	descByField: Map<string, boolean>;
+	comparatorByField: Map<string, (a: unknown, b: unknown) => number>;
+}
 
-				const comparison = compareValues(aVal, bVal);
-				if (comparison !== 0) {
-					return sortItem.sort === 'desc' ? -comparison : comparison;
+interface SiblingEntry<TData> {
+	node: RowTreeNode<TData>;
+	index: number;
+	keys: SortKey[] | null;
+}
+
+function sortSiblings<TData>(children: RowTreeNode<TData>[], sorter: TreeSorter<TData>): void {
+	if (children.length < 2) return;
+	const { sortModel, getters, descByField, comparatorByField } = sorter;
+	const hasSort = sortModel.length > 0;
+	// Without a sort model only comparator-bearing group levels move.
+	if (!hasSort && !children.some((child) => child.kind === 'group' && comparatorByField.has(child.field))) return;
+
+	const entries: SiblingEntry<TData>[] = new Array(children.length);
+	for (let i = 0; i < children.length; i++) {
+		const node = children[i];
+		let keys: SortKey[] | null = null;
+		if (hasSort && node.kind === 'data') {
+			keys = new Array(getters.length);
+			for (let k = 0; k < getters.length; k++) keys[k] = toSortKey(getters[k](node.node));
+		}
+		entries[i] = { node, index: i, keys };
+	}
+
+	entries.sort((left, right) => {
+		const a = left.node;
+		const b = right.node;
+		let comparison = 0;
+		if (a.kind === 'group' && b.kind === 'group') {
+			const comparator = comparatorByField.get(a.field);
+			if (comparator) {
+				comparison = comparator(a.key, b.key);
+			} else if (hasSort) {
+				if (a.keyString < b.keyString) comparison = -1;
+				else if (a.keyString > b.keyString) comparison = 1;
+			}
+			if (descByField.get(a.field) === true) comparison = -comparison;
+		} else if (a.kind === 'data' && b.kind === 'data') {
+			if (left.keys && right.keys) {
+				for (let i = 0; i < sortModel.length; i++) {
+					const c = compareSortKeys(left.keys[i], right.keys[i]);
+					if (c !== 0) {
+						comparison = sortModel[i].sort === 'desc' ? -c : c;
+						break;
+					}
 				}
 			}
-			return 0;
+		} else if (hasSort) {
+			// Hybrid comparison (fallback): groups before leaves.
+			comparison = a.kind === 'group' ? -1 : 1;
 		}
-
-		// Hybrid comparison (fallback)
-		return a.kind === 'group' ? -1 : 1;
+		// NaN (e.g. from a NaN numeric key) is treated as a tie, as Array.prototype.sort does.
+		return comparison !== 0 && !Number.isNaN(comparison) ? comparison : left.index - right.index;
 	});
+
+	for (let i = 0; i < entries.length; i++) children[i] = entries[i].node;
 }

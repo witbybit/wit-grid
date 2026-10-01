@@ -42,10 +42,10 @@
 			"id": "virtual-scroll",
 			"name": "Virtual scroll (row + column)",
 			"level": "foundation",
-			"modules": ["src/renderer/renderScrollCoordinator.ts", "src/renderer/scrollEngine.ts"],
+			"modules": ["src/renderer/renderScrollPipeline.ts", "src/renderer/scrollEngine.ts"],
 			"apiMethods": ["scrollToRow", "scrollToCell"],
 			"tests": "src/renderer/renderEngine.test.ts",
-			"owner": "RenderScrollCoordinator"
+			"owner": "RenderScrollPipeline"
 		},
 		{
 			"id": "column-resize",

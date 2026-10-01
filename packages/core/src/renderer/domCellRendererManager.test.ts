@@ -10,6 +10,7 @@ interface Row {
 function makeEngineStub(runtimeLimits?: { maxWarmCustomRenderers?: number }): any {
 	return {
 		isScrolling: false,
+		getApiRef: () => ({}),
 		stateManager: { getState: () => ({ runtimeLimits }) },
 	};
 }
@@ -41,6 +42,7 @@ function acquireParams(
 		isEditing: false,
 		phase: 'scroll',
 		isScrolling: false,
+		getApiRef: () => ({}),
 		isFocused: false,
 		isSelected: false,
 	};

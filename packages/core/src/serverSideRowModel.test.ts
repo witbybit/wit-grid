@@ -1,3 +1,4 @@
+import { FLAT_HIERARCHY } from './visualRow.js';
 import { describe, expect, it, vi } from 'vitest';
 import {
 	createServerSideGetRowsRequest,
@@ -378,12 +379,12 @@ describe('ServerSideRowModelController', () => {
 			id: 'group:region=EMEA',
 			groupId: 'group:region=EMEA',
 			keyString: 'EMEA',
-			expanded: false,
+			hierarchy: { level: 0, parentId: null, hasChildren: true, expanded: false },
 		});
 
-		const refresh = controller.toggleGroupExpanded('group:region=EMEA');
+		const refresh = controller.setExpanded('group:region=EMEA', true);
 		expect(refresh).toMatchObject({ changed: true, reason: 'expansion', groupId: 'group:region=EMEA' });
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(true);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(true);
 		expect(getRows).toHaveBeenCalledTimes(2);
 
 		await flushAsync();
@@ -445,7 +446,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		await flushAsync();
 
 		controller.refreshServerSide({ route: ['region', 'EMEA'] });
@@ -466,7 +467,7 @@ describe('ServerSideRowModelController', () => {
 			}),
 		]);
 		expect(controller.getBlockSnapshots()).toEqual([expect.objectContaining({ storeId: '', blockIndex: 0, state: 'loaded' })]);
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(false);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(false);
 
 		controller.dispose();
 		store.destroy();
@@ -507,7 +508,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		expect(getRows).toHaveBeenCalledTimes(2);
 
 		controller.purgeServerSide({ route: ['region', 'EMEA'] });
@@ -564,7 +565,7 @@ describe('ServerSideRowModelController', () => {
 		});
 
 		await flushAsync();
-		controller.toggleGroupExpanded('group:region=EMEA');
+		controller.setExpanded('group:region=EMEA', true);
 		controller.refreshServerSide({ route: ['region', 'EMEA', 'country', 'DE'] });
 		await flushAsync();
 
@@ -584,7 +585,7 @@ describe('ServerSideRowModelController', () => {
 			}),
 		]);
 		expect(controller.getBlockSnapshots()).toEqual([expect.objectContaining({ storeId: '', blockIndex: 0, state: 'loaded' })]);
-		expect(controller.isGroupExpanded('group:region=EMEA')).toBe(false);
+		expect(controller.isExpanded('group:region=EMEA')).toBe(false);
 
 		controller.dispose();
 		store.destroy();
@@ -659,6 +660,7 @@ describe('ServerSideRowModelController', () => {
 			kind: 'loading',
 			id: 'loading:0',
 			rowIndex: 0,
+			hierarchy: FLAT_HIERARCHY,
 			editable: false,
 		});
 		expect(controller.getRowLoadState(0)).toEqual({ kind: 'loading', reason: 'server-side-block' });
@@ -700,6 +702,7 @@ describe('ServerSideRowModelController', () => {
 			kind: 'loading',
 			id: 'loading:5',
 			rowIndex: 5,
+			hierarchy: FLAT_HIERARCHY,
 			editable: false,
 		});
 

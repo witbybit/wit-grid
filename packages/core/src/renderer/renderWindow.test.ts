@@ -113,6 +113,73 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		expect(getRowIndices(limited)).toEqual([0, 1, 2, 3, 18, 19]);
 	});
 
+	it('never drops visible rows to meet the row budget: overscan gives way first', () => {
+		// Scrolling down: 8 overscan rows above the visible 20..34, 2 below. Budget 20.
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowCount: 100,
+				rowStart: 12,
+				rowEnd: 36,
+				visibleRowStart: 20,
+				visibleRowEnd: 34,
+			},
+			{ maxRenderedRows: 20 }
+		);
+		expect(limited.rowStart).toBeLessThanOrEqual(20);
+		expect(limited.rowEnd).toBeGreaterThanOrEqual(34);
+		expect(limited.rowEnd - limited.rowStart + 1).toBe(20);
+		// 5 spare rows: 2 below (all there is), the other 3 above.
+		expect([limited.rowStart, limited.rowEnd]).toEqual([17, 36]);
+	});
+
+	it('never drops visible columns to meet the cell budget', () => {
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowStart: 0,
+				rowEnd: 1,
+				colCount: 60,
+				colStart: 5,
+				colEnd: 40,
+				visibleColStart: 20,
+				visibleColEnd: 30,
+			},
+			{ maxRenderedCells: 30 }
+		);
+		expect(limited.colStart).toBeLessThanOrEqual(20);
+		expect(limited.colEnd).toBeGreaterThanOrEqual(30);
+		expect(limited.colEnd - limited.colStart + 1).toBe(15);
+		expect([limited.colStart, limited.colEnd]).toEqual([18, 32]);
+	});
+
+	it('keeps the start when the visible range alone exceeds the budget', () => {
+		const limited = applyRenderWindowRuntimeLimits(
+			{
+				...baseWindow,
+				pinTopRows: 0,
+				pinBottomRows: 0,
+				pinLeftCols: 0,
+				pinRightCols: 0,
+				rowCount: 100,
+				rowStart: 10,
+				rowEnd: 60,
+				visibleRowStart: 15,
+				visibleRowEnd: 55,
+			},
+			{ maxRenderedRows: 10 }
+		);
+		expect([limited.rowStart, limited.rowEnd]).toEqual([15, 24]);
+	});
+
 	it('clamps max rendered cells by reducing center columns only', () => {
 		const limited = applyRenderWindowRuntimeLimits(
 			{
@@ -162,15 +229,7 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 				{ field: 'product', header: 'Product' },
 			],
 			defaultRowHeight: 40,
-			groupRowHeight: 40,
-			enableStickyGroupRows: true,
-			rowModelConfig: {
-				type: 'client',
-				grouping: {
-					model: [{ colId: 'category' }, { colId: 'product' }],
-					defaultExpanded: true,
-				},
-			},
+			grouping: { by: ['category', 'product'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -259,15 +318,7 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 				{ field: 'product', header: 'Product' },
 			],
 			defaultRowHeight: 40,
-			groupRowHeight: 40,
-			enableStickyGroupRows: true,
-			rowModelConfig: {
-				type: 'client',
-				grouping: {
-					model: [{ colId: 'category' }],
-					defaultExpanded: true,
-				},
-			},
+			grouping: { by: ['category'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
 		});
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -317,7 +368,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer,
-			rowModelConfig: { type: 'client' },
 		});
 		return { store, columns };
 	}
@@ -406,7 +456,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer: 1,
-			rowModelConfig: { type: 'client' },
 		});
 		store.setViewportPins({ left: 2, right: 2 });
 		store.setViewportSize(500, 400);
@@ -435,7 +484,6 @@ describe('column virtualization', () => {
 			columns,
 			defaultRowHeight: 40,
 			colBuffer: 0,
-			rowModelConfig: { type: 'client' },
 		});
 		store.setViewportPins({ left: 1, right: 1 });
 		store.setViewportSize(300, 400); // 300px shows ~3 center columns
@@ -451,5 +499,53 @@ describe('column virtualization', () => {
 		expect(rendered.length).toBeLessThan(10);
 
 		store.destroy();
+	});
+});
+
+describe('sticky group headers with nested groups', () => {
+	function makeNestedGrid(pagination?: { pageSize: number }) {
+		type Row = { id: string; region: string; category: string };
+		const rows: Row[] = [];
+		for (const region of ['Americas', 'EMEA']) {
+			for (const category of ['Cloud', 'Hardware', 'Software']) {
+				for (let i = 0; i < 10; i++) rows.push({ id: `${region}-${category}-${i}`, region, category });
+			}
+		}
+		const store = new GridStore<Row>({
+			getRowId: (row) => row.id,
+			columns: [
+				{ field: 'region', header: 'Region' },
+				{ field: 'category', header: 'Category' },
+			],
+			defaultRowHeight: 40,
+			grouping: { by: ['region', 'category'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
+			...(pagination ? { pagination: { pageSize: pagination.pageSize, page: 0 } } : {}),
+		});
+		new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
+		store.setViewportSize(500, 200);
+		return store;
+	}
+
+	const stackAt = (store: ReturnType<typeof makeNestedGrid>, scrollTop: number) => {
+		store.setScrollPosition(scrollTop, 0);
+		const rowModel = store.engine.getRowModel()!;
+		return (computeRenderWindow(store.engine).stickyGroupStack ?? []).map((item) => {
+			const row = rowModel.getVisualRow(item.visualIndex);
+			return row?.kind === 'group' ? row.keyString : '?';
+		});
+	};
+
+	it.each([
+		['unpaginated', undefined],
+		['paginated', { pageSize: 1000 }],
+	] as const)('%s: keeps the outer group stuck above the current inner group for the whole outer group', (_label, pagination) => {
+		const store = makeNestedGrid(pagination);
+		// Rows: Americas(0), Cloud(1), 10 rows, Hardware(12), 10 rows, Software(23), 10 rows, EMEA(34)...
+		expect(stackAt(store, 5 * 40)).toEqual(['Americas', 'Cloud']);
+		// Past the first sub-group (the old bug: the stack emptied here) and into the second.
+		expect(stackAt(store, 15 * 40)).toEqual(['Americas', 'Hardware']);
+		expect(stackAt(store, 26 * 40)).toEqual(['Americas', 'Software']);
+		// Into the next outer group.
+		expect(stackAt(store, 37 * 40)).toEqual(['EMEA', 'Cloud']);
 	});
 });

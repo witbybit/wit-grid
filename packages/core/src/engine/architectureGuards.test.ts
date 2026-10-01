@@ -97,22 +97,22 @@ describe('Architecture guardrails', () => {
 		expect(generated, `generated artifacts found in source tree: ${generated.join(', ')}`).toEqual([]);
 	});
 
-	it('RenderInvalidationCoordinator owns renderer subscription wiring', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+	it('RenderPaintPipeline owns renderer subscription wiring', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		expect(content).toContain('stateManager.subscribeToKey');
 		expect(content).toContain('eventBus.addEventListener');
 	});
 
-	it('renderScrollCoordinator owns scroll-frame orchestration and cheap-path fan-out', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollCoordinator.ts'), 'utf-8');
+	it('RenderScrollPipeline owns scroll-frame orchestration and cheap-path fan-out', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollPipeline.ts'), 'utf-8');
 		expect(content).toContain('computeRenderWindowInto');
 		expect(content).toContain('sameRenderedWindow');
 		expect(content).toContain('public flushScrollFrame =');
 		expect(content).toContain('public syncCheapScrollOnly');
 
 		const engineContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderEngine.ts'), 'utf-8');
-		expect(engineContent).toContain('this.scrollCoordinator.flushScrollFrame()');
-		// syncCheapScrollOnly is called internally by renderScrollCoordinator, not forwarded from renderEngine
+		expect(engineContent).toContain('this.scrollPipeline.flushScrollFrame()');
+		// syncCheapScrollOnly is called internally by RenderScrollPipeline, not forwarded from renderEngine
 		expect(engineContent).not.toContain('computeRenderWindowInto(');
 		expect(engineContent).not.toContain('sameRenderedWindow(');
 	});
@@ -145,24 +145,34 @@ describe('Architecture guardrails', () => {
 		expect(content).toContain('rs.isScrollEpochCurrent(this.postScrollEpoch)');
 		// Single RAF arbiter (Plan 093 replaced per-channel handles with a single rafId).
 		expect(content).toContain('this.rafId');
-		// renderScrollCoordinator must not import defaultGridScheduler directly.
-		const scrollContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollCoordinator.ts'), 'utf-8');
+		// RenderScrollPipeline must not import defaultGridScheduler directly.
+		const scrollContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollPipeline.ts'), 'utf-8');
 		expect(scrollContent).not.toContain('import { defaultGridScheduler }');
 		expect(scrollContent).toContain('gridScheduler: GridScheduler');
 		expect(scrollContent).toContain('this.deps.gridScheduler.');
 	});
 
-	it('renderPaintCoordinator owns paint lifecycle orchestration', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintCoordinator.ts'), 'utf-8');
-		expect(content).toContain('public flushPaint =');
-		expect(content).toContain('public fullPaint =');
+	it('RenderPaintPipeline owns the paint lane: requests, flush, dispatch and full paint', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
+		expect(content).toContain('public flushPaint(): void');
+		expect(content).toContain('public fullPaint(): void');
+		expect(content).toContain('public dispatch(frame: InvalidationFrame): void');
 		expect(content).toContain('public refreshRendererEpochs');
+		expect(content).toContain('private requestPaint(');
 
 		const engineContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderEngine.ts'), 'utf-8');
-		expect(engineContent).toContain('this.paintCoordinator.flushPaint()');
-		expect(engineContent).toContain('this.paintCoordinator.fullPaint()');
-		expect(engineContent).not.toContain('this.orchestrator.flush(frame)');
+		expect(engineContent).toContain('this.paintPipeline.flushPaint()');
+		expect(engineContent).toContain('this.paintPipeline.fullPaint()');
 		expect(engineContent).not.toContain('refreshRendererEpochs()');
+		// The deleted owners stay deleted: one paint lane, one telemetry source.
+		for (const removed of [
+			'RenderInvalidationCoordinator.ts',
+			'renderPaintCoordinator.ts',
+			'renderOrchestrator.ts',
+			'renderScrollCoordinator.ts',
+		]) {
+			expect(existsSync(resolve(CORE_ROOT, 'src', 'renderer', removed)), removed).toBe(false);
+		}
 	});
 
 	it('renderViewportCoordinator owns viewport layout and scroll-into-view orchestration', () => {
@@ -175,11 +185,13 @@ describe('Architecture guardrails', () => {
 
 		const engineContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderEngine.ts'), 'utf-8');
 		expect(engineContent).toContain('this.viewportCoordinator.syncLayoutPlan()');
-		expect(engineContent).toContain('this.viewportCoordinator.recycleViewport(false, undefined, layoutPlan.renderWindow)');
 		expect(engineContent).toContain('this.viewportCoordinator.scrollCellIntoView(rowId, colField)');
-		expect(engineContent).toContain('this.viewportCoordinator.scrollCellPointerIntoView(pointer)');
+		expect(engineContent).toContain('viewportLayout: this.viewportCoordinator');
 		expect(engineContent).not.toContain('computeGridLayoutPlan(');
 		expect(engineContent).not.toContain('computeScrollTarget(');
+		const paintContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
+		expect(paintContent).toContain('this.deps.viewportLayout.recycleViewport(false, undefined, layoutPlan.renderWindow)');
+		expect(paintContent).toContain('this.deps.viewportLayout.scrollCellPointerIntoView(selection.focus)');
 	});
 
 	it('rowRenderMaintenance owns scroll-idle repair and invalidation repaint orchestration', () => {
@@ -336,8 +348,8 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('const editState = this.deps.ctx.getState().activeEdit;');
 	});
 
-	it('renderScrollCoordinator focus matching uses full column identity instead of a field-only stub', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollCoordinator.ts'), 'utf-8');
+	it('approach-band prewarm focus matching uses full column identity instead of a field-only stub', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'approachBandPrewarm.ts'), 'utf-8');
 		expect(content).toContain('return doesCanonicalCellPointerMatchColumn(focusedCell, rowId, column);');
 		expect(content).toContain('const isFocused = isCellFocused(rowId, col, focusedCell);');
 		expect(content).not.toContain('return doesCellPointerMatchColumn(focusedCell, rowId, { field: colField });');
@@ -987,8 +999,10 @@ describe('Architecture guardrails', () => {
 	});
 
 	it('treeData options expose getParentIdDependencies (Plan 082)', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'rows', 'RowPipeline.ts'), 'utf-8');
-		expect(content).toContain('getParentIdDependencies');
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'rows', 'hierarchyConfig.ts'), 'utf-8');
+		const treeDataConfig = content.match(/export interface TreeDataConfig<[^>]*>\s*\{[\s\S]*?\n\}/)?.[0];
+		expect(treeDataConfig, 'TreeDataConfig interface not found in rows/hierarchyConfig.ts').toBeDefined();
+		expect(treeDataConfig).toMatch(/getParentIdDependencies\?:\s*string\[\]/);
 	});
 
 	it('incremental index maintenance uses reindexFrom and preserves Map identity (Plan 083)', () => {
@@ -996,8 +1010,8 @@ describe('Architecture guardrails', () => {
 		// reindexFrom must exist and update maps in-place (no new Map() calls in incremental paths).
 		expect(content).toContain('private reindexFrom(');
 		expect(content).toContain('this.reindexFrom(');
-		// Cost model must exist.
-		expect(content).toContain('isIncrementalCheaper');
+		// Cost model must exist (the transaction-size threshold; the unused isIncrementalCheaper was removed).
+		expect(content).toContain('INCREMENTAL_TX_LIMIT');
 		// Stale entries for removed rows must be deleted before splice.
 		expect(content).toContain('this.rowIdToVisualIndex.delete(node.id)');
 	});
@@ -1573,8 +1587,8 @@ describe('Architecture guardrails', () => {
 
 	// ── Plan 096: frame epoch and post-scroll durability ─────────────────────
 
-	it('FrameCoordinator owns scroll-frame/post-scroll transitions — not renderScrollCoordinator (Plan 096→098)', () => {
-		const rscContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollCoordinator.ts'), 'utf-8');
+	it('FrameCoordinator owns scroll-frame/post-scroll transitions — not RenderScrollPipeline (Plan 096→098)', () => {
+		const rscContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollPipeline.ts'), 'utf-8');
 		const fcContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'frameCoordinator.ts'), 'utf-8');
 		// Phase transitions must live in FrameCoordinator, not in the scroll coordinator callback.
 		expect(rscContent).not.toContain("transitionTo('scroll-frame')");
@@ -1632,8 +1646,8 @@ describe('Architecture guardrails', () => {
 
 	// ── Plan 098: render runtime convergence and demolition ──────────────────
 
-	it('FrameCoordinator absorbs scroll-end detection — no second RAF loop in renderScrollCoordinator (Plan 098)', () => {
-		const rscContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollCoordinator.ts'), 'utf-8');
+	it('FrameCoordinator absorbs scroll-end detection — no second RAF loop in RenderScrollPipeline (Plan 098)', () => {
+		const rscContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderScrollPipeline.ts'), 'utf-8');
 		// These fields and methods were removed in Plan 098 — FrameCoordinator owns scroll-end detection.
 		expect(rscContent).not.toContain('scrollEndRafId');
 		expect(rscContent).not.toContain('scrollEndTickerActive');
@@ -1659,7 +1673,7 @@ describe('Architecture guardrails', () => {
 		expect(fcContent).toContain('keepAlive');
 	});
 
-	it('renderEngine wires onScrollEnd to scrollCoordinator.finishScrolling (Plan 098)', () => {
+	it('renderEngine wires onScrollEnd to scrollPipeline.finishScrolling (Plan 098)', () => {
 		const reContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderEngine.ts'), 'utf-8');
 		// onScrollEnd callback must delegate to finishScrolling.
 		expect(reContent).toContain('onScrollEnd');
@@ -1771,7 +1785,18 @@ describe('Architecture guardrails', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'portalMountManager.ts'), 'utf-8');
 		expect(content).toContain('getActiveGeneration(');
 		expect(content).toContain('getActiveIdentity(');
-		expect(content).toContain('activeIdentityByKey.get(');
+		// Identity lives in the single cell-portal registry, not a parallel map that can drift.
+		expect(content).toContain('this.cells.getIdentity(');
+		for (const retired of [
+			'activeIdentityByKey',
+			'mountedCells',
+			'deferredCellMounts',
+			'deferredCellReleases',
+			'pendingCellReleases',
+			'deferredNewCellMounts',
+		]) {
+			expect(content).not.toContain(`private ${retired}`);
+		}
 	});
 
 	it('stale-detection guards in portalMountManager no longer have redundant !== undefined checks (Plan 100)', () => {
@@ -2168,32 +2193,32 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('const selection = this.selection.setSelection(');
 	});
 
-	it('RenderInvalidationCoordinator no longer infers edit/validation paints from state keys (Plan 105)', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+	it('RenderPaintPipeline no longer infers edit/validation paints from state keys (Plan 105)', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		expect(content).not.toContain("subscribeToKey('activeEdit'");
 		expect(content).not.toContain("subscribeToKey('validationErrors'");
 	});
 
-	it('RenderInvalidationCoordinator no longer requests selection flushes from rowSelectionChanged directly (Plan 105)', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+	it('RenderPaintPipeline no longer requests selection flushes from rowSelectionChanged directly (Plan 105)', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		expect(content).not.toContain('GridEventName.rowSelectionChanged');
 		expect(content).not.toContain("invalidateOverlay('selection')");
 		expect(content).not.toContain("invalidateHeaders('selection')");
-		expect(content).not.toContain("requestFlushGated('selection')");
+		expect(content).not.toContain("requestPaint('selection')");
 	});
 
-	it('RenderInvalidationCoordinator derives focus-follow scrolling from interaction state instead of selectionChanged payloads', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+	it('RenderPaintPipeline derives focus-follow scrolling from interaction state instead of selectionChanged payloads', () => {
+		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		expect(content).toContain("import { readInteractionState } from '../interaction/interactionState.js';");
 		expect(content).toContain('const interaction = readInteractionState(this.deps.engine.stateManager.getState());');
 		expect(content).toContain('const selection = interaction.cellSelection.selection;');
 		expect(content).not.toContain('const { selection } = event.payload;');
 	});
 
-	it('layout-panel commands own showGroupPanel/showFloatingFilters/showFilterChipBar invalidation instead of RenderInvalidationCoordinator (Plan 105)', () => {
+	it('layout-panel commands own showGroupPanel/showFloatingFilters/showFilterChipBar invalidation instead of RenderPaintPipeline (Plan 105)', () => {
 		const groupingContent = readFileSync(resolve(CORE_ROOT, 'src', 'features', 'GroupingFeatureController.ts'), 'utf-8');
 		const stateContent = readFileSync(resolve(CORE_ROOT, 'src', 'features', 'GridStateFeatureController.ts'), 'utf-8');
-		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		expect(groupingContent).toContain("reason: 'grouping:set-panel'");
 		expect(groupingContent).toContain("{ kind: 'geometry', reason: 'showGroupPanel' }");
 		expect(groupingContent).toContain("{ kind: 'viewport', reason: 'showGroupPanel' }");
@@ -2207,9 +2232,9 @@ describe('Architecture guardrails', () => {
 		expect(ricContent).not.toContain("subscribeToKey('showFilterChipBar'");
 	});
 
-	it('RenderInvalidationCoordinator no longer records legacy inferred invalidation fallbacks (Plan 105)', () => {
+	it('RenderPaintPipeline no longer records legacy inferred invalidation fallbacks (Plan 105)', () => {
 		const diagnosticsContent = readFileSync(resolve(CORE_ROOT, 'src', 'diagnostics', 'GridInstrumentation.ts'), 'utf-8');
-		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		const columnContent = readFileSync(resolve(CORE_ROOT, 'src', 'features', 'ColumnFeatureController.ts'), 'utf-8');
 		expect(columnContent).toContain("reason: 'columns:reorder-toggle'");
 		expect(columnContent).toContain("{ kind: 'headers' }");
@@ -2219,8 +2244,8 @@ describe('Architecture guardrails', () => {
 		expect(ricContent).not.toContain("subscribeToKey('enableColumnReorder'");
 	});
 
-	it('RenderInvalidationCoordinator only keeps targeted state subscriptions for non-command animation hooks', () => {
-		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+	it('RenderPaintPipeline only keeps targeted state subscriptions for non-command animation hooks', () => {
+		const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 		const subscriptions = [...ricContent.matchAll(/subscribeToKey\('([^']+)'/g)].map((match) => match[1]);
 		expect(subscriptions).toEqual(['expansion']);
 	});
@@ -2686,7 +2711,7 @@ describe('Architecture guardrails', () => {
 
 		it('selection invalidation is declared at commit time, not rebuilt in the renderer coordinator', () => {
 			const engineContent = readFileSync(resolve(CORE_ROOT, 'src', 'engine', 'GridEngine.ts'), 'utf-8');
-			const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'RenderInvalidationCoordinator.ts'), 'utf-8');
+			const ricContent = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 			expect(engineContent).toContain("reason: 'selection:set-range'");
 			expect(engineContent).toContain("kind: 'headers' as const, reason: 'selection' as const");
 			expect(ricContent).not.toContain("invalidateHeaders('selection')");
@@ -2833,8 +2858,8 @@ describe('Architecture guardrails', () => {
 			expect(content).not.toContain("invalidations: changed ? [{ kind: 'full' as const, reason: 'data' }] : []");
 		});
 
-		it('RenderOrchestrator treats row-range and group invalidations as structural viewport work', () => {
-			const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderOrchestrator.ts'), 'utf-8');
+		it('RenderPaintPipeline dispatch treats row-range and group invalidations as structural viewport work', () => {
+			const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'renderPaintPipeline.ts'), 'utf-8');
 			expect(content).toContain('const hasStructuralViewportWork = frame.rowRanges.length > 0 || frame.groups.size > 0;');
 			expect(content).toContain('if (frame.viewport || hasStructuralViewportWork)');
 		});

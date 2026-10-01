@@ -61,6 +61,9 @@ function makeDeps(stateHost: RowRendererRuntimeStateHost<unknown>): RowRendererR
 			releaseCellForScroll: vi.fn(),
 			releaseCell: vi.fn(),
 			getActiveIdentity: vi.fn(() => ({ rowSlotId: 'slot-0', slotGeneration: 1 })),
+			cancelDeferredMount: vi.fn(() => false),
+			isCellMounted: vi.fn(() => true),
+			getMountedKeyForContainer: vi.fn(() => undefined),
 		} as any,
 		getViewportContainer: () => null,
 		selectionPaint: {} as any,
@@ -186,6 +189,32 @@ describe('RowRendererRuntimeBridge – releaseCellPortal', () => {
 
 		expect(deps.portalMountManager.releaseCell).not.toHaveBeenCalled();
 		expect((deps.engine as any).runtimeFaults.report).toHaveBeenCalledOnce();
+	});
+
+	it('treats a repeat release of an already-released portal as a no-op, not a fault', () => {
+		const { bridge, deps } = makeBridge();
+		const cell = cellWithKey('cell-released');
+		(deps.portalMountManager.getActiveIdentity as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+		(deps.portalMountManager.isCellMounted as ReturnType<typeof vi.fn>).mockReturnValue(false);
+
+		bridge.releaseCellPortal(cell);
+
+		expect(deps.portalMountManager.releaseCell).not.toHaveBeenCalled();
+		expect(deps.portalMountManager.releaseCellForScroll).not.toHaveBeenCalled();
+		expect((deps.engine as any).runtimeFaults.report).not.toHaveBeenCalled();
+	});
+
+	it('cancels a mount still queued from scroll instead of reporting a missing identity', () => {
+		const { bridge, deps } = makeBridge();
+		const cell = cellWithKey('cell-queued');
+		(deps.portalMountManager.getActiveIdentity as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
+		(deps.portalMountManager.cancelDeferredMount as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+		bridge.releaseCellPortal(cell);
+
+		expect(deps.portalMountManager.cancelDeferredMount).toHaveBeenCalledWith('cell-queued');
+		expect(deps.portalMountManager.releaseCell).not.toHaveBeenCalled();
+		expect((deps.engine as any).runtimeFaults.report).not.toHaveBeenCalled();
 	});
 });
 

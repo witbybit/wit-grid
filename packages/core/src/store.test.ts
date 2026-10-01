@@ -554,7 +554,7 @@ describe('GridStore generic row-store functionality', () => {
 			queryModel,
 			selectedRowIds: ['1'],
 			pagination: { pageSize: 25, page: 2 },
-			groupBy: ['name'],
+			grouping: { by: ['name'] },
 		});
 		const nameColumn = store.engine.columns.getDisplayedColumns()[1] as { field: string; colId?: string; instanceId?: string };
 		store.engine.stateManager.setState({
@@ -594,7 +594,7 @@ describe('GridStore generic row-store functionality', () => {
 			(snapshot.pagination as { pageSize: number; page?: number }).page = 99;
 		}).toThrow();
 		expect(() => {
-			(snapshot.groupBy as string[]).push('id');
+			(snapshot.grouping!.by as string[]).push('id');
 		}).toThrow();
 
 		const liveAfter = store.getState();
@@ -608,15 +608,16 @@ describe('GridStore generic row-store functionality', () => {
 		expect(liveAfter.selectedRowIds).toEqual(['1']);
 		expect(liveAfter.activeEdit?.validationError).toBe('Required');
 		expect(liveAfter.pagination?.page).toBe(2);
-		expect(liveAfter.groupBy).toEqual(['name']);
-		expect(freshSnapshot.columns[0]?.header).toBe('ID');
+		expect(liveAfter.grouping?.by).toEqual(['name']);
+		// Grouped: the first column is the hierarchy column; its header survived the mutation attempt.
+		expect(freshSnapshot.columns[0]?.header).toBe('Group');
 		expect(freshSnapshot.sortModel).toEqual([{ colId: 'name', sort: 'asc' }]);
 		expect(freshSnapshot.filterModel).toEqual({ name: { type: 'text', operator: 'contains', value: 'A' } });
 		expect(freshSnapshot.queryModel).toEqual(queryModel);
 		expect(freshSnapshot.selectedRowIds).toEqual(['1']);
 		expect(freshSnapshot.activeEdit?.validationError).toBe('Required');
 		expect(freshSnapshot.pagination?.page).toBe(2);
-		expect(freshSnapshot.groupBy).toEqual(['name']);
+		expect(freshSnapshot.grouping?.by).toEqual(['name']);
 
 		store.destroy();
 	});
@@ -862,7 +863,7 @@ describe('GridStore generic row-store functionality', () => {
 				{ field: 'id', header: 'ID', width: 50 },
 				{ field: 'name', header: 'Name', width: 150 },
 			],
-			groupBy: ['name'],
+			grouping: { by: ['name'] },
 		});
 		const controller = new ClientRowModelController<TestRow>(store.getClientRowModelRuntime(), {
 			rows: [
@@ -879,7 +880,7 @@ describe('GridStore generic row-store functionality', () => {
 		expect(groupAId).not.toBeNull();
 
 		// Expand group A — data row id='1' becomes visible
-		store.toggleGroupExpanded(groupAId!);
+		store.toggleExpanded(groupAId!);
 		// Visual layout: [group:GroupA(0), data:1(1), group:GroupB(2)]
 		expect(controller.getVisualIndexByRowId('1')).toBe(1);
 
@@ -888,7 +889,7 @@ describe('GridStore generic row-store functionality', () => {
 		expect(store.getState().selection.bounds?.minRow).toBe(1);
 
 		// Collapse group A — id='1' is now hidden, getVisualIndexByRowId returns -1
-		store.toggleGroupExpanded(groupAId!);
+		store.toggleExpanded(groupAId!);
 		expect(controller.getVisualIndexByRowId('1')).toBe(-1);
 
 		// Bounds must be null since the selected row is no longer visible
@@ -1824,11 +1825,9 @@ describe('GridStore generic row-store functionality', () => {
 				{ field: 'name', header: 'Name', width: 150 },
 			],
 			defaultRowHeight: 40,
-			masterDetailEnabled: true,
-			detailRowHeight: 220,
+			detail: { height: 220 },
 			expansion: {
-				groups: {},
-				treeRows: {},
+				rows: {},
 				details: { '1': true },
 			},
 			getRowId: (row) => row.id,
@@ -2428,7 +2427,7 @@ describe('Plan 141 regression â€” targeted invalidations for canonical row 
 				{ field: 'name', header: 'Name', enableRowGroup: true },
 				{ field: 'price', header: 'Price' },
 			],
-			groupBy: ['name'],
+			grouping: { by: ['name'] },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -2440,7 +2439,7 @@ describe('Plan 141 regression â€” targeted invalidations for canonical row 
 		});
 		const groupAId = ctrl.getVisualRow(0)?.kind === 'group' ? ctrl.getVisualRow(0)?.groupId : null;
 		expect(groupAId).not.toBeNull();
-		store.toggleGroupExpanded(groupAId!);
+		store.toggleExpanded(groupAId!);
 		void store.engine.invalidation.consume();
 
 		store.setSortModel([{ colId: 'price', sort: 'desc' }]);
@@ -2461,7 +2460,7 @@ describe('Plan 141 regression â€” targeted invalidations for canonical row 
 				{ field: 'name', header: 'Name', enableRowGroup: true },
 				{ field: 'price', header: 'Price' },
 			],
-			groupBy: ['name'],
+			grouping: { by: ['name'] },
 		});
 		const ctrl = new ClientRowModelController(store.getClientRowModelRuntime(), {
 			rows: [
@@ -2473,7 +2472,7 @@ describe('Plan 141 regression â€” targeted invalidations for canonical row 
 		});
 		const groupAId = ctrl.getVisualRow(0)?.kind === 'group' ? ctrl.getVisualRow(0)?.groupId : null;
 		expect(groupAId).not.toBeNull();
-		store.toggleGroupExpanded(groupAId!);
+		store.toggleExpanded(groupAId!);
 		void store.engine.invalidation.consume();
 
 		store.setFilterModel({ price: { type: 'number', operator: 'gt', value: 15 } });
@@ -3957,11 +3956,16 @@ describe('groupBy mutation API', () => {
 		store.destroy();
 	});
 
-	it('addGroupBy clears invalidation geometry when first group is added', () => {
+	it('addGroupBy repaints fully when the first group adds the hierarchy column, then targets later levels', () => {
 		const store = makeGroupStore();
 		store.engine.invalidation.consume();
 		store.addGroupBy('region');
+		expect(store.engine.invalidation.consume().full).toBe(true);
+
+		const next = store.getState().columns.find((column) => column.field !== 'region' && !column.field.startsWith('__'))!.field;
+		store.addGroupBy(next);
 		const frame = store.engine.invalidation.consume();
+		expect(frame.full).toBe(false);
 		expect(frame.geometry).toBe(true);
 		expect(frame.viewport).toBe(true);
 		store.destroy();

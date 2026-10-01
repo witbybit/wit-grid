@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 import { CellSlot } from '../cellSlot.js';
+import { PortalRendererHandle } from '../cellRendererHandle.js';
 import type { RowCellBinderDeps, BindCellDuringScrollRequest } from '../rowCellBinder.js';
 import type { ScrollCellPresentation } from '../scrollCellPresentation.js';
 import { dispatchCellPresentation } from './cellPresentationDispatcher.js';
@@ -45,7 +46,6 @@ function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: strin
 		markCellDirtyAfterScroll: vi.fn(),
 		releaseCellPortal: vi.fn(),
 		incrementStyleHookCallsDuringScroll: vi.fn(),
-		incrementCellsBoundDuringScroll: vi.fn(),
 		incrementCurrentScrollCellsWritten: vi.fn(),
 		incrementForceLiveMountsDuringScroll: vi.fn(),
 		incrementLiveReactMountsDuringScroll: vi.fn(),
@@ -131,12 +131,6 @@ function makeDispatchInput(
 		className: presentation.className,
 		title: 'title' in presentation ? (presentation.title ?? null) : null,
 		validationError: 'validationError' in presentation ? presentation.validationError : undefined,
-		releaseStalePortal:
-			'releaseStalePortal' in presentation
-				? presentation.releaseStalePortal
-				: 'releasePriorPortal' in presentation
-					? presentation.releasePriorPortal
-					: false,
 		requiresFidelity: false,
 		freshness: cellCtrl.freshness!,
 		contentMode: 'contentMode' in presentation ? presentation.contentMode : undefined,
@@ -160,7 +154,6 @@ function makeDispatchInput(
 						? presentation.recordVersions
 						: undefined,
 	};
-	cellCtrl.rendererState.portalKey = cellCtrl.presentationState.portalKey;
 	cellCtrl.visualState.editing = cellCtrl.presentationState.isEditing ?? false;
 	cellCtrl.visualState.focused = cellCtrl.presentationState.isFocused ?? false;
 	return {
@@ -217,7 +210,6 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 				contentMode: 'text',
 				formattedValue: 'hello',
 				markDirty: true,
-				releaseStalePortal: false,
 				title: null,
 				validationError: undefined,
 				recordVersionsFrom: undefined,
@@ -236,7 +228,6 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 				kind: 'live-renderer',
 				className: laneClass[lane],
 				portalCellKey: 'ck1',
-				releasePriorPortal: false,
 				isEditing: false,
 				isFocused: false,
 				forceLiveInteractive: false,
@@ -282,7 +273,6 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 				className: laneClass[lane],
 				contentMode: 'fallback',
 				formattedValue: '★ chip',
-				releaseStalePortal: false,
 				recordVersions: { rowVersion: 1, globalVersion: 1, insightVersion: 0, styleVersion: 0, loadingVersion: 0, selectionVersion: 0 },
 				title: null,
 				validationError: undefined,
@@ -302,7 +292,6 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 				kind: 'html-snapshot',
 				className: laneClass[lane],
 				frozenHtml: '<span>frozen</span>',
-				releaseStalePortal: false,
 				recordVersionsFrom: { rowVersion: 1, globalVersion: 1, insightVersion: 0, styleVersion: 0, loadingVersion: 0, selectionVersion: 0 },
 				title: null,
 				validationError: undefined,
@@ -334,7 +323,6 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 			kind: 'live-renderer',
 			className: laneClass.center,
 			portalCellKey: 'ck1',
-			releasePriorPortal: false,
 			isEditing: true,
 			isFocused: true,
 			forceLiveInteractive: false,
@@ -355,7 +343,6 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 			kind: 'live-renderer',
 			className: laneClass.center,
 			portalCellKey: 'ck1',
-			releasePriorPortal: true,
 			isEditing: true,
 			isFocused: false,
 			forceLiveInteractive: true,
@@ -387,6 +374,30 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 		expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
 	});
 
+	it('releases a stale portal handle once, not again on every later bind', () => {
+		const deps = makeDeps();
+		const request = makeRequest('center', { isRowRebind: true });
+		// The slot still holds the editor portal of the row that scrolled out.
+		request.cellSlot.renderer = new PortalRendererHandle('E4:MA.65:coli3');
+		const shell: ScrollCellPresentation = {
+			kind: 'frozen-portal',
+			className: laneClass.center,
+			portalCellKey: 'ck-new-row',
+			title: null,
+			validationError: undefined,
+			markDirty: true,
+			captureFrozenHtml: false,
+			keepVersionFresh: false,
+			recordVersionsFrom: undefined,
+		};
+
+		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
+		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
+
+		expect(deps.releaseCellPortal).toHaveBeenCalledTimes(1);
+		expect(request.cellSlot.renderer).not.toBeInstanceOf(PortalRendererHandle);
+	});
+
 	it('freeze-live-portal with shouldMarkDirty:false does not mark the cell dirty', () => {
 		const deps = makeDeps();
 		const request = makeRequest('center');
@@ -413,7 +424,6 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 			className: laneClass.center,
 			title: null,
 			validationError: undefined,
-			releaseStalePortal: false,
 			recordVersions: { rowVersion: 1, globalVersion: 1, insightVersion: 0, styleVersion: 0, loadingVersion: 0, selectionVersion: 0 },
 		};
 		dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
@@ -431,7 +441,6 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 			contentMode: 'text',
 			formattedValue: 'hello',
 			markDirty: false,
-			releaseStalePortal: false,
 			title: null,
 			validationError: undefined,
 			recordVersionsFrom: undefined,
@@ -440,4 +449,47 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 		expect(request.cellSlot.lastShift).toBe(24);
 		expect(request.cellSlot.element.style.transform).toContain('translateX(24px)');
 	});
+});
+
+describe('cellPresentationDispatcher — the one portal transition rule', () => {
+	// A cell holding portal 'held' moves to each presentation. The held portal is released exactly
+	// once (across repeated binds) unless the next presentation keeps that same portal.
+	const cases: Array<[string, Partial<ReturnType<typeof makeDispatchInput>['cellCtrl']['presentationState']>, boolean]> = [
+		['primitive', { kind: 'primitive', contentMode: 'text', formattedValue: 'x' }, true],
+		['buffered text', { kind: 'buffered', contentMode: 'text', formattedValue: 'x', portalKey: undefined }, true],
+		['buffered keeping the portal', { kind: 'buffered', contentMode: 'portal', portalKey: 'held' }, false],
+		['loading', { kind: 'loading', formattedValue: '' }, true],
+		['shell', { kind: 'shell', contentMode: 'fallback', formattedValue: 'x' }, true],
+		['text-impostor', { kind: 'text-impostor', contentMode: 'fallback', formattedValue: 'x', textImpostorSource: 'explicit' }, true],
+		['html-pending', { kind: 'html-pending' }, true],
+		['html-snapshot', { kind: 'html-snapshot', html: '<b>x</b>' }, true],
+		['frozen-portal of the same key', { kind: 'frozen-portal', portalKey: 'held' }, false],
+		['live renderer of the same key', { kind: 'live-renderer', portalKey: 'held' }, false],
+		['live renderer of another key', { kind: 'live-renderer', portalKey: 'other' }, true],
+		['checkbox selector', { kind: 'checkbox-selector', markDirty: false }, true],
+	];
+	for (const [name, next, expectRelease] of cases) {
+		it(`${expectRelease ? 'releases' : 'keeps'} the held portal when moving to ${name}`, () => {
+			const deps = makeDeps();
+			const request = makeRequest('center');
+			request.cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'held');
+			const base: ScrollCellPresentation = {
+				kind: 'primitive',
+				className: 'og-cell',
+				contentMode: 'text',
+				formattedValue: '',
+				markDirty: false,
+				title: null,
+				validationError: undefined,
+				recordVersionsFrom: undefined,
+			};
+			for (let bind = 0; bind < 2; bind++) {
+				const input = makeDispatchInput(deps, request, base, 1);
+				Object.assign(input.cellCtrl.presentationState, next);
+				dispatchCellPresentation(input);
+			}
+			const releasesOfHeld = (deps.releaseCellPortal as ReturnType<typeof vi.fn>).mock.calls.filter((call) => call[3] === 'held');
+			expect(releasesOfHeld).toHaveLength(expectRelease ? 1 : 0);
+		});
+	}
 });

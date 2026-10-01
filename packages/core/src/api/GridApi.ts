@@ -10,6 +10,7 @@ import type { GridIntegrityIssue } from '../features/dataIntegrity/integrityType
 import type { GridApi as PublicGridApi, GridPluginRuntime as PublicGridPluginRuntime } from './GridApiSurfaces.js';
 import type { GridRowNode } from '../publicRowNode.js';
 import type { RowNodeTransaction } from '../rowTransactions.js';
+import type { AggregationConfig, DetailConfig, GroupingConfig, TreeDataConfig } from '../rows/hierarchyConfig.js';
 
 export type {
 	GridDataApi,
@@ -226,10 +227,10 @@ export interface GridStateSnapshot<TRowData = unknown> {
 	readonly themeName?: BuiltInThemeName;
 	readonly sidebarOpenPanel?: string | null;
 	readonly chartOpen?: boolean;
-	readonly groupBy?: readonly string[];
-	readonly showGroupFooter?: boolean;
-	readonly enableStickyGroupRows?: boolean;
-	readonly masterDetailEnabled?: boolean;
+	readonly grouping?: Readonly<GroupingConfig<TRowData>>;
+	readonly treeData?: Readonly<TreeDataConfig<TRowData>>;
+	readonly aggregation?: Readonly<AggregationConfig<TRowData>>;
+	readonly detail?: Readonly<DetailConfig<TRowData>>;
 	readonly globalVersion: number;
 }
 
@@ -338,6 +339,11 @@ export type { ColumnState, GridCellRangeBounds };
 export interface CellRendererProps<TRowData = unknown, TValue = unknown> {
 	value: TValue;
 	computedValue: TValue;
+	/**
+	 * Display text for `value`: the column's `valueFormatter` output, otherwise `String(value)`
+	 * (`''` for null/undefined). Provided by the React adapter.
+	 */
+	formattedValue?: string;
 	row: TRowData;
 	rowId: string;
 	colField: string;

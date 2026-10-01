@@ -261,10 +261,16 @@ const routes = new Set(files.map(routeForDoc));
 const exportedSymbols = exportedReactSymbols();
 const snippets = [];
 
+// Versioned docs (`content/docs/<version>/`) describe that release's API; only `next` is checked
+// against the packages in this repo.
+const nextDocsRoot = path.join(docsRoot, 'next');
+const isNextDoc = (file) => path.resolve(file).startsWith(nextDocsRoot + path.sep);
+
 for (const file of files) {
 	const source = readFileSync(file, 'utf8');
 	validateLinks(file, source, routes);
 	validateMdxImports(file, source);
+	if (!isNextDoc(file)) continue;
 	validateReactImports(file, source, exportedSymbols);
 	snippets.push(...extractSnippets(file, source));
 }

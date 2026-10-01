@@ -108,11 +108,17 @@ Return `false` to reject a commit. Return a promise when validation depends on a
 
 Wit Grid ships built-in type registry entries for:
 
-| Type       | Behavior                    |
-| ---------- | --------------------------- |
-| `checkbox` | Checkbox renderer.          |
-| `date`     | Date renderer and editor.   |
-| `number`   | Number renderer and editor. |
+| Type       | Behavior                                                           |
+| ---------- | ------------------------------------------------------------------ |
+| `checkbox` | Checkbox; a click selects the cell and toggles the value.          |
+| `date`     | Calendar icon and `DD/MM/YYYY` display, with a date-picker editor. |
+| `number`   | Monospace number display, with a number editor.                    |
+
+The built-in cells are DOM renderers: they draw without React, so they cost no more than plain text during
+scroll. `numberColumnType` uses the same renderer. The React versions (`CheckboxCellRenderer`,
+`DateCellRenderer`, `createNumberCellRenderer`) are still exported and look identical, if you want to wrap one
+in your own component; the DOM versions are exported as `CheckboxDomCellRenderer`, `DateDomCellRenderer` and
+`createNumberDomCellRenderer`.
 
 Register custom types with the `columnTypes` grid prop.
 
@@ -152,7 +158,8 @@ const columns: ColumnDef<Person>[] = [
 ];
 ```
 
-Renderer specs support text, DOM, React, and imperative React modes. For high-frequency cells, renderer capabilities control scroll behavior with `primitive`, `live`, `freeze`, `text-impostor`, or `html-snapshot` presentation — see [Renderer Capabilities](/docs/next/renderer-capabilities) for the full tradeoff and when to use each.
+Renderer specs support text, DOM, React, and imperative React modes. A DOM renderer's `mount()` and `update()`
+receive the cell's `value`, `node`, `col`, state flags and the grid `api` — the same api React renderers get. For high-frequency cells, renderer capabilities control scroll behavior with `primitive`, `live`, `freeze`, `text-impostor`, or `html-snapshot` presentation — see [Renderer Capabilities](/docs/next/renderer-capabilities) for the full tradeoff and when to use each.
 
 ## Filtering And Sorting
 

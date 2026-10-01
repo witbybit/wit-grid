@@ -6,8 +6,6 @@ import type { CellDisplaySnapshot } from './cellDisplaySnapshot.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
 import { hasMountedDataVersionDrifted, type VisualFreshness } from './visualFreshness.js';
 import { getCellScrollPresentation } from './scrollPresentationMode.js';
-import { canFreezePortalForCellCtrl } from './controllerWarmDomGuards.js';
-import { createCellCtrl } from './controllers/CellCtrl.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 
 /**
@@ -41,6 +39,24 @@ export interface ScrollCellPresentationDeps {
 	 *  GridRendererOptions.htmlSnapshot. Column-level `htmlSnapshot` capabilities take priority.
 	 *  Omitted defaults to `{ allowShellWhenMissing: true, allowTextFallbackWhenMissing: false }`. */
 	getHtmlSnapshotDefaults?(): { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean };
+	/** Read-only: whether (rowId, colField) is a formula cell. Lets a plain primitive column (no
+	 *  valueGetter/formatter/renderer) show its raw field value during scroll instead of the "..."
+	 *  placeholder. Omitted means unknown — the placeholder is kept. */
+	hasFormula?(rowId: string, colField: string): boolean;
+}
+
+/**
+ * Direct display text for a plain `mode: 'primitive'` column — a single own-field read of the row
+ * object, the same value the full bind would show (String(raw), no formatter involved). Returns
+ * undefined whenever that equivalence can't be guaranteed cheaply: nested field paths, formula
+ * cells, or no row data — callers keep their placeholder then.
+ */
+function readPrimitiveDisplayText<TRowData>(deps: ScrollCellPresentationDeps, node: RowNode<TRowData>, colField: string): string | undefined {
+	if (!deps.hasFormula || !node.data || colField.indexOf('.') !== -1) return undefined;
+	if (deps.hasFormula(node.id, colField)) return undefined;
+	const raw = (node.data as Record<string, unknown>)[colField];
+	if (typeof raw === 'string' && raw.startsWith('=')) return undefined;
+	return raw == null ? '' : String(raw);
 }
 
 export function isPrimitiveSnapshotContent(snapshot: CellDisplaySnapshot | undefined): snapshot is CellDisplaySnapshot {
@@ -76,22 +92,11 @@ export function canFreezeExistingPortalForIdentity<TRowData>(
 	isRowRebind: boolean
 ): boolean {
 	if (isRowRebind) return false;
-	const controller = createCellCtrl({
-		rowId: cellSlot.rowId,
-		columnInstanceId: cellSlot.columnInstanceId as ColumnInstanceId,
-		colField: cellSlot.colField,
-		freshness: {
-			rowVersion: cellSlot.lastMountedRowVersion,
-			globalVersion: cellSlot.lastMountedGlobalVersion,
-			insightVersion: cellSlot.lastMountedInsightVersion,
-			styleVersion: cellSlot.lastMountedStyleVersion,
-			loadingVersion: cellSlot.lastMountedLoadingVersion,
-			selectionVersion: cellSlot.lastMountedSelectionVersion,
-		},
-	});
-	controller.lifecycle.attachedSlotInstanceId = cellSlot.cellInstanceId;
-	controller.rendererState.portalKey = expectedPortalKey;
-	return canFreezePortalForCellCtrl(cellSlot, controller) && hasAuthoritativePortalHostContent(deps, cellSlot, expectedPortalKey);
+	// The slot's own identity always matches here (mustClearSlotForControllerChange is false by
+	// construction), so freezing only needs the held portal to be the one this cell expects.
+	if (!expectedPortalKey) return false;
+	if (cellSlot.lastContentMode !== 'portal' || cellSlot.lastPortalKey !== expectedPortalKey) return false;
+	return hasAuthoritativePortalHostContent(deps, cellSlot, expectedPortalKey);
 }
 
 /**
@@ -127,7 +132,6 @@ export type ScrollCellPresentation =
 			contentMode: CellContentMode;
 			formattedValue: string;
 			portalKey: string | undefined;
-			releaseStalePortal: boolean;
 			title: string | null;
 			validationError: string | undefined;
 			recordVersionsFrom: CellDisplaySnapshot | undefined;
@@ -138,7 +142,6 @@ export type ScrollCellPresentation =
 			contentMode: CellContentMode;
 			formattedValue: string;
 			markDirty: boolean;
-			releaseStalePortal: boolean;
 			title: string | null;
 			validationError: string | undefined;
 			recordVersionsFrom: CellDisplaySnapshot | undefined;
@@ -158,7 +161,6 @@ export type ScrollCellPresentation =
 			kind: 'html-snapshot';
 			className: string;
 			frozenHtml: string;
-			releaseStalePortal: boolean;
 			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -168,7 +170,6 @@ export type ScrollCellPresentation =
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -183,7 +184,6 @@ export type ScrollCellPresentation =
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -195,7 +195,6 @@ export type ScrollCellPresentation =
 			 * than raw text, per the html-snapshot contract. */
 			kind: 'html-pending';
 			className: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -210,7 +209,6 @@ export type ScrollCellPresentation =
 			kind: 'live-renderer';
 			className: string;
 			portalCellKey: string;
-			releasePriorPortal: boolean;
 			isEditing: boolean;
 			isFocused: boolean;
 			forceLiveInteractive: boolean;
@@ -219,11 +217,25 @@ export type ScrollCellPresentation =
 			validationError: string | undefined;
 	  }
 	| {
+			/**
+			 * `scrollPresentation: 'update'` (DOM renderers): the cell's DOM renderer is updated in place
+			 * this frame, within the frame's DOM-update budget, and recorded fresh so scroll-end does
+			 * not redo it. `formattedValue` is the stand-in shown only if the budget refuses the update.
+			 */
+			kind: 'dom-update';
+			className: string;
+			portalCellKey: string;
+			formattedValue: string;
+			isFocused: boolean;
+			recordVersions: CellDisplaySnapshot | VisualFreshness;
+			title: string | null;
+			validationError: string | undefined;
+	  }
+	| {
 			kind: 'shell';
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
-			releaseStalePortal: boolean;
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
@@ -240,7 +252,6 @@ export type ScrollCellPresentation =
 			kind: 'live-renderer';
 			className: string;
 			portalCellKey: string;
-			releasePriorPortal: boolean;
 			isEditing: boolean;
 			isFocused: boolean;
 			forceLiveInteractive: true;
@@ -310,7 +321,15 @@ export function resolveScrollCellPresentation<TRowData>(
 	const rendererKind: 'primitive' | 'portal' | 'loading' = isRowLoading ? 'loading' : isEditing || compiledPlan?.isCustom ? 'portal' : 'primitive';
 	const scrollMode = compiledPlan?.mode;
 	const isDomRenderer = scrollMode === 'custom-dom';
-	const presentation = isDomRenderer ? 'freeze' : getCellScrollPresentation(col);
+	// DOM renderers default to 'freeze' during scroll. An explicit `scrollPresentation: 'live'`
+	// is honoured: DomCellRendererHandle.update() is cheap enough to run in the paint loop.
+	const columnPresentation = getCellScrollPresentation(col);
+	// A DOM renderer column follows its own presentation ('update' by default). Any other mode it
+	// does not implement directly (e.g. 'text-impostor') keeps the freeze behaviour it always had.
+	const presentation =
+		isDomRenderer && columnPresentation !== 'live' && columnPresentation !== 'update' && columnPresentation !== 'html-snapshot'
+			? 'freeze'
+			: columnPresentation;
 
 	let cellClassName = buildCellPinClass(lane);
 	if (rendererKind === 'loading') cellClassName += ' og-cell-loading';
@@ -320,18 +339,29 @@ export function resolveScrollCellPresentation<TRowData>(
 		cellClassName = cellSlot.lastClassName;
 	}
 
-	if (!isInVisibleContent && presentation !== 'live') {
+	// 'update' cells in the overscan band update in place too (within budget), so they are already
+	// drawn when they reach the viewport.
+	if (!isInVisibleContent && presentation !== 'live' && presentation !== 'update') {
 		const primitiveSnapshot = isPrimitiveSnapshotContent(snapshot) ? snapshot : undefined;
 		const canReuseSnapshotContent = !!primitiveSnapshot;
 		const canReuseSnapshotPortal =
 			snapshot?.contentMode === 'portal' && hasAuthoritativePortalHostContent(deps, cellSlot, cellSlot.lastPortalKey);
+		// A plain primitive column's text is a direct field read: fill the buffered cell with it rather
+		// than clearing it, so the row enters the viewport already correct. Clearing meant a second
+		// write, a text-node replacement and a content-mode flip (a style recalc) per cell on entry.
+		const directText =
+			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive' && compiledPlan?.mode === 'primitive'
+				? readPrimitiveDisplayText(deps, node, col.field)
+				: undefined;
 		const preservedContentMode: CellContentMode = canReuseSnapshotPortal
 			? 'portal'
 			: canReuseSnapshotContent
 				? primitiveSnapshot.contentMode
-				: rendererKind === 'loading'
-					? 'loading'
-					: 'empty';
+				: directText
+					? 'text'
+					: rendererKind === 'loading'
+						? 'loading'
+						: 'empty';
 		return {
 			kind: 'buffered',
 			className: cellClassName,
@@ -339,9 +369,8 @@ export function resolveScrollCellPresentation<TRowData>(
 			formattedValue:
 				canReuseSnapshotContent && (preservedContentMode === 'text' || preservedContentMode === 'fallback')
 					? primitiveSnapshot.formattedValue
-					: '',
+					: (directText ?? ''),
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
-			releaseStalePortal: !canReuseSnapshotPortal && !!cellSlot.lastPortalKey,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
 			recordVersionsFrom: snapshot,
@@ -361,8 +390,16 @@ export function resolveScrollCellPresentation<TRowData>(
 			contentMode = warmText.contentMode;
 			markDirty = true;
 		} else {
-			formattedValue = '...';
-			contentMode = 'text';
+			// A plain primitive column's value is a direct field read — show it rather than a
+			// placeholder. Anything needing a valueGetter/formatter/formula keeps the placeholder.
+			const directText = compiledPlan?.mode === 'primitive' ? readPrimitiveDisplayText(deps, node, col.field) : undefined;
+			if (directText !== undefined) {
+				formattedValue = directText;
+				contentMode = directText === '' ? 'empty' : 'text';
+			} else {
+				formattedValue = '...';
+				contentMode = 'text';
+			}
 			markDirty = true;
 		}
 		return {
@@ -371,7 +408,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			contentMode,
 			formattedValue,
 			markDirty,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
 			recordVersionsFrom: snapshot,
@@ -400,7 +436,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			kind: 'live-renderer',
 			className: cellClassName,
 			portalCellKey,
-			releasePriorPortal: !!cellSlot.lastPortalKey && cellSlot.lastPortalKey !== portalCellKey,
 			isEditing,
 			isFocused,
 			forceLiveInteractive: false,
@@ -410,19 +445,65 @@ export function resolveScrollCellPresentation<TRowData>(
 		};
 	}
 
+	// 'update' — DOM renderers update in place. An editor is a React portal, so an editing cell takes
+	// the interactive path below instead. A slot still holding this cell's current content needs
+	// nothing; anything else (a row rebind, or data that changed) updates within the frame budget.
+	if (presentation === 'update' && !isEditing) {
+		if (canFreezeExistingPortalForIdentity(deps, cellSlot, portalCellKey, isRowRebind)) {
+			const { globalChanged, rowChanged } = hasMountedDataVersionDrifted(cellSlot, {
+				rowVersion: input.rowVersion,
+				globalVersion: ctx.globalVersion,
+			});
+			if (!globalChanged && !rowChanged) {
+				return {
+					kind: 'frozen-portal',
+					className: cellClassName,
+					portalCellKey,
+					title: snapshot?.title || null,
+					validationError: snapshot?.validationError,
+					markDirty: false,
+					captureFrozenHtml: false,
+					keepVersionFresh: false,
+					recordVersionsFrom: snapshot,
+				};
+			}
+		}
+		return {
+			kind: 'dom-update',
+			className: cellClassName,
+			portalCellKey,
+			formattedValue: deps.getCheapDisplayValue(node.id, col.field) ?? '',
+			isFocused,
+			recordVersions: snapshot ?? versionsFromCtx(),
+			title: snapshot?.title || null,
+			validationError: snapshot?.validationError,
+		};
+	}
+
 	// 'text-impostor' — always shows the explicit text/chip stand-in during scroll, regardless of
 	// whether a live portal happens to be mounted. The only mode allowed to use textImpostor.render.
 	if (presentation === 'text-impostor') {
-		const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
-		const renderFn = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render;
-		const cheapValue = renderFn != null ? renderFn({ value: undefined, formattedValue: genericCheap }) || genericCheap : genericCheap;
+		let cheapValue: string;
+		if (snapshot?.contentMode === 'fallback' && !isEditing) {
+			// The full bind already rendered this cell's impostor text for these exact versions —
+			// reuse it so scroll and rest show identical output (no flicker between the two).
+			cheapValue = snapshot.formattedValue;
+		} else {
+			const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+			const renderFn = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render;
+			// Hand the renderer the real value when it is a direct field read, as the full bind does.
+			const value =
+				renderFn != null && !(col as InternalColumnDef<TRowData>).valueGetter && readPrimitiveDisplayText(deps, node, col.field) !== undefined
+					? (node.data as Record<string, unknown>)[col.field]
+					: undefined;
+			cheapValue = renderFn != null ? renderFn({ value, formattedValue: genericCheap }) || genericCheap : genericCheap;
+		}
 		const syntheticMode: CellContentMode = cheapValue !== '' ? 'fallback' : 'empty';
 		return {
 			kind: 'text-impostor',
 			className: cellClassName,
 			contentMode: syntheticMode,
 			formattedValue: cheapValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
@@ -488,13 +569,11 @@ export function resolveScrollCellPresentation<TRowData>(
 				deps.getRowHeight(rowIndex),
 				deps.getColWidth(colIndex)
 			);
-			const releaseStalePortal = !!cellSlot.lastPortalKey;
 			if (frozenHtml) {
 				return {
 					kind: 'html-snapshot',
 					className: cellClassName,
 					frozenHtml: frozenHtml.html,
-					releaseStalePortal,
 					recordVersionsFrom: portalImpostorSnapshot,
 					title: portalImpostorSnapshot.title || null,
 					validationError: portalImpostorSnapshot.validationError,
@@ -506,7 +585,6 @@ export function resolveScrollCellPresentation<TRowData>(
 					className: cellClassName,
 					contentMode: portalImpostorSnapshot.contentMode,
 					formattedValue: portalImpostorSnapshot.formattedValue,
-					releaseStalePortal,
 					recordVersionsFrom: portalImpostorSnapshot,
 					title: portalImpostorSnapshot.title || null,
 					validationError: portalImpostorSnapshot.validationError,
@@ -516,7 +594,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			return {
 				kind: 'html-pending',
 				className: cellClassName,
-				releaseStalePortal,
 				recordVersions: portalImpostorSnapshot,
 				title: portalImpostorSnapshot.title || null,
 				validationError: portalImpostorSnapshot.validationError,
@@ -527,7 +604,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			contentMode: portalImpostorSnapshot.contentMode,
 			formattedValue: portalImpostorSnapshot.formattedValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersionsFrom: portalImpostorSnapshot,
 			title: portalImpostorSnapshot.title || null,
 			validationError: portalImpostorSnapshot.validationError,
@@ -535,7 +611,10 @@ export function resolveScrollCellPresentation<TRowData>(
 		};
 	}
 
+	// A row rebind never freezes: the slot's mounted portal content belongs to the previous row
+	// (portal keys are per cell instance, not per row), so it must not stay visible for the new one.
 	const canFreezePortal =
+		!isRowRebind &&
 		isPortalSnapshotContent(snapshot) &&
 		cellSlot.lastPortalKey === portalCellKey &&
 		(snapshot.contentKind === 'portal-live' || snapshot.contentKind === 'portal-frozen') &&
@@ -552,13 +631,11 @@ export function resolveScrollCellPresentation<TRowData>(
 				deps.getRowHeight(rowIndex),
 				deps.getColWidth(colIndex)
 			);
-			const releaseStalePortal = !!cellSlot.lastPortalKey;
 			if (frozenHtml) {
 				return {
 					kind: 'html-snapshot',
 					className: cellClassName,
 					frozenHtml: frozenHtml.html,
-					releaseStalePortal,
 					recordVersionsFrom: snapshot ?? versionsFromCtx(),
 					title: snapshot?.title || null,
 					validationError: snapshot?.validationError,
@@ -573,7 +650,6 @@ export function resolveScrollCellPresentation<TRowData>(
 					className: cellClassName,
 					contentMode: cheapValue !== '' ? 'fallback' : 'empty',
 					formattedValue: cheapValue,
-					releaseStalePortal,
 					recordVersionsFrom: snapshot ?? versionsFromCtx(),
 					title: snapshot?.title || null,
 					validationError: snapshot?.validationError,
@@ -583,7 +659,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			return {
 				kind: 'html-pending',
 				className: cellClassName,
-				releaseStalePortal,
 				recordVersions: snapshot ?? versionsFromCtx(),
 				title: snapshot?.title || null,
 				validationError: snapshot?.validationError,
@@ -598,7 +673,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			contentMode: syntheticMode,
 			formattedValue: cheapValue,
-			releaseStalePortal: !!cellSlot.lastPortalKey,
 			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
@@ -609,7 +683,8 @@ export function resolveScrollCellPresentation<TRowData>(
 	const isDataStale = !isRowRebind && canFreezePortal && (globalChanged || rowChanged);
 	const isPortalFrozen =
 		!isRowRebind && canFreezePortal && (!isDataStale || (isPortalSnapshotContent(snapshot) && snapshot.contentKind === 'portal-frozen'));
-	const isStaleFrozen = (isRowRebind || isDataStale) && canFreezePortal;
+	const isStaleFrozen = isDataStale && canFreezePortal;
+
 	const hasSnapshotCoverageForDecorations = !ctx.hasInsightDecorations || !!snapshot;
 	const shouldDirtyFrozenPortal =
 		isFocused ||
@@ -642,7 +717,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			kind: 'live-renderer',
 			className: cellClassName,
 			portalCellKey,
-			releasePriorPortal: !!cellSlot.lastPortalKey && cellSlot.lastPortalKey !== portalCellKey,
 			isEditing,
 			isFocused,
 			forceLiveInteractive: true,
@@ -666,7 +740,6 @@ export function resolveScrollCellPresentation<TRowData>(
 		className: cellClassName,
 		contentMode: fallbackSyntheticMode,
 		formattedValue: fallbackCheapValue,
-		releaseStalePortal: !!cellSlot.lastPortalKey,
 		recordVersions: snapshot ?? {
 			rowVersion: input.rowVersion,
 			globalVersion: ctx.globalVersion,

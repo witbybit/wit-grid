@@ -1,31 +1,15 @@
-import { memo, useSyncExternalStore } from 'react';
+import { createElement, memo, useSyncExternalStore } from 'react';
 import { GridApi, VisualRow } from '@eregister/wit-grid-core';
 import { createPortal } from 'react-dom';
 import { GridProvider } from './gridContext.js';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { createPortalStore, type ConcretePortalStore } from './gridPortalStore.js';
-import {
-	PortalCell,
-	PortalCellWrapper,
-	ImperativePortalCellWrapper,
-	DefaultGroupRowRenderer,
-	DefaultDetailRowRenderer,
-	DefaultFooterRowRenderer,
-	DefaultFailedRowRenderer,
-	DefaultPlaceholderRowRenderer,
-} from './gridPortalHosts.js';
+import { PortalCell, PortalCellWrapper, ImperativePortalCellWrapper } from './gridPortalHosts.js';
 import type { PortalStore, PortalManagerProps } from './gridPortalTypes.js';
 
 export { createPortalStore };
 export type { PortalStore };
-export {
-	PortalCell,
-	DefaultGroupRowRenderer,
-	DefaultDetailRowRenderer,
-	DefaultFooterRowRenderer,
-	DefaultFailedRowRenderer,
-	DefaultPlaceholderRowRenderer,
-};
+export { PortalCell };
 export type { PortalCellProps, PortalData, CellPortalSnapshot, RowMenuPortalSnapshot, PortalManagerProps } from './gridPortalTypes.js';
 
 // ─── CellPortalPool ───────────────────────────────────────────────────────────
@@ -76,7 +60,7 @@ interface RowMenuPortalPoolProps<TRowData = unknown> {
 	api: GridApi<TRowData>;
 	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
-	footerRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
+	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
 }
 
 /**
@@ -88,7 +72,7 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 	api,
 	groupRowRenderer,
 	detailRowRenderer,
-	footerRowRenderer,
+	totalRowRenderer,
 }: RowMenuPortalPoolProps<TRowData>) {
 	const snapshot = useSyncExternalStore(store.subscribeRowsMenus, store.getRowMenuSnapshot, store.getRowMenuSnapshot);
 	const { rowPortalList, menuPortalList } = snapshot;
@@ -96,27 +80,22 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 	return (
 		<>
 			{rowPortalList.map((rp) => {
-				const { rowKey, container, visualRow } = rp;
+				const { rowKey, container, visualRow, renderer } = rp;
 				let content: React.ReactNode = null;
-				if (visualRow.kind === 'group') {
-					content = groupRowRenderer ? groupRowRenderer({ visualRow, api }) : <DefaultGroupRowRenderer visualRow={visualRow} api={api} />;
+				if (renderer?.kind === 'react') {
+					// The row's configured component (`detail.renderer` / `grouping.rowRenderer`) wins.
+					content = createElement(renderer.component as React.ComponentType<{ visualRow: typeof visualRow; api: typeof api }>, {
+						visualRow,
+						api,
+					});
+				} else if (visualRow.kind === 'group') {
+					content = groupRowRenderer?.({ visualRow, api }) ?? null;
 				} else if (visualRow.kind === 'detail') {
-					content = detailRowRenderer ? (
-						detailRowRenderer({ visualRow, api })
-					) : (
-						<DefaultDetailRowRenderer visualRow={visualRow} api={api} />
-					);
-				} else if (visualRow.kind === 'footer') {
-					content = footerRowRenderer ? (
-						footerRowRenderer({ visualRow, api })
-					) : (
-						<DefaultFooterRowRenderer visualRow={visualRow} api={api} />
-					);
-				} else if (visualRow.kind === 'failed') {
-					content = <DefaultFailedRowRenderer visualRow={visualRow} api={api} />;
-				} else if (visualRow.kind === 'placeholder') {
-					content = <DefaultPlaceholderRowRenderer visualRow={visualRow} api={api} />;
+					content = detailRowRenderer?.({ visualRow, api }) ?? null;
+				} else if (visualRow.kind === 'total') {
+					content = totalRowRenderer?.({ visualRow, api }) ?? null;
 				}
+				// Rows without a user renderer are drawn by core and never reach the adapter.
 				// Keyed via createPortal's third arg — see CellPortalPool note.
 				return createPortal(content, container, rowKey);
 			})}
@@ -148,7 +127,7 @@ export function PortalManager<TRowData = unknown>({
 	api,
 	groupRowRenderer,
 	detailRowRenderer,
-	footerRowRenderer,
+	totalRowRenderer,
 	store,
 }: PortalManagerProps<TRowData>) {
 	if (!store?.subscribeCells || !store?.subscribeRowsMenus) {
@@ -167,7 +146,7 @@ export function PortalManager<TRowData = unknown>({
 				api={api}
 				groupRowRenderer={groupRowRenderer}
 				detailRowRenderer={detailRowRenderer}
-				footerRowRenderer={footerRowRenderer}
+				totalRowRenderer={totalRowRenderer}
 			/>
 		</GridProvider>
 	);

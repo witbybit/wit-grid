@@ -1,9 +1,11 @@
+import { getMemoizedColumnTopology } from './columnTopology.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { RenderRuntimeState } from './renderRuntimeState.js';
 import type { GridCellClassParams } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
 import type { CellRenderer } from './cellRenderer.js';
 import { CellSlot } from './cellSlot.js';
+import { PortalRendererHandle } from './cellRendererHandle.js';
 import type { FullWidthRowRenderer } from './fullWidthRowRenderer.js';
 import type { InvalidationFrame } from './invalidationManager.js';
 import type { PortalMountManager } from './portalMountManager.js';
@@ -11,9 +13,11 @@ import { bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import {
 	bindAllDataCells,
 	bindAllLoadingCells,
+	bindAllHierarchyRowCells,
 	reconcileTopology,
 	type BindAllDataCellsRequest,
 	type BindAllLoadingCellsRequest,
+	type BindAllHierarchyRowCellsRequest,
 	type RowCellBindingLaneDeps,
 } from './rowCellBindingLanes.js';
 import type { CompiledColumnTopology } from './columnTopology.js';
@@ -55,7 +59,12 @@ export interface RowRendererRuntimeArgs<TRowData = unknown> {
 	ensureCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement;
 	getCellPortalHost: (cell: HTMLDivElement) => HTMLDivElement | null;
 	markCellDirtyAfterScroll: (cell: HTMLDivElement) => void;
-	releaseCellPortal: (cell: HTMLDivElement, forceDeferred?: boolean, reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated') => void;
+	releaseCellPortal: (
+		cell: HTMLDivElement,
+		forceDeferred?: boolean,
+		reason?: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated',
+		portalKey?: string
+	) => void;
 	applyFocus: (cell: HTMLDivElement) => void;
 	isEditorInteractiveElement: (el: Element | null) => boolean;
 	isScrolling: boolean;
@@ -65,7 +74,6 @@ export interface RowRendererRuntimeArgs<TRowData = unknown> {
 	clearProgrammaticScrollCell: () => void;
 	setDeferredFocusCell: (cell: HTMLDivElement) => void;
 	incrementStyleHookCallsDuringScroll: () => void;
-	incrementCellsBoundDuringScroll: () => void;
 	incrementCurrentScrollCellsVisited: () => void;
 	incrementCurrentScrollCellsPatched: () => void;
 	incrementCurrentScrollCellsWritten: () => void;
@@ -140,7 +148,7 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			ensureCellPortalHost: (cell) => this.ensureCellPortalHost(cell),
 			getCellPortalHost: (cell) => this.getCellPortalHost(cell),
 			markCellDirtyAfterScroll: (cell) => this.markCellDirtyAfterScroll(cell),
-			releaseCellPortal: (cell, forceDeferred, reason) => this.releaseCellPortal(cell, forceDeferred, reason),
+			releaseCellPortal: (cell, forceDeferred, reason, portalKey) => this.releaseCellPortal(cell, forceDeferred, reason, portalKey),
 			applyFocus: (cell) => this.applyFocus(cell),
 			isEditorInteractiveElement: (el) => this.isEditorInteractiveElement(el),
 			isScrolling: false,
@@ -157,11 +165,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			},
 			incrementStyleHookCallsDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) this.deps.stateHost.renderStats.styleHookCallsDuringScroll++;
-			},
-			incrementCellsBoundDuringScroll: () => {
-				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.cellsBoundDuringScroll = (this.deps.stateHost.renderStats.cellsBoundDuringScroll || 0) + 1;
-				}
 			},
 			incrementCurrentScrollCellsVisited: () => {
 				this.deps.stateHost.currentScrollCellsVisited++;
@@ -197,7 +200,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			markCellDirtyAfterScroll: this.runtimeArgs.markCellDirtyAfterScroll,
 			releaseCellPortal: this.runtimeArgs.releaseCellPortal,
 			incrementStyleHookCallsDuringScroll: this.runtimeArgs.incrementStyleHookCallsDuringScroll,
-			incrementCellsBoundDuringScroll: this.runtimeArgs.incrementCellsBoundDuringScroll,
 			incrementCurrentScrollCellsWritten: this.runtimeArgs.incrementCurrentScrollCellsWritten,
 			incrementFullCellBinds: () => {
 				if (this.deps.stateHost.renderStats) this.deps.stateHost.renderStats.fullCellBinds++;
@@ -246,6 +248,24 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			tryConsumeLiveBudget: (kind: 'mount' | 'update') => {
 				const budget = this.deps.stateHost.liveFrameBudget;
 				return budget ? budget.tryConsume(kind) : true;
+			},
+			tryConsumeDomUpdateBudget: () => {
+				const budget = this.deps.stateHost.liveFrameBudget;
+				return budget ? budget.beginDomUpdate() : true;
+			},
+			endDomUpdate: () => {
+				this.deps.stateHost.liveFrameBudget?.endDomUpdate();
+			},
+			incrementDomUpdatesDuringScroll: () => {
+				if (this.deps.stateHost.renderStats) {
+					this.deps.stateHost.renderStats.domUpdatesDuringScroll = (this.deps.stateHost.renderStats.domUpdatesDuringScroll || 0) + 1;
+				}
+			},
+			incrementDomUpdatesDeferredDuringScroll: () => {
+				if (this.deps.stateHost.renderStats) {
+					this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll =
+						(this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll || 0) + 1;
+				}
 			},
 			allowLiveEmergencyShell: () => {
 				const budget = this.deps.stateHost.liveFrameBudget;
@@ -296,6 +316,7 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			onScrollCellPatched: this.runtimeArgs.incrementCurrentScrollCellsPatched,
 			onScrollCellWritten: this.runtimeArgs.incrementCurrentScrollCellsWritten,
 			retentionStats: this.deps.stateHost.renderStats,
+			getRenderedRowCount: () => this.deps.stateHost.activeRows.size,
 		};
 
 		this.rowRenderMaintenanceDeps = {
@@ -308,6 +329,22 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			dirtyRowsAfterScroll: this.deps.stateHost.dirtyRowsAfterScroll,
 			dirtyBuckets: this.deps.stateHost.dirtyBuckets,
 			incrementPostScrollDirtyCellsDecorated: this.runtimeArgs.incrementPostScrollDirtyCellsDecorated,
+			rebindHierarchyRow: (slot, row, rowIndex) => {
+				const engine = this.deps.engine;
+				const plan = engine.columns.getCompiledPlan();
+				this.bindAllHierarchyRowCells({
+					slot,
+					row,
+					rowIndex,
+					centerColStart: slot.centerColStart,
+					centerColCount: slot.centerCells.length,
+					columns: engine.columns.getDisplayedColumns(),
+					plan,
+					columnTopology: getMemoizedColumnTopology(plan),
+					isScrollFrameActive: false,
+					state: engine.stateManager.getState(),
+				});
+			},
 			bindCellFull: (request: RowCellBindRequest<TRowData>) =>
 				bindCellFull(this.rowCellBinderDeps, {
 					cellSlot: request.cellSlot as CellSlot<TRowData>,
@@ -361,6 +398,19 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 		bindAllLoadingCells(this.rowCellBindingLaneDeps, request);
 	}
 
+	public bindAllHierarchyRowCells(request: BindAllHierarchyRowCellsRequest<TRowData>): void {
+		this.refreshCachedHotState();
+		bindAllHierarchyRowCells(this.rowCellBindingLaneDeps, request);
+	}
+
+	/** Releases a slot bound outside the pool (sticky headers): its cells' portals, then its DOM. */
+	public releaseDetachedSlot(slot: RowSlot<TRowData>): void {
+		slot.forEachCell((cell) => {
+			if (cell.lastPortalKey) this.releaseCellPortal(cell.element, false, 'destroyed');
+		});
+		slot.destroyCold();
+	}
+
 	public markCellDirtyAfterScroll(cell: HTMLDivElement): void {
 		if (!this.deps.stateHost.dirtyCellsAfterScroll.has(cell)) {
 			this.deps.stateHost.dirtyCellsAfterScroll.add(cell);
@@ -371,15 +421,32 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	public releaseCellPortal(
 		cell: HTMLDivElement,
 		forceDeferred?: boolean,
-		reason: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated' = 'scrolled-out'
+		reason: 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated' = 'scrolled-out',
+		portalKey?: string
 	): void {
 		const cellSlot = CellSlot.fromElement(cell);
-		const cellKey = cellSlot.binding?.cellKey ?? cellSlot.lastPortalKey ?? cell.dataset.cellKey;
-		if (!cellKey) return;
 		const container = this.getCellPortalHost(cell) ?? cell;
+		// Release what the cell actually holds. The portal registry knows exactly which key is wanted
+		// in this host; slot bookkeeping is the fallback. The binding key comes last: an edit portal
+		// is keyed by row (E…), not by the slot's current cell binding (C…), so it would miss it.
+		const heldPortalKey = cellSlot.renderer instanceof PortalRendererHandle ? cellSlot.renderer.portalKey : undefined;
+		const cellKey =
+			portalKey ??
+			this.deps.portalMountManager.getMountedKeyForContainer(container) ??
+			heldPortalKey ??
+			cellSlot.lastPortalKey ??
+			cellSlot.binding?.cellKey ??
+			cell.dataset.cellKey;
+		if (!cellKey) return;
 		const isDeferred = forceDeferred ?? this.deps.stateHost.runtimeState.isScrolling();
 		const activeIdentity = this.deps.portalMountManager.getActiveIdentity(cellKey);
 		if (!activeIdentity) {
+			// Mounted during scroll but still queued: there is nothing to unmount yet, just cancel it.
+			if (this.deps.portalMountManager.cancelDeferredMount(cellKey)) return;
+			// Already released (or never mounted): callers re-request release from slot bookkeeping
+			// that outlives the portal (lastPortalKey, a stale handle), so a repeat is a no-op. Only a
+			// cell still recorded as mounted without an identity is a real inconsistency.
+			if (!this.deps.portalMountManager.isCellMounted(cellKey)) return;
 			reportRendererFault(
 				this.deps.engine,
 				'release-cell-portal-without-identity',
@@ -422,10 +489,24 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 				portalHostId,
 			});
 		}
+		// The slot no longer holds this portal; a stale handle would make the next bind release it again.
+		if (heldPortalKey === cellKey) cellSlot.renderer = null;
 	}
 
+	/**
+	 * Moves DOM focus to the focused cell. While the grid scrolls, the move waits for scroll end —
+	 * unless focus is already in the grid (keyboard navigation, whose moves scroll the viewport):
+	 * deferring then strands focus on <body>, because the previous cell loses its tabindex at once,
+	 * and the next key would scroll the page instead of moving the cell.
+	 */
 	public applyFocus(cell: HTMLDivElement): void {
-		if (this.deps.stateHost.runtimeState.isScrolling()) {
+		const active = typeof document !== 'undefined' ? document.activeElement : null;
+		const viewport = this.deps.getViewportContainer();
+		if (active === cell) return;
+		// Never pull focus out of an open editor.
+		if (active && active !== document.body && this.isEditorInteractiveElement(active)) return;
+		const focusInGrid = !!active && active !== document.body && !!viewport?.contains(active);
+		if (this.deps.stateHost.runtimeState.isScrolling() && !focusInGrid) {
 			this.deps.stateHost.deferredFocusCell = cell;
 			const renderStats = this.deps.stateHost.renderStats;
 			if (renderStats) {
@@ -433,6 +514,8 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			}
 			return;
 		}
+		// Focusable before focusing: the accessibility sync that writes tabindex runs after this.
+		if (!cell.hasAttribute('tabindex')) cell.tabIndex = -1;
 		cell.focus({ preventScroll: true });
 	}
 
@@ -455,7 +538,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	}
 
 	private ensureCellPortalHost(cell: HTMLDivElement): HTMLDivElement {
-		this.deps.cellRenderer.getOrCreateCellContentLayer(cell);
 		return this.deps.cellRenderer.getOrCreatePortalHost(cell) as HTMLDivElement;
 	}
 
@@ -469,30 +551,51 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 	}
 }
 
+/** Shared, never-mutated empty topology — reconcileTopology only reads it. */
+const EMPTY_TOPOLOGY: CompiledColumnTopology = Object.freeze({
+	version: 0,
+	placements: [],
+	byColumnId: new Map(),
+	left: [],
+	center: [],
+	right: [],
+	groupSegments: [],
+	pinLeftWidth: 0,
+	pinRightWidth: 0,
+	pinRightBaseLeft: 0,
+	totalContentWidth: 0,
+}) as CompiledColumnTopology;
+const EMPTY_COLUMNS: never[] = [];
+
+/** Per-args collapse/release callbacks, built once instead of two closures per full-width bind. */
+interface FullWidthRowCallbacks<TRowData> {
+	collapseLanes: (slot: RowSlot<TRowData>) => void;
+	releaseRowPortal: (slot: RowSlot<TRowData>) => void;
+}
+
+const fullWidthCallbacksByArgs = new WeakMap<object, FullWidthRowCallbacks<any>>();
+
+function getFullWidthRowCallbacks<TRowData>(args: RowRendererRuntimeArgs<TRowData>): FullWidthRowCallbacks<TRowData> {
+	let callbacks = fullWidthCallbacksByArgs.get(args) as FullWidthRowCallbacks<TRowData> | undefined;
+	if (!callbacks) {
+		callbacks = {
+			collapseLanes: (s) => {
+				// Clear all data cells via reconcileTopology with an empty topology.
+				// This properly removes cells from cellsByColumnInstanceId and calls releaseFn on each.
+				const pinLeftContainer = args.ensurePinnedContainer(s, 'left', 0);
+				const pinRightContainer = args.ensurePinnedContainer(s, 'right', 0);
+				reconcileTopology(s, EMPTY_TOPOLOGY, pinLeftContainer, 0, 0, pinRightContainer, EMPTY_COLUMNS, args.initCell, args.releaseCellFn);
+			},
+			releaseRowPortal: (s) => {
+				args.releaseRowPortal(s);
+			},
+		};
+		fullWidthCallbacksByArgs.set(args, callbacks);
+	}
+	return callbacks;
+}
+
 export function bindFullWidthRow<TRowData>(args: RowRendererRuntimeArgs<TRowData>, slot: RowSlot<TRowData>, visualRow: VisualRow<TRowData>): void {
-	const EMPTY_TOPOLOGY: CompiledColumnTopology = {
-		version: 0,
-		placements: [],
-		byColumnId: new Map(),
-		left: [],
-		center: [],
-		right: [],
-		groupSegments: [],
-		pinLeftWidth: 0,
-		pinRightWidth: 0,
-		pinRightBaseLeft: 0,
-		totalContentWidth: 0,
-	};
-	args.fullWidthRenderer.bind(
-		slot,
-		visualRow,
-		(s) => {
-			// Clear all data cells via reconcileTopology with an empty topology.
-			// This properly removes cells from cellsByColumnInstanceId and calls releaseFn on each.
-			const pinLeftContainer = args.ensurePinnedContainer(s, 'left', 0);
-			const pinRightContainer = args.ensurePinnedContainer(s, 'right', 0);
-			reconcileTopology(s, EMPTY_TOPOLOGY, pinLeftContainer, 0, 0, pinRightContainer, [], args.initCell, args.releaseCellFn);
-		},
-		(s) => args.releaseRowPortal(s)
-	);
+	const callbacks = getFullWidthRowCallbacks(args);
+	args.fullWidthRenderer.bind(slot, visualRow, callbacks.collapseLanes, callbacks.releaseRowPortal);
 }

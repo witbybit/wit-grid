@@ -128,7 +128,6 @@ interface Props {
 	compact?: boolean;
 }
 
-
 export default function RowDragDemo({ compact = false }: Props = {}) {
 	const [mode, setMode] = useState<'managed' | 'unmanaged'>('managed');
 	const [rows] = useState<TaskRow[]>(() => generateTasks(15));
@@ -287,39 +286,39 @@ export default function RowDragDemo({ compact = false }: Props = {}) {
 
 			{/* Right: event log */}
 			{!compact && (
-			<div className='w-72 shrink-0 flex flex-col gap-2 overflow-hidden rounded-xl border border-slate-900 bg-slate-950/60 p-3'>
-				<div className='flex items-center justify-between shrink-0'>
-					<div className='flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500'>
-						<List className='h-3.5 w-3.5 text-purple-400' />
-						Drag Events
-					</div>
-					<button
-						onClick={() => setLog([])}
-						className='text-[9px] text-slate-600 hover:text-slate-400 transition font-semibold uppercase tracking-wider'
-					>
-						Clear
-					</button>
-				</div>
-
-				<div className='flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 font-mono'>
-					{log.length === 0 ? (
-						<div className='flex flex-col items-center justify-center h-full gap-2 text-center'>
-							<ArrowUpDown className='h-6 w-6 text-slate-700' />
-							<span className='text-[10px] text-slate-600 font-semibold'>Drag a row to see events</span>
+				<div className='w-72 shrink-0 flex flex-col gap-2 overflow-hidden rounded-xl border border-slate-900 bg-slate-950/60 p-3'>
+					<div className='flex items-center justify-between shrink-0'>
+						<div className='flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wider text-slate-500'>
+							<List className='h-3.5 w-3.5 text-purple-400' />
+							Drag Events
 						</div>
-					) : (
-						log.map((entry) => (
-							<div key={entry.id} className='flex flex-col gap-0.5 px-2 py-1.5 rounded-lg bg-slate-900/60 border border-slate-900'>
-								<div className='flex items-center justify-between'>
-									<span className={`text-[10px] font-bold ${entry.color}`}>{entry.event}</span>
-									<span className='text-[9px] text-slate-600'>{entry.time}</span>
-								</div>
-								<span className='text-[9px] text-slate-500 break-all leading-relaxed'>{entry.detail}</span>
+						<button
+							onClick={() => setLog([])}
+							className='text-[9px] text-slate-600 hover:text-slate-400 transition font-semibold uppercase tracking-wider'
+						>
+							Clear
+						</button>
+					</div>
+
+					<div className='flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 font-mono'>
+						{log.length === 0 ? (
+							<div className='flex flex-col items-center justify-center h-full gap-2 text-center'>
+								<ArrowUpDown className='h-6 w-6 text-slate-700' />
+								<span className='text-[10px] text-slate-600 font-semibold'>Drag a row to see events</span>
 							</div>
-						))
-					)}
+						) : (
+							log.map((entry) => (
+								<div key={entry.id} className='flex flex-col gap-0.5 px-2 py-1.5 rounded-lg bg-slate-900/60 border border-slate-900'>
+									<div className='flex items-center justify-between'>
+										<span className={`text-[10px] font-bold ${entry.color}`}>{entry.event}</span>
+										<span className='text-[9px] text-slate-600'>{entry.time}</span>
+									</div>
+									<span className='text-[9px] text-slate-500 break-all leading-relaxed'>{entry.detail}</span>
+								</div>
+							))
+						)}
+					</div>
 				</div>
-			</div>
 			)}
 		</div>
 	);

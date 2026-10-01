@@ -309,22 +309,22 @@ describe('RowDependencyRegistry – source dependency expansion (Plan 082)', () 
 
 	describe('aggregation-input', () => {
 		it('returns aggregation-input when changed field feeds an aggregation def', () => {
-			const reg = makeRegistry({ aggDefs: [{ field: 'salary', aggFunc: 'sum' }] });
+			const reg = makeRegistry({ aggDefs: [{ colId: 'salary', aggFunc: 'sum' }] });
 			expect(classifyMutation(fields('salary'), reg)).toBe('aggregation-input');
 		});
 
 		it('returns aggregation-input for avg aggregation', () => {
-			const reg = makeRegistry({ aggDefs: [{ field: 'score', aggFunc: 'avg' }] });
+			const reg = makeRegistry({ aggDefs: [{ colId: 'score', aggFunc: 'avg' }] });
 			expect(classifyMutation(fields('score'), reg)).toBe('aggregation-input');
 		});
 
 		it('returns aggregation-input for custom aggregation function', () => {
-			const reg = makeRegistry({ aggDefs: [{ field: 'revenue', aggFunc: () => 0 }] });
+			const reg = makeRegistry({ aggDefs: [{ colId: 'revenue', aggFunc: () => 0 }] });
 			expect(classifyMutation(fields('revenue'), reg)).toBe('aggregation-input');
 		});
 
 		it('returns value-only when changed field does not match any aggregation def', () => {
-			const reg = makeRegistry({ aggDefs: [{ field: 'salary', aggFunc: 'sum' }] });
+			const reg = makeRegistry({ aggDefs: [{ colId: 'salary', aggFunc: 'sum' }] });
 			expect(classifyMutation(fields('name'), reg)).toBe('value-only');
 		});
 
@@ -334,14 +334,14 @@ describe('RowDependencyRegistry – source dependency expansion (Plan 082)', () 
 		});
 
 		it('handles dotted-path aggregation field: root match', () => {
-			const reg = makeRegistry({ aggDefs: [{ field: 'stats.revenue', aggFunc: 'sum' }] });
+			const reg = makeRegistry({ aggDefs: [{ colId: 'stats.revenue', aggFunc: 'sum' }] });
 			expect(classifyMutation(fields('stats.revenue'), reg)).toBe('aggregation-input');
 		});
 
 		it('group-key takes priority over aggregation-input when both match', () => {
 			const reg = makeRegistry({
 				groupBy: ['salary'],
-				aggDefs: [{ field: 'salary', aggFunc: 'sum' }],
+				aggDefs: [{ colId: 'salary', aggFunc: 'sum' }],
 			});
 			expect(classifyMutation(fields('salary'), reg)).toBe('group-key');
 		});
@@ -349,8 +349,8 @@ describe('RowDependencyRegistry – source dependency expansion (Plan 082)', () 
 		it('returns aggregation-input when multiple agg fields and one matches', () => {
 			const reg = makeRegistry({
 				aggDefs: [
-					{ field: 'salary', aggFunc: 'sum' },
-					{ field: 'bonus', aggFunc: 'avg' },
+					{ colId: 'salary', aggFunc: 'sum' },
+					{ colId: 'bonus', aggFunc: 'avg' },
 				],
 			});
 			expect(classifyMutation(fields('bonus'), reg)).toBe('aggregation-input');

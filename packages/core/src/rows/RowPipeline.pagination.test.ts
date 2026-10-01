@@ -18,8 +18,7 @@ function baseInput(over: Partial<RowPipelineInput<Row>>): RowPipelineInput<Row> 
 		columns: [{ field: 'category', header: 'category' }],
 		sortModel: null,
 		filterModel: null,
-		expandedGroupIds: new Set(),
-		expandedDetailRowIds: new Set(),
+		expansion: { rows: {}, details: {} },
 		defaultRowHeight: 40,
 		rowHeightsRecord: {},
 		...over,
@@ -83,8 +82,7 @@ describe('RowPipeline client pagination page-window', () => {
 		const out = new RowPipeline<Row>().run(
 			baseInput({
 				nodes: nodes(10),
-				groupBy: ['category'],
-				rowModelConfig: { type: 'client', grouping: { model: [{ colId: 'category' }], defaultExpanded: true } },
+				grouping: { by: ['category'], defaultExpanded: true },
 				pagination: { pageSize: 4, page: 0 },
 			})
 		);

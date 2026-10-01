@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { HIERARCHY_COLUMN_FIELD } from './rows/hierarchyColumn.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GridEventName } from './api/GridEvents.js';
 import { ClientRowModelController } from './rowModel.js';
 import { GridStore } from './store.js';
+import { toDataVisualRowId } from './rows/visualRowIds.js';
 import { RenderEngine } from './renderer/renderEngine.js';
+import { RuntimeFaultReporter } from './diagnostics/RuntimeFaultReporter.js';
 
 type CompositionRow = {
 	id: string;
@@ -66,7 +69,20 @@ function mockClipboard() {
 	};
 }
 
+// Runtime faults are reported, not thrown, so a composition can pass every assertion while the
+// renderer quietly faults. Every scenario must also finish fault-free.
+let runtimeFaults: string[] = [];
+beforeEach(() => {
+	runtimeFaults = [];
+	const report = RuntimeFaultReporter.prototype.report;
+	vi.spyOn(RuntimeFaultReporter.prototype, 'report').mockImplementation(function (this: RuntimeFaultReporter, ...args) {
+		runtimeFaults.push(`${args[0].source}:${args[0].operation}`);
+		return report.apply(this, args);
+	});
+});
+
 afterEach(() => {
+	expect(runtimeFaults).toEqual([]);
 	document.body.textContent = '';
 	vi.restoreAllMocks();
 	vi.unstubAllGlobals();
@@ -101,11 +117,9 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		store.engine.invalidation.consume();
 		store.setGroupBy(['team']);
 		expect(events.splice(0)).toEqual(['renderInvalidated', 'groupByChanged']);
+		// The first grouping adds the hierarchy column; a changed column set repaints everything.
 		const groupFrame = store.engine.invalidation.consume();
-		expect(groupFrame.full).toBe(false);
-		expect(groupFrame.viewport).toBe(true);
-		expect(groupFrame.headers).toBe(true);
-		expect(groupFrame.overlay).toBe(true);
+		expect(groupFrame.full).toBe(true);
 
 		const eastGroup = Array.from({ length: store.getVisualRowCount() }, (_, index) => store.getVisualRow(index)).find((row) => {
 			if (row?.kind !== 'group') return false;
@@ -113,7 +127,7 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		});
 		expect(eastGroup?.kind).toBe('group');
 
-		store.toggleGroupExpanded(eastGroup!.groupId);
+		store.toggleExpanded(eastGroup!.groupId);
 		const expandFrame = store.engine.invalidation.consume();
 		expect(expandFrame.full).toBe(false);
 		expect(expandFrame.viewport).toBe(true);
@@ -157,7 +171,10 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		expect(store.getVisualIndexByRowId('r4')).toBe(1);
 		expect(store.getVisualRow(1)?.kind).toBe('data');
 		expect(store.getVisualRow(1)?.node.data.id).toBe('r4');
-		expect(store.getState().selection.bounds).toEqual({ minRow: 1, maxRow: 1, minCol: 2, maxCol: 2 });
+		// The hierarchy column sits in front, so 'score' is found by name rather than a fixed index.
+		const scoreCol = store.getColumnIndex('score');
+		expect(scoreCol).toBe(3);
+		expect(store.getState().selection.bounds).toEqual({ minRow: 1, maxRow: 1, minCol: scoreCol, maxCol: scoreCol });
 
 		controller.dispose();
 		store.destroy();
@@ -354,17 +371,12 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 				{ field: 'status', header: 'Status', width: 120, pinned: 'right' },
 			],
 			pinnedColumns: { left: 1, right: 1 },
-			rowModelConfig: {
-				type: 'client',
-				treeData: {
-					enabled: true,
-					getParentId: (row) => row.parentId ?? null,
-					getParentIdDependencies: ['parentId'],
-				},
+			treeData: {
+				getParentId: (row) => row.parentId ?? null,
+				getParentIdDependencies: ['parentId'],
 			},
 			expansion: {
-				groups: {},
-				treeRows: { root: true, other: true },
+				rows: { [toDataVisualRowId('root')]: true, [toDataVisualRowId('other')]: true },
 				details: {},
 			},
 		});
@@ -378,7 +390,14 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 			columns: store.getState().columns,
 		});
 
-		expect(store.getPinnedColumns()).toEqual({ left: 1, right: 1 });
+		// Tree data adds the pinned hierarchy column in front of the user's pinned column.
+		expect(store.getPinnedColumns()).toEqual({ left: 2, right: 1 });
+		expect(
+			store
+				.getState()
+				.columns.slice(0, 2)
+				.map((column) => column.field)
+		).toEqual([HIERARCHY_COLUMN_FIELD, 'name']);
 		store.selectCell({ rowId: 'child-b', colField: 'name' });
 		store.applyRowSelectionGesture({ kind: 'replace', rowIds: ['child-b'], source: 'api' });
 		await store.copySelectedRange();
@@ -398,12 +417,12 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'child-b', colField: 'name' }));
 
 		store.selectCell({ rowId: 'other', colField: 'name' });
-		store.toggleGroupExpanded('other');
+		store.toggleExpanded(toDataVisualRowId('other'));
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'other', colField: 'name' }));
 		expect(store.getSelectedRowIds()).toEqual(['child-b']);
 		expect(store.getVisualIndexByRowId('child-b')).toBeNull();
 
-		store.toggleGroupExpanded('other');
+		store.toggleExpanded(toDataVisualRowId('other'));
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'other', colField: 'name' }));
 		expect(store.getSelectedRowIds()).toEqual(['child-b']);
 		expect(store.getVisualIndexByRowId('child-b')).toBeGreaterThan(store.getVisualIndexByRowId('other'));
@@ -430,14 +449,11 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 				{ field: 'score', header: 'Score', width: 120 },
 				{ field: 'status', header: 'Status', width: 120 },
 			],
-			groupBy: ['team'],
-			enableStickyGroupRows: true,
-			masterDetailEnabled: true,
-			detailRowHeight: 120,
+			grouping: { by: ['team'], stickyHeaders: true },
+			detail: { height: 120 },
 			pinnedColumns: { left: 1, right: 1 },
 			expansion: {
-				groups: { 'group:team=East': true, 'group:team=West': true },
-				treeRows: {},
+				rows: { 'group:team=East': true, 'group:team=West': true },
 				details: { 'row-12': true },
 			},
 			defaultRowHeight: 40,

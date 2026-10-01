@@ -7,13 +7,13 @@ import { type CompiledStyleRules, evaluateDetailRowStyleRules, evaluateGroupRowS
 import type { SelectionPaintManager } from './selectionPaintManager.js';
 
 // Precomputed base class strings for non-data row kinds — avoids string concat per row per frame.
-const ROW_KIND_BASE: Record<string, string> = {
+const ROW_KIND_BASE: Record<Exclude<VisualRow['kind'], 'data'>, string> = {
 	loading: 'og-row og-row-loading',
 	failed: 'og-row og-row-failed',
 	placeholder: 'og-row og-row-placeholder',
 	group: 'og-row og-row-group',
 	detail: 'og-row og-row-detail',
-	footer: 'og-row og-row-footer',
+	total: 'og-row og-row-total',
 };
 
 export interface RowPresentationResolverDeps<TRowData = unknown> {
@@ -57,7 +57,8 @@ export interface RowPresentationResult {
  * This is the canonical row-class computation for the scroll/recycle path. It intentionally does
  * NOT replace `SelectionPaintManager.updateRowClassNameSlot`, which serves the separate post-scroll
  * full-repaint path with different inputs (no warm-class preservation, no group/detail handling) —
- * unifying those is a follow-up, not something to fold into this extraction silently.
+ * unifying those is a follow-up. Both do apply insight row decorations, so a row painted here and
+ * later repainted there (or vice versa) ends up with the same decoration classes.
  */
 export function resolveRowPresentation<TRowData>(
 	deps: RowPresentationResolverDeps<TRowData>,
@@ -79,7 +80,7 @@ export function resolveRowPresentation<TRowData>(
 		shouldDeferWarmRowVisualRefresh,
 	} = input;
 
-	let rowClassName = ROW_KIND_BASE[visualRow.kind] ?? 'og-row';
+	let rowClassName = visualRow.kind === 'data' ? 'og-row' : ROW_KIND_BASE[visualRow.kind];
 	let markDirtyAfterScroll = false;
 
 	if (visualRow.kind === 'group') {
@@ -140,6 +141,21 @@ export function resolveRowPresentation<TRowData>(
 					if (customRowClass) rowClassName += ' ' + customRowClass;
 				} catch (e) {
 					reportRendererFault(deps.engine, 'row-class', e, { rowId: node.id, rowIndex: r });
+				}
+			}
+
+			// Insight row decorations — the same overlay SelectionPaintManager.updateRowClassNameSlot
+			// appends, so a row painted here and later repainted there gets the same className. Like
+			// row style rules, they're deferred to the post-scroll repaint (dirty row) during an active
+			// scroll frame rather than computed on the hot path.
+			const insights = deps.engine.insights;
+			if (insights && insights.size > 0) {
+				if (isScrollFrameActive) {
+					markDirtyAfterScroll = true;
+				} else {
+					for (const d of insights.getRowDecorations(node.id)) {
+						if (d.className) rowClassName += ' ' + d.className;
+					}
 				}
 			}
 		}

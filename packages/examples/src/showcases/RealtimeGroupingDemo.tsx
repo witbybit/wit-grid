@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Grid } from '@eregister/wit-grid-react';
-import type { AggregationDef, ColumnDef, CellRendererProps, GroupVisualRow, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
+import type { AggregationDef, ColumnDef, CellRendererProps, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 
 // ── Data model ────────────────────────────────────────────────────────────────
 
@@ -57,9 +57,9 @@ function generateRows(count: number): SalesRow[] {
 // ── Aggregation definitions ───────────────────────────────────────────────────
 
 const AGG_DEFS: AggregationDef<SalesRow>[] = [
-	{ field: 'revenue', aggFunc: 'sum' },
-	{ field: 'units', aggFunc: 'sum' },
-	{ field: 'margin', aggFunc: 'avg' },
+	{ colId: 'revenue', aggFunc: 'sum' },
+	{ colId: 'units', aggFunc: 'sum' },
+	{ colId: 'margin', aggFunc: 'avg' },
 ];
 
 // ── Cell renderers ────────────────────────────────────────────────────────────
@@ -117,6 +117,8 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 		sortable: true,
 
 		enableRowGroup: false,
+		// Formats the group and total aggregates (the renderer draws the data cells).
+		valueFormatter: ({ value }) => (typeof value === 'number' ? `$${Math.round(value).toLocaleString('en-US')}` : ''),
 		renderer: { kind: 'react', component: CurrencyRenderer, capabilities: { scrollPresentation: 'freeze' } },
 	},
 	{ field: 'units', header: 'Units', width: 75, sortable: true, enableRowGroup: false },
@@ -127,6 +129,7 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 		sortable: true,
 
 		enableRowGroup: false,
+		valueFormatter: ({ value }) => (typeof value === 'number' ? `${value.toFixed(1)}%` : ''),
 		renderer: { kind: 'react', component: MarginRenderer, capabilities: { scrollPresentation: 'freeze' } },
 	},
 	{
@@ -142,155 +145,15 @@ const COLUMNS: ColumnDef<SalesRow>[] = [
 
 const ROWS = generateRows(500);
 
-// ── Group row renderer ────────────────────────────────────────────────────────
-
-function GroupRowRenderer({ visualRow, api }: { visualRow: GroupVisualRow<SalesRow>; api: GridApi<SalesRow> }) {
-	const isExpanded = api.isGroupExpanded(visualRow.groupId);
-	const agg = visualRow.aggregateValues;
-
-	return (
-		<div
-			style={{
-				display: 'flex',
-				alignItems: 'center',
-				height: '100%',
-				paddingLeft: 12 + visualRow.depth * 18,
-				paddingRight: 12,
-				gap: 8,
-				cursor: 'pointer',
-				minWidth: 0,
-				background: 'linear-gradient(90deg, rgba(124,58,237,0.16), rgba(37,99,235,0.08) 42%, rgba(15,23,42,0.02))',
-				boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-			}}
-			onClick={() => api.toggleGroupExpanded(visualRow.groupId)}
-		>
-			<span
-				style={{
-					width: 3,
-					height: 22,
-					borderRadius: 999,
-					background: visualRow.depth === 0 ? '#8b5cf6' : '#3b82f6',
-					opacity: 0.9,
-					flexShrink: 0,
-				}}
-			/>
-			<span
-				style={{
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					width: 16,
-					height: 16,
-					borderRadius: 3,
-					background: 'rgba(167,139,250,0.15)',
-					border: '1px solid rgba(167,139,250,0.3)',
-					color: '#a78bfa',
-					fontSize: 9,
-					flexShrink: 0,
-					transition: 'transform 0.15s',
-					transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-				}}
-			>
-				▶
-			</span>
-
-			<span
-				style={{
-					display: 'flex',
-					alignItems: 'baseline',
-					gap: 6,
-					minWidth: 130,
-					maxWidth: 260,
-					overflow: 'hidden',
-				}}
-			>
-				<span
-					style={{
-						fontSize: 10,
-						fontWeight: 800,
-						color: '#94a3b8',
-						textTransform: 'uppercase',
-						whiteSpace: 'nowrap',
-					}}
-				>
-					{visualRow.field}
-				</span>
-				<span
-					style={{
-						fontSize: 13,
-						fontWeight: 800,
-						color: '#c4b5fd',
-						whiteSpace: 'nowrap',
-						overflow: 'hidden',
-						textOverflow: 'ellipsis',
-					}}
-				>
-					{visualRow.keyString}
-				</span>
-			</span>
-
-			<span
-				style={{
-					fontSize: 10,
-					color: '#64748b',
-					fontWeight: 500,
-					padding: '1px 6px',
-					borderRadius: 10,
-					background: 'rgba(100,116,139,0.1)',
-					border: '1px solid rgba(100,116,139,0.2)',
-					flexShrink: 0,
-				}}
-			>
-				{visualRow.leafCount} rows
-			</span>
-
-			{/* Aggregate chips */}
-			{agg && (
-				<div style={{ display: 'flex', gap: 6, marginLeft: 'auto', minWidth: 0, overflow: 'hidden' }}>
-					{agg.revenue != null && (
-						<span style={aggChip('#3b82f6')}>
-							Rev: <strong>${Number(agg.revenue).toLocaleString()}</strong>
-						</span>
-					)}
-					{agg.units != null && (
-						<span style={aggChip('#10b981')}>
-							Units: <strong>{Number(agg.units).toLocaleString()}</strong>
-						</span>
-					)}
-					{agg.margin != null && (
-						<span style={aggChip('#f59e0b')}>
-							Avg Margin: <strong>{Number(agg.margin).toFixed(1)}%</strong>
-						</span>
-					)}
-				</div>
-			)}
-		</div>
-	);
-}
-
-function aggChip(color: string): React.CSSProperties {
-	return {
-		fontSize: 10,
-		fontWeight: 700,
-		padding: '2px 8px',
-		borderRadius: 999,
-		background: `${color}14`,
-		border: `1px solid ${color}33`,
-		color: `${color}cc`,
-		whiteSpace: 'nowrap',
-		flexShrink: 0,
-	};
-}
-
 // ── Toolbar ───────────────────────────────────────────────────────────────────
 
 function Toolbar({ api, showPanel, onTogglePanel }: { api: GridApi<SalesRow> | null; showPanel: boolean; onTogglePanel: () => void }) {
 	return (
 		<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-			<ToolBtn onClick={() => api?.expandAllGroups()} title='Expand all groups'>
+			<ToolBtn onClick={() => api?.expandAll()} title='Expand all groups'>
 				Expand All
 			</ToolBtn>
-			<ToolBtn onClick={() => api?.collapseAllGroups()} title='Collapse all groups'>
+			<ToolBtn onClick={() => api?.collapseAll()} title='Collapse all groups'>
 				Collapse All
 			</ToolBtn>
 			<div style={{ width: 1, height: 16, background: 'rgba(100,116,139,0.3)', margin: '0 2px' }} />
@@ -346,7 +209,6 @@ function RealtimeGroupingDemoInner({
 	useEffect(() => {
 		if (!api) return;
 		api.setRows(ROWS);
-		api.setAggDefs(AGG_DEFS);
 	}, [api]);
 
 	useEffect(() => {
@@ -378,16 +240,17 @@ function RealtimeGroupingDemoInner({
 					rows={ROWS}
 					persistence='wit-grid-sales-demo'
 					initialState={{
-						groupBy: ['region', 'category'],
-						groupRowHeight: 44,
-						showGroupFooter: true,
-						enableStickyGroupRows: true,
+						grouping: { by: ['region', 'category'], rowHeight: 44, totals: { groups: 'bottom' }, stickyHeaders: true },
+						aggregation: { defs: AGG_DEFS },
 						showGroupPanel: true,
 					}}
 					pinLeftColumns={1}
 					enableContextMenu={true}
-					groupRowRenderer={(props) => <GroupRowRenderer visualRow={props.visualRow as GroupVisualRow<SalesRow>} api={props.api} />}
-					sidebar={compact ? undefined : { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }}
+					sidebar={
+						compact
+							? undefined
+							: { panels: ['columns', 'filters', 'sort', 'themes'], defaultOpen: 'columns', position: 'right', width: 280 }
+					}
 					onGridReady={onGridReady}
 				/>
 			</div>

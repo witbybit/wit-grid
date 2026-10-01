@@ -11,6 +11,7 @@ import type {
 	RowModelRefreshResult,
 	RowModelWriteResult,
 	RowRangeLoadState,
+	ExpandAllOptions,
 	RowExpansionCapableModel,
 	RowExpansionStateReadableModel,
 	ServerSideControllableRowModel,
@@ -21,7 +22,7 @@ import { GridEventName } from './api/GridEvents.js';
 import type { RowSelectionScope } from './api/GridApi.js';
 import { RowNode } from './rowNode.js';
 import { toDataVisualRowId, toFailedVisualRowId, toGroupVisualRowId, toLoadingVisualRowId, type GroupPathItem } from './rows/visualRowIds.js';
-import type { VisualRow } from './visualRow.js';
+import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import { createServerSideRouteKey, isRootServerSideRoute, normalizeServerSideRoute } from './serverSideRoute.js';
 
 function toErrorMessage(error: unknown): string {
@@ -585,10 +586,17 @@ export class ServerSideRowModelController<TRowData = unknown>
 					key: groupMetadata.groupKey,
 					keyString: groupMetadata.groupKey,
 					path,
-					depth: path.length,
-					expanded: this.expandedGroupIds.has(groupId),
-					childCount: this.getKnownChildStoreRowCount(groupMetadata.route),
-					leafCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+					hierarchy: {
+						level: Math.max(0, path.length - 1),
+						parentId: path.length > 1 ? toGroupVisualRowId(path.slice(0, -1)) : null,
+						hasChildren: true,
+						expanded: this.expandedGroupIds.has(groupId),
+						childCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+						leafCount: this.getKnownChildStoreRowCount(groupMetadata.route),
+						posInSet: 0,
+						setSize: 0,
+					},
+					aggregates: {},
 					selectable: true,
 					editable: false,
 				};
@@ -598,11 +606,12 @@ export class ServerSideRowModelController<TRowData = unknown>
 				id: toDataVisualRowId(node.id),
 				rowId: node.id,
 				node,
-				depth: 0,
+				hierarchy: FLAT_HIERARCHY,
 			};
 		}
 		const state = this.getRowLoadState(index);
-		if (state.kind === 'loading') return { kind: 'loading', id: toLoadingVisualRowId(index), rowIndex: index, editable: false };
+		if (state.kind === 'loading')
+			return { kind: 'loading', id: toLoadingVisualRowId(index), rowIndex: index, hierarchy: FLAT_HIERARCHY, editable: false };
 		if (state.kind === 'failed') {
 			return {
 				kind: 'failed',
@@ -610,33 +619,45 @@ export class ServerSideRowModelController<TRowData = unknown>
 				rowIndex: index,
 				error: state.error,
 				retryable: state.retryable,
+				hierarchy: FLAT_HIERARCHY,
 				editable: false,
 			};
 		}
 		return null;
 	}
 
-	public toggleGroupExpanded(groupId: string): RowModelRefreshResult {
-		const metadata = this.groupMetadataByGroupId.get(groupId) ?? this.groupMetadataByRowId.get(groupId);
-		if (!metadata?.expandable) return { changed: false };
-		const actualGroupId = this.groupMetadataByGroupId.has(groupId) ? groupId : toGroupVisualRowId(this.toGroupPath(metadata));
-		const previousRowCount = this.getVisualRowCount();
-		if (this.expandedGroupIds.has(actualGroupId)) {
-			this.expandedGroupIds.delete(actualGroupId);
-			this.publishServerSideState();
-			return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId: actualGroupId };
-		}
-		this.expandedGroupIds.add(actualGroupId);
-		const store = this.getOrCreateChildStore(metadata.route);
-		this.loadChildBlock(store, 0, false);
-		this.publishServerSideState();
-		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId: actualGroupId };
+	private resolveGroupId(id: string): { groupId: string; metadata: ServerSideGroupMetadata } | null {
+		const byGroupId = this.groupMetadataByGroupId.get(id);
+		if (byGroupId) return { groupId: id, metadata: byGroupId };
+		const byRowId = this.groupMetadataByRowId.get(id);
+		return byRowId ? { groupId: toGroupVisualRowId(this.toGroupPath(byRowId)), metadata: byRowId } : null;
 	}
 
-	public expandAllGroups(): RowModelRefreshResult {
+	public setExpanded(id: string, expanded: boolean): RowModelRefreshResult {
+		const resolved = this.resolveGroupId(id);
+		if (!resolved?.metadata.expandable || this.expandedGroupIds.has(resolved.groupId) === expanded) return { changed: false };
+		const { groupId, metadata } = resolved;
+		const previousRowCount = this.getVisualRowCount();
+		if (expanded) {
+			this.expandedGroupIds.add(groupId);
+			this.loadChildBlock(this.getOrCreateChildStore(metadata.route), 0, false);
+		} else {
+			this.expandedGroupIds.delete(groupId);
+		}
+		this.publishServerSideState();
+		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount(), groupId };
+	}
+
+	/** Expands the groups the server has described so far (children load as they open). */
+	public expandAll(options?: ExpandAllOptions): RowModelRefreshResult {
 		const previousRowCount = this.getVisualRowCount();
 		let changed = false;
 		for (const [groupId, metadata] of this.groupMetadataByGroupId) {
+			const level = Math.max(0, this.toGroupPath(metadata).length - 1);
+			if (options?.maxLevel !== undefined && level > options.maxLevel) {
+				changed = this.expandedGroupIds.delete(groupId) || changed;
+				continue;
+			}
 			if (!metadata.expandable || this.expandedGroupIds.has(groupId)) continue;
 			this.expandedGroupIds.add(groupId);
 			this.loadChildBlock(this.getOrCreateChildStore(metadata.route), 0, false);
@@ -646,7 +667,7 @@ export class ServerSideRowModelController<TRowData = unknown>
 		return { changed, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount() };
 	}
 
-	public collapseAllGroups(): RowModelRefreshResult {
+	public collapseAll(): RowModelRefreshResult {
 		if (this.expandedGroupIds.size === 0) return { changed: false };
 		const previousRowCount = this.getVisualRowCount();
 		this.expandedGroupIds.clear();
@@ -654,23 +675,27 @@ export class ServerSideRowModelController<TRowData = unknown>
 		return { changed: true, reason: 'expansion', previousRowCount, nextRowCount: this.getVisualRowCount() };
 	}
 
-	public toggleDetailExpanded(_rowId: string): RowModelRefreshResult {
+	public setDetailOpen(_rowId: string, _open: boolean): RowModelRefreshResult {
 		return { changed: false };
 	}
 
-	public isGroupExpanded(groupId: string): boolean {
-		const metadata = this.groupMetadataByGroupId.get(groupId) ?? this.groupMetadataByRowId.get(groupId);
-		const actualGroupId = metadata && !this.groupMetadataByGroupId.has(groupId) ? toGroupVisualRowId(this.toGroupPath(metadata)) : groupId;
-		return this.expandedGroupIds.has(actualGroupId);
+	public isExpanded(id: string): boolean {
+		const resolved = this.resolveGroupId(id);
+		return this.expandedGroupIds.has(resolved?.groupId ?? id);
 	}
 
-	public isDetailExpanded(_rowId: string): boolean {
+	public isDetailOpen(_rowId: string): boolean {
 		return false;
 	}
 
 	public getVisualRowCount(): number {
 		if (this.rowCountState.kind === 'known' || this.rowCountState.kind === 'estimated') return this.rowCountState.count;
-		return this.blocks.size > 0 ? Math.max(...[...this.blocks.values()].map((block) => block.endRow + 1)) : 0;
+		// Loop instead of Math.max(...spread): no per-call arrays, no argument-count limit.
+		let count = 0;
+		for (const block of this.blocks.values()) {
+			if (block.endRow + 1 > count) count = block.endRow + 1;
+		}
+		return count;
 	}
 
 	public getVisualIndexById(visualRowId: string): number {
@@ -960,12 +985,30 @@ export class ServerSideRowModelController<TRowData = unknown>
 	private drainQueuedBlocks(): void {
 		if (this.disposed) return;
 		while (this.activeRequestCount < this.maxConcurrentRequests) {
-			const nextQueuedBlock = [...this.getAllBlocks()]
-				.filter((block) => block.state === 'queued' && block.queryGeneration === this.queryGeneration)
-				.sort((a, b) => b.lastAccessedAt - a.lastAccessedAt || a.storeId.localeCompare(b.storeId) || a.blockIndex - b.blockIndex)[0];
+			// Single pass for the best queued block (same ordering the old filter+sort()[0] used):
+			// most recently accessed first, then storeId, then blockIndex.
+			let nextQueuedBlock: ServerSideLoadedBlock<TRowData> | null = null;
+			nextQueuedBlock = this.pickQueuedBlock(this.blocks, nextQueuedBlock);
+			for (const store of this.childStores.values()) nextQueuedBlock = this.pickQueuedBlock(store.blocks, nextQueuedBlock);
 			if (!nextQueuedBlock) return;
 			this.startStoreBlockRequest(this.getStoreById(nextQueuedBlock.storeId), nextQueuedBlock.blockIndex);
 		}
+	}
+
+	private pickQueuedBlock(
+		blocks: ReadonlyMap<number, ServerSideLoadedBlock<TRowData>>,
+		best: ServerSideLoadedBlock<TRowData> | null
+	): ServerSideLoadedBlock<TRowData> | null {
+		for (const block of blocks.values()) {
+			if (block.state !== 'queued' || block.queryGeneration !== this.queryGeneration) continue;
+			if (
+				!best ||
+				(block.lastAccessedAt - best.lastAccessedAt || best.storeId.localeCompare(block.storeId) || best.blockIndex - block.blockIndex) > 0
+			) {
+				best = block;
+			}
+		}
+		return best;
 	}
 
 	private rebuildIndexes(): void {

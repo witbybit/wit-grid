@@ -2,8 +2,15 @@ export type CellContentMode = 'text' | 'portal' | 'loading' | 'empty' | 'fallbac
 
 import type { CellRendererHandle, CellPlacement } from './cellRendererHandle.js';
 import { isMountedCellVisuallyFresh } from './visualFreshness.js';
-import type { ColumnInstanceId } from '../columnDef.js';
-import type { CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
+import { createCellInstanceRendererKey } from './identityKeys.js';
+import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
+import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+
+/** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
+export interface CellCtrlOwner {
+	releaseDetachedCellCtrl(cellCtrl: CellCtrl, slotInstanceId: string): boolean;
+}
 
 export interface CellSlotMountedVisualVersions {
 	insightVersion: number;
@@ -73,6 +80,32 @@ export function matchesCellSlotMountedVisualVersions(cellSlot: CellSlot, version
 	);
 }
 
+/** The five non-row version stamps a scroll frame judges mounted state against — satisfied
+ *  structurally by ScrollRenderContext, so callers can pass the context itself. */
+export interface CellSlotFrameVersions {
+	globalVersion: number;
+	insightVersion: number;
+	styleVersion: number;
+	loadingVersion: number;
+	selectionVersion: number;
+}
+
+/**
+ * Allocation-free form of matchesCellSlotMountedFreshness for the per-cell scroll path — the same
+ * predicate as isMountedCellVisuallyFresh (a never-stamped slot is always stale), over scalars.
+ */
+export function isCellSlotMountedFreshAt(cellSlot: CellSlot, rowVersion: number, versions: CellSlotFrameVersions): boolean {
+	if (cellSlot.lastMountedRowVersion === -1 && cellSlot.lastMountedGlobalVersion === -1) return false;
+	return (
+		cellSlot.lastMountedRowVersion === rowVersion &&
+		cellSlot.lastMountedGlobalVersion === versions.globalVersion &&
+		cellSlot.lastMountedInsightVersion === versions.insightVersion &&
+		cellSlot.lastMountedStyleVersion === versions.styleVersion &&
+		cellSlot.lastMountedLoadingVersion === versions.loadingVersion &&
+		cellSlot.lastMountedSelectionVersion === versions.selectionVersion
+	);
+}
+
 export function matchesCellSlotMountedFreshness(
 	cellSlot: CellSlot,
 	request: {
@@ -91,9 +124,42 @@ export function matchesCellSlotMountedFreshness(
 	});
 }
 
+/**
+ * Writes a cell's text. When the element already holds exactly one Text node, updating its
+ * nodeValue avoids the node replacement (and allocation) that `textContent =` performs. Empty
+ * text still goes through textContent so the element ends up with no child, as before.
+ */
+function setCellText(element: HTMLElement, text: string): void {
+	const first = element.firstChild;
+	if (text !== '' && first !== null && first === element.lastChild && first.nodeType === 3) {
+		first.nodeValue = text;
+		return;
+	}
+	element.textContent = text;
+}
+
+/**
+ * Whether a column's cells hold their text directly (`data-text-cell`), without the
+ * `.og-cell-content` wrapper. True for columns with no custom renderer and no row-selection
+ * checkbox: their cells only ever show text, so the wrapper — which exists to let a cell swap
+ * between text and a renderer by flipping one attribute — is pure cost there: one more element to
+ * style-match and one more layout object to re-lay out whenever the text changes.
+ * A CellSlot belongs to one column for its whole life, so the choice never changes for a slot.
+ */
+export function isDirectTextColumn(
+	col: Pick<ColumnDef<unknown>, 'checkboxSelection' | 'field'> & { cellRenderer?: unknown; aggregateRenderer?: unknown }
+): boolean {
+	// An aggregate renderer mounts into the content wrapper on group / total rows.
+	return !col.cellRenderer && !col.checkboxSelection && !isHierarchyColumn(col) && !col.aggregateRenderer;
+}
+
 export class CellSlot<TRowData = unknown> {
 	public readonly element: HTMLDivElement;
-	public readonly contentElement: HTMLDivElement;
+	/** Text lives directly in `element` (a text-only column); there is no content wrapper. */
+	public readonly directText: boolean;
+	private readonly wrapper: HTMLDivElement | null;
+	/** Direct-text cells: the cell's single text node, written in place. */
+	private readonly textNode: Text | null;
 	/**
 	 * Unique identity for this physical CellSlot object. Assigned once at construction
 	 * and never changes — not even across row rebinds or lane relocations.
@@ -177,6 +243,65 @@ export class CellSlot<TRowData = unknown> {
 	public lastMountedLoadingVersion = -1;
 	public lastMountedSelectionVersion = -1;
 
+	/**
+	 * The CellCtrl this slot is currently presenting, and the store that owns it. When the slot
+	 * attaches a different controller (row rebind) or is cold-unbound, the previous one is handed
+	 * back to its owner so CellCtrl lifetime stays bounded by the physical slot pool.
+	 */
+	public boundCellCtrl: CellCtrl | null = null;
+	public boundCellCtrlOwner: CellCtrlOwner | null = null;
+
+	/** Horizontal-retention recency stamp (see cellSlotRetention.ts); larger = touched more recently. */
+	public retentionStamp = 0;
+
+	/** Cached row-selector checkbox (checkbox-selection columns) — see checkboxCellBinder.ts. */
+
+	public rowCheckbox: HTMLInputElement | null = null;
+	/**
+	 * The cell's text was written for a group / total row (an aggregate). A data bind clears it first:
+	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
+	 */
+	public hasAggregateText = false;
+	/** An aggregate renderer mounted in this cell (group / total rows), and what it last drew. */
+	// Typed loosely: only the binder, which knows the row type, calls into it.
+	public aggregateMount: {
+		renderer: unknown;
+		handle: { update?(params: never): void; destroy?(): void };
+		rowId: string;
+		value: unknown;
+	} | null = null;
+
+	/** Destroys a mounted aggregate renderer and clears its content. */
+	public releaseAggregateMount(): void {
+		const mount = this.aggregateMount;
+		if (!mount) return;
+		this.aggregateMount = null;
+		try {
+			mount.handle.destroy?.();
+		} finally {
+			this.contentElement.textContent = '';
+			this.lastFormattedValue = '';
+		}
+	}
+	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
+	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
+
+	/**
+	 * The last frozen-HTML string written into the portal host by the html-snapshot binder, plus the
+	 * host's first/last child right after that write. A repeat bind with the same HTML skips the
+	 * innerHTML write only while those boundary nodes are still in place — any other writer (a live
+	 * portal mount, a release clearing the host) replaces them and forces a rewrite.
+	 */
+	public lastSnapshotHtml: string | undefined = undefined;
+	public lastSnapshotHtmlFirst: ChildNode | null = null;
+	public lastSnapshotHtmlLast: ChildNode | null = null;
+
+	// JS-side mirrors of DOM state, so steady-state binds never read the DOM back.
+
+	private lastDatasetColumnInstanceId: string | undefined = undefined;
+	private rendererKeyColumnInstanceId: string | undefined = undefined;
+	private rendererKey = '';
+
 	constructor(element: HTMLDivElement) {
 		this.cellInstanceId = `ci${++_cellInstanceCounter}`;
 		this.portalHostId = `${this.cellInstanceId}-ph`;
@@ -186,15 +311,50 @@ export class CellSlot<TRowData = unknown> {
 		// ARIA grid semantics — role is static per element; positional/state attrs are
 		// written (guarded) in update().
 		if (element.getAttribute('role') !== 'gridcell') element.setAttribute('role', 'gridcell');
-		let content = element.querySelector('.og-cell-content') as HTMLDivElement;
-		if (!content) {
-			content = document.createElement('div');
-			content.className = 'og-cell-content';
-			element.appendChild(content);
+		this.directText = element.dataset.textCell !== undefined;
+		if (this.directText) {
+			const first = element.firstChild;
+			let textNode = first !== null && first.nodeType === 3 ? (first as Text) : null;
+			if (!textNode) {
+				textNode = document.createTextNode('');
+				element.insertBefore(textNode, element.firstChild);
+			}
+			this.textNode = textNode;
+			this.wrapper = null;
+		} else {
+			let content = element.querySelector('.og-cell-content') as HTMLDivElement;
+			if (!content) {
+				content = document.createElement('div');
+				content.className = 'og-cell-content';
+				element.appendChild(content);
+			}
+			this.wrapper = content;
+			this.textNode = null;
 		}
-		this.contentElement = content;
 		// Adopt an existing portal host (recycled element); otherwise create lazily.
 		this.portalHostElement = element.querySelector('.og-cell-portal-host') as HTMLDivElement | null;
+	}
+
+	/**
+	 * The `.og-cell-content` wrapper of a cell that can show more than text (custom renderer or
+	 * row-selection checkbox). Direct-text cells have none; asking for it is a programming error.
+	 */
+	public get contentElement(): HTMLDivElement {
+		if (!this.wrapper) throw new Error('CellSlot: a direct-text cell has no content wrapper');
+		return this.wrapper;
+	}
+
+	/** Writes the cell's text; callers keep lastFormattedValue in step. */
+	private writeText(text: string): void {
+		if (this.textNode) this.textNode.nodeValue = text;
+		else setCellText(this.wrapper!, text);
+	}
+
+	/** Clears the text and the text cache together (loading skeletons, cold unbind). */
+	public clearText(): void {
+		if (this.lastFormattedValue === '') return;
+		this.lastFormattedValue = '';
+		this.writeText('');
 	}
 
 	/** Portal host accessor — creates the div on first use only. */
@@ -207,6 +367,18 @@ export class CellSlot<TRowData = unknown> {
 			this.portalHostElement = host;
 		}
 		return host;
+	}
+
+	/**
+	 * createCellInstanceRendererKey(this.cellInstanceId, columnInstanceId), memoized — the inputs
+	 * never change for a given column, so the scroll path doesn't rebuild the string per bind.
+	 */
+	public getRendererKey(columnInstanceId: ColumnInstanceId): string {
+		if (this.rendererKeyColumnInstanceId !== columnInstanceId) {
+			this.rendererKeyColumnInstanceId = columnInstanceId;
+			this.rendererKey = createCellInstanceRendererKey(this.cellInstanceId, columnInstanceId);
+		}
+		return this.rendererKey;
 	}
 
 	public static fromElement<TRowData = unknown>(element: HTMLDivElement): CellSlot<TRowData> {
@@ -287,7 +459,9 @@ export class CellSlot<TRowData = unknown> {
 		}
 
 		if (input.focused) {
-			if (!this.hasTabIndex || this.element.getAttribute('tabindex') !== '-1') {
+			// hasTabIndex mirrors the attribute this method wrote; the only other writer
+			// (gridHost focusCellElement) writes the same -1, so no DOM read-back is needed.
+			if (!this.hasTabIndex) {
 				this.element.tabIndex = -1;
 				this.hasTabIndex = true;
 				domUpdated = true;
@@ -333,9 +507,12 @@ export class CellSlot<TRowData = unknown> {
 			this.element.dataset.colField = colField;
 			domUpdated = true;
 		}
-		if (this.element.dataset.columnInstanceId !== this.columnInstanceId) {
-			this.element.dataset.columnInstanceId = this.columnInstanceId;
-			domUpdated = true;
+		if (this.lastDatasetColumnInstanceId !== this.columnInstanceId) {
+			this.lastDatasetColumnInstanceId = this.columnInstanceId;
+			if (this.element.dataset.columnInstanceId !== this.columnInstanceId) {
+				this.element.dataset.columnInstanceId = this.columnInstanceId;
+				domUpdated = true;
+			}
 		}
 		if (this.rowIndex !== rowIndex) {
 			this.rowIndex = rowIndex;
@@ -346,6 +523,11 @@ export class CellSlot<TRowData = unknown> {
 			this.rowId = rowId;
 			this.element.dataset.rowId = rowId;
 			domUpdated = true;
+			// A stale inline visibility can only be left over from before this identity was bound
+			// (nothing sets it on a bound cell), so the style read is limited to rebinds.
+			if (this.element.style.visibility) {
+				this.element.style.visibility = '';
+			}
 		}
 
 		// Position — one DOM write per changed axis, pin-right uses right, others use left
@@ -412,10 +594,6 @@ export class CellSlot<TRowData = unknown> {
 			}
 			domUpdated = true;
 		}
-		if (this.element.style.visibility) {
-			this.element.style.visibility = '';
-			domUpdated = true;
-		}
 
 		this.lastRawValue = rawValue;
 
@@ -426,19 +604,21 @@ export class CellSlot<TRowData = unknown> {
 			if (contentMode === 'text' || contentMode === 'fallback') {
 				if (this.lastFormattedValue !== formattedValue) {
 					this.lastFormattedValue = formattedValue;
-					this.contentElement.textContent = formattedValue;
+					this.writeText(formattedValue);
 					cellSlotWriteStats.cellTextWrites++;
 					domUpdated = true;
 				} else {
 					cellSlotWriteStats.cellDomReadsAvoided++;
 				}
-			} else if (contentMode !== 'portal') {
-				// Portal mode leaves existing text in the DOM — CSS hides .og-cell-content via
-				// [data-content-mode="portal"] > .og-cell-content { display: none }.
-				// Text is cleared lazily when the cell transitions to empty/loading/pending.
+			} else if (contentMode !== 'portal' || this.directText) {
+				// Wrapped cells in portal mode leave their text in the DOM — CSS hides .og-cell-content
+				// via [data-content-mode="portal"] > .og-cell-content { display: none }, so a
+				// text <-> renderer swap costs one attribute write. A direct-text cell only enters portal
+				// mode to host an editor, and a bare text node cannot be hidden, so it clears its text.
+				// Text is otherwise cleared lazily when the cell transitions to empty/loading/pending.
 				if (this.lastFormattedValue !== '') {
 					this.lastFormattedValue = '';
-					this.contentElement.textContent = '';
+					this.writeText('');
 					cellSlotWriteStats.cellTextWrites++;
 					domUpdated = true;
 				} else {
@@ -518,7 +698,30 @@ export class CellSlot<TRowData = unknown> {
 		}
 	}
 
+	/**
+	 * Records `cellCtrl` as the controller this slot presents, releasing the previously bound one
+	 * (if different) back to its owner. `owner` is null for test doubles without a RowCtrlStore.
+	 */
+	public attachCellCtrl(cellCtrl: CellCtrl, owner: CellCtrlOwner | null): void {
+		const previous = this.boundCellCtrl;
+		if (previous === cellCtrl) return;
+		if (previous) this.boundCellCtrlOwner?.releaseDetachedCellCtrl(previous, this.cellInstanceId);
+		this.boundCellCtrl = cellCtrl;
+		this.boundCellCtrlOwner = owner;
+	}
+
+	/** Releases the bound controller (if any) back to its owner. */
+	public detachCellCtrl(): void {
+		const previous = this.boundCellCtrl;
+		if (!previous) return;
+		this.boundCellCtrl = null;
+		this.boundCellCtrlOwner?.releaseDetachedCellCtrl(previous, this.cellInstanceId);
+		this.boundCellCtrlOwner = null;
+	}
+
 	public unbindCold(): void {
+		this.detachCellCtrl();
+		this.releaseAggregateMount();
 		if (this.renderer !== null) {
 			this.renderer.destroy();
 			this.renderer = null;
@@ -561,11 +764,12 @@ export class CellSlot<TRowData = unknown> {
 		this.rowIndex = -1;
 		this.rowId = '';
 
-		this.contentElement.textContent = '';
+		this.writeText('');
 		this.element.className = '';
 		this.element.removeAttribute('style');
 		delete this.element.dataset.colField;
 		delete this.element.dataset.columnInstanceId;
+		this.lastDatasetColumnInstanceId = undefined;
 		delete this.element.dataset.rowIndex;
 		delete this.element.dataset.rowId;
 		delete this.element.dataset.cellKey;

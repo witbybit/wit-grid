@@ -88,7 +88,8 @@ describe('resolveScrollCellPresentation', () => {
 		expect(presentation.kind).toBe('buffered');
 		if (presentation.kind !== 'buffered') throw new Error('unreachable');
 		expect(presentation.contentMode).toBe('empty');
-		expect(presentation.releaseStalePortal).toBe(true);
+		// It keeps no portal, so the dispatcher releases the stale one the slot still holds.
+		expect(presentation.portalKey).toBeUndefined();
 	});
 
 	it('resolves a visible primitive cell with no snapshot and no warm state to the "..." placeholder', () => {

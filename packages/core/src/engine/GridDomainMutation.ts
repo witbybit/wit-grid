@@ -192,6 +192,8 @@ export interface GridCommitContext<TRowData = unknown> {
 	applyStructuralWriteEffects?: (writeResult: RowModelWriteResult<TRowData>) => StructuralWriteEffectResult;
 	publishCommittedCellChanges?: (changes: Map<string, Set<string>>) => void;
 	requestLayoutTransitionCapture?: (reason: LayoutTransitionReason) => void;
+	/** Re-syncs row geometry from a visual index after an in-place row reorder. */
+	syncRowGeometryFrom?: (startIndex: number) => void;
 }
 
 export interface PreparedDomainMutation<TRowData = unknown, TMutation extends GridDomainMutation<TRowData> = GridDomainMutation<TRowData>> {
@@ -294,13 +296,26 @@ function createInvalidationsFromCells(cells: readonly GridCellPointer[]): GridIn
 	return invalidations;
 }
 
-function createInvalidationsFromRefreshResult(
+function createInvalidationsFromRefreshResult<TRowData>(
 	result: import('../rowModel.js').RowModelRefreshResult,
+	context: GridCommitContext<TRowData>,
 	reason: GridInvalidation['reason'] = 'data'
 ): GridInvalidation[] {
 	if (!result.changed) return [];
+	// A live sort-key relocation moves rows in place: no globalVersion bump and no row-count
+	// change, so the projection pipeline would keep the old per-index heights. Re-sync geometry
+	// from the first moved index so variable row heights follow their rows.
+	if (result.layoutTransitionHint === 'live-reorder' && result.changedStartIndex !== undefined) {
+		context.syncRowGeometryFrom?.(result.changedStartIndex);
+	}
 	const effectiveReason: GridInvalidation['reason'] = result.layoutTransitionHint === 'live-reorder' ? 'sort' : reason;
-	const invalidations: GridInvalidation[] = [{ kind: 'viewport', reason: effectiveReason }];
+	// Aggregates changing in place (same rows, same order) need only those rows, not the viewport.
+	const aggregateOnly =
+		result.changedStartIndex === undefined &&
+		!result.groupId &&
+		result.previousRowCount === result.nextRowCount &&
+		!!result.aggregateChangedIndices;
+	const invalidations: GridInvalidation[] = aggregateOnly ? [] : [{ kind: 'viewport', reason: effectiveReason }];
 	if (result.groupId) {
 		invalidations.push({ kind: 'group', groupId: result.groupId, reason: effectiveReason });
 	}
@@ -311,6 +326,16 @@ function createInvalidationsFromRefreshResult(
 			endIndex: result.changedEndIndex,
 			reason: effectiveReason,
 		});
+	}
+	// Rows whose aggregates changed in place, as contiguous runs.
+	const aggregateRows = result.aggregateChangedIndices;
+	if (aggregateRows) {
+		for (let i = 0; i < aggregateRows.length; ) {
+			let end = i;
+			while (end + 1 < aggregateRows.length && aggregateRows[end + 1] === aggregateRows[end] + 1) end++;
+			invalidations.push({ kind: 'row-range', startIndex: aggregateRows[i], endIndex: aggregateRows[end], reason: effectiveReason });
+			i = end + 1;
+		}
 	}
 	if (result.previousRowCount !== result.nextRowCount) {
 		invalidations.push({ kind: 'geometry', reason: effectiveReason });
@@ -565,8 +590,18 @@ function previewCellValueMutation<TRowData>(context: GridCommitContext<TRowData>
 }
 
 export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unknown>(): GridDomainMutationExecutorRegistry<TRowData> {
+	// The commit kernel calls validate() and then immediately prepare() for the same mutation
+	// object and context, with nothing applied in between. Hand the validate-time preview to that
+	// prepare() instead of re-reading raw/computed/stored values; any other call order misses the
+	// single slot and previews afresh.
+	let validatedCellPreview: {
+		mutation: CellValueMutation;
+		context: GridCommitContext<TRowData>;
+		preview: CellValueMutationPreview;
+	} | null = null;
 	const cellValueExecutor: GridDomainMutationExecutor<TRowData, CellValueMutation> = {
 		validate(mutation, context) {
+			validatedCellPreview = null;
 			if (!context.applyCellValueChange) {
 				return {
 					ok: false,
@@ -575,6 +610,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 				};
 			}
 			const preview = previewCellValueMutation(context, mutation);
+			if (preview.status !== 'rejected') validatedCellPreview = { mutation, context, preview };
 			if (preview.status === 'rejected') {
 				return {
 					ok: false,
@@ -585,7 +621,12 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 			return { ok: true };
 		},
 		prepare(mutation, context) {
-			const preview = previewCellValueMutation(context, mutation);
+			const validated = validatedCellPreview;
+			validatedCellPreview = null;
+			const preview =
+				validated && validated.mutation === mutation && validated.context === context
+					? validated.preview
+					: previewCellValueMutation(context, mutation);
 			return {
 				mutation,
 				preview,
@@ -640,7 +681,8 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 								},
 								impact
 							);
-							if (reconcileResult.changed) invalidations = [...invalidations, ...createInvalidationsFromRefreshResult(reconcileResult)];
+							if (reconcileResult.changed)
+								invalidations = [...invalidations, ...createInvalidationsFromRefreshResult(reconcileResult, commitContext)];
 						}
 					}
 					return {
@@ -815,7 +857,10 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 									impact
 								);
 								if (reconcileResult.changed) {
-									batchInvalidations = [...batchInvalidations, ...createInvalidationsFromRefreshResult(reconcileResult)];
+									batchInvalidations = [
+										...batchInvalidations,
+										...createInvalidationsFromRefreshResult(reconcileResult, commitContext),
+									];
 								}
 							}
 						}
@@ -921,7 +966,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 					}
 					requestLayoutTransitionCaptureForImpact(context, impact);
 					const reconcileResult = structuralRowModel.reconcileAfterDataWrite(txResult, impact);
-					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult) : [];
+					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, context) : [];
 					const changed = txResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: ['rows', 'geometry'],
@@ -983,7 +1028,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 					const rowModel = asClientStructuralRowModel<TRowData>(commitContext.getRowModel())!;
 					const writeResult = rowModel.replaceRowsStructurally(mutation.rows as TRowData[]);
 					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, 'value-only');
-					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult) : [];
+					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
 					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),
@@ -1031,7 +1076,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 					const impact: RowWriteImpact = allFields.size > 0 ? rowModel.classifyFieldMutation(allFields) : 'value-only';
 					requestLayoutTransitionCaptureForImpact(commitContext, impact);
 					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, impact);
-					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult) : [];
+					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
 					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),

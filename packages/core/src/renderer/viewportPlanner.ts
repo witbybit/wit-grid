@@ -146,22 +146,40 @@ export class ViewportPlanner<TRowData = unknown> {
 			Math.min(window.colEnd, visibleColEnd + liveColumnOverscan)
 		);
 		const { liveColumns } = this.getRendererModeClassification(compiledPlan, topology);
-		const executableLiveColumns = [...pinnedLeftColumns, ...liveCenterColumnWindow, ...pinnedRightColumns];
-		const visibleExecutableColumns = new Set([...pinnedLeftColumns, ...visibleCenterColumns, ...pinnedRightColumns]);
 
 		const liveVisibleCells: CellAddress[] = [];
 		const liveOverscanCells: CellAddress[] = [];
-		for (let rowIndex = liveRowRange.start; rowIndex <= liveRowRange.end; rowIndex++) {
-			for (const columnInstanceId of executableLiveColumns) {
-				if (!liveColumns.has(columnInstanceId)) continue;
-				const address = { rowIndex, columnInstanceId };
-				if (rowIndex >= visibleRows.start && rowIndex <= visibleRows.end && visibleExecutableColumns.has(columnInstanceId)) {
-					liveVisibleCells.push(address);
-				} else {
-					liveOverscanCells.push(address);
+		// No live-presentation columns (the common case): there are no live cells to classify, so
+		// skip the O(rows x columns) probe loop entirely.
+		if (liveColumns.size > 0) {
+			// Only live columns can produce cells; filter once instead of probing per row. Order is
+			// preserved: pinned-left, live center window, pinned-right.
+			const executableLiveColumns: ColumnInstanceId[] = [];
+			const visibleExecutableColumns = new Set<ColumnInstanceId>();
+			for (const id of pinnedLeftColumns) {
+				if (liveColumns.has(id)) executableLiveColumns.push(id);
+				visibleExecutableColumns.add(id);
+			}
+			for (const id of liveCenterColumnWindow) if (liveColumns.has(id)) executableLiveColumns.push(id);
+			for (const id of visibleCenterColumns) visibleExecutableColumns.add(id);
+			for (const id of pinnedRightColumns) {
+				if (liveColumns.has(id)) executableLiveColumns.push(id);
+				visibleExecutableColumns.add(id);
+			}
+			for (let rowIndex = liveRowRange.start; rowIndex <= liveRowRange.end; rowIndex++) {
+				const isVisibleRow = rowIndex >= visibleRows.start && rowIndex <= visibleRows.end;
+				for (const columnInstanceId of executableLiveColumns) {
+					const address = { rowIndex, columnInstanceId };
+					if (isVisibleRow && visibleExecutableColumns.has(columnInstanceId)) {
+						liveVisibleCells.push(address);
+					} else {
+						liveOverscanCells.push(address);
+					}
 				}
 			}
 		}
+		// Mount and update priority share one read-only ordering (visible first, then overscan).
+		const livePriority = liveOverscanCells.length === 0 ? liveVisibleCells : liveVisibleCells.concat(liveOverscanCells);
 
 		const plan: ViewportPlan = {
 			epoch: ++this.frameCounter,
@@ -183,8 +201,8 @@ export class ViewportPlanner<TRowData = unknown> {
 				visible: liveVisibleCells,
 				overscan: liveOverscanCells,
 				exited: [],
-				mountPriority: [...liveVisibleCells, ...liveOverscanCells],
-				updatePriority: [...liveVisibleCells, ...liveOverscanCells],
+				mountPriority: livePriority,
+				updatePriority: livePriority,
 			},
 			retainedFocusEditRowIndices,
 			reasons: {

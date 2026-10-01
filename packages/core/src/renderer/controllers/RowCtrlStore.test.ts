@@ -81,12 +81,12 @@ describe('getOrCreateCellCtrl', () => {
 		const store = new RowCtrlStore();
 		const rowCtrl = store.getOrCreate('r1');
 		const before = getOrCreateCellCtrl(rowCtrl, store.cellCtrls, 'coli1' as any, { colField: 'price' });
-		before.cellCtrl.rendererState.mode = 'live';
+		before.cellCtrl.visualState.editing = true;
 
 		const after = getOrCreateCellCtrl(rowCtrl, store.cellCtrls, 'coli2' as any, { colField: 'price' });
 		expect(after.created).toBe(true);
 		expect(after.cellCtrl).not.toBe(before.cellCtrl);
-		expect(after.cellCtrl.rendererState.mode).toBe('none');
+		expect(after.cellCtrl.visualState.editing).toBe(false);
 		expect(after.cellCtrl.columnInstanceId).toBe('coli2');
 		expect(rowCtrl.cellKeysByColumnInstanceId.get('coli1' as any)).toBe(before.cellCtrl.key);
 		expect(rowCtrl.cellKeysByColumnInstanceId.get('coli2' as any)).toBe(after.cellCtrl.key);
@@ -95,13 +95,13 @@ describe('getOrCreateCellCtrl', () => {
 	it('row rebind: CellCtrls for the old row are not visible from the new RowCtrl at the same field', () => {
 		const store = new RowCtrlStore();
 		const rowA = store.getOrCreate('rowA');
-		getOrCreateCellCtrl(rowA, store.cellCtrls, 'coli1' as any, { colField: 'price' }).cellCtrl.rendererState.mode = 'primitive';
+		getOrCreateCellCtrl(rowA, store.cellCtrls, 'coli1' as any, { colField: 'price' }).cellCtrl.visualState.editing = true;
 
 		// A different logical row may reuse the same physical slot conceptually, but CellCtrlStore keys
 		// by rowId and columnInstanceId, not slot.
 		const rowB = store.getOrCreate('rowB');
 		const { cellCtrl, created } = getOrCreateCellCtrl(rowB, store.cellCtrls, 'coli1' as any, { colField: 'price' });
 		expect(created).toBe(true);
-		expect(cellCtrl.rendererState.mode).toBe('none');
+		expect(cellCtrl.visualState.editing).toBe(false);
 	});
 });

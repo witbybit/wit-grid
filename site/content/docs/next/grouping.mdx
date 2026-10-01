@@ -5,12 +5,19 @@ icon: FolderTree
 ---
 
 Row grouping organizes flat rows into an expandable folder-like structure based on identical column values.
-Tree data instead nests rows using an explicit parent-child relationship. Both are driven by `initialState` and
-both render through a custom `groupRowRenderer`.
+Tree data instead nests rows using an explicit parent-child relationship. Both are configured in `initialState`
+(`grouping`, `treeData`, `aggregation`), and every row carries a `hierarchy` block — `level`, `parentId`,
+`hasChildren`, `expanded`, `childCount`, `leafCount`, `posInSet`, `setSize` — so renderers never reconstruct it.
 
 ## Row grouping
 
-Set `groupBy` to the fields to fold rows by, and `aggDefs` to compute summary metrics for each group:
+Set `grouping.by` to the columns to fold rows by, and `aggregation.defs` to compute summary values for each group.
+By default group and total rows are ordinary cell rows: an auto **hierarchy column**, pinned left, shows each
+group's toggle, key and row count, and every other column shows that group's aggregate through the column's own
+`valueFormatter`. Configure the hierarchy column with `hierarchyColumn` (header, width, indent, which parts show,
+custom label and count) or turn it off with `hierarchyColumn: false`.
+
+For a fully custom full-width group row instead, set `grouping.display: 'row'` and supply a `groupRowRenderer`:
 
 ```tsx
 import { useCallback, useMemo } from 'react';
@@ -37,8 +44,9 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
 		if (visualRow.kind !== 'group') return null;
 		return (
-			<div onClick={() => api.toggleGroupExpanded(visualRow.id)} style={{ paddingLeft: visualRow.depth * 20 + 10 }}>
-				{visualRow.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.childCount})
+			<div onClick={() => api.toggleExpanded(visualRow.id)} style={{ paddingLeft: visualRow.hierarchy.level * 20 + 10 }}>
+				{visualRow.hierarchy.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.hierarchy.leafCount}) · total{' '}
+				{String(visualRow.aggregates.salary ?? '')}
 			</div>
 		);
 	}, []);
@@ -48,25 +56,33 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 			rows={data}
 			columns={columns}
 			getRowId={(row) => row.id}
-			initialState={{ groupBy: ['department'], groupRowHeight: 42 }}
+			initialState={{
+				grouping: { by: ['department'], display: 'row', rowHeight: 42, defaultExpanded: 1 },
+				aggregation: { defs: [{ colId: 'salary', aggFunc: 'sum' }] },
+			}}
 			groupRowRenderer={groupRowRenderer}
 		/>
 	);
 }
 ```
 
-<Callout title='Group toggling' type='info'>
-	`visualRow.kind === 'group'` rows carry `field`, `key`, `depth`, `childCount`, and `expanded`. Toggle expansion with
-	`api.toggleGroupExpanded(visualRow.id)`, or drive it from outside the renderer with `api.expandAllGroups()` / `api.collapseAllGroups()`.
+<Callout title='Expansion' type='info'>
+	Group rows carry `field`, `key`, `path`, `aggregates` and their `hierarchy`. Expansion is keyed by visual row id: `api.setExpanded(id, open)`,
+	`api.toggleExpanded(id)`, `api.isExpanded(id)`. `api.expandAll({maxLevel})` and `api.collapseAll()` replace individual choices.
+	`grouping.defaultExpanded` takes `true`, a number of open levels, or a predicate over the group — and a default-open group can still be closed.
 </Callout>
 
-Group footers can be enabled with `initialState.showGroupFooter: true`, and rendered with `footerRowRenderer`.
+Total rows are configured with `grouping.totals`: `groups` places a total row at the `'top'` or `'bottom'` of every
+group (or per level, with a function of the level), and `grand` adds one total over every row. They render with
+`totalRowRenderer`. Built-in aggregations are `sum`, `avg`, `min`, `max`, `count`, `distinctCount`, `first` and
+`last`; a custom `aggFunc` receives `{ colId, values, rows, scope, level, key }`.
 
 ## Tree data
 
-For parent-child hierarchies (file trees, org charts, bill of materials), set `getParentId` instead of `groupBy`.
-Indentation isn't computed by the grid for you — walk the row's own `parentId` chain to derive its depth, and use
-that inside a cell renderer:
+For parent-child hierarchies (file trees, org charts, bill of materials), set `treeData.getParentId`, and
+`treeData.column` to the field the hierarchy column shows — indented by level, with a toggle on parents. To draw
+the tree in one of your own columns instead, read each row's `hierarchy` (its level and whether it has children)
+in a cell renderer and set `hierarchyColumn: false`:
 
 ```tsx
 import { useMemo } from 'react';
@@ -79,48 +95,93 @@ interface FileNode {
 	size?: string;
 }
 
-function depthOf(nodeId: string, byId: Map<string, FileNode>): number {
-	let depth = 0;
-	let current = byId.get(nodeId);
-	while (current?.parentId) {
-		depth += 1;
-		current = byId.get(current.parentId);
-	}
-	return depth;
-}
-
-function createTreeNameRenderer(byId: Map<string, FileNode>) {
-	return function TreeNameRenderer({ value, row }: CellRendererProps<FileNode>) {
-		const depth = depthOf(row.id, byId);
-		const hasChildren = [...byId.values()].some((node) => node.parentId === row.id);
-		return (
-			<div style={{ paddingLeft: depth * 20 }}>
-				{hasChildren ? '📁' : '📄'} {String(value)}
-			</div>
-		);
-	};
+function TreeNameRenderer({ value, rowId, api }: CellRendererProps<FileNode>) {
+	const visualRow = api.rows().getVisualRowById(rowId);
+	if (!visualRow) return null;
+	const { level, hasChildren, expanded } = visualRow.hierarchy;
+	return (
+		<div style={{ paddingLeft: level * 20 }} onClick={() => hasChildren && api.toggleExpanded(visualRow.id)}>
+			{hasChildren ? (expanded ? '📂' : '📁') : '📄'} {String(value)}
+		</div>
+	);
 }
 
 export function FileDirectoryGrid({ nodes }: { nodes: FileNode[] }) {
-	const byId = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
-	const TreeNameRenderer = useMemo(() => createTreeNameRenderer(byId), [byId]);
 	const columns = useMemo<ColumnDef<FileNode>[]>(
 		() => [
 			{ field: 'name', header: 'Node Path / Name', width: 300, renderer: { kind: 'react', component: TreeNameRenderer } },
 			{ field: 'size', header: 'Capacity Size', width: 120 },
 		],
-		[TreeNameRenderer]
+		[]
 	);
 
 	return (
-		<Grid rows={nodes} columns={columns} getRowId={(row) => row.id} initialState={{ getParentId: (row) => row.parentId, groupRowHeight: 38 }} />
+		<Grid
+			rows={nodes}
+			columns={columns}
+			getRowId={(row) => row.id}
+			initialState={{ treeData: { getParentId: (row) => row.parentId, defaultExpanded: true }, hierarchyColumn: false }}
+		/>
 	);
 }
 ```
 
-`groupBy` and `getParentId` are mutually exclusive strategies for the same underlying grouped row model — use
-`groupBy` when groups come from repeated column values, `getParentId` when the hierarchy is already explicit in
-the data.
+Use `grouping` when groups come from repeated column values, and `treeData` when the hierarchy is already explicit
+in the data; when both are set, grouping wins. With aggregation configured, tree parents carry the aggregate of
+their descendants (`treeData.aggregateParents`, default on).
 
-See [Events](/docs/next/events) for the `groupByChanged`, `groupColumnAdded/Removed/Moved`, and
-`aggDefsChanged` events emitted as grouping state changes.
+## Hierarchy column and display modes
+
+| `grouping.display`   | What you get                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------- |
+| `'column'` (default) | One hierarchy column, pinned left, showing every level indented.                             |
+| `'columns'`          | One hierarchy column per grouping level (headed by that column), each showing its own level. |
+| `'row'`              | A full-width row per group, drawn by `groupRowRenderer` (or `grouping.rowRenderer`).         |
+
+`hierarchyColumn` configures the auto column(s): `header`, `width`, `minWidth`, `pinned` (default `true`),
+`indentPerLevel` (default 16), `show: { toggle, checkbox, count }`, and `label(ctx)` / `count(ctx)` /
+`cellClass` to replace a part — each receives the row's kind, level, key or value, formatted value and
+aggregates. `hierarchyColumn: false` removes it.
+
+A column's aggregate can be drawn instead of written: `aggregateRenderer: { kind: 'dom', renderer }` is mounted by
+the grid into that column's cells on group and total rows, with `{ value, formattedValue, row, col }`
+(`mount(container, params)` returns `{ update?, destroy? }`) — a sparkline, a progress bar, a badge.
+
+## Keyboard, accessibility, selection and export
+
+Group and total rows take focus like data rows. On the hierarchy cell, **ArrowRight** opens a closed row (or
+moves into an open one's first child), **ArrowLeft** closes an open row (or moves to its parent) and **Enter**
+toggles; group and total cells are never edited. While rows are grouped or tree-shaped the grid is a
+`treegrid`: each row carries `aria-level`, `aria-expanded`, `aria-posinset` and `aria-setsize`.
+
+The group checkbox (`hierarchyColumn.show.checkbox`) reflects and selects every row beneath the group, collapsed
+ones included — `api.getDescendantSelection(id)` and `api.setDescendantsSelected(id, selected)` expose the same.
+For tree data, `treeData.selectDescendants` makes selecting a parent select its whole subtree.
+
+Copying a range that spans group or total rows copies what they show (the label and formatted aggregates).
+`api.exportCsv()` / `api.getCsv()` export the whole hierarchy — every group expanded — with group and total rows
+(`includeGroups`, `includeTotals`) and the hierarchy column indented or as a path (`hierarchyText`).
+
+See [Events](/docs/next/events) for `groupingChanged`, `groupByChanged`, `groupColumnAdded/Removed/Moved`,
+`aggregationChanged`, `treeDataChanged` and `expansionChanged`.
+
+## Upgrading from 1.x
+
+The hierarchy configuration changed shape; there is no compatibility layer.
+
+| 1.x                                                                              | Now                                                                                 |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `groupBy: [...]`, `groupRowHeight`                                               | `grouping: { by: [...], rowHeight }`                                                |
+| `showGroupFooter`, `footerRowRenderer`                                           | `grouping.totals: { groups: 'bottom' }`, `totalRowRenderer`                         |
+| `enableStickyGroupRows`                                                          | `grouping.stickyHeaders`                                                            |
+| `getParentId`, `rowModelConfig.treeData`                                         | `treeData: { getParentId, column, defaultExpanded, filterMode }`                    |
+| `masterDetailEnabled`, `detailRowHeight`, `detailRenderer`                       | `detail: { height, renderer, isMaster }`                                            |
+| `setAggDefs([{ field, aggFunc }])`                                               | `aggregation: { defs: [{ colId, aggFunc }] }` / `api.setAggregation(defs)`          |
+| `toggleGroupExpanded`, `isGroupExpanded`, `expandAllGroups`, `collapseAllGroups` | `toggleExpanded`, `isExpanded`, `expandAll({ maxLevel })`, `collapseAll`            |
+| `toggleDetailExpanded`, `isDetailExpanded`                                       | `toggleDetailOpen`, `isDetailOpen`                                                  |
+| `visualRow.depth` / `expanded` / `childCount`, `aggregateValues`                 | `visualRow.hierarchy.level` / `.expanded` / `.childCount`, `aggregates`             |
+| Group rows drawn by `groupRowRenderer`                                           | Cell rows with a hierarchy column; `grouping.display: 'row'` for `groupRowRenderer` |
+| `DefaultGroupRowRenderer` and the other default React row renderers              | Removed — the grid draws these rows itself                                          |
+
+Saved grid state from 1.x (schema v2) is not restored; the grouping part of saved state is now
+`grouping: { by, totals, stickyHeaders }` (schema v3).

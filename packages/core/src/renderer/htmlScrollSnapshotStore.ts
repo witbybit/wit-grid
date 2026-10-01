@@ -63,7 +63,8 @@ export class HtmlScrollSnapshotStore {
 		colWidth?: number;
 		policy: HtmlSnapshotPolicy;
 	}): HtmlScrollSnapshot | undefined {
-		const entry = this.entries.get(buildKey(input.rowId, input.columnInstanceId));
+		const key = buildKey(input.rowId, input.columnInstanceId);
+		const entry = this.entries.get(key);
 		if (!entry) return undefined;
 		if (!entry.html) return undefined;
 		if (!matchesFreshness(entry.freshness, input.expectedFreshness, input.policy)) return undefined;
@@ -71,8 +72,9 @@ export class HtmlScrollSnapshotStore {
 		if (input.colWidth !== undefined && entry.colWidth !== undefined && input.colWidth !== entry.colWidth) return undefined;
 		entry.lastUsedEpoch = ++this.epoch;
 		entry.lastUsedSequence = entry.lastUsedEpoch;
-		this.entries.delete(buildKey(input.rowId, input.columnInstanceId));
-		this.entries.set(buildKey(input.rowId, input.columnInstanceId), entry);
+		this.entries.delete(key);
+		this.entries.set(key, entry);
+
 		return entry;
 	}
 

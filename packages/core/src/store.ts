@@ -32,10 +32,12 @@ import { createClientRowModelRuntime, createInfiniteRowModelRuntime, createServe
 import type { GridRuntimePorts, RuntimePortBinding, RuntimePortBindResult } from './engine/rendererPorts.js';
 import { HEADLESS_PORTS } from './engine/rendererPorts.js';
 import { type GridInstrumentation, NOOP_INSTRUMENTATION } from './diagnostics/GridInstrumentation.js';
-import type { RenderStats } from './renderer/renderOrchestrator.js';
+import type { RenderStats } from './renderer/renderTelemetry.js';
 import type { GridRowNode } from './publicRowNode.js';
 import type { AggregationDef } from './rows/stages/aggregateStage.js';
-import { exportToCsv, type CsvExportOptions } from './export/csvExport.js';
+import { exportToCsv, toCsv, type CsvExportOptions } from './export/csvExport.js';
+import { createHierarchyTextResolver } from './rows/hierarchyText.js';
+import { isHierarchyActive } from './rows/hierarchyConfig.js';
 import type { PersistenceStatus, PersistedGridState } from './persistence/statePersistence.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './workspace/workspaceTypes.js';
 import { extractPersistedState, preparePersistedGridStateRestore, areRowHeightsEqual } from './persistence/statePersistence.js';
@@ -85,7 +87,7 @@ export {
 	canFocusVisualRow,
 	isDataCellSelectable,
 } from './visualRow.js';
-export type { DataVisualRow, GroupVisualRow, DetailVisualRow, FooterVisualRow, LoadingVisualRow, VisualRow } from './visualRow.js';
+export type { DataVisualRow, GroupVisualRow, DetailVisualRow, TotalVisualRow, LoadingVisualRow, VisualRow, RowHierarchy } from './visualRow.js';
 
 export type { PersistenceStatus };
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
@@ -129,6 +131,10 @@ import type {
 	GridStateSnapshot,
 } from './api/GridApi.js';
 import { createGridStateSnapshot } from './api/createGridStateSnapshot.js';
+import type { DetailConfig, GroupDef, GroupingConfig, HierarchyColumnConfig, TreeDataConfig } from './rows/hierarchyConfig.js';
+import type { ExpandAllOptions } from './rowModel.js';
+import { syncHierarchyColumn } from './rows/hierarchyColumn.js';
+import type { DescendantSelection } from './rows/hierarchyIndex.js';
 import type { InternalGridState, GridInitialState, ColumnState, RowModelType } from './state/GridState.js';
 import type { GridEventPayloadMap, GridEventListener } from './api/GridEvents.js';
 import { GridEventName } from './api/GridEvents.js';
@@ -196,6 +202,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			dataIntegrity?: import('./features/dataIntegrity/integrityTypes.js').GridDataIntegrityConfig<TRowData>;
 		}
 	) {
+		// The hierarchy column is part of the column set from the first frame.
+		{
+			const synced = syncHierarchyColumn({
+				columns: initialState.columns || [],
+				pinnedColumns: initialState.pinnedColumns,
+				grouping: initialState.grouping,
+				treeData: initialState.treeData,
+				hierarchyColumn: initialState.hierarchyColumn,
+			});
+			if (synced.changed) initialState = { ...initialState, columns: synced.columns, pinnedColumns: synced.pinnedColumns };
+		}
 		validateColumns(initialState.columns || []);
 		this.engine = new GridEngine<TRowData>({
 			capabilities: engineOptions?.capabilities,
@@ -218,15 +235,12 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			loading: initialState.loading,
 			loadingSkeletonCount: initialState.loadingSkeletonCount,
 			styleRules: initialState.styleRules,
-			groupBy: initialState.groupBy,
-			getParentId: initialState.getParentId,
-			masterDetailEnabled: initialState.masterDetailEnabled,
-			groupRowHeight: initialState.groupRowHeight,
-			detailRowHeight: initialState.detailRowHeight,
-			detailRenderer: initialState.detailRenderer,
-			rowModelConfig: initialState.rowModelConfig,
-			showGroupFooter: initialState.showGroupFooter,
-			enableStickyGroupRows: initialState.enableStickyGroupRows,
+			grouping: initialState.grouping,
+			treeData: initialState.treeData,
+			aggregation: initialState.aggregation,
+			detail: initialState.detail,
+			hierarchyColumn: initialState.hierarchyColumn,
+			pinnedColumns: initialState.pinnedColumns,
 			showGroupPanel: initialState.showGroupPanel,
 			showFilterChipBar: initialState.showFilterChipBar,
 			showFloatingFilters: initialState.showFloatingFilters,
@@ -237,7 +251,9 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			themeOverrides: initialState.themeOverrides,
 			rowOverscanPx: initialState.rowOverscanPx ?? 400,
 			colBuffer: initialState.colBuffer ?? 2,
+			colOverscanPx: initialState.colOverscanPx,
 			rendererOptions: initialState.rendererOptions,
+			asyncTransactionWaitMs: initialState.asyncTransactionWaitMs,
 			// Always normalize runtimeLimits so all callers can assume it exists.
 			runtimeLimits: {
 				maxRenderedRows: 500,
@@ -282,15 +298,15 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			getCellValue: (rowId, colField) => this.getCellValue(rowId, colField),
 			getSelectedRowIds: () => this.getSelectedRowIds(),
 			isRowNodeSelected: (rowId) => this.isRowNodeSelected(rowId),
-			isGroupExpanded: (groupId) => this.isGroupExpanded(groupId),
-			isDetailExpanded: (rowId) => this.isDetailExpanded(rowId),
+			isExpanded: (id) => this.isExpanded(id),
+			isDetailOpen: (rowId) => this.isDetailOpen(rowId),
 			selectRows: (rowIds, options) => this.selectRows(rowIds, options),
 			deselectRows: (rowIds) => this.deselectRows(rowIds),
 			scrollToRow: (rowId, options) => this.scrollToRow(rowId, options),
 			setCellValue: (rowId, colField, value) => this.setCellValue(rowId, colField, value),
 			batchCellValues: (updates, source) => this.engine.batchCellValues(updates, source),
-			toggleGroupExpanded: (groupId) => this.toggleGroupExpanded(groupId),
-			toggleDetailExpanded: (rowId) => this.toggleDetailExpanded(rowId),
+			setExpanded: (id, expanded) => this.setExpanded(id, expanded),
+			setDetailOpen: (rowId, open) => this.setDetailOpen(rowId, open),
 			refreshRows: () => this.refreshRows(),
 			retryRowLoad: (rowIndex, loadState) => {
 				if (loadState.kind !== 'failed') return { status: 'rejected', reason: 'Row retry is only available for failed rows.' };
@@ -585,13 +601,21 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return evaluateQueryModel(queryModel, node, ctx);
 	};
 
-	public setGroupBy = (colIds: string[]): void => {
-		this.engine.setGroupBy(colIds);
+	public getGrouping = (): GroupingConfig<TRowData> | undefined => this.engine.groupingFeature.getGrouping();
+
+	public setGrouping = (grouping: GroupingConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setGrouping(grouping);
 	};
 
-	public getGroupBy = (): string[] => {
-		return this.state.groupBy ?? [];
+	public updateGrouping = (patch: Partial<GroupingConfig<TRowData>>): void => {
+		this.engine.groupingFeature.updateGrouping(patch);
 	};
+
+	public setGroupBy = (by: ReadonlyArray<string | GroupDef<TRowData>>): void => {
+		this.engine.setGroupBy(by);
+	};
+
+	public getGroupBy = (): string[] => this.engine.groupingFeature.getGroupBy();
 
 	public addGroupBy = (colId: string, atIndex?: number): void => {
 		this.engine.addGroupBy(colId, atIndex);
@@ -605,28 +629,67 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		this.engine.moveGroupBy(colId, toIndex);
 	};
 
-	public setAggDefs = (defs: AggregationDef<TRowData>[]): void => {
-		this.engine.setAggDefs(defs);
+	public getTreeData = (): TreeDataConfig<TRowData> | undefined => this.engine.groupingFeature.getTreeData();
+
+	public setTreeData = (treeData: TreeDataConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setTreeData(treeData);
 	};
 
-	public getAggDefs = (): AggregationDef<TRowData>[] => {
-		return this.state.aggDefs ?? [];
+	public getAggregation = (): AggregationDef<TRowData>[] => this.engine.groupingFeature.getAggregation();
+
+	public setAggregation = (defs: AggregationDef<TRowData>[]): void => {
+		this.engine.groupingFeature.setAggregation(defs);
 	};
 
-	public expandAllGroups = (): void => {
-		this.engine.groupingFeature.expandAllGroups();
+	public getHierarchyColumn = (): HierarchyColumnConfig<TRowData> | false | undefined => this.engine.groupingFeature.getHierarchyColumn();
+
+	public setHierarchyColumn = (config: HierarchyColumnConfig<TRowData> | false | undefined): void => {
+		this.engine.groupingFeature.setHierarchyColumn(config);
 	};
 
-	public collapseAllGroups = (): void => {
-		this.engine.groupingFeature.collapseAllGroups();
+	public getDetail = (): DetailConfig<TRowData> | undefined => this.engine.groupingFeature.getDetail();
+
+	public setDetail = (detail: DetailConfig<TRowData> | undefined): void => {
+		this.engine.groupingFeature.setDetail(detail);
 	};
 
-	public setShowGroupFooter = (enabled: boolean): void => {
-		this.engine.setShowGroupFooter(enabled);
+	public setExpanded = (id: string, expanded: boolean): void => {
+		this.engine.groupingFeature.setExpanded(id, expanded);
 	};
 
-	public setStickyGroupRows = (enabled: boolean): void => {
-		this.engine.setStickyGroupRows(enabled);
+	public toggleExpanded = (id: string): void => {
+		this.engine.groupingFeature.toggleExpanded(id);
+	};
+
+	public isExpanded = (id: string): boolean => this.engine.groupingFeature.isExpanded(id);
+
+	public expandAll = (options?: ExpandAllOptions): void => {
+		this.engine.groupingFeature.expandAll(options);
+	};
+
+	public collapseAll = (): void => {
+		this.engine.groupingFeature.collapseAll();
+	};
+
+	public setDetailOpen = (rowId: string, open: boolean): void => {
+		this.engine.groupingFeature.setDetailOpen(rowId, open);
+	};
+
+	public toggleDetailOpen = (rowId: string): void => {
+		this.engine.groupingFeature.toggleDetailOpen(rowId);
+	};
+
+	public isDetailOpen = (rowId: string): boolean => this.engine.groupingFeature.isDetailOpen(rowId);
+
+	public getDescendantRowIds = (id: string): readonly string[] => this.engine.groupingFeature.getDescendantRowIds(id);
+
+	public getDescendantSelection = (id: string): DescendantSelection => this.engine.groupingFeature.getDescendantSelection(id);
+
+	public setDescendantsSelected = (id: string, selected: boolean): void => {
+		const rowIds = [...this.getDescendantRowIds(id)];
+		if (rowIds.length === 0) return;
+		if (selected) this.selectRows(rowIds);
+		else this.deselectRows(rowIds);
 	};
 
 	public setShowGroupPanel = (enabled: boolean): void => {
@@ -644,6 +707,20 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public exportCsv = (options?: CsvExportOptions): void => {
 		exportToCsv(this, options);
 	};
+
+	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
+
+	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
+	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {
+		const rowModel = this.engine.getRowModel() as { getHierarchyExportRows?: () => VisualRow<TRowData>[] | null } | null;
+		return isHierarchyActive(this.state) ? (rowModel?.getHierarchyExportRows?.() ?? null) : null;
+	};
+
+	public hierarchyCellText = createHierarchyTextResolver<TRowData>({
+		getState: () => this.state,
+		getColumn: (field) => this.engine.columns.getColumnByFieldOrInstanceId(field),
+		getCellValue: (rowId, field) => this.engine.data.getCellValue(rowId, field),
+	});
 
 	// All persistence methods are overridden by the private runtime composition root when an adapter is configured.
 	public hasPersistence = (): boolean => false;
@@ -708,22 +785,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public setStyleRules = (styleRules: GridStyleRule<TRowData>[] | undefined): void => {
 		this.engine.setStyleRules(styleRules);
-	};
-
-	public toggleGroupExpanded = (groupId: string): void => {
-		this.engine.groupingFeature.toggleGroupExpanded(groupId);
-	};
-
-	public toggleDetailExpanded = (rowId: string): void => {
-		this.engine.groupingFeature.toggleDetailExpanded(rowId);
-	};
-
-	public isGroupExpanded = (groupId: string): boolean => {
-		return this.getExpansionStateReadableRowModel()?.isGroupExpanded(groupId) ?? false;
-	};
-
-	public isDetailExpanded = (rowId: string): boolean => {
-		return this.getExpansionStateReadableRowModel()?.isDetailExpanded(rowId) ?? false;
 	};
 
 	public getVisualRow = (index: number): VisualRow<TRowData> | null => {
@@ -949,6 +1010,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public applyTransaction = (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {
 		return this.engine.applyTransaction(transaction);
+	};
+
+	public applyTransactionAsync = (
+		transaction: RowDataTransaction<TRowData>,
+		callback?: (result: RowNodeTransaction<TRowData> | null) => void
+	): void => {
+		this.engine.applyTransactionAsync(transaction, callback);
+	};
+
+	public flushAsyncTransactions = (): void => {
+		this.engine.flushAsyncTransactions();
 	};
 
 	public transaction = (transaction: GridTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {

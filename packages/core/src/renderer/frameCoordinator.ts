@@ -17,10 +17,13 @@ import type { RenderRuntimeState } from './renderRuntimeState.js';
  * no-ops if a new scroll session has begun.
  *
  * Scroll-end detection: after requestScrollFrame() stops arriving, the
- * coordinator counts quiet frames internally. After scrollEndQuietFrames
- * consecutive RAF callbacks with no new scroll request, the runtime
- * transitions to idle and onScrollEnd() fires. This eliminates any secondary
- * RAF loop outside the coordinator.
+ * coordinator counts quiet frames internally. Scroll ends once at least
+ * scrollEndQuietFrames consecutive RAF callbacks had no new scroll request AND
+ * (when scrollEndQuietMs is set) that much wall-clock time has passed since the
+ * last request — a pure frame count ends a gesture after ~12ms at 240Hz, which
+ * is mid-gesture. The runtime then transitions to idle and onScrollEnd() fires.
+ * A native `scrollend` (notifyScrollEnd) short-circuits the wait. This
+ * eliminates any secondary RAF loop outside the coordinator.
  *
  * Phase transitions: the coordinator owns scroll-frame and post-scroll
  * transitions around the onScrollFrame callback. Callbacks must not call
@@ -70,7 +73,27 @@ export interface FrameCoordinatorDeps {
 	 * add a buffer against momentary gaps between scroll events.
 	 */
 	scrollEndQuietFrames?: number;
+	/**
+	 * Minimum wall-clock quiet time (ms since the last requestScrollFrame) before scroll-end is
+	 * declared, in addition to scrollEndQuietFrames. Defaults to 0 (frame count only). Ignored
+	 * for synchronously-firing test schedulers, where no time can pass between frames.
+	 */
+	scrollEndQuietMs?: number;
+	/**
+	 * Quiet time (ms since the last requestScrollFrame) a native `scrollend` still needs before the
+	 * scroll ends. Defaults to 50. Every discrete scroll — an instant wheel tick, a scripted
+	 * `scrollTop` assignment — fires its own `scrollend`, so without this a stream of them ended and
+	 * restarted the session between each step (re-running the whole scroll-end path and toggling the
+	 * container's scrolling class, which restyles every row). Ignored for synchronously-firing test
+	 * schedulers, where no time can pass between frames.
+	 */
+	nativeScrollEndQuietMs?: number;
+	/** Clock for the quiet windows. Defaults to performance.now(). */
+	now?: () => number;
 }
+
+/** Upper bound on quiet frames before scroll-end when scrollEndQuietMs is in use. */
+const SCROLL_END_MAX_QUIET_FRAMES = 48;
 
 export class DefaultFrameCoordinator implements FrameCoordinator {
 	private pendingScroll = false;
@@ -84,6 +107,14 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 	private postScrollEpoch = 0;
 	private scrollEndQuietCount = 0;
 	private readonly scrollEndQuietThreshold: number;
+	private readonly scrollEndQuietMs: number;
+	private readonly nativeScrollEndQuietMs: number;
+	private readonly now: () => number;
+	private lastScrollRequestAt = 0;
+	/** Native scrollend arrived while a scroll frame was still owed; end right after it. */
+	private scrollEndRequested = false;
+	/** >0 while inside gs.raf(); a frame firing then comes from a synchronous scheduler. */
+	private rafScheduleDepth = 0;
 	private readonly gs: GridScheduler;
 	private readonly onScrollFrame: () => void;
 	private readonly onPaintFrame: (changeIds: readonly number[]) => void;
@@ -101,12 +132,60 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		this.onFault = deps.onFault;
 		this.runtimeState = deps.runtimeState;
 		this.scrollEndQuietThreshold = deps.scrollEndQuietFrames ?? 3;
+		this.scrollEndQuietMs = deps.scrollEndQuietMs ?? 0;
+		this.nativeScrollEndQuietMs = deps.nativeScrollEndQuietMs ?? 50;
+		this.now = deps.now ?? (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
 	}
 
 	requestScrollFrame(): void {
-		if (this.destroyed || this.pendingScroll) return;
+		if (this.destroyed) return;
+		// Movement after a native scrollend belongs to a new gesture.
+		this.scrollEndRequested = false;
+		if (this.scrollEndQuietMs > 0 || this.nativeScrollEndQuietMs > 0) this.lastScrollRequestAt = this.now();
+		if (this.pendingScroll) return;
 		this.pendingScroll = true;
 		this.scheduleFrame();
+	}
+
+	/**
+	 * Native `scrollend`: the browser reports that a scroll finished, so the quiet-time fallback
+	 * need not be waited out. It is confirmed on the next frame that brings no new movement rather
+	 * than acted on at once: a programmatic `scrollTop` assignment fires `scrollend` as soon as it
+	 * lands, so a scripted scroll animation (or auto-scroll) produces one per frame while it is still
+	 * moving. Ending the session on each one reset velocity (so adaptive overscan never built up and
+	 * the leading edge went blank) and re-ran the whole scroll-end path every frame. New movement
+	 * (requestScrollFrame) cancels the request; a real gesture ends at most one frame later.
+	 */
+	notifyScrollEnd(): void {
+		if (this.destroyed || !this.runtimeState?.isScrolling()) return;
+		this.scrollEndRequested = true;
+		this.scheduleFrame();
+	}
+
+	private endScroll(): void {
+		this.scrollEndQuietCount = 0;
+		this.scrollEndRequested = false;
+		// Runtime transitions to idle before notifying the scroll-end handler.
+		this.runtimeState?.transitionTo('idle');
+		this.onScrollEnd?.();
+	}
+
+	/** A native scrollend was reported: end once a frame and nativeScrollEndQuietMs passed without movement. */
+	private isNativeScrollEndQuiet(syncFrame: boolean): boolean {
+		if (this.nativeScrollEndQuietMs <= 0 || syncFrame) return true;
+		// Same frame cap as the fallback path, for clocks that do not advance between frames.
+		if (this.scrollEndQuietCount >= SCROLL_END_MAX_QUIET_FRAMES) return true;
+		return this.now() - this.lastScrollRequestAt >= this.nativeScrollEndQuietMs;
+	}
+
+	private isScrollQuiet(syncFrame: boolean): boolean {
+		if (this.scrollEndQuietCount < this.scrollEndQuietThreshold) return false;
+		if (this.scrollEndQuietMs <= 0 || syncFrame) return true;
+		// The frame cap bounds the wait when the clock does not advance between frames (frozen or
+		// fake timers, frames drained back-to-back); on real displays the time window ends first
+		// (48 frames is 200ms at 240Hz).
+		if (this.scrollEndQuietCount >= SCROLL_END_MAX_QUIET_FRAMES) return true;
+		return this.now() - this.lastScrollRequestAt >= this.scrollEndQuietMs;
 	}
 
 	requestPaintFrame(changeIds: readonly number[] = []): void {
@@ -135,11 +214,18 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		// while the callback is running.  The real id overwrites it after
 		// the call — unless the callback already fired and cleared it to null.
 		this.rafId = -1;
-		const id = this.gs.raf(() => this.flushFrame());
+		this.rafScheduleDepth++;
+		let id: number;
+		try {
+			id = this.gs.raf(() => this.flushFrame());
+		} finally {
+			this.rafScheduleDepth--;
+		}
 		if (this.rafId === -1) this.rafId = id;
 	}
 
 	private flushFrame(): void {
+		const syncFrame = this.rafScheduleDepth > 0;
 		this.rafId = null;
 		if (this.inFrame) {
 			this.onFault?.('FrameCoordinator: reentrant frame detected');
@@ -155,6 +241,9 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 				// Runtime owns scroll-frame phase transition. The onScrollFrame callback
 				// must not call transitionTo('scroll-frame') or transitionTo('post-scroll').
 				if (rs && !rs.isDestroyed()) {
+					// A scroll frame owed while idle (a request that skipped markScrolling) opens a scroll
+					// session first; idle -> scroll-frame is not a legal transition.
+					if (rs.phase === 'idle') rs.transitionTo('scroll-pending');
 					rs.transitionTo('scroll-frame');
 				}
 				try {
@@ -169,11 +258,8 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 				// This path fires while the runtime is still in post-scroll (or scroll-pending)
 				// after the last visible scroll frame.
 				this.scrollEndQuietCount++;
-				if (this.scrollEndQuietCount >= this.scrollEndQuietThreshold) {
-					this.scrollEndQuietCount = 0;
-					// Runtime transitions to idle before notifying the scroll-end handler.
-					this.runtimeState.transitionTo('idle');
-					this.onScrollEnd?.();
+				if (this.scrollEndRequested ? this.isNativeScrollEndQuiet(syncFrame) : this.isScrollQuiet(syncFrame)) {
+					this.endScroll();
 				}
 			}
 			if (this.pendingPaint) {
@@ -239,17 +325,20 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		const changeIds = Object.freeze([...this.pendingPaintChangeIds]);
 		this.pendingPaintChangeIds.clear();
 		const rs = this.runtimeState;
-		if (rs) {
-			if (rs.isDestroyed()) {
-				this.onFault?.('FrameCoordinator: paint frame after destruction');
-				return;
-			}
-			rs.transitionTo('paint-frame');
+		if (rs?.isDestroyed()) {
+			this.onFault?.('FrameCoordinator: paint frame after destruction');
+			return;
 		}
+		// A paint can be owed while a scroll session is open (scroll-pending / post-scroll). It runs
+		// inside that session instead of taking a paint-frame phase: entering paint-frame is illegal
+		// there, and returning to idle afterwards would silently drop the scroll session, so its
+		// scroll-end work (deferred portal mounts, the scrolling class) would never run.
+		const ownsPhase = !rs || rs.phase === 'idle';
+		if (rs && ownsPhase) rs.transitionTo('paint-frame');
 		try {
 			this.onPaintFrame(changeIds);
 		} finally {
-			if (rs && !rs.isDestroyed()) {
+			if (rs && ownsPhase && !rs.isDestroyed()) {
 				rs.transitionTo('idle');
 			}
 		}
@@ -267,5 +356,6 @@ export class DefaultFrameCoordinator implements FrameCoordinator {
 		this.pendingPostScroll = false;
 		this.pendingPostScrollChangeIds.clear();
 		this.scrollEndQuietCount = 0;
+		this.scrollEndRequested = false;
 	}
 }

@@ -60,7 +60,7 @@ export const layoutColumnsFull: ColumnDef<PerformanceRow>[] = [
 		field: 'subtotal',
 		header: 'Delta Δ',
 		width: 100,
-		renderer: { kind: 'react', component: GreeksRenderer },
+		renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollState: true } },
 		valueGetterDependencies: ['price', 'quantity'],
 		valueGetter: ({ row }) => {
 			const vol = parseFloat(row.quantity) || 20;
@@ -96,7 +96,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'delta',
 			header: 'Delta Δ',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -109,7 +109,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'gamma',
 			header: 'Gamma Γ',
 			width: 95,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -122,7 +122,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'vega',
 			header: 'Vega ν',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -135,7 +135,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'theta',
 			header: 'Theta θ',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -193,7 +193,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			width: 170,
 			// scrollPresentation: 'live' — the real renderer mounts/updates on every scroll frame,
 			// unlike every other column here which freezes or shows an impostor during scroll.
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'live' } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'live', scrollState: true } },
 			valueGetter: ({ row }) => `live|${row.service}`,
 		},
 		{
@@ -202,7 +202,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			width: 170,
 			// Plain text impostor — shows raw "defer|INFO scroll-idle" text during scroll.
 			// Compare with the Snap column next to it to see the visual difference.
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['severity'],
 			valueGetter: ({ row }) => `defer|${row.severity}`,
 		},
@@ -216,7 +216,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			renderer: {
 				kind: 'react',
 				component: RendererStrategyProbe,
-				capabilities: { scrollPresentation: 'html-snapshot' },
+				capabilities: { scrollPresentation: 'html-snapshot', scrollState: true },
 			},
 			valueGetterDependencies: ['severity'],
 			valueGetter: ({ row }) => `defer|${row.severity}`,
@@ -233,7 +233,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			field: 'rendererFallback',
 			header: 'Defer Freeze',
 			width: 175,
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['latencyMs'],
 			valueGetter: ({ row }) => `defer|${row.latencyMs}ms`,
 		},
@@ -241,7 +241,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			field: 'rendererDestroy',
 			header: 'Destroy Recycle',
 			width: 180,
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze' } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
 			valueGetterDependencies: ['ipAddress'],
 			valueGetter: ({ row }) => `destroy|${row.ipAddress}`,
 		},

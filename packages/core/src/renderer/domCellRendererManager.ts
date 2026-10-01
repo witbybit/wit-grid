@@ -1,4 +1,4 @@
-import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle } from '../columnDef.js';
+import type { ColumnDef, CellRendererPhase, DomCellRenderer, DomCellRendererHandle, DomCellRendererParams, InternalColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 
@@ -40,8 +40,8 @@ export class DomCellRendererManager<TRowData = unknown> {
 	private activeByKey = new Map<string, DomRendererInstance<TRowData>>();
 	private activeByCellKey = new Map<string, DomRendererInstance<TRowData>>();
 	private activeKeyByParent = new Map<HTMLElement, string>();
+	/** Warm cache in LRU order: Map insertion order, touched via delete+set, evicted from the front. */
 	private warmByKey = new Map<string, DomRendererInstance<TRowData>>();
-	private lruOrder = new Map<string, number>();
 	private lruCounter = 0;
 
 	private maxWarmOverride: number | null = null;
@@ -59,6 +59,11 @@ export class DomCellRendererManager<TRowData = unknown> {
 	public setLimits(maxWarm: number): void {
 		this.maxWarmOverride = maxWarm;
 		this.pruneWarmCache();
+	}
+
+	private getApi(): DomCellRendererParams<TRowData>['api'] {
+		if (!this.engine) throw new Error('DOM cell renderers need a grid engine');
+		return this.engine.getApiRef() as DomCellRendererParams<TRowData>['api'];
 	}
 
 	private ensureHiddenContainer(): HTMLDivElement | null {
@@ -83,7 +88,6 @@ export class DomCellRendererManager<TRowData = unknown> {
 		instance = this.warmByKey.get(params.rendererKey);
 		if (instance) {
 			this.warmByKey.delete(params.rendererKey);
-			this.lruOrder.delete(params.rendererKey);
 			this.rebindInstance(instance, params);
 			return;
 		}
@@ -105,6 +109,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 			phase: params.phase,
 			isFocused: params.isFocused,
 			isSelected: params.isSelected,
+			api: this.getApi(),
 		};
 
 		const handle = params.renderer.mount(container, mountParams);
@@ -160,7 +165,6 @@ export class DomCellRendererManager<TRowData = unknown> {
 		this.activeKeyByParent.clear();
 		for (const instance of this.warmByKey.values()) this.destroyInstance(instance);
 		this.warmByKey.clear();
-		this.lruOrder.clear();
 		this.lruCounter = 0;
 		this.hiddenContainer?.remove();
 		this.hiddenContainer = null;
@@ -175,8 +179,9 @@ export class DomCellRendererManager<TRowData = unknown> {
 				hidden.appendChild(instance.container);
 			}
 			instance.lastAccessTime = ++this.lruCounter;
+			// delete+set moves the key to the back of the Map's insertion order (most recently used).
+			this.warmByKey.delete(instance.rendererKey);
 			this.warmByKey.set(instance.rendererKey, instance);
-			this.lruOrder.set(instance.rendererKey, this.lruCounter);
 			if (!this.engine?.isScrolling) this.pruneWarmCache();
 			return;
 		}
@@ -185,6 +190,9 @@ export class DomCellRendererManager<TRowData = unknown> {
 	}
 
 	private rebindInstance(instance: DomRendererInstance<TRowData>, params: AcquireDomRendererParams<TRowData>): void {
+		// isScrolling/phase changes alone update the renderer only when it opts in (capabilities
+		// .scrollState): otherwise every scroll start/end would re-run update() on every DOM cell.
+		const receivesScrollState = (params.col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollState === true;
 		const needsUpdate =
 			instance.value !== params.value ||
 			instance.node !== params.node ||
@@ -192,12 +200,13 @@ export class DomCellRendererManager<TRowData = unknown> {
 			instance.isEditing !== params.isEditing ||
 			instance.isFocused !== params.isFocused ||
 			instance.isSelected !== params.isSelected ||
-			instance.phase !== params.phase ||
-			instance.isScrolling !== params.isScrolling ||
+			(receivesScrollState && (instance.phase !== params.phase || instance.isScrolling !== params.isScrolling)) ||
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey;
 
 		this.unregisterActive(instance);
+		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
+		if (instance.cellKey !== params.cellKey) this.onCellKeyRetired?.(instance.cellKey);
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.value = params.value;
@@ -209,8 +218,12 @@ export class DomCellRendererManager<TRowData = unknown> {
 		instance.isFocused = params.isFocused;
 		instance.isSelected = params.isSelected;
 		instance.lastAccessTime = ++this.lruCounter;
-		instance.container.dataset.rendererKey = params.rendererKey;
-		instance.container.dataset.cellKey = params.cellKey;
+		// Attribute writes are DOM mutations (and style-invalidation checks) even with an unchanged
+		// value; a rebind of the same renderer to the same cell must not repeat them.
+		if (keysChanged) {
+			instance.container.dataset.rendererKey = params.rendererKey;
+			instance.container.dataset.cellKey = params.cellKey;
+		}
 
 		if (instance.container.parentElement !== params.parentContainer) {
 			params.parentContainer.appendChild(instance.container);
@@ -230,6 +243,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 				phase: params.phase,
 				isFocused: params.isFocused,
 				isSelected: params.isSelected,
+				api: this.getApi(),
 			});
 		}
 	}
@@ -250,6 +264,13 @@ export class DomCellRendererManager<TRowData = unknown> {
 		}
 	}
 
+	/**
+	 * Fired when an instance stops representing a cell key: it was destroyed (including warm-cache
+	 * eviction) or rebound to a different key. PortalMountManager uses it to forget that key's
+	 * portal record, which a warm-parked instance otherwise keeps forever.
+	 */
+	public onCellKeyRetired?: (cellKey: string) => void;
+
 	private destroyInstance(instance: DomRendererInstance<TRowData>): void {
 		try {
 			instance.handle.destroy?.();
@@ -257,6 +278,7 @@ export class DomCellRendererManager<TRowData = unknown> {
 		delete instance.container.dataset.rendererKey;
 		delete instance.container.dataset.cellKey;
 		instance.container.remove();
+		this.onCellKeyRetired?.(instance.cellKey);
 	}
 
 	private removeSiblingContainers(rendererKey: string, parentContainer: HTMLElement, activeContainer: HTMLElement): void {
@@ -280,32 +302,16 @@ export class DomCellRendererManager<TRowData = unknown> {
 	}
 
 	private pruneWarmCache(): void {
-		while (this.warmByKey.size > this.maxWarm && this.lruOrder.size > 0) {
-			let oldest: string | null = null;
-			let minVal = Infinity;
-			for (const [key, val] of this.lruOrder) {
-				if (val < minVal) {
-					minVal = val;
-					oldest = key;
-				}
-			}
-			if (oldest) {
-				const inst = this.warmByKey.get(oldest);
-				this.lruOrder.delete(oldest);
-				if (inst) {
-					this.warmByKey.delete(oldest);
-					this.destroyInstance(inst);
-				}
-			} else break;
-		}
-
-		const staleThreshold = this.lruCounter - this.maxWarm * 2;
-		for (const [key, inst] of this.warmByKey) {
-			if (inst.lastAccessTime < staleThreshold) {
-				this.warmByKey.delete(key);
-				this.lruOrder.delete(key);
-				this.destroyInstance(inst);
-			}
+		// Size-based LRU eviction only — the Map's first entry is the least recently used (O(1)).
+		// Deliberately no counter-based stale threshold: lruCounter also advances on cold mounts and
+		// rebinds, so a threshold of lruCounter - maxWarm*2 destroyed legitimately warm entries
+		// (same bug CustomRendererManager.pruneWarmCache documents and removed).
+		while (this.warmByKey.size > this.maxWarm) {
+			const oldest = this.warmByKey.entries().next();
+			if (oldest.done) break;
+			const [oldestKey, inst] = oldest.value;
+			this.warmByKey.delete(oldestKey);
+			this.destroyInstance(inst);
 		}
 	}
 }

@@ -9,6 +9,18 @@ import { computeRowWindowRetention } from './rowWindowRetention.js';
 import { CellSlot } from './cellSlot.js';
 import { CORE_STYLES } from './styles.js';
 
+/** A cell's visible text: direct-text cells hold it themselves, wrapped cells in .og-cell-content. */
+function readCellText(cell: Element): string {
+	if ((cell as HTMLElement).dataset.textCell !== undefined) {
+		return Array.from(cell.childNodes)
+			.filter((node) => node.nodeType === 3)
+			.map((node) => node.textContent)
+			.join('')
+			.trim();
+	}
+	return cell.querySelector<HTMLElement>(':scope > .og-cell-content')?.textContent?.trim() ?? '';
+}
+
 interface AuditPerfRow {
 	id: string;
 	timestamp: string;
@@ -302,7 +314,14 @@ function assertNoStaleOrOverlappingDom(grid: AuditGrid): void {
 		for (const cell of cells) {
 			expect(cell.dataset.rowIndex).toBe(row.dataset.rowIndex);
 			expect(row.dataset.rowId === cell.dataset.rowId || row.dataset.rowId === `row:${cell.dataset.rowId}`).toBe(true);
-			expect(cell.querySelectorAll(':scope > .og-cell-content')).toHaveLength(1);
+			if (cell.dataset.textCell !== undefined) {
+				// Direct-text cell: no wrapper, exactly one text node, at most a portal host besides.
+				expect(cell.querySelectorAll(':scope > .og-cell-content')).toHaveLength(0);
+				expect(Array.from(cell.childNodes).filter((node) => node.nodeType === 3)).toHaveLength(1);
+				expect(Array.from(cell.children).every((child) => child.classList.contains('og-cell-portal-host'))).toBe(true);
+			} else {
+				expect(cell.querySelectorAll(':scope > .og-cell-content')).toHaveLength(1);
+			}
 			// Portal hosts are created lazily on first portal use — text cells have none.
 			expect(cell.querySelectorAll(':scope > .og-cell-portal-host').length).toBeLessThanOrEqual(1);
 			for (const renderer of Array.from(cell.querySelectorAll<HTMLElement>('.og-custom-renderer-container'))) {
@@ -510,7 +529,7 @@ function assertNoBlankVisibleCells(grid: AuditGrid, expectedScrollTop: number, e
 		expect(visibleCells.length).toBeGreaterThan(0);
 		for (const cell of visibleCells) {
 			const contentMode = cell.dataset.contentMode ?? CellSlot.fromElement(cell as HTMLDivElement).lastContentMode;
-			const contentText = cell.querySelector<HTMLElement>(':scope > .og-cell-content')?.textContent?.trim() ?? '';
+			const contentText = readCellText(cell);
 			const portalHost = cell.querySelector<HTMLElement>(':scope > .og-cell-portal-host');
 			const hasPortalContent = !!portalHost && portalHost.childElementCount > 0;
 			const isLoading = cell.classList.contains('og-cell-loading') || contentMode === 'loading';
@@ -567,7 +586,7 @@ function assertVisibleIntegrityDecorationsStayPresent(grid: AuditGrid): void {
 				title: cell.title,
 				validationError: cell.dataset.validationError,
 				contentMode: cell.dataset.contentMode,
-				text: cell.querySelector<HTMLElement>(':scope > .og-cell-content')?.textContent?.trim() ?? '',
+				text: readCellText(cell),
 			}));
 		throw new Error(`Missing integrity decorations: ${JSON.stringify(sample)}`);
 	}
@@ -725,7 +744,9 @@ describe('Server demo ruthless runtime performance contracts', () => {
 		cleanupGrid(grid);
 	}, 20_000);
 
-	it('BLOCKER: a cold, never-before-seen DOM-renderer cell never live-mounts during active scroll', async () => {
+	it("BLOCKER: with scrollPresentation 'freeze', a cold, never-before-seen DOM-renderer cell never mounts during active scroll", async () => {
+		// DOM renderers default to 'update' (drawn in place within a frame budget — see
+		// domUpdatePresentation.e2e.test.ts). An explicit 'freeze' keeps this original guarantee.
 		// mode:'custom-dom' is NOT in the impostor-capable set (custom-live/custom-imperative/custom) —
 		// this is the real compiled-plan shape for any column using a DOM cell renderer. Scrolling a
 		// never-before-visited window of such columns into view previously fell through to a synchronous
@@ -747,14 +768,18 @@ describe('Server demo ruthless runtime performance contracts', () => {
 				field: 'value',
 				header: 'DOM Metric',
 				width: 120,
-				cellRenderer: {
-					mount(container: HTMLElement, params: { value: unknown; isScrolling: boolean; phase: string }) {
-						domRendererMounts.push(String(params.value));
-						domRendererMountPhases.push({ isScrolling: params.isScrolling, phase: params.phase });
-						container.textContent = String(params.value);
-						return { update: () => {}, destroy: () => {} };
-					},
-				} as any,
+				renderer: {
+					kind: 'dom',
+					renderer: {
+						mount(container: HTMLElement, params: { value: unknown; isScrolling: boolean; phase: string }) {
+							domRendererMounts.push(String(params.value));
+							domRendererMountPhases.push({ isScrolling: params.isScrolling, phase: params.phase });
+							container.textContent = String(params.value);
+							return { update: () => {}, destroy: () => {} };
+						},
+					} as any,
+					capabilities: { scrollPresentation: 'freeze' },
+				},
 			},
 		];
 		const store = new GridStore<ColdRow>({
@@ -952,7 +977,7 @@ describe('Server demo ruthless runtime performance contracts', () => {
 				childrenCount: cell.childNodes.length,
 				childClasses: Array.from(cell.childNodes).map((c: any) => c.className),
 				hasCachedParts: !!slot,
-				cachedContentHasParent: slot ? !!slot.contentElement.parentNode : false,
+				cachedContentHasParent: slot && !slot.directText ? !!slot.contentElement.parentNode : null,
 				cachedPortalHasParent: slot ? !!slot.portalHostElement?.parentNode : false,
 			});
 		}

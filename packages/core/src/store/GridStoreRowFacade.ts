@@ -22,15 +22,15 @@ export interface GridStoreRowFacadeDeps<TRowData = unknown> {
 	getCellValue(rowId: string, colField: string): unknown;
 	getSelectedRowIds(): string[];
 	isRowNodeSelected(rowId: string): boolean;
-	isGroupExpanded(groupId: string): boolean;
-	isDetailExpanded(rowId: string): boolean;
+	isExpanded(id: string): boolean;
+	isDetailOpen(rowId: string): boolean;
 	selectRows(rowIds: string[], options?: { mode?: 'add' | 'replace' }): void;
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, colField: string, value: unknown): GridWriteResult;
 	batchCellValues(updates: Array<{ rowId: string; colField: string; value: unknown }>, source: 'api'): GridWriteResult;
-	toggleGroupExpanded(groupId: string): void;
-	toggleDetailExpanded(rowId: string): void;
+	setExpanded(id: string, expanded: boolean): void;
+	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
 	retryRowLoad(rowIndex: number | null, loadState: RowLoadState): GridWriteResult;
 	getRowIssues(rowId: string): readonly GridIntegrityIssue[];
@@ -79,15 +79,15 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 		getVisualIndexByRowId,
 		getVisualRowCount,
 		getSelectedRowIds: deps.getSelectedRowIds,
-		isGroupExpanded: deps.isGroupExpanded,
-		isDetailExpanded: deps.isDetailExpanded,
+		isExpanded: deps.isExpanded,
+		isDetailOpen: deps.isDetailOpen,
 		selectRows: deps.selectRows,
 		deselectRows: deps.deselectRows,
 		scrollToRow: deps.scrollToRow,
 		setCellValue: deps.setCellValue,
 		batchCellValues: (updates) => deps.batchCellValues([...updates], 'api'),
-		toggleGroupExpanded: deps.toggleGroupExpanded,
-		toggleDetailExpanded: deps.toggleDetailExpanded,
+		setExpanded: deps.setExpanded,
+		setDetailOpen: deps.setDetailOpen,
 		refreshRows: deps.refreshRows,
 		retryRowLoad: deps.retryRowLoad,
 		getRowIssues: deps.getRowIssues,
@@ -107,7 +107,7 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 			selectable: true,
 			selected: deps.isRowNodeSelected(rowId),
 			expandable: false,
-			expanded: deps.isDetailExpanded(rowId),
+			expanded: deps.isDetailOpen(rowId),
 			editable: true,
 		});
 	};
@@ -127,7 +127,7 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 					selectable: true,
 					selected: deps.isRowNodeSelected(row.rowId),
 					expandable: false,
-					expanded: deps.isDetailExpanded(row.rowId),
+					expanded: deps.isDetailOpen(row.rowId),
 					editable: true,
 				});
 			case 'loading':
@@ -165,7 +165,7 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 					loadState: { kind: 'loaded', rowId: row.groupId },
 					selectable: row.selectable !== false,
 					expandable: true,
-					expanded: row.expanded,
+					expanded: row.hierarchy.expanded,
 					editable: false,
 				});
 			case 'detail':

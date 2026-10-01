@@ -50,10 +50,10 @@ Depth: **6**, semantic handoffs: **5** (API, query policy, commit state, project
 | #   | Hop                                                   | I/O                                | State read/write                                      | Role, faults, diagnostics, duplicate decision                     |
 | --- | ----------------------------------------------------- | ---------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
 | 1   | `renderer/renderEngine.ts:576 onScroll`               | `(top,left,timestamp?) -> void`    | none                                                  | DOM adapter handoff.                                              |
-| 2   | `renderer/renderScrollCoordinator.ts:130 onScroll`    | scroll offsets -> viewport request | writes scroll/idle bookkeeping                        | Scroll policy; no second scroll-idle owner.                       |
+| 2   | `renderer/renderScrollPipeline.ts:174 onScroll`       | scroll offsets -> viewport request | writes scroll/idle bookkeeping                        | Scroll policy; no second scroll-idle owner.                       |
 | 3   | `renderer/frameCoordinator.ts:106 requestScrollFrame` | request -> RAF                     | writes pending RAF/scroll-idle state                  | Sole cancellable frame scheduler; faults are lifecycle-contained. |
 | 4   | `renderer/renderViewportCoordinator.ts:22`            | offset -> layout plan              | reads geometry/row projection; writes viewport plan   | Derived viewport boundary.                                        |
-| 5   | `renderer/renderPaintCoordinator.ts:39`               | plan -> paint work                 | writes paint epoch/fidelity phase                     | Epoch/phase safety owner; invokes fidelity repair after idle.     |
+| 5   | `renderer/renderPaintPipeline.ts:176`                 | plan -> paint work                 | writes paint epoch/fidelity phase                     | Epoch/phase safety owner; invokes fidelity repair after idle.     |
 | 6   | `renderer/rowRenderer.ts` (`recycleViewport`)         | plan -> bound DOM slots            | writes mounted slots/portals via `PortalMountManager` | Physical DOM identity; Flight Recorder observes, never schedules. |
 
 Depth: **6**, semantic handoffs: **5** (input, scroll policy, schedule, viewport, paint/DOM). `GridReplayScheduler` is a deterministic diagnostic seam and is not a duplicate renderer scheduler.

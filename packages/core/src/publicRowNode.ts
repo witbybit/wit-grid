@@ -68,15 +68,15 @@ export interface GridRowNodeFacadeSource<TRowData = unknown> {
 	getVisualIndexByRowId(rowId: string): number | null;
 	getVisualRowCount(): number;
 	getSelectedRowIds(): string[];
-	isGroupExpanded(groupId: string): boolean;
-	isDetailExpanded(rowId: string): boolean;
+	isExpanded(id: string): boolean;
+	isDetailOpen(rowId: string): boolean;
 	selectRows(rowIds: string[], options?: { mode?: 'add' | 'replace' }): void;
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, field: string, value: unknown): GridWriteResult;
 	batchCellValues(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
-	toggleGroupExpanded(groupId: string): void;
-	toggleDetailExpanded(rowId: string): void;
+	setExpanded(id: string, expanded: boolean): void;
+	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
 	retryRowLoad(rowIndex: number | null, loadState: RowLoadState): GridWriteResult;
 	getRowIssues(rowId: string): readonly GridIntegrityIssue[];
@@ -192,8 +192,8 @@ export function createGridRowNodeFacade<TRowData>(
 		},
 		get expanded() {
 			if (input.expanded !== undefined) return input.expanded;
-			if (input.kind === 'group') return source.isGroupExpanded(input.id);
-			return source.isDetailExpanded(input.id);
+			if (input.kind === 'group') return source.isExpanded(input.id);
+			return source.isDetailOpen(input.id);
 		},
 		get editable() {
 			return input.editable ?? input.kind === 'data';
@@ -219,10 +219,10 @@ export function createGridRowNodeFacade<TRowData>(
 			if (!this.expandable) return rejectedResult(`Row '${input.id}' is not expandable.`);
 			if (expanded === this.expanded) return { status: 'noop' };
 			if (input.kind === 'group') {
-				source.toggleGroupExpanded(input.id);
+				source.setExpanded(input.id, expanded);
 				return appliedResult(Date.now());
 			}
-			source.toggleDetailExpanded(input.id);
+			source.setDetailOpen(input.id, expanded);
 			return appliedResult(Date.now());
 		},
 		ensureVisible(position?: 'top' | 'middle' | 'bottom' | 'nearest'): GridWriteResult {

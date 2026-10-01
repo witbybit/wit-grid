@@ -1,3 +1,4 @@
+import { withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { ColumnState } from '../state/GridState.js';
@@ -6,8 +7,11 @@ import type { GridFeatureContext } from './GridFeatureContext.js';
 export class ColumnFeatureController<TRowData = unknown> {
 	constructor(private readonly ctx: GridFeatureContext<TRowData>) {}
 
-	private applyColumnOrder(columns: ColumnDef<TRowData>[]): void {
-		const prevFields = this.ctx.getState().columns.map((column) => column.field);
+	private applyColumnOrder(requested: ColumnDef<TRowData>[]): void {
+		const state = this.ctx.getState();
+		// Reordering never moves the hierarchy column out of its (pinned) place.
+		const { columns } = withHierarchyColumnFor(requested, state);
+		const prevFields = state.columns.map((column) => column.field);
 		const nextFields = columns.map((column) => column.field);
 		if (prevFields.length === nextFields.length && prevFields.every((field, index) => field === nextFields[index])) {
 			return;
@@ -108,8 +112,11 @@ export class ColumnFeatureController<TRowData = unknown> {
 		});
 	}
 
-	public setColumns(columns: ColumnDef<TRowData>[], undoable = false): void {
+	public setColumns(nextColumns: ColumnDef<TRowData>[], undoable = false): void {
 		const state = this.ctx.getState();
+		// The hierarchy column belongs to the grouping / tree configuration, not the caller's list.
+		const { columns, pinnedColumns } = withHierarchyColumnFor(nextColumns, state);
+		const pinnedPatch = pinnedColumns ? { pinnedColumns } : {};
 		const prevColumns = state.columns;
 		const prevWidths = state.columnWidths;
 
@@ -125,7 +132,7 @@ export class ColumnFeatureController<TRowData = unknown> {
 
 		this.ctx.applyChange({
 			reason: 'columns:set',
-			state: { columns, columnWidths: nextWidths },
+			state: { columns, columnWidths: nextWidths, ...pinnedPatch },
 			invalidations: [{ kind: 'full' }],
 			domains: ['columns', 'geometry'],
 			events: [{ type: GridEventName.columnsChanged, payload: { columns, columnFields: columns.map((c) => c.field) } }],

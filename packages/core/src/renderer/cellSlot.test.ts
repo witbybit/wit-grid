@@ -319,3 +319,81 @@ describe('CellSlot accessibility sync - Plan 157 kernel-derived cell ARIA state'
 		expect(slot.element.hasAttribute('aria-invalid')).toBe(false);
 	});
 });
+
+describe('CellSlot direct-text cells (text-only columns)', () => {
+	function directCell(): CellSlot {
+		const element = document.createElement('div');
+		element.dataset.textCell = '';
+		return new CellSlot(element);
+	}
+	const bind = (slot: CellSlot, mode: 'text' | 'portal' | 'loading' | 'empty', text: string) =>
+		slot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', mode, text, text, mode === 'portal' ? 'key-1' : undefined);
+
+	it('holds its text as the cell’s only text node, with no content wrapper', () => {
+		const slot = directCell();
+		bind(slot, 'text', 'Alice');
+		expect(slot.directText).toBe(true);
+		expect(slot.element.querySelector('.og-cell-content')).toBeNull();
+		expect(slot.element.childNodes).toHaveLength(1);
+		expect(slot.element.firstChild?.nodeType).toBe(3);
+		expect(slot.element.textContent).toBe('Alice');
+		expect(() => slot.contentElement).toThrow(/direct-text cell/);
+	});
+
+	it('writes changed text into the same text node, and skips unchanged text', () => {
+		const slot = directCell();
+		bind(slot, 'text', 'Alice');
+		const node = slot.element.firstChild;
+		bind(slot, 'text', 'Bob');
+		expect(slot.element.firstChild).toBe(node);
+		expect(slot.element.textContent).toBe('Bob');
+		expect(bind(slot, 'text', 'Bob')).toBe(false);
+	});
+
+	it('clears its text while hosting an editor, and writes it back afterwards', () => {
+		const slot = directCell();
+		bind(slot, 'text', 'Alice');
+		bind(slot, 'portal', 'Alice');
+		slot.getOrCreatePortalHost().appendChild(document.createElement('input'));
+		// A bare text node cannot be hidden with CSS, so it must not show behind the editor.
+		expect(Array.from(slot.element.childNodes).filter((n) => n.nodeType === 3 && n.textContent)).toHaveLength(0);
+		slot.portalHostElement!.replaceChildren();
+		bind(slot, 'text', 'Alice');
+		expect(slot.element.textContent).toBe('Alice');
+	});
+
+	it('clears its text for a loading skeleton and keeps the text cache in step', () => {
+		const slot = directCell();
+		bind(slot, 'text', 'Alice');
+		slot.clearText();
+		expect(slot.element.textContent).toBe('');
+		bind(slot, 'text', 'Alice');
+		expect(slot.element.textContent).toBe('Alice');
+	});
+
+	it('adopts the text node of a recycled element instead of adding a second one', () => {
+		const element = document.createElement('div');
+		element.dataset.textCell = '';
+		element.appendChild(document.createTextNode('old'));
+		const slot = new CellSlot(element);
+		bind(slot, 'text', 'new');
+		expect(element.childNodes).toHaveLength(1);
+		expect(element.textContent).toBe('new');
+	});
+
+	it('keeps the wrapper for cells without the direct-text mark', () => {
+		const slot = new CellSlot(document.createElement('div'));
+		bind(slot, 'text', 'Alice');
+		expect(slot.directText).toBe(false);
+		expect(slot.contentElement.textContent).toBe('Alice');
+	});
+});
+
+describe('isDirectTextColumn', () => {
+	it('is true only for columns with no renderer and no selection checkbox', async () => {
+		const { isDirectTextColumn } = await import('./cellSlot.js');
+		expect(isDirectTextColumn({})).toBe(true);
+		expect(isDirectTextColumn({ cellRenderer: {} })).toBe(false);
+		expect(isDirectTextColumn({ checkboxSelection: true })).toBe(false);
+	});
+});

@@ -1,8 +1,8 @@
 import { compilePathGetter, type ColumnDef } from '../columnDef.js';
 import { createGridRowDataRef } from '../publicRowRef.js';
 import { RowNode } from '../rowNode.js';
-import type { GroupDef } from './RowPipeline.js';
-import type { RowPipelineContext, RowPipelineExpansion } from './stages/types.js';
+import type { GroupDef } from './hierarchyConfig.js';
+import type { RowPipelineContext } from './stages/types.js';
 
 export function getCellValueForPipeline<TData>(node: RowNode<TData>, column: ColumnDef<TData> | undefined, colId: string): unknown {
 	if (!column) {
@@ -18,7 +18,6 @@ export function getCellValueForPipeline<TData>(node: RowNode<TData>, column: Col
 
 export function createRowPipelineContext<TData>(
 	columns: ColumnDef<TData>[],
-	expansion: RowPipelineExpansion,
 	reportFault?: RowPipelineContext<TData>['reportFault']
 ): RowPipelineContext<TData> {
 	const columnsById = new Map<string, ColumnDef<TData>>();
@@ -28,7 +27,6 @@ export function createRowPipelineContext<TData>(
 
 	return {
 		columnsById,
-		expansion,
 		reportFault,
 		getValue: (node, colId) => getCellValueForPipeline(node, columnsById.get(colId), colId),
 		getGroupKey: (node, groupDef: GroupDef<TData>) => {

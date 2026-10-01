@@ -1,6 +1,13 @@
 import type { FilterModel, QuickFilterModel, SortDirection, SortModel } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
-import type { AggregationDef } from '../rows/stages/aggregateStage.js';
+import type {
+	AggregationConfig,
+	DetailConfig,
+	ExpansionState,
+	GroupingConfig,
+	HierarchyColumnConfig,
+	TreeDataConfig,
+} from '../rows/hierarchyConfig.js';
 import type { ServerSideStoreSnapshot } from '../serverSideRowModel.js';
 import type { ColumnDef, GridStyleRule, GridRendererOptions } from '../columnDef.js';
 import type { CanonicalGridSelectionState, GridInteractionState } from '../interaction/interactionState.js';
@@ -44,10 +51,16 @@ export interface GridModelState<TRowData = unknown> {
 	/** Partial theme token overrides applied on top of `themeName` when the renderer mounts. */
 	themeOverrides?: Partial<ThemeTokens>;
 
-	groupBy?: string[];
-	aggDefs?: AggregationDef<TRowData>[];
-	showGroupFooter?: boolean;
-	enableStickyGroupRows?: boolean;
+	/** Row grouping. Absent, or with no `by` levels, means rows are not grouped. */
+	grouping?: GroupingConfig<TRowData>;
+	/** Tree data: rows nest under the row `getParentId` names. Grouping takes precedence when both are set. */
+	treeData?: TreeDataConfig<TRowData>;
+	/** Aggregates shown on group, total and tree-parent rows. */
+	aggregation?: AggregationConfig<TRowData>;
+	/** Master-detail: rows that can open a detail row beneath them. */
+	detail?: DetailConfig<TRowData>;
+	/** The auto hierarchy column shown while rows are grouped or tree-shaped; `false` turns it off. */
+	hierarchyColumn?: HierarchyColumnConfig<TRowData> | false;
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
 	pinnedColumns?: { left: number; right: number };
@@ -68,24 +81,14 @@ export interface GridModelState<TRowData = unknown> {
 	selectedRowIds: string[];
 	rowSelection?: RowSelectionOptions;
 
-	expansion: {
-		groups: Record<string, true>;
-		treeRows: Record<string, true>;
-		details: Record<string, true>;
-	};
-
-	// Row model configuration — structural, not persisted for serialization
-	getParentId?: (row: TRowData) => string | null | undefined;
-	masterDetailEnabled?: boolean;
-	groupRowHeight?: number;
-	detailRowHeight?: number;
-	detailRenderer?: unknown;
-	rowModelConfig?: import('../rowModel.js').RowModelConfig<TRowData>;
+	expansion: ExpansionState;
 
 	// Render tuning config
 	styleRules?: GridStyleRule<TRowData>[];
 	/** Grid-wide scroll presentation policy — see columnDef.ts's GridRendererOptions. Initial-only. */
 	rendererOptions?: GridRendererOptions;
+	/** See GridEngineConfig.asyncTransactionWaitMs. */
+	asyncTransactionWaitMs?: number;
 	rowOverscanPx?: number;
 	/**
 	 * Number of off-screen columns to pre-render on each side of the visible range.
@@ -94,6 +97,8 @@ export interface GridModelState<TRowData = unknown> {
 	 * Default: 2. Finance grids with narrow columns (80–120 px) benefit from at least 2.
 	 */
 	colBuffer?: number;
+	/** Minimum pixel width of off-screen columns pre-rendered on the leading (scroll-direction) edge. */
+	colOverscanPx?: number;
 	runtimeLimits?: {
 		maxRenderedRows?: number;
 		maxRenderedCells?: number;

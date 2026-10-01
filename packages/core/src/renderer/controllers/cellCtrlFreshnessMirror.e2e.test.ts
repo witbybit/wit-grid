@@ -48,7 +48,7 @@ describe('CellCtrl freshness - full bind resolves controller state before bindin
 		expect(cellCtrl).toBeDefined();
 		expect(cellCtrl!.freshness).not.toBeUndefined();
 		expect(cellCtrl!.presentationState.kind).toBe('primitive');
-		expect(cellCtrl!.rendererState.mountedSlotInstanceId).toBeDefined();
+		expect(cellCtrl!.lifecycle.attachedSlotInstanceId).toBeDefined();
 
 		renderer.unmount();
 		controller.dispose();

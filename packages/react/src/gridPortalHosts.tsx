@@ -1,18 +1,58 @@
-import { useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
 import {
 	ColumnDef,
 	doesCanonicalCellPointerMatchColumn,
 	GridApi,
-	VisualRow,
 	type ActiveEditState,
 	type CellRendererPhase,
+	type CellRendererProps,
 	type ImperativeCellHandle,
 	isDomCellRenderer,
 } from '@eregister/wit-grid-core';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { useGridApi } from './hooks.js';
-import { GridAdapterContext } from './gridContext.js';
-import type { PortalCellProps, PortalData, PortalStore } from './gridPortalTypes.js';
+import type { PortalCellProps, PortalData, PortalRowNodeLike, PortalStore } from './gridPortalTypes.js';
+
+// Static inline styles hoisted to module scope so cell renders don't allocate a fresh object each time.
+const FILL_STYLE = { width: '100%', height: '100%' } as const;
+const CELL_FLEX_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center' } as const;
+const CELL_FLEX_RELATIVE_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' } as const;
+const LOADING_CELL_STYLE = { width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' } as const;
+const LOADING_SKELETON_STYLE = { height: '16px', width: '80%', borderRadius: '4px' } as const;
+const VALIDATION_ERROR_STYLE = {
+	position: 'absolute',
+	top: '100%',
+	left: 0,
+	right: 0,
+	zIndex: 10,
+	background: 'var(--og-validation-error-bg, #fff0f0)',
+	color: 'var(--og-validation-error-color, #c00)',
+	fontSize: '11px',
+	padding: '2px 6px',
+	border: '1px solid var(--og-validation-error-border, #f5a5a5)',
+	borderTop: 'none',
+	borderRadius: '0 0 4px 4px',
+	whiteSpace: 'nowrap',
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+} as const;
+
+/** Column ids passed to renderers: the user/API `colId` (falling back to `field`) and the instance id. */
+function getRendererColumnIds<TRowData>(col: ColumnDef<TRowData>): { colId: string; columnInstanceId: CellRendererProps['columnInstanceId'] } {
+	return {
+		colId: col.colId ?? col.field,
+		columnInstanceId: 'instanceId' in col ? (col.instanceId as CellRendererProps['columnInstanceId']) : undefined,
+	};
+}
+
+/**
+ * The `formattedValue` renderer prop: the column's `valueFormatter` output, otherwise the value as a
+ * string (`''` for null/undefined), matching the text the grid's default cell renderer shows.
+ */
+function formatCellValue<TRowData>(col: ColumnDef<TRowData>, value: unknown, node: PortalRowNodeLike<TRowData>): string {
+	if (col.valueFormatter) return col.valueFormatter({ value, rowData: node.data, colDef: col, rowId: node.id });
+	return value == null ? '' : String(value);
+}
 
 // ─── ActiveCellEditor ────────────────────────────────────────────────────────
 // Mounted ONLY when a cell is actively being edited. Keeping the activeEdit
@@ -94,7 +134,7 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 		<>
 			{CustomEditor ? (
 				<div
-					style={{ width: '100%', height: '100%' }}
+					style={FILL_STYLE}
 					onMouseDown={(e) => e.stopPropagation()}
 					onDoubleClick={(e) => e.stopPropagation()}
 					onKeyDown={(e) => {
@@ -149,27 +189,7 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 				/>
 			)}
 			{validationError && (
-				<div
-					className='og-cell-validation-error'
-					style={{
-						position: 'absolute',
-						top: '100%',
-						left: 0,
-						right: 0,
-						zIndex: 10,
-						background: 'var(--og-validation-error-bg, #fff0f0)',
-						color: 'var(--og-validation-error-color, #c00)',
-						fontSize: '11px',
-						padding: '2px 6px',
-						border: '1px solid var(--og-validation-error-border, #f5a5a5)',
-						borderTop: 'none',
-						borderRadius: '0 0 4px 4px',
-						whiteSpace: 'nowrap',
-						overflow: 'hidden',
-						textOverflow: 'ellipsis',
-					}}
-					role='alert'
-				>
+				<div className='og-cell-validation-error' style={VALIDATION_ERROR_STYLE} role='alert'>
 					{validationError}
 				</div>
 			)}
@@ -198,8 +218,8 @@ function PortalCellInner<TRowData = unknown>({
 
 	if (isLoading) {
 		return (
-			<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', padding: '0 12px' }}>
-				<div className='og-cell-loading-skeleton' style={{ height: '16px', width: '80%', borderRadius: '4px' }} />
+			<div style={LOADING_CELL_STYLE}>
+				<div className='og-cell-loading-skeleton' style={LOADING_SKELETON_STYLE} />
 			</div>
 		);
 	}
@@ -212,11 +232,10 @@ function PortalCellInner<TRowData = unknown>({
 		iCol?.cellRenderer && !isDomCellRenderer(iCol.cellRenderer)
 			? (iCol.cellRenderer as unknown as ComponentType<Record<string, unknown>>)
 			: undefined;
-	const colId = col.colId ?? col.field;
-	const columnInstanceId = 'instanceId' in col ? (col.instanceId as string | undefined) : undefined;
+	const { colId, columnInstanceId } = getRendererColumnIds(col);
 
 	return (
-		<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' }}>
+		<div style={CELL_FLEX_RELATIVE_STYLE}>
 			{isEditing ? (
 				<ActiveCellEditor<TRowData>
 					rowId={rowId}
@@ -231,6 +250,7 @@ function PortalCellInner<TRowData = unknown>({
 				createElement(CustomRenderer, {
 					value,
 					computedValue: value,
+					formattedValue: formatCellValue(col, value, node),
 					row: rowData,
 					rowId,
 					colField,
@@ -249,166 +269,6 @@ function PortalCellInner<TRowData = unknown>({
 }
 
 export const PortalCell = memo(PortalCellInner) as typeof PortalCellInner;
-
-// ─── Default row renderers ────────────────────────────────────────────────────
-
-function DefaultGroupRowRendererInner<TRowData = unknown>({ visualRow, api }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'group') return null;
-	const expanded = visualRow.expanded;
-	const depth = visualRow.depth;
-
-	// Memoize getSnapshot to cache selectedRowIds and avoid infinite loops
-	const selRowIdUpdateGenRef = useRef(0);
-	const selRowIdCacheRef = useRef<{ gen: number; value: readonly string[] }>({ gen: -1, value: [] });
-
-	const selectedRowIds = useSyncExternalStore(
-		useCallback(
-			(onStoreChange) =>
-				api.subscribeToKey('selectedRowIds', () => {
-					selRowIdUpdateGenRef.current++;
-					onStoreChange();
-				}),
-			[api]
-		),
-		useCallback(() => {
-			const currentGen = selRowIdUpdateGenRef.current;
-			const cache = selRowIdCacheRef.current;
-
-			// If subscription hasn't fired since last call, return cached value
-			if (cache.gen === currentGen && cache.gen !== -1) {
-				return cache.value;
-			}
-
-			// Recompute value
-			const value = api.getStateSnapshot().selectedRowIds;
-
-			// Cache and return
-			selRowIdCacheRef.current = { gen: currentGen, value };
-			return value;
-		}, [api])
-	);
-	const adapterHandle = useContext(GridAdapterContext);
-	const descendantIds = adapterHandle?.getGroupVisibleDescendantRowIds(visualRow.groupId) ?? [];
-	const selectedSet = new Set(selectedRowIds);
-	const selectedDescendantCount = descendantIds.reduce((count, rowId) => count + (selectedSet.has(rowId) ? 1 : 0), 0);
-	const allDescendantsSelected = descendantIds.length > 0 && selectedDescendantCount === descendantIds.length;
-	const someDescendantsSelected = selectedDescendantCount > 0 && selectedDescendantCount < descendantIds.length;
-
-	const handleToggle = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		api.toggleGroupExpanded(visualRow.id);
-	};
-
-	const handleGroupSelection = (e: React.MouseEvent<HTMLInputElement>) => {
-		e.stopPropagation();
-		if (descendantIds.length === 0) return;
-		if (allDescendantsSelected) api.deselectRows(descendantIds);
-		else api.selectRows(descendantIds);
-	};
-
-	return (
-		<div className='og-group-row-content' style={{ paddingLeft: `${depth * 20 + 8}px` }} onClick={handleToggle}>
-			<input
-				type='checkbox'
-				className='og-group-row-checkbox'
-				checked={allDescendantsSelected}
-				ref={(input) => {
-					if (input) input.indeterminate = someDescendantsSelected;
-				}}
-				onClick={handleGroupSelection}
-				onChange={() => undefined}
-				aria-label={allDescendantsSelected ? 'Deselect group rows' : 'Select group rows'}
-				title={
-					selectedDescendantCount > 0
-						? `${selectedDescendantCount} of ${descendantIds.length} visible rows selected`
-						: `Select ${descendantIds.length} visible rows`
-				}
-			/>
-			<span className={`og-group-row-toggle ${expanded ? 'og-group-row-toggle-expanded' : ''}`}>▶</span>
-			<span className='og-group-row-label-prefix'>{visualRow.field}:</span>
-			<span className='og-group-row-value'>{String(visualRow.key)}</span>
-			<span className='og-group-count'>{visualRow.leafCount ?? visualRow.childCount} rows</span>
-			{visualRow.aggregateValues &&
-				Object.entries(visualRow.aggregateValues)
-					.slice(0, 3)
-					.map(([field, value]) =>
-						value != null ? (
-							<span key={field} className='og-group-aggregate'>
-								<span>{field}</span>
-								<strong>{String(value)}</strong>
-							</span>
-						) : null
-					)}
-		</div>
-	);
-}
-
-export const DefaultGroupRowRenderer = memo(DefaultGroupRowRendererInner) as typeof DefaultGroupRowRendererInner;
-
-function DefaultDetailRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'detail') return null;
-	return <div className='og-detail-row-content'>Nested detail view for parent row: {visualRow.parentId}</div>;
-}
-
-export const DefaultDetailRowRenderer = memo(DefaultDetailRowRendererInner) as typeof DefaultDetailRowRendererInner;
-
-function DefaultFooterRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'footer') return null;
-	const agg = visualRow.aggregateValues;
-	return (
-		<div
-			style={{
-				display: 'flex',
-				alignItems: 'center',
-				height: '100%',
-				paddingLeft: 12,
-				gap: 12,
-				fontSize: 11,
-				color: 'var(--og-header-text)',
-				fontWeight: 600,
-			}}
-		>
-			<span style={{ color: 'rgba(167,139,250,0.6)', fontWeight: 700, fontSize: 10, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-				Subtotal
-			</span>
-			{agg &&
-				Object.entries(agg).map(([field, value]) =>
-					value != null ? (
-						<span key={field} style={{ color: '#94a3b8' }}>
-							<span style={{ opacity: 0.6 }}>{field}: </span>
-							<span style={{ color: '#e2e8f0' }}>
-								{typeof value === 'number' && value > 1000 ? `$${value.toLocaleString()}` : String(value)}
-							</span>
-						</span>
-					) : null
-				)}
-		</div>
-	);
-}
-
-export const DefaultFooterRowRenderer = memo(DefaultFooterRowRendererInner) as typeof DefaultFooterRowRendererInner;
-
-function DefaultFailedRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'failed') return null;
-	return (
-		<div style={{ display: 'flex', alignItems: 'center', height: '100%', paddingLeft: 12, color: '#fca5a5', fontWeight: 600 }}>
-			{visualRow.error}
-		</div>
-	);
-}
-
-export const DefaultFailedRowRenderer = memo(DefaultFailedRowRendererInner) as typeof DefaultFailedRowRendererInner;
-
-function DefaultPlaceholderRowRendererInner<TRowData = unknown>({ visualRow }: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) {
-	if (visualRow.kind !== 'placeholder') return null;
-	return (
-		<div style={{ display: 'flex', alignItems: 'center', height: '100%', paddingLeft: 12, color: '#94a3b8', fontWeight: 500 }}>
-			{visualRow.reason ?? 'Unavailable'}
-		</div>
-	);
-}
-
-export const DefaultPlaceholderRowRenderer = memo(DefaultPlaceholderRowRendererInner) as typeof DefaultPlaceholderRowRendererInner;
 
 // ─── PortalCellWrapper ────────────────────────────────────────────────────────
 
@@ -513,13 +373,16 @@ function ImperativePortalCellWrapperInner<TRowData = unknown>({ cellKey, store }
 		store.registerImperativeUpdater(cellKey, (value, node, col, isEditing, _isLoading, phase, isScrolling, isFocused, isSelected) => {
 			const handle = imperativeRef.current;
 			if (!handle) return false;
+			const { colId, columnInstanceId } = getRendererColumnIds(col);
 			handle.update({
 				value,
 				computedValue: value,
+				formattedValue: formatCellValue(col, value, node),
 				row: node.data as TRowData,
 				rowId: node.id,
 				colField: col.field,
-				colId: col.field,
+				colId,
+				columnInstanceId,
 				isScrolling: isScrolling ?? false,
 				phase: phase ?? 'initial',
 				isFocused: isFocused ?? false,
@@ -544,17 +407,20 @@ function ImperativePortalCellWrapperInner<TRowData = unknown>({ cellKey, store }
 	const rowData = effectiveData.node?.data;
 
 	if (!CustomRenderer || isDomCellRenderer(iColData.cellRenderer) || !rowData) return null;
+	const { colId, columnInstanceId } = getRendererColumnIds(effectiveData.col);
 
 	return (
-		<div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center' }}>
+		<div style={CELL_FLEX_STYLE}>
 			<CustomRenderer
 				ref={imperativeRef as React.Ref<unknown>}
 				value={effectiveData.value}
 				computedValue={effectiveData.value}
+				formattedValue={formatCellValue(effectiveData.col, effectiveData.value, effectiveData.node)}
 				row={rowData as Record<string, unknown>}
 				rowId={effectiveData.node.id}
 				colField={effectiveData.col.field}
-				colId={effectiveData.col.field}
+				colId={colId}
+				columnInstanceId={columnInstanceId}
 				isScrolling={effectiveData.isScrolling ?? false}
 				phase={effectiveData.phase ?? 'initial'}
 				isFocused={effectiveData.isFocused ?? false}

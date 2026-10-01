@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveColumnTypes } from './resolveColumnTypes.js';
-import { CheckboxCellRenderer, DateCellRenderer, BUILTIN_COLUMN_TYPES } from './renderers/CellTypes.js';
+import { BUILTIN_COLUMN_TYPES } from './renderers/CellTypes.js';
+import { CheckboxDomCellRenderer, DateDomCellRenderer } from './renderers/domCellTypes.js';
 import type { ColumnDef } from '@eregister/wit-grid-core';
 
 interface Row {
@@ -28,14 +29,15 @@ describe('resolveColumnTypes', () => {
 	it('applies built-in checkbox renderer when type = checkbox', () => {
 		const result = resolveColumnTypes<Row>([{ field: 'active', header: 'Active', type: 'checkbox' }]);
 		const renderer = result[0].renderer as any;
-		expect(renderer?.kind).toBe('react');
-		expect(renderer?.component).toBe(CheckboxCellRenderer);
+		expect(renderer?.kind).toBe('dom');
+		expect(renderer?.renderer).toBe(CheckboxDomCellRenderer);
 	});
 
 	it('applies built-in date renderer and editor when type = date', () => {
 		const result = resolveColumnTypes<Row>([{ field: 'born', header: 'Born', type: 'date' }]);
 		const renderer = result[0].renderer as any;
-		expect(renderer?.component).toBe(DateCellRenderer);
+		expect(renderer?.kind).toBe('dom');
+		expect(renderer?.renderer).toBe(DateDomCellRenderer);
 		expect(result[0].cellEditor).toBeDefined();
 	});
 
@@ -83,7 +85,7 @@ describe('resolveColumnTypes', () => {
 	it('built-in types are still accessible when userTypes is provided with different keys', () => {
 		const result = resolveColumnTypes<Row>([{ field: 'active', header: 'Active', type: 'checkbox' }], { custom: { renderer: { kind: 'text' } } });
 		const renderer = result[0].renderer as any;
-		expect(renderer?.component).toBe(CheckboxCellRenderer);
+		expect(renderer?.renderer).toBe(CheckboxDomCellRenderer);
 	});
 
 	it('all three built-in types are present in BUILTIN_COLUMN_TYPES', () => {

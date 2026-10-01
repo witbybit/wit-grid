@@ -139,7 +139,7 @@ export class RowDependencyRegistry<TData = unknown> {
 		}
 
 		this.aggregationFields.clear();
-		for (const agg of aggDefs ?? []) this.aggregationFields.add(agg.field);
+		for (const agg of aggDefs ?? []) this.aggregationFields.add(agg.colId);
 
 		this.formulaFields.clear();
 		for (const col of columns) {
@@ -171,6 +171,20 @@ function anyFieldMatchesSet(changedFields: ReadonlySet<string>, keys: ReadonlySe
 		}
 	}
 	return false;
+}
+
+/**
+ * True when the changed fields could move a row within the active sort order. The
+ * single-impact classification reports 'filter-key' ahead of 'sort-key', so a caller that
+ * handles 'filter-key' must consult this to avoid dropping a needed re-sort.
+ */
+export function mutationAffectsSortKeys(
+	changedFields: ReadonlySet<string>,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	registry: RowDependencyRegistry<any>
+): boolean {
+	if (registry.sortKeys.size === 0 || changedFields.size === 0) return false;
+	return registry.opaqueStructuralDependency || anyFieldMatchesSet(changedFields, registry.sortKeys);
 }
 
 /**

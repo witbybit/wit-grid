@@ -15,7 +15,7 @@ is actively scrolling, independent of what it shows at rest.
 	cannot.
 </Callout>
 
-## The five modes
+## The six modes
 
 `scrollPresentation` is the one field that chooses the mode; each mode has its own config sub-object, valid only
 alongside that mode.
@@ -23,13 +23,43 @@ alongside that mode.
 | Mode            | What shows during active scroll                                                            | Cost    |
 | --------------- | ------------------------------------------------------------------------------------------ | ------- |
 | `primitive`     | N/A — default for columns with no custom renderer. Fast text/class presentation always.    | Lowest  |
+| `update`        | DOM renderers only: entering cells are redrawn in place, within a per-frame budget.        | Low     |
 | `freeze`        | The existing rendered cell stays visually frozen. New/cold cells show a shell placeholder. | Low     |
 | `text-impostor` | An explicit cheap text/chip stand-in you provide (`textImpostor.render`).                  | Low     |
 | `html-snapshot` | A captured inert HTML clone of the cell, replayed during scroll.                           | Medium  |
 | `live`          | The real renderer is mounted/updated on every scroll frame. No fallback, no placeholder.   | Highest |
 
-`freeze` is the default for any column with a renderer but no explicit `scrollPresentation`. `primitive` is the
-default for columns with no renderer at all — there's nothing to freeze or snapshot.
+With no explicit `scrollPresentation`, a DOM renderer (`kind: 'dom'`) uses `update` and a React renderer uses
+`freeze`. `primitive` is the default for columns with no renderer at all — there's nothing to freeze or snapshot.
+
+## `update` — DOM renderers, redrawn in place
+
+A DOM renderer's `update()` is a direct DOM write with no React involved, so it is cheap enough to run inside
+the scroll frame. With `update`, a cell that scrolls into view calls your renderer's `update()` with its new
+row, or `mount()` the first time a slot uses it. The cell is final as drawn: nothing is redone when scrolling
+stops, and cells that stay in view are not touched at all.
+
+```typescript
+const SparklineRenderer = {
+	mount(container: HTMLElement, params: { value: unknown }) {
+		const bar = document.createElement('div');
+		container.appendChild(bar);
+		const paint = (value: unknown) => {
+			bar.style.width = `${Number(value) || 0}%`;
+		};
+		paint(params.value);
+		return { update: (next: { value: unknown }) => paint(next.value) };
+	},
+};
+
+// No capabilities needed: 'update' is the DOM renderer default.
+const column = { field: 'trend', header: 'Trend', renderer: { kind: 'dom', renderer: SparklineRenderer } };
+```
+
+The work is budgeted by time: `rendererOptions.domUpdate.maxMsPerFrame` (default 4 ms) caps how much DOM
+renderer work runs in one frame. Cells beyond the budget show a plain-text stand-in and are drawn once scrolling
+settles. A React renderer cannot use `update`; mounting React inside a scroll frame is what `freeze` exists to
+avoid.
 
 ## `live` — real-time cells
 
@@ -59,8 +89,8 @@ where a frozen frame would be actively misleading.
   highest-frequency feeds, where even `setState` latency is too much.
 
 The [Realtime Dashboard example](/docs/next/examples) renders exactly this pattern — its "Change %" column is an
-imperative `live` renderer, its "Price" column is a `html-snapshot` DOM renderer, and its "Volume" column is a
-plain memoized React renderer with no special `scrollPresentation` (implicitly `freeze`) — one grid, three
+imperative `live` renderer, its "Price" column is a DOM renderer on the default `update`, and its "Volume" column
+is a plain memoized React renderer with no special `scrollPresentation` (implicitly `freeze`) — one grid, three
 renderer strategies, side by side.
 
 ## `text-impostor` — cheap stand-in during scroll
@@ -119,10 +149,33 @@ it during scroll instead of re-mounting.
 | `invalidateOnWidthChange`      | —            | Re-capture when the column is resized.                                                                   |
 | `invalidateOnHeightChange`     | —            | Re-capture when the row height changes.                                                                  |
 
+## `scrollState` — reacting to scrolling
+
+Renderers receive `isScrolling` and `phase`, but by default a change to those alone does not update or re-render
+the cell. A renderer is updated only when its value, row, column, or editing, focus or selection state changes,
+so scroll start and scroll end cost nothing for most renderers.
+
+A renderer that draws differently while scrolling opts in with `scrollState`:
+
+```typescript
+{
+	field: 'status',
+	header: 'Status',
+	renderer: {
+		kind: 'react',
+		component: StatusBadge,
+		capabilities: { scrollState: true },
+	},
+}
+```
+
+Without `scrollState`, the `isScrolling` and `phase` a renderer receives reflect its last update, not the live
+scroll state.
+
 ## Grid-level budgets
 
 Per-column capabilities choose _which_ mode a column uses. `rendererOptions` on `<Grid>` controls the _shared
-budget_ every `live` and `html-snapshot` column draws from — this is grid-wide policy, not a per-column setting,
+budget_ every `update`, `live` and `html-snapshot` column draws from — this is grid-wide policy, not a per-column setting,
 because it's about total frame budget across every visible cell:
 
 ```tsx
@@ -131,6 +184,7 @@ because it's about total frame budget across every visible cell:
 	columns={columns}
 	getRowId={(row) => row.id}
 	rendererOptions={{
+		domUpdate: { maxMsPerFrame: 4 },
 		liveReact: { maxMountsPerFrame: 12, maxUpdatesPerFrame: 40, allowEmergencyShell: true },
 		htmlSnapshot: { maxSnapshots: 500, maxTotalBytes: 8_000_000 },
 	}}
@@ -143,10 +197,51 @@ because it's about total frame budget across every visible cell:
 	exists to make explicit: more fidelity per frame costs more per frame.
 </Callout>
 
+## The rendering window
+
+The grid renders the rows and columns in view plus a margin around them (overscan), so a scroll step lands on
+cells that are already drawn. Four `<Grid>` props size that margin:
+
+| Prop               | Default | Effect                                                                                                     |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `rowOverscanPx`    | `400`   | Pixels of rows rendered above and below the viewport.                                                      |
+| `colBuffer`        | `2`     | Columns rendered left and right of the viewport.                                                           |
+| `overscanAdaptive` | `false` | Grows the margin on the side the grid is scrolling toward, in proportion to scroll speed.                  |
+| `runtimeLimits`    | —       | Hard caps on rendered rows and cells (`maxRenderedRows`, default 500; `maxRenderedCells`, default 20,000). |
+
+```tsx
+import { Grid } from '@eregister/wit-grid-react';
+
+type Row = { id: string; value: number };
+
+export function FastScrollingGrid({ rows }: { rows: Row[] }) {
+	return (
+		<Grid
+			rows={rows}
+			columns={[{ field: 'value', header: 'Value' }]}
+			getRowId={(row) => row.id}
+			rowOverscanPx={200}
+			overscanAdaptive
+			runtimeLimits={{ maxRenderedRows: 60, maxRenderedCells: 2_000 }}
+		/>
+	);
+}
+```
+
+Scroll from user input is drawn in the same frame it happens. A scroll set from script — `scrollTop` assigned inside
+`requestAnimationFrame`, a scroll animation, an auto-scroll — is drawn one frame later, so each step must land inside
+the margin. If a scripted scroll moves further per frame than `rowOverscanPx`, turn on `overscanAdaptive`, which
+extends the leading edge while the grid is moving and shrinks it again once it stops. It is off by default because it
+renders more rows and cells during fast scrolls.
+
+When `runtimeLimits` bind, the overscan gives way first: rows and columns in view are always kept, and only the
+margin shrinks.
+
 ## Choosing a mode
 
 - Nothing custom on the cell → don't set `scrollPresentation` at all (`primitive`).
-- Custom renderer, appearance rarely changes → leave the default (`freeze`).
+- DOM renderer → leave the default (`update`): cells are drawn in place during scroll.
+- React renderer, appearance rarely changes → leave the default (`freeze`).
 - Custom renderer, expensive to mount, appearance mostly static mid-scroll → `html-snapshot`.
 - Custom renderer, cheap plain-text equivalent exists → `text-impostor`.
 - Data changes multiple times per second and staleness would mislead → `live`, with `update: 'imperative'` only

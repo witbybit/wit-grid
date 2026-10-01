@@ -1,4 +1,4 @@
-import type { CellScrollPresentation, ColumnDef, InternalColumnDef } from '../columnDef.js';
+import { isDomCellRenderer, type CellScrollPresentation, type ColumnDef, type InternalColumnDef } from '../columnDef.js';
 
 /**
  * Resolves a column's scroll presentation mode. Non-renderer columns are always 'primitive';
@@ -8,7 +8,8 @@ import type { CellScrollPresentation, ColumnDef, InternalColumnDef } from '../co
 export function getCellScrollPresentation<TRowData>(col: ColumnDef<TRowData>): CellScrollPresentation {
 	const internal = col as InternalColumnDef<TRowData>;
 	if (!internal.cellRenderer) return 'primitive';
-	return internal.cellRendererCapabilities?.scrollPresentation ?? 'freeze';
+	// A raw DOM `cellRenderer` (no `renderer` spec) is not normalized; it gets the DOM default too.
+	return internal.cellRendererCapabilities?.scrollPresentation ?? (isDomCellRenderer(internal.cellRenderer) ? 'update' : 'freeze');
 }
 
 export function isPrimitivePresentation<TRowData>(col: ColumnDef<TRowData>): boolean {

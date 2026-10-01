@@ -16,6 +16,8 @@ import {
 	Zap,
 	Maximize2,
 	Minimize2,
+	RefreshCw,
+	Search,
 	type LucideIcon,
 } from 'lucide-react';
 import examples from '@/generated/next/examples.json';
@@ -58,6 +60,7 @@ const previewModules = {
 	'kanban-board': dynamic(() => import('@eregister/wit-grid-examples/kanban-board'), { ssr: false }),
 	clipboard: dynamic(() => import('@eregister/wit-grid-examples/clipboard'), { ssr: false }),
 	'realtime-grouping': dynamic(() => import('@eregister/wit-grid-examples/realtime-grouping'), { ssr: false }),
+	'nested-hierarchy': dynamic(() => import('@eregister/wit-grid-examples/nested-hierarchy'), { ssr: false }),
 };
 
 type HighlightToken = {
@@ -73,7 +76,7 @@ type ExampleDoc = {
 	tokens?: HighlightToken[][];
 };
 
-type GalleryMode = 'preview' | 'source';
+type GalleryMode = 'preview' | 'source' | 'notes';
 
 function getExampleTone(level: WitGridExampleMeta['level']) {
 	if (level === 'advanced') return 'border-sky-500/35 bg-sky-500/10 text-sky-700 dark:text-sky-300';
@@ -132,12 +135,14 @@ function PreviewStage({
 	title,
 	isFullscreen,
 	onToggleFullscreen,
+	onReset,
 }: {
 	Preview: any;
 	theme: 'light' | 'dark';
 	title: string;
 	isFullscreen: boolean;
 	onToggleFullscreen: () => void;
+	onReset?: () => void;
 }) {
 	return (
 		<div className={isFullscreen ? 'wg-preview-frame wg-example-fullscreen-frame' : 'wg-preview-frame'}>
@@ -151,10 +156,17 @@ function PreviewStage({
 					{isFullscreen && <span className='text-xs font-semibold text-slate-300'>{title}</span>}
 				</span>
 				<span className='flex items-center gap-3'>
-					<span className='flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400'>
-						<span className='h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400' />
-						Live preview
-					</span>
+					{onReset ? (
+						<button
+							type='button'
+							onClick={onReset}
+							className='wg-stage-fullscreen-toggle'
+							aria-label='Reload preview'
+							title='Reload preview'
+						>
+							<RefreshCw className='h-3.5 w-3.5' />
+						</button>
+					) : null}
 					<button
 						type='button'
 						onClick={onToggleFullscreen}
@@ -179,13 +191,30 @@ function ExampleSidebar({
 	groups,
 	selectedId,
 	onSelect,
+	query,
+	onQueryChange,
+	totalCount,
 }: {
 	groups: [WitGridExampleMeta['category'], WitGridExampleMeta[]][];
 	selectedId: string;
 	onSelect: (id: string) => void;
+	query: string;
+	onQueryChange: (query: string) => void;
+	totalCount: number;
 }) {
 	return (
 		<nav className='wg-example-sidebar' aria-label='Examples'>
+			<div className='wg-example-sidebar-header'>
+				<div>
+					<p className='text-[10px] font-black uppercase tracking-wider text-sky-500 dark:text-sky-300'>Live examples</p>
+					<p className='mt-0.5 text-sm font-bold text-fd-foreground'>Showcase index</p>
+				</div>
+				<span className='wg-example-count'>{totalCount}</span>
+			</div>
+			<label className='wg-example-search'>
+				<Search className='h-3.5 w-3.5' />
+				<input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder='Filter examples' />
+			</label>
 			{groups.map(([category, categoryItems]) => (
 				<div key={category} className='flex flex-col gap-1'>
 					<p className='wg-example-group-label'>{category}</p>
@@ -213,16 +242,65 @@ function ExampleSidebar({
 					})}
 				</div>
 			))}
+			<p className='mt-auto border-t border-fd-border pt-3 text-[11px] leading-5 text-fd-muted-foreground'>
+				Every example runs from <code className='text-[10px]'>@eregister/wit-grid-examples</code>.
+			</p>
 		</nav>
+	);
+}
+
+function ExampleNotes({ selected }: { selected: WitGridExampleMeta }) {
+	return (
+		<div className='wg-example-notes'>
+			<div>
+				<p className='text-[11px] font-black uppercase tracking-wider text-sky-600 dark:text-sky-300'>What this demonstrates</p>
+				<h3 className='mt-2 text-xl font-black tracking-tight text-fd-foreground'>{selected.title}</h3>
+				<p className='mt-2 max-w-2xl text-sm leading-6 text-fd-muted-foreground'>{selected.description}</p>
+			</div>
+			<div className='grid gap-3 sm:grid-cols-3'>
+				<div className='wg-example-note-card'>
+					<span>Level</span>
+					<strong>{selected.level}</strong>
+				</div>
+				<div className='wg-example-note-card'>
+					<span>Category</span>
+					<strong>{selected.category}</strong>
+				</div>
+				<div className='wg-example-note-card'>
+					<span>Package</span>
+					<strong>@eregister/wit-grid-examples</strong>
+				</div>
+			</div>
+			<div>
+				<p className='mb-2 text-[11px] font-black uppercase tracking-wider text-fd-muted-foreground'>Feature tags</p>
+				<div className='flex flex-wrap gap-2'>
+					{selected.tags.map((tag) => (
+						<span key={tag} className='rounded-md border border-fd-border bg-fd-muted/40 px-2.5 py-1 text-xs text-fd-muted-foreground'>
+							{tag}
+						</span>
+					))}
+				</div>
+			</div>
+		</div>
 	);
 }
 
 export function ExampleGallery() {
 	const sourceById = useMemo(() => new Map((examples.examples as ExampleDoc[]).map((example) => [example.id, example])), []);
 	const items = showcaseExamples as WitGridExampleMeta[];
+	const [query, setQuery] = useState('');
+	const filteredItems = useMemo(() => {
+		const normalized = query.trim().toLowerCase();
+		if (!normalized) return items;
+		return items.filter((example) =>
+			[example.title, example.description, example.category, example.level, ...example.tags].some((value) =>
+				value.toLowerCase().includes(normalized)
+			)
+		);
+	}, [items, query]);
 	const groups = useMemo(() => {
 		const byCategory = new Map<WitGridExampleMeta['category'], WitGridExampleMeta[]>();
-		for (const example of items) {
+		for (const example of filteredItems) {
 			const list = byCategory.get(example.category) ?? [];
 			list.push(example);
 			byCategory.set(example.category, list);
@@ -230,18 +308,24 @@ export function ExampleGallery() {
 		return CATEGORY_ORDER.filter((category) => byCategory.has(category)).map(
 			(category) => [category, byCategory.get(category)!] as [WitGridExampleMeta['category'], WitGridExampleMeta[]]
 		);
-	}, [items]);
+	}, [filteredItems]);
 	const initialId = items.some((item) => item.id === FEATURED_EXAMPLE_ID) ? FEATURED_EXAMPLE_ID : (items[0]?.id ?? 'basic-grid');
 	const [selectedId, setSelectedId] = useState(initialId);
 	const [mode, setMode] = useState<GalleryMode>('preview');
 	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [previewRevision, setPreviewRevision] = useState(0);
 	const { resolvedTheme } = useTheme();
-	const selected = items.find((example) => example.id === selectedId) ?? items[0];
+	const selected = items.find((example) => example.id === selectedId) ?? filteredItems[0] ?? items[0];
 	const Preview: any = selected ? previewModules[selected.id as keyof typeof previewModules] : null;
 	const selectedDoc = selected ? sourceById.get(selected.id as keyof typeof previewModules) : undefined;
 	const source = selectedDoc?.source ?? '';
 	const CategoryIcon = selected ? (CATEGORY_ICONS[selected.category] ?? Sparkles) : Sparkles;
 	const stageTheme = resolvedTheme === 'light' ? 'light' : 'dark';
+
+	async function copyMarkdown() {
+		if (!selected) return;
+		await navigator.clipboard.writeText(`[${selected.title}](${selected.docs})`);
+	}
 
 	useEffect(() => {
 		if (!isFullscreen) return;
@@ -263,33 +347,31 @@ export function ExampleGallery() {
 	}, [selectedId, mode]);
 
 	return (
-		<div className='not-prose wg-examples-workbench flex flex-col gap-4'>
-			<div className='flex flex-wrap items-end justify-between gap-3'>
-				<div>
-					<p className='text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400'>Live &amp; interactive</p>
-					<h2 className='mt-1 text-xl font-bold tracking-tight text-fd-foreground sm:text-2xl'>Examples</h2>
-				</div>
-				<p className='max-w-xl text-sm leading-6 text-fd-muted-foreground'>
-					Every example is a running instance of <code className='text-xs'>@eregister/wit-grid-examples</code> — the same package the
-					demo app imports from. Pick one, then flip to <span className='font-semibold text-fd-foreground'>Source</span>.
-				</p>
-			</div>
-
+		<div className='not-prose wg-examples-workbench'>
 			<div className='wg-example-shell'>
-				<ExampleSidebar groups={groups} selectedId={selected?.id ?? ''} onSelect={setSelectedId} />
+				<ExampleSidebar
+					groups={groups}
+					selectedId={selected?.id ?? ''}
+					onSelect={setSelectedId}
+					query={query}
+					onQueryChange={setQuery}
+					totalCount={items.length}
+				/>
 
 				{selected && Preview ? (
-					<section className='min-w-0 overflow-hidden rounded-lg border border-fd-border bg-fd-card'>
-						<div className='flex flex-col gap-3 border-b border-fd-border p-4 lg:flex-row lg:items-start lg:justify-between'>
+					<section className='wg-example-main'>
+						<div className='wg-example-main-header'>
 							<div className='min-w-0'>
 								<div className='flex flex-wrap items-center gap-2'>
 									<CategoryIcon aria-hidden size={16} className='shrink-0 text-sky-600 dark:text-sky-300' />
-									<h3 className='m-0 text-lg font-semibold tracking-tight text-fd-foreground'>{selected.title}</h3>
+									<h3 className='m-0 max-w-lg text-2xl font-black leading-tight tracking-tight text-fd-foreground'>
+										{selected.title}
+									</h3>
 									<span className={`rounded-md border px-2 py-0.5 text-xs font-medium ${getExampleTone(selected.level)}`}>
 										{selected.level}
 									</span>
 								</div>
-								<p className='mt-1.5 max-w-2xl text-sm leading-6 text-fd-muted-foreground'>{selected.description}</p>
+								<p className='mt-2 max-w-xl text-sm leading-6 text-fd-muted-foreground'>{selected.description}</p>
 								<div className='mt-2.5 flex flex-wrap gap-1.5'>
 									{selected.tags.map((tag) => (
 										<span
@@ -303,8 +385,8 @@ export function ExampleGallery() {
 							</div>
 
 							<div className='flex shrink-0 items-center gap-2'>
-								<div className='inline-flex w-fit rounded-lg border border-fd-border bg-fd-muted p-1'>
-									{(['preview', 'source'] as const).map((item) => (
+								<div className='wg-mode-switcher'>
+									{(['preview', 'source', 'notes'] as const).map((item) => (
 										<button
 											key={item}
 											type='button'
@@ -319,26 +401,28 @@ export function ExampleGallery() {
 										</button>
 									))}
 								</div>
-								<a
-									href={selected.docs}
-									className='whitespace-nowrap rounded-md border border-fd-border bg-fd-card px-3 py-2 text-sm font-medium text-fd-foreground transition hover:border-sky-500/50 hover:text-sky-600 dark:hover:text-sky-300'
-								>
-									Docs
-								</a>
 							</div>
 						</div>
 
-						<div className='p-3'>
+						<div className='wg-example-stage-wrap'>
 							{mode === 'preview' ? (
 								<PreviewStage
+									key={`${selected.id}-${previewRevision}`}
 									Preview={Preview}
 									theme={stageTheme}
 									title={selected.title}
 									isFullscreen={false}
 									onToggleFullscreen={() => setIsFullscreen(true)}
+									onReset={() => setPreviewRevision((value) => value + 1)}
 								/>
 							) : (
-								<CodeViewer source={source} sourcePath={selected.sourcePath} tokens={selectedDoc?.tokens} />
+								<>
+									{mode === 'source' ? (
+										<CodeViewer source={source} sourcePath={selected.sourcePath} tokens={selectedDoc?.tokens} />
+									) : (
+										<ExampleNotes selected={selected} />
+									)}
+								</>
 							)}
 						</div>
 					</section>
@@ -347,7 +431,12 @@ export function ExampleGallery() {
 
 			{isFullscreen && selected && Preview && typeof document !== 'undefined'
 				? (createPortal(
-						<div className='wg-example-fullscreen-overlay' role='dialog' aria-modal='true' aria-label={`${selected.title} — fullscreen preview`}>
+						<div
+							className='wg-example-fullscreen-overlay'
+							role='dialog'
+							aria-modal='true'
+							aria-label={`${selected.title} — fullscreen preview`}
+						>
 							<PreviewStage
 								Preview={Preview}
 								theme={stageTheme}

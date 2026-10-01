@@ -32,26 +32,26 @@ export function treeStage<TData>(nodes: RowNode<TData>[], getParentId: (data: TD
 	// They should also be treated as roots!
 	for (const [parentId, childIds] of parentRelations.entries()) {
 		if (!nodeMap.has(parentId)) {
-			roots.push(...childIds);
+			for (const childId of childIds) roots.push(childId);
 		}
 	}
 
 	// Remove duplicates from roots
 	const uniqueRoots = Array.from(new Set(roots));
 
-	// Helper to build hierarchy recursively from root down
-	const buildSubtree = (nodeId: string, depth: number): RowTreeNode<TData> => {
+	// Build the hierarchy from the roots down with an explicit stack: a deep parent chain must
+	// not overflow the call stack. Each node has one parent, so it is visited at most once.
+	const stack: Array<{ nodeId: string; depth: number }> = [];
+	for (let i = uniqueRoots.length - 1; i >= 0; i--) stack.push({ nodeId: uniqueRoots[i], depth: 0 });
+	while (stack.length > 0) {
+		const { nodeId, depth } = stack.pop()!;
 		const current = nodeMap.get(nodeId)!;
-		const childIds = parentRelations.get(nodeId);
 		current.depth = depth;
+		const childIds = parentRelations.get(nodeId);
+		if (!childIds || childIds.length === 0) continue;
+		current.children = childIds.map((cId) => nodeMap.get(cId)!);
+		for (let i = childIds.length - 1; i >= 0; i--) stack.push({ nodeId: childIds[i], depth: depth + 1 });
+	}
 
-		if (!childIds || childIds.length === 0) {
-			return current;
-		}
-
-		current.children = childIds.map((cId) => buildSubtree(cId, depth + 1));
-		return current;
-	};
-
-	return uniqueRoots.map((rootId) => buildSubtree(rootId, 0));
+	return uniqueRoots.map((rootId) => nodeMap.get(rootId)!);
 }

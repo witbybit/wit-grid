@@ -24,6 +24,7 @@ export interface CellCtrlPresentationState {
 		| 'loading'
 		| 'checkbox-selector'
 		| 'live-renderer'
+		| 'dom-update'
 		| 'frozen-portal'
 		| 'shell'
 		| 'text-impostor'
@@ -36,7 +37,6 @@ export interface CellCtrlPresentationState {
 	formattedValue?: string;
 	portalKey?: string;
 	html?: string;
-	releaseStalePortal: boolean;
 	requiresFidelity: boolean;
 	markDirty?: boolean;
 	isEditing?: boolean;
@@ -101,18 +101,6 @@ export interface CellCtrl {
 		diff?: unknown;
 		conflict?: unknown;
 		quality?: unknown;
-	};
-
-	rendererState: {
-		mode: 'none' | 'primitive' | 'live' | 'frozen' | 'text-impostor' | 'html-snapshot' | 'html-pending' | 'shell' | 'loading';
-		portalKey?: string;
-		htmlSnapshotKey?: string;
-		mountedSlotInstanceId?: string;
-		mountedHost?: HTMLElement;
-		mountedFreshness?: VisualFreshness;
-		pendingWorkToken?: ControllerWorkToken;
-		lastCommitEpoch?: number;
-		lastBindEpoch?: number;
 	};
 
 	lifecycle: {
@@ -196,9 +184,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			editing: false,
 			readOnly: false,
 		},
-		rendererState: {
-			mode: 'none',
-		},
 		lifecycle: {
 			destroyed: false,
 			stale: false,
@@ -207,7 +192,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			kind: 'primitive',
 			className: '',
 			title: null,
-			releaseStalePortal: false,
 			requiresFidelity: false,
 			freshness,
 			formattedValue: '',
