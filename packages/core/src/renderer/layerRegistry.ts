@@ -173,7 +173,10 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		order: 4,
 		apply(el, plan) {
 			el.style.width = `${plan.dimensions.contentWidth}px`;
-			el.style.transform = `translate3d(0, ${plan.origins.stickyGroupLayerTop}px, 0)`;
+			// Stuck just below the top chrome from the first pixel of scroll. The layer already sits
+			// after the chrome in flow, so a translate here would place it a chrome height too low
+			// until it sticks.
+			el.style.top = `${plan.origins.stickyGroupLayerTop}px`;
 			setViewportWidthVar(el, plan);
 		},
 	},

@@ -65,7 +65,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 		}
 		if (this.lastLayerTop !== plan.origins.stickyGroupLayerTop) {
 			this.lastLayerTop = plan.origins.stickyGroupLayerTop;
-			layer.style.transform = `translate3d(0, ${plan.origins.stickyGroupLayerTop}px, 0)`;
+			layer.style.top = `${plan.origins.stickyGroupLayerTop}px`;
 		}
 
 		const rowModel = this.engine.getRowModel();

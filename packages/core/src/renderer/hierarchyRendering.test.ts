@@ -220,7 +220,11 @@ describe('sticky group headers as cell rows', () => {
 		grid.store.engine.viewport.setScrollPosition(400, 0);
 		grid.renderer.fullPaint();
 
-		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+		const layer = grid.container.querySelector<HTMLElement>('.og-layer-sticky-groups')!;
+		// Offset by top, not translated: the layer already follows the chrome in flow, so a translate
+		// would draw every header a chrome height too low until the layer sticks.
+		expect(layer.style.transform).toBe('');
+		expect(layer.style.top).toMatch(/^\d+(\.\d+)?px$/);
 		const labels = [...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent);
 		expect(labels).toEqual(['EMEA', 'Cloud']);
 		const emea = layer.querySelector('[data-row-id="group:region=EMEA"]')!;

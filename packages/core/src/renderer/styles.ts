@@ -846,26 +846,37 @@ export const CORE_STYLES = `
     border-bottom: 2px solid var(--og-border-color) !important;
   }
 
+  /*
+   * The sticky copy looks exactly like the group row it stands for, so attaching, detaching and
+   * being pushed change nothing visible: the same tint over an opaque grid background (the copy
+   * covers rows scrolling underneath). Only a soft shadow marks it as stuck; it fades in once
+   * when the copy appears and never changes while pushed.
+   */
   .og-row-group-sticky {
-    background-color: color-mix(in srgb, var(--og-header-bg) 82%, #3b82f6);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(147, 197, 253, 0.22);
-    border-bottom: 1px solid rgba(147, 197, 253, 0.28) !important;
+    background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
   }
 
-  .og-row-group-sticky .og-group-row-content {
-    background:
-      linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(167, 139, 250, 0.1) 44%, rgba(15, 23, 42, 0.02)),
-      var(--og-header-bg);
+  .og-row-group-sticky::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 6px;
+    pointer-events: none;
+    background: linear-gradient(rgba(0, 0, 0, 0.16), transparent);
   }
 
-  .og-row-group-sticky-depth-1 .og-group-row-content { padding-left: 20px; }
-  .og-row-group-sticky-depth-2 .og-group-row-content { padding-left: 40px; }
-  .og-row-group-sticky-depth-3 .og-group-row-content { padding-left: 60px; }
-  .og-row-group-sticky-depth-4 .og-group-row-content { padding-left: 80px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .og-row-group-sticky::after {
+      animation: og-sticky-shadow-in 140ms ease-out;
+    }
+  }
 
-  .og-row-group-sticky-pushed {
-    opacity: 0.96;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), 0 -1px 0 rgba(248, 250, 252, 0.08) inset;
+  @keyframes og-sticky-shadow-in {
+    from { opacity: 0; }
   }
 
   .og-row-pinned-bottom {
