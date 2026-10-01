@@ -56,5 +56,7 @@ installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.og-scroll-viewport'),
 	header: () => container.querySelector<HTMLElement>('.og-layer-header-wrapper'),
 	rows: () => container.querySelectorAll<HTMLElement>('.og-rows-container > .og-row'),
+	cells: (row) => row.querySelectorAll<HTMLElement>('.og-cell'),
+	cellIds: (cell) => ({ rowId: cell.dataset.rowId ?? null, colId: cell.dataset.colField ?? null }),
 });
 requestAnimationFrame(() => requestAnimationFrame(markReady));

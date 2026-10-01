@@ -44,4 +44,6 @@ installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.ag-grid-viewport'),
 	header: () => container.querySelector<HTMLElement>('.ag-header'),
 	rows: () => container.querySelectorAll<HTMLElement>('.ag-grid-scrolling-rows .ag-row'),
+	cells: (row) => row.querySelectorAll<HTMLElement>('.ag-cell'),
+	cellIds: (cell, row) => ({ rowId: row.getAttribute('row-id'), colId: cell.getAttribute('col-id') }),
 });
