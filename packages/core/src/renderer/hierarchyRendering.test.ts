@@ -239,6 +239,75 @@ describe('sticky group headers as cell rows', () => {
 		expect([...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent)).toEqual(['EMEA', 'Hardware']);
 		grid.destroy();
 	});
+
+	function stickyRows(): Sale[] {
+		const rows: Sale[] = [];
+		for (const region of ['EMEA', 'APAC']) {
+			for (const product of ['Cloud', 'Hardware']) {
+				for (let i = 0; i < 20; i++) rows.push({ id: `${region}-${product}-${i}`, region, product, amount: 1 });
+			}
+		}
+		return rows;
+	}
+
+	function scrollTo(grid: ReturnType<typeof mountGrid>, top: number, left = 0) {
+		const viewport = grid.container.querySelector<HTMLDivElement>('.og-scroll-viewport')!;
+		viewport.scrollTop = top;
+		viewport.scrollLeft = left;
+		grid.store.engine.viewport.setScrollPosition(top, left);
+		grid.renderer.fullPaint();
+	}
+
+	const visibleHosts = (layer: Element) =>
+		[...layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')].filter((host) => host.style.display !== 'none');
+
+	it('reuses the host element per stack depth when another group becomes stuck', () => {
+		const grid = mountGrid({ grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
+		scrollTo(grid, 400);
+		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+		const [outer, inner] = visibleHosts(layer);
+		expect(inner.dataset.rowId).toBe('group:region=EMEA/product=Cloud');
+		const innerIndex = inner.dataset.rowIndex;
+
+		scrollTo(grid, 1300);
+		const [outer2, inner2] = visibleHosts(layer);
+		expect(outer2).toBe(outer);
+		expect(inner2).toBe(inner);
+		expect(inner2.dataset.rowId).toBe('group:region=EMEA/product=Hardware');
+		expect(inner2.dataset.rowIndex).not.toBe(innerIndex);
+		expect(inner2.dataset.rowKey).toBe('sticky-group:group:region=EMEA/product=Hardware');
+		expect(inner2.textContent).toContain('Hardware');
+		expect(inner2.textContent).not.toContain('Cloud');
+		grid.destroy();
+	});
+
+	it('hides hosts beyond the current stack depth', () => {
+		const grid = mountGrid({ grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
+		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+		scrollTo(grid, 400);
+		expect(visibleHosts(layer)).toHaveLength(2);
+		scrollTo(grid, 0);
+		const visible = visibleHosts(layer);
+		expect(visible.length).toBeLessThan(2);
+		for (const host of layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')) {
+			if (visible.includes(host)) continue;
+			expect(host.isConnected && host.style.display !== 'none').toBe(false);
+			expect(host.textContent).toBe('');
+		}
+		grid.destroy();
+	});
+
+	it("pins full-width sticky content like body rows with display: 'row'", () => {
+		const grid = mountGrid({ grouping: { by: ['region'], display: 'row', defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
+		scrollTo(grid, 400, 120);
+		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+		const [host] = visibleHosts(layer);
+		expect(host).toBeDefined();
+		const wrapper = host.querySelector<HTMLElement>(':scope > .og-row-portal-host');
+		expect(wrapper).not.toBeNull();
+		expect(wrapper!.dataset.rowKey).toBe(host.dataset.rowKey);
+		grid.destroy();
+	});
 });
 
 describe('tree rows in the hierarchy column', () => {
