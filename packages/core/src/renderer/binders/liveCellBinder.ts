@@ -26,11 +26,12 @@ function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<
 	return isOverscanLiveCell(input.viewportPlan.liveCells.overscan, input.geometry.rowIndex, input.cellCtrl.columnInstanceId);
 }
 
-/** Renders the over-budget emergency shell for a fresh live mount that couldn't be granted this
- * frame's mount budget. */
+/** Renders the over-budget emergency shell for a live cell that couldn't be granted this frame's
+ * budget: the cell's text, as the default stand-in shows, rather than a blank cell. */
 function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
+	const standIn = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
 	deps.incrementLiveReactEmergencyShellsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
@@ -44,9 +45,9 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 		geometry.right,
 		geometry.width,
 		presentation.className,
-		'pending',
+		standIn !== '' ? 'fallback' : 'pending',
 		undefined,
-		'',
+		standIn,
 		undefined,
 		0
 	);
@@ -221,7 +222,9 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	const isFreshMount = !deps.portalMountManager.isCellMounted(presentation.portalKey!);
 	const withinBudget = deps.tryConsumeLiveBudget?.(isFreshMount ? 'mount' : 'update') ?? true;
 	if (!withinBudget) {
-		if (!isFreshMount) return;
+		// An over-budget update keeps the mounted content, unless the slot was just recycled to
+		// another row: that content is the previous row's, so it must not stay visible.
+		if (!isFreshMount && cellSlot.rowId === cellCtrl.rowId) return;
 		if (deps.allowLiveEmergencyShell?.() ?? true) {
 			applyLiveMountEmergencyShell(input);
 			return;

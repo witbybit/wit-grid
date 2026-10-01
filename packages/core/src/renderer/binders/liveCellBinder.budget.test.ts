@@ -245,16 +245,47 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		expect(deps.incrementLiveReactMountsDuringScroll).toHaveBeenCalledTimes(1);
 	});
 
-	it("over budget + already mounted: skips this frame's update, leaves DOM untouched", () => {
+	it("over budget + already mounted for this row: skips this frame's update, leaves DOM untouched", () => {
 		const deps = makeDeps({
 			portalMountManager: { isCellMounted: vi.fn(() => true), mountCellImmediately: vi.fn() } as any,
 			tryConsumeLiveBudget: vi.fn(() => false),
 		});
-		applyLiveCellPresentation(makeDispatchInput(deps, makeRequest(), makeLiveMountPresentation(), 1));
+		const request = makeRequest();
+		request.cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'ck1');
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
 
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactUpdatesDuringScroll).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
+		expect(request.cellSlot.lastContentMode).toBe('portal');
+	});
+
+	it("over budget in a slot recycled from another row: hides that row's content behind the cell's text", () => {
+		const deps = makeDeps({
+			engine: { ...(makeDeps().engine as any), getCheapDisplayValue: vi.fn(() => 'Name 1') } as any,
+			portalMountManager: { isCellMounted: vi.fn(() => true), mountCellImmediately: vi.fn() } as any,
+			tryConsumeLiveBudget: vi.fn(() => false),
+		});
+		const request = makeRequest();
+		request.cellSlot.update(0, 'name', 0, 'r0', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'ck1');
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
+
+		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).toHaveBeenCalledTimes(1);
+		expect(request.cellSlot.rowId).toBe('r1');
+		expect(request.cellSlot.lastContentMode).toBe('fallback');
+		expect(request.cellSlot.element.textContent).toContain('Name 1');
+	});
+
+	it('over budget for a fresh mount: shows the cell text, not a blank cell', () => {
+		const deps = makeDeps({
+			engine: { ...(makeDeps().engine as any), getCheapDisplayValue: vi.fn(() => 'Name 1') } as any,
+			tryConsumeLiveBudget: vi.fn(() => false),
+		});
+		const request = makeRequest();
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
+		expect(request.cellSlot.lastContentMode).toBe('fallback');
+		expect(request.cellSlot.element.textContent).toContain('Name 1');
 	});
 
 	it('omitted tryConsumeLiveBudget (no scheduler wired) defaults to unlimited — behaves as before', () => {
