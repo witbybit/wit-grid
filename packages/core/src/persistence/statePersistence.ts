@@ -606,14 +606,14 @@ export function preparePersistedGridStateRestore<TRowData>(
 	const s = parsed.value.state;
 	const knownFields = new Set(current.columns.map((c) => c.field));
 
-	let columns = current.columns as import('../columnDef.js').ColumnDef<TRowData>[];
+	let columns = current.columns as ColumnDef<TRowData>[];
 	let columnWidths = { ...current.columnWidths };
 
 	if (s.columnOrder) {
 		const validOrder = s.columnOrder.filter((f) => knownFields.has(f));
 		if (validOrder.length === columns.length) {
 			const colMap = new Map(columns.map((c) => [c.field, c]));
-			const reordered = validOrder.map((f) => colMap.get(f)).filter((c): c is import('../columnDef.js').ColumnDef<TRowData> => !!c);
+			const reordered = validOrder.map((f) => colMap.get(f)).filter((c): c is ColumnDef<TRowData> => !!c);
 			if (reordered.length === columns.length) columns = reordered;
 		}
 	}

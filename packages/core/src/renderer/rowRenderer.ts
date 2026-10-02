@@ -34,6 +34,7 @@ import { snapToDevicePixel } from './layoutPlan.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 import { syncRowRendererInteractionAccessibility } from './rowRendererAccessibility.js';
 import type { ProgrammaticScrollTarget } from './programmaticScrollTarget.js';
+import type { RenderRuntimeState } from './renderRuntimeState.js';
 
 export class RowRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
@@ -94,7 +95,7 @@ export class RowRenderer<TRowData = unknown> {
 	public currentScrollCellsVisited = 0;
 	public currentScrollCellsWritten = 0;
 	public currentScrollPortalOps = 0;
-	public runtimeState!: import('./renderRuntimeState.js').RenderRuntimeState;
+	public runtimeState!: RenderRuntimeState;
 	public dirtyCellsMarkedDuringScroll = 0;
 
 	/** Current viewport-owned resources; cumulative paint telemetry remains in RenderStats. */

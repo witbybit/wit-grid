@@ -14,6 +14,8 @@ import type { ColumnDef, ColumnInstanceId, InternalColumnDef } from './columnDef
 import { resolveGridInteractionController, resolveGridRuntimeComposition } from './internal/apiInternalBridge.js';
 import { createGridInteractionEventRouter } from './interaction/GridInteractionEventRouter.js';
 import type { GridNavigationOptions } from './interaction/GridInteractionController.js';
+import type { VisualRow } from './visualRow.js';
+import type { BuiltInThemeName, ThemeTokens } from './renderer/themes.js';
 
 export function hasImperativeRendererCapability<TRowData = unknown>(column: ColumnDef<TRowData>): boolean {
 	const caps = (column as InternalColumnDef<TRowData>).cellRendererCapabilities;
@@ -33,7 +35,7 @@ export interface GridRowContentAdapter<TRowData = unknown> {
 	 * Which full-width rows (detail, full-width group / total, failed, placeholder) the adapter draws
 	 * with its own renderers. Rows it does not draw get core's built-in renderers. Unset: all.
 	 */
-	rendersRow?: (row: import('./visualRow.js').VisualRow<TRowData>) => boolean;
+	rendersRow?: (row: VisualRow<TRowData>) => boolean;
 }
 
 export interface GridHeaderMenuAdapter<TRowData = unknown> {
@@ -65,17 +67,17 @@ export interface GridHost {
 	getRenderStats(): RenderStats;
 	resetRenderStats(): void;
 	/** Set a custom theme immediately. */
-	setTheme(theme: import('./renderer/themes.js').ThemeTokens): void;
+	setTheme(theme: ThemeTokens): void;
 	/** Switch to a built-in theme by name. */
 	switchTheme(themeName: string): void;
 	/** Get the currently active theme. */
-	getTheme(): import('./renderer/themes.js').ThemeTokens;
+	getTheme(): ThemeTokens;
 	/** Get the active built-in theme name, or null for a custom theme. */
-	getThemeName(): import('./renderer/themes.js').BuiltInThemeName | null;
+	getThemeName(): BuiltInThemeName | null;
 	/** List supported built-in theme names. */
-	getAvailableThemes(): import('./renderer/themes.js').BuiltInThemeName[];
+	getAvailableThemes(): BuiltInThemeName[];
 	/** Subscribe to theme changes. Returns an unsubscribe function. */
-	onThemeChange(listener: (theme: import('./renderer/themes.js').ThemeTokens) => void): () => void;
+	onThemeChange(listener: (theme: ThemeTokens) => void): () => void;
 	destroy(): void;
 }
 
@@ -91,7 +93,7 @@ export interface GridAdapterHandle<TRowData = unknown> {
 	/** Get full cell access data by row id and column field. */
 	getCellAccess(rowId: string, colField: string): GridCellAccess<TRowData> | null;
 	/** Returns true when the column uses the imperative-update renderer protocol. */
-	isImperativeRendererColumn(column: import('./columnDef.js').ColumnDef<TRowData>): boolean;
+	isImperativeRendererColumn(column: ColumnDef<TRowData>): boolean;
 }
 
 export type GridHostWithAdapter<TRowData = unknown> = GridHost & { adapterHandle: GridAdapterHandle<TRowData> };

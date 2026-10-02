@@ -6,6 +6,8 @@ import type { RuntimeFault } from '../diagnostics/RuntimeFaultReporter.js';
 import type { GridViewDefinition, GridWorkspaceState } from '../workspace/workspaceTypes.js';
 import type { GridIntegrityIssue } from '../features/dataIntegrity/integrityTypes.js';
 import type { GridRowNode } from '../publicRowNode.js';
+import type { ServerSideStoreSnapshot } from '../serverSideRowModel.js';
+import type { GridQueryModel } from '../query/GridQueryModel.js';
 
 export interface GridEvent<T = unknown> {
 	type: string;
@@ -145,7 +147,7 @@ export interface GridEventPayloadMap<TRowData = unknown> {
 	[GridEventName.serverSideStateChanged]: {
 		loading: boolean;
 		error: string | null;
-		storeStates: readonly import('../serverSideRowModel.js').ServerSideStoreSnapshot[];
+		storeStates: readonly ServerSideStoreSnapshot[];
 	};
 	[GridEventName.treeDataChanged]: { treeData: TreeDataConfig<TRowData> | undefined };
 	[GridEventName.sortChanged]: { sortModel: SortModel | null };
@@ -156,7 +158,7 @@ export interface GridEventPayloadMap<TRowData = unknown> {
 	[GridEventName.rowDragEnd]: { rowId: string; overRowId: string | null; overVisualIndex: number | null };
 	[GridEventName.rowDragCancelled]: { rowId: string };
 	[GridEventName.rowOrderChanged]: { rowIds: string[] };
-	[GridEventName.queryModelChanged]: { queryModel: import('../query/GridQueryModel.js').GridQueryModel | null };
+	[GridEventName.queryModelChanged]: { queryModel: GridQueryModel | null };
 	[GridEventName.viewSaved]: { view: GridViewDefinition };
 	[GridEventName.viewApplied]: { view: GridViewDefinition };
 	[GridEventName.viewDeleted]: { id: string };

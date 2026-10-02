@@ -6,6 +6,9 @@ import type { GroupVisualRow, DetailVisualRow } from './visualRow.js';
 import type { GridCapabilityCallback } from './capabilities/capabilityTypes.js';
 import type { GridRowDataRef } from './publicRowRef.js';
 import type { GridApi as PublicGridApi } from './api/GridApiSurfaces.js';
+import type { TotalVisualRow } from './visualRow.js';
+import type { ColumnFilterDef } from './filters/filterDef.js';
+import type { FloatingFilterRendererParams } from './renderer/floatingFilterRenderer.js';
 
 // ─── Value getter / setter / validator params ─────────────────────────────────
 
@@ -98,7 +101,7 @@ export interface AggregateRendererParams<TRowData = unknown> {
 	/** `value` through the column's `valueFormatter` (or String). */
 	formattedValue: string;
 	/** The group or total row. */
-	row: import('./visualRow.js').GroupVisualRow<TRowData> | import('./visualRow.js').TotalVisualRow<TRowData>;
+	row: GroupVisualRow<TRowData> | TotalVisualRow<TRowData>;
 	col: ColumnDef<TRowData>;
 }
 
@@ -368,7 +371,7 @@ export interface ColumnDef<TRowData = unknown> {
 	 * Backwards-compatible — existing filterType/filterValues still work and are normalised
 	 * to filterDef internally.
 	 */
-	filterDef?: import('./filters/filterDef.js').ColumnFilterDef<TRowData>;
+	filterDef?: ColumnFilterDef<TRowData>;
 	/**
 	 * Filter UI type shown for this column in the sidebar and header menu.
 	 * Defaults to `'text'`. Use `'none'` to hide the filter UI for this column.
@@ -387,7 +390,7 @@ export interface ColumnDef<TRowData = unknown> {
 	 * When omitted, the default input (text / number / date / set badge) is used.
 	 * @deprecated Prefer filterDef.renderFloatingFilter for React-based renderers.
 	 */
-	floatingFilterRenderer?: (params: import('./renderer/floatingFilterRenderer.js').FloatingFilterRendererParams<TRowData>) => void;
+	floatingFilterRenderer?: (params: FloatingFilterRendererParams<TRowData>) => void;
 	/**
 	 * Prevent cell range selection from starting when the user clicks on cells in this column.
 	 * Useful for action / checkbox / drag-handle columns.

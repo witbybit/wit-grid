@@ -31,6 +31,9 @@ import {
 	type CompoundFilterCondition,
 	type ColumnFilter,
 } from './filterModel.js';
+import type { RowTransactionMutation } from './engine/GridDomainMutation.js';
+import type { InfiniteDatasource } from './infiniteRowModel.js';
+import type { ServerSideDatasource, ServerSideRefreshOptions, ServerSideStoreSnapshot } from './serverSideRowModel.js';
 
 export type {
 	FilterModel,
@@ -335,14 +338,10 @@ export interface RowModelWriteResult<TRowData = unknown> {
  * dispatch events, invalidate formulas, or bump versions.
  */
 export interface ClientStructuralRowModel<TRowData = unknown> extends RowOrderCapableModel {
-	captureTransactionSnapshot(
-		mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TRowData>
-	): RowModelTransactionSnapshot<TRowData>;
+	captureTransactionSnapshot(mutation: RowTransactionMutation<TRowData>): RowModelTransactionSnapshot<TRowData>;
 	restoreTransactionSnapshot(snapshot: RowModelTransactionSnapshot<TRowData>): void;
 	replaceRowsStructurally(rows: readonly TRowData[]): RowModelWriteResult<TRowData>;
-	applyTransactionStructurally(
-		transaction: import('./api/GridApi.js').RowDataTransaction<TRowData>
-	): RowModelWriteResult<TRowData> & InternalRowNodeTransaction<TRowData>;
+	applyTransactionStructurally(transaction: RowDataTransaction<TRowData>): RowModelWriteResult<TRowData> & InternalRowNodeTransaction<TRowData>;
 	writeCellValueStructurally(
 		rowId: string,
 		colField: string,
@@ -406,15 +405,15 @@ export function asAnyModelCellWritable<TRowData = unknown>(rowModel: RowModel<TR
 /** Capability interface for the infinite (block/range) row model. */
 export interface InfiniteControllableRowModel<TRowData = unknown> {
 	purgeCache(): void;
-	setDatasource(datasource: import('./infiniteRowModel.js').InfiniteDatasource<TRowData>, blockSize?: number): void;
+	setDatasource(datasource: InfiniteDatasource<TRowData>, blockSize?: number): void;
 }
 
 /** Capability interface for the real server-side row model (SSRM). */
 export interface ServerSideControllableRowModel<TRowData = unknown> {
-	setServerSideDatasource(datasource: import('./serverSideRowModel.js').ServerSideDatasource<TRowData>): void;
-	refreshServerSide(options?: import('./serverSideRowModel.js').ServerSideRefreshOptions): void;
-	purgeServerSide(options?: Omit<import('./serverSideRowModel.js').ServerSideRefreshOptions, 'purge'>): void;
-	getServerSideStoreState(): readonly import('./serverSideRowModel.js').ServerSideStoreSnapshot[];
+	setServerSideDatasource(datasource: ServerSideDatasource<TRowData>): void;
+	refreshServerSide(options?: ServerSideRefreshOptions): void;
+	purgeServerSide(options?: Omit<ServerSideRefreshOptions, 'purge'>): void;
+	getServerSideStoreState(): readonly ServerSideStoreSnapshot[];
 }
 
 export interface VisibleBlockLoadCapableRowModel {
@@ -1350,9 +1349,7 @@ export class ClientRowModelController<TData = unknown>
 		};
 	}
 
-	public applyTransactionStructurally(
-		transaction: import('./api/GridApi.js').RowDataTransaction<TData>
-	): RowModelWriteResult<TData> & InternalRowNodeTransaction<TData> {
+	public applyTransactionStructurally(transaction: RowDataTransaction<TData>): RowModelWriteResult<TData> & InternalRowNodeTransaction<TData> {
 		const result = this.dataStore.applyTransaction(transaction);
 		const hasStructural = result.added.length > 0 || result.removed.length > 0;
 		return {
@@ -1593,9 +1590,7 @@ export class ClientRowModelController<TData = unknown>
 		return earliestChangedIndex === mutable.length ? 0 : earliestChangedIndex;
 	}
 
-	public captureTransactionSnapshot = (
-		mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TData>
-	): RowModelTransactionSnapshot<TData> => {
+	public captureTransactionSnapshot = (mutation: RowTransactionMutation<TData>): RowModelTransactionSnapshot<TData> => {
 		// Delta snapshot: only the rows this transaction touches, captured by reference.
 		return {
 			modelType: 'client',

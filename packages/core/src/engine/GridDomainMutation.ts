@@ -32,6 +32,7 @@ import type { GridCommitEvent, GridCommitReason, GridHistoryEntry } from './Grid
 import type { CellValueChangeOptions, CellValueChangeResult, StructuralWriteEffectResult } from '../features/DataMutationController.js';
 import type { GridIntegrityIssueFilter } from '../features/dataIntegrity/integrityTypes.js';
 import type { LayoutTransitionReason } from '../renderer/layoutTransitionController.js';
+import type { RowModelRefreshResult } from '../rowModel.js';
 
 export type GridDomain = keyof GridDomainVersions;
 
@@ -291,7 +292,7 @@ function createInvalidationsFromCells(cells: readonly GridCellPointer[]): GridIn
 }
 
 function createInvalidationsFromRefreshResult<TRowData>(
-	result: import('../rowModel.js').RowModelRefreshResult,
+	result: RowModelRefreshResult,
 	context: GridCommitContext<TRowData>,
 	reason: GridInvalidation['reason'] = 'data'
 ): GridInvalidation[] {
