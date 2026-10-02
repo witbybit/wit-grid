@@ -1,6 +1,8 @@
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { PortalRendererHandle } from '../cellRendererHandle.js';
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
+import type { ControllerWorkToken } from '../controllers/CellCtrl.js';
+import type { CellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
 import {
 	applyCellAccessibilityState,
 	applyCellTitlesAndValidation,
@@ -26,14 +28,15 @@ function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<
 	return isOverscanLiveCell(input.viewportPlan.liveCells.overscan, input.geometry.rowIndex, input.cellCtrl.columnInstanceId);
 }
 
-/** Renders the over-budget emergency shell for a fresh live mount that couldn't be granted this
- * frame's mount budget. */
+/** Renders the over-budget emergency shell for a live cell that couldn't be granted this frame's
+ * budget: the cell's text, as the default stand-in shows, rather than a blank cell. */
 function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
+	const standIn = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
 	deps.incrementLiveReactEmergencyShellsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,
@@ -44,9 +47,9 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 		geometry.right,
 		geometry.width,
 		presentation.className,
-		'pending',
+		standIn !== '' ? 'fallback' : 'pending',
 		undefined,
-		'',
+		standIn,
 		undefined,
 		0
 	);
@@ -54,6 +57,16 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 	cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
 	recordDispatchWrite(input, didWrite);
 }
+type DomUpdateMount<TRowData> = Parameters<CellRendererLifecycle<TRowData>['updateLive']>[0]['mount'];
+const domUpdateTokenScratch: ControllerWorkToken = {
+	epoch: 0,
+	cellControllerKey: '' as ControllerWorkToken['cellControllerKey'],
+	rowId: '',
+	columnInstanceId: '' as ControllerWorkToken['columnInstanceId'],
+	freshness: undefined as unknown as ControllerWorkToken['freshness'],
+};
+const domUpdateMountScratch = {} as DomUpdateMount<unknown>;
+
 /**
  * `dom-update`: a DOM renderer cell updated in place during scroll. The frame's DOM-update budget
  * admits it; the renderer's update() (or, for a slot's first use, mount()) runs now, and the cell is
@@ -65,7 +78,7 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 	const presentation = cellCtrl.presentationState;
 	const mountRuntime = runtime.mount;
 	if (!mountRuntime) throw new Error('DOM update presentation requires mount runtime.');
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 
 	if (!(deps.tryConsumeDomUpdateBudget?.() ?? true)) {
@@ -93,30 +106,30 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 	deps.incrementDomUpdatesDuringScroll?.();
 	const lifecycle = getCellRendererLifecycle(deps);
 	const host = deps.ensureCellPortalHost(cellSlot.element);
-	const token = {
-		epoch: runtime.globalVersion,
-		cellControllerKey: cellCtrl.key,
-		rowId: cellCtrl.rowId,
-		columnInstanceId: cellCtrl.columnInstanceId,
-		freshness: cellCtrl.freshness!,
-	};
-	const mount = {
-		cellKey: presentation.portalKey!,
-		value: mountRuntime.value,
-		node: mountRuntime.node,
-		col: mountRuntime.col,
-		rowIndex: geometry.rowIndex,
-		colIndex: geometry.colIndex,
-		rowSlotId: runtime.rowSlotId,
-		slotGeneration: runtime.slotGeneration,
-		cellRowBindingGeneration: cellSlot.rowBindingGeneration,
-		cellInstanceId: cellSlot.cellInstanceId,
-		portalHostId: cellSlot.portalHostId,
-		isEditing: false,
-		isLoading: mountRuntime.isLoading,
-		isFocused: cellCtrl.visualState.focused,
-		isSelected: mountRuntime.isSelected,
-	};
+	// Scratch, refilled per cell: the lifecycle checks the token and copies the mount fields before
+	// any renderer code runs, and keeps neither, so one pair serves every DOM update.
+	const token = domUpdateTokenScratch;
+	token.epoch = runtime.globalVersion;
+	token.cellControllerKey = cellCtrl.key;
+	token.rowId = cellCtrl.rowId;
+	token.columnInstanceId = cellCtrl.columnInstanceId;
+	token.freshness = cellCtrl.freshness!;
+	const mount = domUpdateMountScratch as DomUpdateMount<TRowData>;
+	mount.cellKey = presentation.portalKey!;
+	mount.value = mountRuntime.value;
+	mount.node = mountRuntime.node;
+	mount.col = mountRuntime.col;
+	mount.rowIndex = geometry.rowIndex;
+	mount.colIndex = geometry.colIndex;
+	mount.rowSlotId = runtime.rowSlotId;
+	mount.slotGeneration = runtime.slotGeneration;
+	mount.cellRowBindingGeneration = cellSlot.rowBindingGeneration;
+	mount.cellInstanceId = cellSlot.cellInstanceId;
+	mount.portalHostId = cellSlot.portalHostId;
+	mount.isEditing = false;
+	mount.isLoading = mountRuntime.isLoading;
+	mount.isFocused = cellCtrl.visualState.focused;
+	mount.isSelected = mountRuntime.isSelected;
 	try {
 		if (deps.portalMountManager.isCellMounted(mount.cellKey)) lifecycle.updateLive({ cellCtrl, host, reason: 'scroll-live', token, mount });
 		else lifecycle.mountLive({ cellCtrl, host, reason: 'scroll-live', token, mount });
@@ -195,7 +208,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		recordHeldPortal(cellSlot, presentation.portalKey!);
 		cellSlot.lastMountedRowVersion = rowVersion;
 		cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
-		applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+		applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 		applyCellAccessibilityState(cellSlot, cellCtrl);
 		const didWrite = cellSlot.update(
 			geometry.colIndex,
@@ -221,7 +234,9 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	const isFreshMount = !deps.portalMountManager.isCellMounted(presentation.portalKey!);
 	const withinBudget = deps.tryConsumeLiveBudget?.(isFreshMount ? 'mount' : 'update') ?? true;
 	if (!withinBudget) {
-		if (!isFreshMount) return;
+		// An over-budget update keeps the mounted content, unless the slot was just recycled to
+		// another row: that content is the previous row's, so it must not stay visible.
+		if (!isFreshMount && cellSlot.rowId === cellCtrl.rowId) return;
 		if (deps.allowLiveEmergencyShell?.() ?? true) {
 			applyLiveMountEmergencyShell(input);
 			return;
@@ -275,7 +290,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 			colWidth: runtime.colWidth,
 		});
 	}
-	applyCellTitlesAndValidation(cellSlot.element, presentation.title ?? null, '', presentation.validationError);
+	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
 		geometry.colIndex,

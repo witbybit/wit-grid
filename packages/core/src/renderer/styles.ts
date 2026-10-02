@@ -152,6 +152,9 @@ export const CORE_STYLES = `
     order: 0;
     left: 0;
     border-right: 1px solid var(--og-pin-left-border-color, var(--og-border-color));
+  }
+
+  .og-scrolled-left .og-layer-floating-filter-left {
     box-shadow: var(--og-pin-left-shadow, none);
   }
 
@@ -159,6 +162,9 @@ export const CORE_STYLES = `
     order: 2;
     right: 0;
     border-left: 1px solid var(--og-pin-right-border-color, var(--og-border-color));
+  }
+
+  .og-scrolled-right .og-layer-floating-filter-right {
     box-shadow: var(--og-pin-right-shadow, none);
   }
 
@@ -698,8 +704,11 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-right: 1px solid var(--og-pin-left-border-color);
-    box-shadow: var(--og-pin-left-shadow);
     background-color: var(--og-header-bg);
+  }
+
+  .og-scrolled-left .og-layer-header-left {
+    box-shadow: var(--og-pin-left-shadow);
   }
 
   .og-layer-header-right {
@@ -714,8 +723,11 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-left: 1px solid var(--og-pin-right-border-color);
-    box-shadow: var(--og-pin-right-shadow);
     background-color: var(--og-header-bg);
+  }
+
+  .og-scrolled-right .og-layer-header-right {
+    box-shadow: var(--og-pin-right-shadow);
   }
 
   /*
@@ -846,26 +858,37 @@ export const CORE_STYLES = `
     border-bottom: 2px solid var(--og-border-color) !important;
   }
 
+  /*
+   * The sticky copy looks exactly like the group row it stands for, so attaching, detaching and
+   * being pushed change nothing visible: the same tint over an opaque grid background (the copy
+   * covers rows scrolling underneath). Only a soft shadow marks it as stuck; it fades in once
+   * when the copy appears and never changes while pushed.
+   */
   .og-row-group-sticky {
-    background-color: color-mix(in srgb, var(--og-header-bg) 82%, #3b82f6);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.34), 0 1px 0 rgba(147, 197, 253, 0.22);
-    border-bottom: 1px solid rgba(147, 197, 253, 0.28) !important;
+    background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
+    color: var(--og-group-row-text);
+    font-weight: var(--og-group-row-font-weight);
   }
 
-  .og-row-group-sticky .og-group-row-content {
-    background:
-      linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(167, 139, 250, 0.1) 44%, rgba(15, 23, 42, 0.02)),
-      var(--og-header-bg);
+  .og-row-group-sticky::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 6px;
+    pointer-events: none;
+    background: linear-gradient(rgba(0, 0, 0, 0.16), transparent);
   }
 
-  .og-row-group-sticky-depth-1 .og-group-row-content { padding-left: 20px; }
-  .og-row-group-sticky-depth-2 .og-group-row-content { padding-left: 40px; }
-  .og-row-group-sticky-depth-3 .og-group-row-content { padding-left: 60px; }
-  .og-row-group-sticky-depth-4 .og-group-row-content { padding-left: 80px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .og-row-group-sticky::after {
+      animation: og-sticky-shadow-in 140ms ease-out;
+    }
+  }
 
-  .og-row-group-sticky-pushed {
-    opacity: 0.96;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3), 0 -1px 0 rgba(248, 250, 252, 0.08) inset;
+  @keyframes og-sticky-shadow-in {
+    from { opacity: 0; }
   }
 
   .og-row-pinned-bottom {
@@ -1146,17 +1169,31 @@ export const CORE_STYLES = `
     contain: layout paint;
   }
 
+  /*
+   * Each row's lane casts the pinned-edge shadow; clipped to the outer side so a blur cannot spill
+   * over the rows above and below (overlapping row shadows read as a band on every row instead of
+   * one continuous edge).
+   */
   .og-row-pin-left {
     left: 0;
     border-right: 1px solid var(--og-pin-left-border-color);
+    clip-path: inset(0 -32px 0 0);
+  }
+
+  /* The edge shadow only while content is scrolled under the lane; at rest the border alone. */
+  .og-scrolled-left .og-row-pin-left {
     box-shadow: var(--og-pin-left-shadow);
+  }
+
+  .og-scrolled-right .og-row-pin-right {
+    box-shadow: var(--og-pin-right-shadow);
   }
 
   .og-row-pin-right {
     right: 0;
     margin-left: auto;
     border-left: 1px solid var(--og-pin-right-border-color);
-    box-shadow: var(--og-pin-right-shadow);
+    clip-path: inset(0 0 0 -32px);
   }
 
   .og-row-selected .og-row-pin-left,
@@ -2030,32 +2067,6 @@ export const CORE_STYLES = `
   }
   .og-btn-secondary:hover {
     background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.12));
-  }
-
-  /* Group and Detail Rows */
-  .og-group-row-content {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    width: 100%;
-    user-select: none;
-    cursor: pointer;
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--og-focus-ring, #3b82f6) 13%, transparent), color-mix(in srgb, var(--og-selection-bg, rgba(59, 130, 246, 0.1)) 40%, transparent) 44%, transparent),
-      var(--og-group-row-bg);
-    color: var(--og-group-row-text);
-    font-size: var(--og-group-row-font-size);
-    font-weight: var(--og-group-row-font-weight);
-    gap: 10px;
-    overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    transition: background-color 0.15s ease;
-  }
-
-  .og-group-row-content:hover {
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--og-focus-ring, #3b82f6) 18%, transparent), color-mix(in srgb, var(--og-selection-bg, rgba(59, 130, 246, 0.1)) 50%, transparent) 44%, transparent),
-      var(--og-group-row-hover-bg);
   }
 
   .og-group-row-toggle {

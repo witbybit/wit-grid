@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { applyCellTitlesAndValidation } from './binders/binderShared.js';
 import { describe, expect, it, vi } from 'vitest';
 import { CellSlot } from './cellSlot.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
@@ -818,8 +819,8 @@ describe('bindCellDuringScroll', () => {
 	it('does not promote buffered primitive DOM state into snapshot truth during scroll', () => {
 		const cellSlot = new CellSlot(document.createElement('div'));
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell warm-class', 'text', undefined, 'Name 1', undefined);
-		cellSlot.element.title = 'Warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Warm title', '', 'Needs review');
 		const snapshotSet = vi.fn();
 
 		const deps: RowCellBinderDeps<{ id: string; name: string }> = {
@@ -910,8 +911,8 @@ describe('bindCellDuringScroll', () => {
 		cellSlot.element.appendChild(host);
 		cellSlot.portalHostElement = host;
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell portal-warm', 'portal', undefined, '', portalKey);
-		cellSlot.element.title = 'Portal warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Portal warm title', '', 'Needs review');
 		cellSlot.lastMountedInsightVersion = 0;
 		cellSlot.lastMountedStyleVersion = 0;
 		cellSlot.lastMountedLoadingVersion = 0;
@@ -1994,8 +1995,8 @@ describe('bindCellDuringScroll', () => {
 		cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell custom-class', 'portal', undefined, '', portalKey);
 		cellSlot.lastMountedGlobalVersion = 1;
 		cellSlot.lastMountedRowVersion = 2;
-		cellSlot.element.title = 'Portal warm title';
-		cellSlot.element.dataset.validationError = 'Needs review';
+		// Warm state as a previous bind left it (written through the slot, like production).
+		applyCellTitlesAndValidation(cellSlot, 'Portal warm title', '', 'Needs review');
 		cellSlot.lastMountedInsightVersion = 0;
 		cellSlot.lastMountedStyleVersion = 0;
 		cellSlot.lastMountedLoadingVersion = 0;
@@ -2529,7 +2530,7 @@ describe('bindCellDuringScroll', () => {
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 	});
 
-	it('shows a pending shell (not raw text) when scrollPresentation:"html-snapshot" has no fresh capture yet', () => {
+	it('a strict html-snapshot column shows a pending shell (not raw text) when it has no fresh capture yet', () => {
 		const dirty = vi.fn();
 		const showPortalContent = vi.fn();
 		const mountCellImmediately = vi.fn();
@@ -2593,7 +2594,7 @@ describe('bindCellDuringScroll', () => {
 			col: {
 				field: 'name',
 				cellRenderer: () => null,
-				cellRendererCapabilities: { scrollPresentation: 'html-snapshot' },
+				cellRendererCapabilities: { scrollPresentation: 'html-snapshot', htmlSnapshot: { strict: true } },
 			} as any,
 			lane: 'center',
 			ctx: {
@@ -2620,8 +2621,8 @@ describe('bindCellDuringScroll', () => {
 			isInVisibleContent: true,
 		});
 
-		// Shows a stable pending shell, not the snapshot's raw fallback text — html-snapshot mode
-		// never shows raw text unless the column/grid explicitly opts into allowTextFallbackWhenMissing.
+		// Shows a stable pending shell, not the snapshot's raw fallback text — a strict html-snapshot
+		// column never shows raw text (non-strict columns show the cell text by default).
 		expect(cellSlot.element.dataset.contentMode).toBe('pending');
 		expect(cellSlot.lastFormattedValue).toBe('');
 		expect(mountCellImmediately).not.toHaveBeenCalled();

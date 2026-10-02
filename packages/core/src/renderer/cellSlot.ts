@@ -221,6 +221,10 @@ export class CellSlot<TRowData = unknown> {
 	// Cached DOM states — integers are faster to compare than strings
 	public lastRawValue: unknown = undefined;
 	public lastFormattedValue: string | undefined = undefined;
+	/** The element's title and data-validation-error as last written (see applyCellTitlesAndValidation),
+	 *  so binds compare against these instead of reading the DOM per cell. */
+	public writtenTitle = '';
+	public writtenValidationError: string | undefined = undefined;
 	public lastLeft = -1; // absolute left px for center and pin-left cells
 	public lastRight = -1; // distance-from-right px for pin-right cells (-1 = not set)
 	public lastWidth = -1; // column width px
@@ -308,6 +312,8 @@ export class CellSlot<TRowData = unknown> {
 		this.element = element;
 		if (!element.id) element.id = `og-cell-${this.cellInstanceId}`;
 		(element as any).__cellSlot = this;
+		this.writtenTitle = element.title;
+		this.writtenValidationError = element.dataset.validationError;
 		// ARIA grid semantics — role is static per element; positional/state attrs are
 		// written (guarded) in update().
 		if (element.getAttribute('role') !== 'gridcell') element.setAttribute('role', 'gridcell');
@@ -504,24 +510,24 @@ export class CellSlot<TRowData = unknown> {
 		}
 		if (this.colField !== colField) {
 			this.colField = colField;
-			this.element.dataset.colField = colField;
+			this.element.setAttribute('data-col-field', colField);
 			domUpdated = true;
 		}
 		if (this.lastDatasetColumnInstanceId !== this.columnInstanceId) {
 			this.lastDatasetColumnInstanceId = this.columnInstanceId;
-			if (this.element.dataset.columnInstanceId !== this.columnInstanceId) {
-				this.element.dataset.columnInstanceId = this.columnInstanceId;
+			if (this.element.getAttribute('data-column-instance-id') !== this.columnInstanceId) {
+				this.element.setAttribute('data-column-instance-id', this.columnInstanceId);
 				domUpdated = true;
 			}
 		}
 		if (this.rowIndex !== rowIndex) {
 			this.rowIndex = rowIndex;
-			this.element.dataset.rowIndex = String(rowIndex);
+			this.element.setAttribute('data-row-index', String(rowIndex));
 			domUpdated = true;
 		}
 		if (this.rowId !== rowId) {
 			this.rowId = rowId;
-			this.element.dataset.rowId = rowId;
+			this.element.setAttribute('data-row-id', rowId);
 			domUpdated = true;
 			// A stale inline visibility can only be left over from before this identity was bound
 			// (nothing sets it on a bound cell), so the style read is limited to rebinds.
@@ -581,14 +587,14 @@ export class CellSlot<TRowData = unknown> {
 
 		if (this.lastContentMode !== contentMode) {
 			this.lastContentMode = contentMode;
-			this.element.dataset.contentMode = contentMode;
+			this.element.setAttribute('data-content-mode', contentMode);
 			domUpdated = true;
 		}
 
 		if (this.lastPortalKey !== portalKey) {
 			this.lastPortalKey = portalKey;
 			if (portalKey) {
-				this.element.dataset.cellKey = portalKey;
+				this.element.setAttribute('data-cell-key', portalKey);
 			} else {
 				delete this.element.dataset.cellKey;
 			}

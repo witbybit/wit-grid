@@ -1,5 +1,12 @@
 import type { ColumnInstanceId } from '../../columnDef.js';
-import { createCellControllerKey, createCellCtrl, type CellControllerKey, type CellCtrl, type CreateCellCtrlInput } from './CellCtrl.js';
+import {
+	createCellControllerKey,
+	createCellCtrl,
+	rekeyCellCtrl,
+	type CellControllerKey,
+	type CellCtrl,
+	type CreateCellCtrlInput,
+} from './CellCtrl.js';
 
 export class CellCtrlStore<TRowData = unknown> {
 	private readonly byKey = new Map<CellControllerKey, CellCtrl>();
@@ -73,6 +80,32 @@ export class CellCtrlStore<TRowData = unknown> {
 		const columnKeys = this.keysByColumnInstanceId.get(cellCtrl.columnInstanceId);
 		columnKeys?.delete(cellCtrl.key);
 		if (columnKeys?.size === 0) this.keysByColumnInstanceId.delete(cellCtrl.columnInstanceId);
+		return true;
+	}
+
+	/**
+	 * Moves an owned controller to another row of the same column (see rekeyCellCtrl). Refused when
+	 * the store does not own it, the column differs, or the new (row, column) already has one.
+	 */
+	public rekey(cellCtrl: CellCtrl, input: CreateCellCtrlInput): boolean {
+		if (this.byKey.get(cellCtrl.key) !== cellCtrl || input.columnInstanceId !== cellCtrl.columnInstanceId) return false;
+		const nextKey = createCellControllerKey(input.rowId, input.columnInstanceId);
+		if (this.byKey.has(nextKey)) return false;
+		this.byKey.delete(cellCtrl.key);
+		const previousRowKeys = this.keysByRowId.get(cellCtrl.rowId);
+		previousRowKeys?.delete(cellCtrl.key);
+		if (previousRowKeys?.size === 0) this.keysByRowId.delete(cellCtrl.rowId);
+		const columnKeys = this.keysByColumnInstanceId.get(cellCtrl.columnInstanceId);
+		columnKeys?.delete(cellCtrl.key);
+		rekeyCellCtrl(cellCtrl, input);
+		this.byKey.set(cellCtrl.key, cellCtrl);
+		let rowKeys = this.keysByRowId.get(cellCtrl.rowId);
+		if (!rowKeys) {
+			rowKeys = new Set();
+			this.keysByRowId.set(cellCtrl.rowId, rowKeys);
+		}
+		rowKeys.add(cellCtrl.key);
+		columnKeys?.add(cellCtrl.key);
 		return true;
 	}
 

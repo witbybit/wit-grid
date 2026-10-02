@@ -137,6 +137,8 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	tryConsumeLiveBudget?: (kind: 'mount' | 'update') => boolean;
 	/** Admits one in-frame DOM renderer update ('update' presentation) against the frame's DOM-work budget. */
 	tryConsumeDomUpdateBudget?: () => boolean;
+	/** Computes (and caches) a getter/formula cell's display text within the frame's budget; undefined when over it. */
+	primeDisplayValueInFrame?: (rowId: string, colField: string) => string | undefined;
 	/** Ends the admitted update, charging its duration to the frame's DOM-work budget. */
 	endDomUpdate?: () => void;
 	/** A DOM renderer cell updated in place during scroll. */
@@ -150,7 +152,7 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	incrementHtmlSnapshotMissesDuringScroll?: () => void;
 	incrementTextImpostorUsesDuringScroll?: () => void;
 	/** Grid-level defaults for scrollPresentation:'html-snapshot' columns that don't override them. */
-	getHtmlSnapshotDefaults?: () => { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean };
+	getHtmlSnapshotDefaults?: () => { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean; defaultStrict?: boolean };
 	getSnapshotVisualVersions: () => SnapshotVisualVersions;
 	/** Live column-reorder preview offset (px) for a displayed column index.
 	 *  0 outside an active header drag. Only consulted on the full-bind path. */
@@ -356,18 +358,31 @@ function attachCellCtrl<TRowData>(
 			cellCtrlStore = new CellCtrlStore<TRowData>();
 			fallbackCellCtrlStores.set(rowCtrl as object, cellCtrlStore);
 		}
-		const result = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, {
+		const metadata = {
 			rowIndex: request.rowIndex,
 			rowCtrlKey: rowCtrl.rowId,
 			colId: col.colId ?? col.field,
 			colField: col.field,
 			colIndex: request.colIndex,
 			scrollPresentation: getCellScrollPresentation(col as InternalColumnDef<TRowData>),
-		});
-		cellCtrl = result.cellCtrl;
-		if (rowCtrlStore) {
-			if (result.created) rowCtrlStore.stats.cellCtrlsCreated++;
-			else rowCtrlStore.stats.cellCtrlsReused++;
+		};
+		// A slot recycled to another row: hand its controller over rather than releasing it and
+		// allocating a new one (only where the release would have happened anyway).
+		if (
+			rowCtrlStore &&
+			bound &&
+			bound.columnInstanceId === instanceId &&
+			rowCtrlStore.rekeyDetachedCellCtrl(bound, cellSlot.cellInstanceId, { ...metadata, rowId: rowCtrl.rowId, columnInstanceId: instanceId })
+		) {
+			cellCtrl = bound;
+			rowCtrl.cellKeysByColumnInstanceId.set(instanceId, cellCtrl.key);
+		} else {
+			const result = getOrCreateCellCtrl(rowCtrl, cellCtrlStore, instanceId, metadata);
+			cellCtrl = result.cellCtrl;
+			if (rowCtrlStore) {
+				if (result.created) rowCtrlStore.stats.cellCtrlsCreated++;
+				else rowCtrlStore.stats.cellCtrlsReused++;
+			}
 		}
 	}
 	// Hand the previously presented controller (another row's) back to its store — this is what
@@ -403,6 +418,8 @@ function createScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData
 		getRowHeight: (idx) => deps.engine.geometry?.rowHeights?.[idx],
 		getColWidth: (idx) => adapter.ctx?.plan?.colWidths?.[idx],
 		getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
+		primeDisplayValue: (rowId, colField) => deps.primeDisplayValueInFrame?.(rowId, colField),
+		getCachedCellValue: (rowId, colField) => deps.engine.data?.getCachedCellValue?.(rowId, colField),
 		hasFormula: (rowId, colField) => deps.engine.hasFormula?.(rowId, colField) ?? true,
 		getFrozenHtmlSnapshot: (rowId, columnInstanceId, expected, rowHeight, colWidth) => {
 			const store = deps.engine.htmlScrollSnapshots as
@@ -925,7 +942,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				rowCtrl,
 				rowVersion,
 				cellCtrl.presentationState.kind === 'live-renderer' || cellCtrl.presentationState.kind === 'dom-update'
-					? getScrollMountValue(deps, request.node, request.col, request.cellSlot)
+					? getScrollMountValue(deps, request.node, request.col, request.cellSlot, request.isRowLoading)
 					: undefined
 			)
 		);

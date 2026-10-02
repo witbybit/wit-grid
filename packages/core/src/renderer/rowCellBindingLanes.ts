@@ -14,7 +14,7 @@ import type { CompiledColumnTopology } from './columnTopology.js';
 import type { ViewportPlan } from './viewportPlanner.js';
 import { GridMetric, type GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { collectCellDecorationSnapshotMetadata, createCellDisplaySnapshot } from './cellDisplaySnapshot.js';
-import { applyCellSlotRetentionPolicy, stampNewCellSlotForRetention } from './cellSlotRetention.js';
+import { applyCellSlotRetentionPolicy, stampNewCellSlotForRetention, takeRecycledCell } from './cellSlotRetention.js';
 import {
 	resolveWarmVisibleCellStatus,
 	type WarmVisibleCellStatus,
@@ -22,7 +22,7 @@ import {
 	type WarmVisibleCellStatusDeps,
 } from './warmCellStatus.js';
 import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
-import { buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
+import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
 import { reportRendererFault } from './rendererFaults.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
@@ -306,15 +306,22 @@ function reconcileCellTopologyForScroll<TRowData>(
 		function ensureCell(instanceId: ColumnInstanceId, col: ColumnDef<TRowData>): CellSlot<TRowData> {
 			let cell = slot.cellsByColumnInstanceId.get(instanceId);
 			if (!cell) {
-				const el = document.createElement('div');
-				if (isDirectTextColumn(col)) el.dataset.textCell = '';
-				initFn(el);
-				cell = CellSlot.fromElement<TRowData>(el);
+				const directText = isDirectTextColumn(col);
+				const recycled = takeRecycledCell(slot, directText);
+				if (recycled) {
+					cell = recycled;
+					if (retentionStats) retentionStats.cellSlotsReusedDuringTopology++;
+				} else {
+					const el = document.createElement('div');
+					if (directText) el.dataset.textCell = '';
+					initFn(el);
+					cell = CellSlot.fromElement<TRowData>(el);
+					instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
+					if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
+				}
 				cell.columnInstanceId = instanceId;
 				slot.cellsByColumnInstanceId.set(instanceId, cell);
 				stampNewCellSlotForRetention(cell);
-				instrumentation?.increment(GridMetric.CELL_VIEW_CREATED);
-				if (retentionStats) retentionStats.cellSlotsCreatedDuringTopology++;
 			} else if (retentionStats) {
 				retentionStats.cellSlotsReusedDuringTopology++;
 			}
@@ -404,22 +411,12 @@ function applyLoadingInsightState<TRowData>(
 	colField: string
 ): string {
 	if (deps.engine.insights.size === 0) {
-		if (cellSlot.element.dataset.validationError !== undefined) delete cellSlot.element.dataset.validationError;
-		if (cellSlot.element.title) cellSlot.element.removeAttribute('title');
+		applyCellTitlesAndValidation(cellSlot, null, '', undefined);
 		return '';
 	}
 
 	const decorationMetadata = collectCellDecorationSnapshotMetadata(deps.engine.insights.getCellDecorations(rowId, colField));
-	if (decorationMetadata.validationError) {
-		cellSlot.element.dataset.validationError = decorationMetadata.validationError;
-	} else if (cellSlot.element.dataset.validationError !== undefined) {
-		delete cellSlot.element.dataset.validationError;
-	}
-	if (decorationMetadata.insightTitle) {
-		cellSlot.element.title = decorationMetadata.insightTitle;
-	} else if (cellSlot.element.title) {
-		cellSlot.element.removeAttribute('title');
-	}
+	applyCellTitlesAndValidation(cellSlot, null, decorationMetadata.insightTitle, decorationMetadata.validationError);
 	return decorationMetadata.classNameSuffix;
 }
 
@@ -457,13 +454,38 @@ interface DataRowBindState<TRowData> {
 function getWarmVisibleCellStatus<TRowData>(row: DataRowBindState<TRowData>, cellSlot: CellSlot<TRowData>): WarmVisibleCellStatus {
 	const warmContext = row.warmContext;
 	if (!warmContext) return NO_WARM_REFRESH;
+	// The slot's bound controller is the store's for this (row, column) while it is alive — the
+	// store never replaces a live controller under its key — so skip the key build + map lookup.
+	const bound = cellSlot.boundCellCtrl;
 	const cellCtrl =
-		cellSlot.columnInstanceId !== ''
-			? row.deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(row.request.node.id, cellSlot.columnInstanceId)
-			: undefined;
+		cellSlot.columnInstanceId === ''
+			? undefined
+			: bound && !bound.lifecycle.destroyed && bound.rowId === row.request.node.id && bound.columnInstanceId === cellSlot.columnInstanceId
+				? bound
+				: row.deps.engine.rowCtrls?.cellCtrls.getByRowAndColumn(row.request.node.id, cellSlot.columnInstanceId);
 	if (!cellCtrl) return WARM_CELL_UNTRACKED;
 	warmContext.cellCtrl = cellCtrl;
 	return resolveWarmVisibleCellStatus(getWarmStatusDeps(row.deps), cellSlot, warmContext);
+}
+
+/**
+ * A row entering the viewport from the overscan band normally re-binds every cell (its buffered
+ * content may be a placeholder). A plain primitive cell the buffered bind filled with its final
+ * text, still fresh for every version and neither focused nor edited, already shows exactly what
+ * the visible bind would write — keep it instead of binding it a second time.
+ */
+function canKeepCellEnteringView<TRowData>(
+	row: DataRowBindState<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	colIndex: number,
+	warmStatus: WarmVisibleCellStatus
+): boolean {
+	const ctx = row.request.ctx;
+	if (!ctx || !row.warmContext || warmStatus.needsDeferredRefresh) return false;
+	if (cellSlot.lastContentMode !== 'text' || cellSlot.lastFormattedValue === '...' || cellSlot.lastMountedRowVersion === -1) return false;
+	if (ctx.plan.columnPlans[colIndex]?.mode !== 'primitive') return false;
+	const rowId = row.request.node.id;
+	return ctx.focusedCell?.rowId !== rowId && ctx.activeEdit?.rowId !== rowId;
 }
 
 /**
@@ -510,14 +532,17 @@ function bindDataCell<TRowData>(
 
 	// shouldSkipStableCellDuringScroll
 	let skip = false;
-	if (isScrollFrameActive && !forceCellRefresh && !isRowRebind) {
+	if (isScrollFrameActive && !isRowRebind && (!forceCellRefresh || isVisibleContent)) {
 		if (cellSlot.colIndex === colIndex && cellSlot.rowId === node.id && cellSlot.rowIndex === rowIndex) {
 			if (!isVisibleContent) {
 				const instanceId = (request.columns[colIndex] as InternalColumnDef<TRowData> | undefined)?.instanceId;
 				skip = !(instanceId && viewportPlan && isOverscanLiveCell(viewportPlan.liveCells.overscan, rowIndex, instanceId));
 			} else {
 				warmStatus ??= getWarmVisibleCellStatus(row, cellSlot);
-				skip = !warmStatus.needsImmediateWake && !refreshVisibleColumns?.has(colIndex);
+				skip =
+					!warmStatus.needsImmediateWake &&
+					!refreshVisibleColumns?.has(colIndex) &&
+					(!forceCellRefresh || canKeepCellEnteringView(row, cellSlot, colIndex, warmStatus));
 			}
 		}
 	}

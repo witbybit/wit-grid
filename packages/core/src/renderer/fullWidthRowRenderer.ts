@@ -64,7 +64,8 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 
 		const rowKey = visualRow.id;
 		if (slot.lastPortalRowKey !== rowKey) {
-			onReleaseRowPortal(slot);
+			// A DOM renderer that can `update` is retargeted to the new row in place (see bindDomRow).
+			if (!this.canRetarget(this.rowPortalHosts.get(slot.element), visualRow)) onReleaseRowPortal(slot);
 			slot.lastPortalRowKey = rowKey;
 			slot.element.dataset.rowKey = rowKey;
 		}
@@ -79,20 +80,27 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 	public mountContent(host: HTMLElement, rowKey: string, visualRow: VisualRow<TRowData>): void {
 		this.syncAutoHeight(host, visualRow);
 		const spec = this.resolveSpec(visualRow);
-		// A DOM spec, else the adapter when it draws this row (a React spec, or its own renderer for
-		// the kind), else core's built-in renderer: adapters carry no hierarchy logic of their own.
-		const domRenderer =
-			spec?.kind === 'dom'
-				? spec.renderer
-				: spec?.kind === 'react' || this.portalMountManager.adapterRendersRow(visualRow)
-					? undefined
-					: getDefaultRowRenderer(visualRow);
+		const domRenderer = this.resolveDomRenderer(spec, visualRow);
 		if (domRenderer) {
 			this.bindDomRow(host, rowKey, visualRow, domRenderer);
 			return;
 		}
 		this.destroyDomRow(host);
 		this.portalMountManager.mountRow({ rowKey, container: host, visualRow, ...(spec ? { renderer: spec } : {}) });
+	}
+
+	// A DOM spec, else the adapter when it draws this row (a React spec, or its own renderer for
+	// the kind), else core's built-in renderer: adapters carry no hierarchy logic of their own.
+	private resolveDomRenderer(spec: RowRendererSpec<TRowData> | undefined, visualRow: VisualRow<TRowData>): DomRowRenderer<TRowData> | undefined {
+		if (spec?.kind === 'dom') return spec.renderer;
+		return spec?.kind === 'react' || this.portalMountManager.adapterRendersRow(visualRow) ? undefined : getDefaultRowRenderer(visualRow);
+	}
+
+	/** True when `host` holds a DOM row whose renderer can take `row` through `update` instead of a remount. */
+	private canRetarget(host: HTMLElement | undefined, row: VisualRow<TRowData>): boolean {
+		const existing = host && this.domRows.get(host);
+		if (!existing || !existing.handle.update) return false;
+		return existing.renderer === this.resolveDomRenderer(this.resolveSpec(row), row);
 	}
 
 	/** Releases what `mountContent` drew into `host`. */
@@ -104,12 +112,14 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 
 	/**
 	 * DOM row renderers are mounted here, synchronously: no adapter, no scroll deferral. The same row
-	 * drawn again with changed content gets `update`; a different row or renderer remounts.
+	 * drawn again with changed content, or a recycled host handed another row, gets `update` when the
+	 * renderer has one; otherwise (or for a different renderer) it remounts.
 	 */
 	private bindDomRow(host: HTMLElement, rowKey: string, row: VisualRow<TRowData>, renderer: DomRowRenderer<TRowData>): void {
 		const existing = this.domRows.get(host);
-		if (existing && existing.rowKey === rowKey && existing.renderer === renderer) {
-			if (!isVisualRowEqual(existing.row, row)) {
+		if (existing && existing.renderer === renderer && (existing.rowKey === rowKey || existing.handle.update)) {
+			if (existing.rowKey !== rowKey || !isVisualRowEqual(existing.row, row)) {
+				existing.rowKey = rowKey;
 				existing.row = row;
 				existing.handle.update?.(this.createParams(row));
 			}

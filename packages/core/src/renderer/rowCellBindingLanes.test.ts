@@ -786,6 +786,80 @@ describe('bindAllDataCells — visibility boundary refresh', () => {
 		expect(slot.centerCells[0].element.textContent).toContain('a-value');
 	});
 
+	describe('a plain primitive cell already filled while buffered', () => {
+		function enterView(options: { focusedRowId?: string; rowVersion?: number; contentMode?: 'text' | 'empty' } = {}) {
+			const cols = [makeCol('a')];
+			const slot = makeRowSlot();
+			const plan = makePlan(cols, 0, 0, 1, [{ isCustom: false, mode: 'primitive' }]);
+			const topology = compileColumnTopology(plan);
+			reconcileTopology(slot, topology, null, 0, 1, null, cols, initCell, vi.fn());
+			const cell = slot.centerCells[0];
+			// What the overscan bind left: this row's final text, stamped fresh for every version.
+			cell.update(
+				0,
+				'a',
+				5,
+				'r1',
+				0,
+				-1,
+				100,
+				'og-cell',
+				options.contentMode ?? 'text',
+				undefined,
+				options.contentMode === 'empty' ? '' : 'a-value'
+			);
+			cell.lastMountedRowVersion = 1;
+			cell.lastMountedGlobalVersion = 1;
+			cell.lastMountedInsightVersion = 0;
+			cell.lastMountedStyleVersion = 0;
+			cell.lastMountedLoadingVersion = 0;
+			cell.lastMountedSelectionVersion = 0;
+			const { deps, onScrollCellPatched } = makeBindingDeps();
+			bindAllDataCells(deps as any, {
+				slot,
+				node: { id: 'r1', data: { id: 'r1', a: 'A1' } } as any,
+				rowIndex: 5,
+				centerColStart: 0,
+				centerColCount: 1,
+				columns: cols,
+				plan,
+				columnTopology: topology,
+				isScrollFrameActive: true,
+				ctx: {
+					globalVersion: 1,
+					insightVersion: 0,
+					styleVersion: 0,
+					selectionVersion: 0,
+					rowVersions: new Map([['r1', options.rowVersion ?? 1]]),
+					loadingVersion: 0,
+					visibleColRange: { startIdx: 0, endIdx: 0 },
+					hasInsightDecorations: false,
+					hasDeferredCellStyleRules: false,
+					activeEdit: null,
+					focusedCell: options.focusedRowId ? { rowId: options.focusedRowId, colField: 'a', columnInstanceId: 'a' } : null,
+					isScrolling: true,
+					plan,
+				} as any,
+				state: {} as any,
+				isRowRebind: false,
+				forceCellRefresh: true,
+				isRowVisible: true,
+				refreshVisibleColumns: null,
+			});
+			return onScrollCellPatched;
+		}
+
+		it('is kept, not bound a second time, when its row enters the visible band', () => {
+			expect(enterView()).not.toHaveBeenCalled();
+		});
+
+		it('is still bound when its row holds focus, its data changed, or it holds a placeholder', () => {
+			expect(enterView({ focusedRowId: 'r1' })).toHaveBeenCalledTimes(1);
+			expect(enterView({ rowVersion: 2 })).toHaveBeenCalledTimes(1);
+			expect(enterView({ contentMode: 'empty' })).toHaveBeenCalledTimes(1);
+		});
+	});
+
 	it('does not skip stable center cells when their column newly enters the visible band', () => {
 		const cols = [makeCol('a'), makeCol('b')];
 		const slot = makeRowSlot();

@@ -25,6 +25,10 @@ export interface ScrollCellPresentationDeps {
 	/** Read-only: a cached cheap display value for the synthetic-impostor fallback — already
 	 *  exempt from the no-semantic-read counters (it's a cache lookup, not a value computation). */
 	getCheapDisplayValue(rowId: string, colField: string): string | undefined;
+	/** A getter/formula cell's display text computed (and cached) within the frame's budget; undefined when over it. */
+	primeDisplayValue?(rowId: string, colField: string): string | undefined;
+	/** The raw cached value behind a primed getter/formula cell, for its valueFormatter. */
+	getCachedCellValue?(rowId: string, colField: string): unknown;
 	/** Read-only: a previously-captured frozen HTML clone for this exact cell identity, freshness-
 	 *  and size-gated — see htmlScrollSnapshotStore.ts. Returns undefined if nothing was captured, the
 	 *  row's data has changed since, or the row/column has been resized since capture. */
@@ -37,8 +41,8 @@ export interface ScrollCellPresentationDeps {
 	): { html: string } | undefined;
 	/** Read-only: grid-level defaults for the html-snapshot mode's missing-capture behavior — see
 	 *  GridRendererOptions.htmlSnapshot. Column-level `htmlSnapshot` capabilities take priority.
-	 *  Omitted defaults to `{ allowShellWhenMissing: true, allowTextFallbackWhenMissing: false }`. */
-	getHtmlSnapshotDefaults?(): { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean };
+	 *  Omitted defaults to `{ allowShellWhenMissing: true, allowTextFallbackWhenMissing: true, defaultStrict: false }`. */
+	getHtmlSnapshotDefaults?(): { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean; defaultStrict?: boolean };
 	/** Read-only: whether (rowId, colField) is a formula cell. Lets a plain primitive column (no
 	 *  valueGetter/formatter/renderer) show its raw field value during scroll instead of the "..."
 	 *  placeholder. Omitted means unknown — the placeholder is kept. */
@@ -57,6 +61,60 @@ function readPrimitiveDisplayText<TRowData>(deps: ScrollCellPresentationDeps, no
 	const raw = (node.data as Record<string, unknown>)[colField];
 	if (typeof raw === 'string' && raw.startsWith('=')) return undefined;
 	return raw == null ? '' : String(raw);
+}
+
+/**
+ * Display text the scroll path can produce without a semantic read: a plain column's own field, or
+ * a plain field through its valueFormatter — exactly what the full bind writes for it, so a cell
+ * shows its final text during scroll instead of a '...' placeholder. Getters and formulas still
+ * wait for the full bind.
+ */
+function readScrollDisplayText<TRowData>(
+	deps: ScrollCellPresentationDeps,
+	node: RowNode<TRowData>,
+	col: ColumnDef<TRowData>,
+	mode: string | undefined
+): string | undefined {
+	if (mode === 'primitive') return readPrimitiveDisplayText(deps, node, col.field);
+	if (mode !== 'primitive-formatted' || col.valueGetter || !col.valueFormatter) return undefined;
+	if (!deps.hasFormula || !node.data || col.field.indexOf('.') !== -1 || deps.hasFormula(node.id, col.field)) return undefined;
+	const value = (node.data as Record<string, unknown>)[col.field];
+	if (typeof value === 'string' && value.startsWith('=')) return undefined;
+	try {
+		return col.valueFormatter({ value, rowData: node.data as TRowData, colDef: col, rowId: node.id }) ?? '';
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Stand-in text for a cell during scroll: its cheap display text, or — for a visible getter/formula
+ * cell with nothing cached yet — the computed value, within the frame's budget. Without it such a
+ * cell was blank until scrolling settled.
+ */
+function readStandInText<TRowData>(
+	deps: ScrollCellPresentationDeps,
+	node: RowNode<TRowData>,
+	col: ColumnDef<TRowData>,
+	isInVisibleContent: boolean
+): string {
+	const cheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+	if (cheap !== '' || !isInVisibleContent || !deps.primeDisplayValue) return cheap;
+	if (!col.valueGetter && !deps.hasFormula?.(node.id, col.field)) return cheap;
+	return deps.primeDisplayValue(node.id, col.field) ?? '';
+}
+
+/** A visible getter/formula text cell's final text, computed within the frame's budget (then formatted, as the full bind does). */
+function readPrimedGetterText<TRowData>(deps: ScrollCellPresentationDeps, node: RowNode<TRowData>, col: ColumnDef<TRowData>): string | undefined {
+	if (!deps.primeDisplayValue || (!col.valueGetter && !deps.hasFormula?.(node.id, col.field))) return undefined;
+	const primed = deps.primeDisplayValue(node.id, col.field);
+	if (primed === undefined || !col.valueFormatter) return primed;
+	try {
+		const value = deps.getCachedCellValue?.(node.id, col.field);
+		return col.valueFormatter({ value, rowData: node.data as TRowData, colDef: col, rowId: node.id }) ?? '';
+	} catch {
+		return undefined;
+	}
 }
 
 export function isPrimitiveSnapshotContent(snapshot: CellDisplaySnapshot | undefined): snapshot is CellDisplaySnapshot {
@@ -108,6 +166,17 @@ export function canFreezeExistingPortalForIdentity<TRowData>(
  * acceptable mode set genuinely differs per call site — e.g. exactly text/fallback vs. merely
  * not-portal), so this deliberately does not make that filtering decision itself.
  */
+/**
+ * Warm text a stand-in may reuse: text the slot actually showed for this identity. An overscan
+ * row's portal cell is buffered empty, so reusing its "fresh" empty text would leave the cell blank
+ * on entry until the real renderer mounts; the current cheap value is shown instead.
+ */
+function isShownWarmText(
+	warm: { formattedValue: string; contentMode: CellContentMode } | undefined
+): warm is { formattedValue: string; contentMode: CellContentMode } {
+	return !!warm && (warm.contentMode === 'text' || warm.contentMode === 'fallback');
+}
+
 export function canReuseWarmTextForIdentity<TRowData>(
 	cellSlot: Pick<CellSlot<TRowData>, 'lastContentMode' | 'lastFormattedValue'>,
 	isWarmBindingVersionFresh: boolean
@@ -134,7 +203,8 @@ export type ScrollCellPresentation =
 			portalKey: string | undefined;
 			title: string | null;
 			validationError: string | undefined;
-			recordVersionsFrom: CellDisplaySnapshot | undefined;
+			/** A snapshot, or this frame's freshness when the cell was filled with its final direct text. */
+			recordVersionsFrom: CellDisplaySnapshot | VisualFreshness | undefined;
 	  }
 	| {
 			kind: 'primitive';
@@ -350,8 +420,8 @@ export function resolveScrollCellPresentation<TRowData>(
 		// than clearing it, so the row enters the viewport already correct. Clearing meant a second
 		// write, a text-node replacement and a content-mode flip (a style recalc) per cell on entry.
 		const directText =
-			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive' && compiledPlan?.mode === 'primitive'
-				? readPrimitiveDisplayText(deps, node, col.field)
+			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive'
+				? readScrollDisplayText(deps, node, col, compiledPlan?.mode)
 				: undefined;
 		const preservedContentMode: CellContentMode = canReuseSnapshotPortal
 			? 'portal'
@@ -373,7 +443,20 @@ export function resolveScrollCellPresentation<TRowData>(
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
-			recordVersionsFrom: snapshot,
+			// Direct text is the cell's final content: record it as fresh, so the row entering the
+			// viewport can keep it instead of binding every cell a second time.
+			recordVersionsFrom:
+				snapshot ??
+				(directText !== undefined && preservedContentMode === 'text'
+					? {
+							rowVersion: input.rowVersion,
+							globalVersion: ctx.globalVersion,
+							insightVersion: ctx.insightVersion,
+							styleVersion: ctx.styleVersion,
+							loadingVersion: ctx.loadingVersion,
+							selectionVersion: ctx.selectionVersion,
+						}
+					: undefined),
 		};
 	}
 
@@ -392,10 +475,12 @@ export function resolveScrollCellPresentation<TRowData>(
 		} else {
 			// A plain primitive column's value is a direct field read — show it rather than a
 			// placeholder. Anything needing a valueGetter/formatter/formula keeps the placeholder.
-			const directText = compiledPlan?.mode === 'primitive' ? readPrimitiveDisplayText(deps, node, col.field) : undefined;
-			if (directText !== undefined) {
-				formattedValue = directText;
-				contentMode = directText === '' ? 'empty' : 'text';
+			const directText = readScrollDisplayText(deps, node, col, compiledPlan?.mode);
+			const primedText = directText === undefined && isInVisibleContent ? readPrimedGetterText(deps, node, col) : undefined;
+			const text = directText ?? primedText;
+			if (text !== undefined) {
+				formattedValue = text;
+				contentMode = text === '' ? 'empty' : 'text';
 			} else {
 				formattedValue = '...';
 				contentMode = 'text';
@@ -489,7 +574,7 @@ export function resolveScrollCellPresentation<TRowData>(
 			// reuse it so scroll and rest show identical output (no flicker between the two).
 			cheapValue = snapshot.formattedValue;
 		} else {
-			const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+			const genericCheap = readStandInText(deps, node, col, isInVisibleContent);
 			const renderFn = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render;
 			// Hand the renderer the real value when it is a direct field read, as the full bind does.
 			const value =
@@ -516,8 +601,12 @@ export function resolveScrollCellPresentation<TRowData>(
 	// own mount/update lifecycle without React portal overhead).
 	const isHtmlSnapshotMode = presentation === 'html-snapshot';
 	const htmlSnapshotCaps = isHtmlSnapshotMode ? (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.htmlSnapshot : undefined;
-	const htmlSnapshotDefaults = deps.getHtmlSnapshotDefaults?.() ?? { allowShellWhenMissing: true, allowTextFallbackWhenMissing: false };
-	const allowTextFallbackWhenMissing = htmlSnapshotCaps?.allowTextFallbackWhenMissing ?? htmlSnapshotDefaults.allowTextFallbackWhenMissing;
+	const htmlSnapshotDefaults = deps.getHtmlSnapshotDefaults?.() ?? { allowShellWhenMissing: true, allowTextFallbackWhenMissing: true };
+	// A cell with no captured snapshot yet shows its text rather than a blank shell, unless the column
+	// (or the grid's defaultStrict) is strict: strict never falls back to raw text.
+	const isStrictSnapshot = htmlSnapshotCaps?.strict ?? htmlSnapshotDefaults.defaultStrict ?? false;
+	const allowTextFallbackWhenMissing =
+		htmlSnapshotCaps?.allowTextFallbackWhenMissing ?? (!isStrictSnapshot && htmlSnapshotDefaults.allowTextFallbackWhenMissing);
 
 	// Compute live-content guard BEFORE any impostor path. If the cell is already showing rendered
 	// portal content for this exact row+key, freeze it in place during scroll rather than replacing
@@ -642,9 +731,9 @@ export function resolveScrollCellPresentation<TRowData>(
 				};
 			}
 			if (allowTextFallbackWhenMissing) {
-				const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+				const genericCheap = readStandInText(deps, node, col, isInVisibleContent);
 				const warmSyntheticText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-				const cheapValue = warmSyntheticText && warmSyntheticText.contentMode !== 'portal' ? warmSyntheticText.formattedValue : genericCheap;
+				const cheapValue = isShownWarmText(warmSyntheticText) ? warmSyntheticText.formattedValue : genericCheap;
 				return {
 					kind: 'text-impostor',
 					className: cellClassName,
@@ -664,9 +753,9 @@ export function resolveScrollCellPresentation<TRowData>(
 				validationError: snapshot?.validationError,
 			};
 		}
-		const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+		const genericCheap = readStandInText(deps, node, col, isInVisibleContent);
 		const warmSyntheticText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-		const cheapValue = warmSyntheticText && warmSyntheticText.contentMode !== 'portal' ? warmSyntheticText.formattedValue : genericCheap;
+		const cheapValue = isShownWarmText(warmSyntheticText) ? warmSyntheticText.formattedValue : genericCheap;
 		const syntheticMode: CellContentMode = cheapValue !== '' ? 'fallback' : 'empty';
 		return {
 			kind: 'shell',
@@ -731,9 +820,9 @@ export function resolveScrollCellPresentation<TRowData>(
 	// This is exactly the case that used to fall through to a synchronous cold mount. Show the same
 	// cheap deterministic stand-in the freeze path already uses, and let the fidelity lane mount the
 	// real renderer later.
-	const genericCheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
+	const genericCheap = readStandInText(deps, node, col, isInVisibleContent);
 	const warmFallbackText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
-	const fallbackCheapValue = warmFallbackText && warmFallbackText.contentMode !== 'portal' ? warmFallbackText.formattedValue : genericCheap;
+	const fallbackCheapValue = isShownWarmText(warmFallbackText) ? warmFallbackText.formattedValue : genericCheap;
 	const fallbackSyntheticMode: CellContentMode = fallbackCheapValue !== '' ? 'fallback' : 'empty';
 	return {
 		kind: 'shell',

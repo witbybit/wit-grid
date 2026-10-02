@@ -220,7 +220,7 @@ describe('resolveScrollCellPresentation', () => {
 		expect(presentation.source).toBe('fallback');
 	});
 
-	it('shows a pending shell, not raw text, when the frozen HTML snapshot is missing by default', () => {
+	it('shows the cell text when the frozen HTML snapshot is missing; a strict column keeps the pending shell', () => {
 		const snapshot = {
 			rowId: 'r1',
 			colField: 'name',
@@ -240,20 +240,29 @@ describe('resolveScrollCellPresentation', () => {
 			formattedValue: 'Fallback name',
 			title: '',
 		};
-		const deps = makeDeps({ getFrozenHtmlSnapshot: () => undefined });
-		const presentation = resolveScrollCellPresentation(
-			deps,
-			baseInput({
-				col: {
-					field: 'name',
-					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'html-snapshot' },
-				} as any,
-				ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
-				snapshot,
-			})
-		);
-		expect(presentation.kind).toBe('html-pending');
+		const resolve = (htmlSnapshot: Record<string, unknown> | undefined, defaultStrict = false) =>
+			resolveScrollCellPresentation(
+				makeDeps({
+					getFrozenHtmlSnapshot: () => undefined,
+					getCheapDisplayValue: () => 'Name 1',
+					getHtmlSnapshotDefaults: () => ({ allowShellWhenMissing: true, allowTextFallbackWhenMissing: true, defaultStrict }),
+				}),
+				baseInput({
+					col: {
+						field: 'name',
+						cellRenderer: () => null,
+						cellRendererCapabilities: { scrollPresentation: 'html-snapshot', ...(htmlSnapshot ? { htmlSnapshot } : {}) },
+					} as any,
+					ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
+					snapshot,
+				})
+			);
+		const byDefault = resolve(undefined);
+		expect(byDefault.kind).toBe('text-impostor');
+		expect((byDefault as { formattedValue?: string }).formattedValue).not.toBe('');
+		expect(resolve({ strict: true }).kind).toBe('html-pending');
+		expect(resolve(undefined, true).kind).toBe('html-pending');
+		expect(resolve({ allowTextFallbackWhenMissing: false }).kind).toBe('html-pending');
 	});
 
 	it('BLOCKER: never mounts a cold portal-capable cell during normal (non-editing, non-focused) active scroll', () => {

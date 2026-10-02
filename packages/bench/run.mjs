@@ -5,6 +5,7 @@
 //   pnpm bench:browser --headed                 # watch it
 //   pnpm bench:browser --only=vertical-text --runs=9 --grid=wit
 //   pnpm bench:browser --publish                # also update the docs comparison page's data
+//   pnpm bench:browser --fidelity               # what visible cells show each frame (flicker), not timing
 //
 // Method: each round runs both grids back to back on the same scenario, alternating which goes
 // first, so machine drift (thermals, background load) hits both equally. Per metric we report the
@@ -39,6 +40,10 @@ const grids = args.grid ? [args.grid] : ['wit', 'ag'];
 // time-based, so under tracing it defers far more DOM-renderer cells than in a normal run and
 // the DOM-renderer scenario's counts describe a slower grid, not the real one.
 const traceLayouts = Boolean(args.trace);
+// --fidelity compares every visible cell with its final content after every frame: placeholders,
+// blanks, another row's content, and content changing while in view (flicker). It forces layout
+// each frame, so its timings are meaningless; results go to results/fidelity-*.json, never latest.json.
+const fidelity = Boolean(args.fidelity);
 
 const SCENARIOS = [
 	{
@@ -69,21 +74,57 @@ const SCENARIOS = [
 		query: { rows: 100_000, cols: 50, domCols: 0 },
 		wheel: { dy: 2400, events: 90 },
 	},
-].filter((s) => !args.only || s.name === args.only);
+	{
+		name: 'vertical-formatted',
+		title: 'Vertical scroll, formatted numbers',
+		description: 'The plain-text grid with a valueFormatter on every numeric column ($<value>).',
+		query: { rows: 100_000, cols: 50, domCols: 0, fmt: 1 },
+		wheel: { dy: 360, events: 150 },
+	},
+	{
+		name: 'vertical-react-renderers',
+		title: 'Vertical scroll, React cell renderers',
+		description:
+			'The DOM-renderer grid through the React adapter, with React component cells (default scroll presentation). Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-react-getters',
+		title: 'Vertical scroll, React cells over valueGetters',
+		description: 'The React cell grid with every renderer column read through a valueGetter. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10, getters: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+]
+	.filter((s) => !args.only || s.name === args.only)
+	// Fidelity-only scenarios have no AG counterpart; they still time on request (--only=<name>), Wit alone.
+	.filter((s) => fidelity || !s.fidelityOnly || args.only === s.name);
 
 async function bundle() {
 	mkdirSync(out, { recursive: true });
 	await build({
-		entryPoints: { wit: join(here, 'src/wit.ts'), ag: join(here, 'src/ag.ts') },
+		entryPoints: { wit: join(here, 'src/wit.ts'), ag: join(here, 'src/ag.ts'), 'wit-react': join(here, 'src/witReact.tsx') },
 		outdir: out,
 		bundle: true,
 		format: 'iife',
 		minify: true,
 		target: 'es2022',
 		define: { 'process.env.NODE_ENV': '"production"' },
+		jsx: 'automatic',
+		// One React (the adapter's), and the core from source like the plain Wit page.
+		alias: {
+			react: join(here, '../react/node_modules/react'),
+			'react-dom': join(here, '../react/node_modules/react-dom'),
+			'@eregister/wit-grid-core': join(here, '../core/src'),
+		},
 		logLevel: 'warning',
 	});
-	for (const grid of ['wit', 'ag']) {
+	for (const grid of ['wit', 'ag', 'wit-react']) {
 		writeFileSync(
 			join(out, `${grid}.html`),
 			`<!doctype html><html><head><meta charset="utf-8"><title>${grid}</title>
@@ -119,6 +160,10 @@ async function runOnce(browser, grid, scenario) {
 	const url = pathToFileURL(join(out, `${grid}.html`));
 	for (const [key, value] of Object.entries(scenario.query)) url.searchParams.set(key, String(value));
 	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
+	if (fidelity) url.searchParams.set('fidelity', '1');
+	// --react-mode=<live|html-snapshot|freeze> sets the React cells' scroll presentation (wit-react page).
+	if (args['react-mode'] && grid === 'wit-react') url.searchParams.set('reactMode', args['react-mode']);
+	if (args['react-mounts'] && grid === 'wit-react') url.searchParams.set('reactMounts', args['react-mounts']);
 	await page.goto(url.href);
 	await page.waitForFunction(() => window.benchReady === true, null, { timeout: 60_000 });
 	await page.mouse.move(600, 360);
@@ -149,9 +194,11 @@ async function runOnce(browser, grid, scenario) {
 	// page.mouse.wheel resolves once the page has handled the event, so time beyond the fixed
 	// 16ms pacing is main-thread work spent handling that input.
 	const inputOverheadMs = (performance.now() - inputStart) / events - 16;
-	await page.waitForTimeout(400);
+	if (fidelity) await page.evaluate(() => window.bench.markInputEnd());
+	await page.waitForTimeout(fidelity ? 1500 : 400);
 	const raw = await page.evaluate(() => window.bench.stop());
 	const after = await readMetrics();
+	const rest = fidelity ? await page.evaluate(() => window.bench.restFidelity()) : null;
 	if (traceLayouts) {
 		const done = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve));
 		await cdp.send('Tracing.end');
@@ -204,6 +251,7 @@ async function runOnce(browser, grid, scenario) {
 			})
 		: {};
 	await page.close();
+	if (fidelity) return summarizeFidelity(raw.fidelity, rest, grid);
 	const deltaMs = (name) => ((after[name] ?? 0) - (before[name] ?? 0)) * 1000;
 	const delta = (name) => (after[name] ?? 0) - (before[name] ?? 0);
 	return {
@@ -221,6 +269,34 @@ async function runOnce(browser, grid, scenario) {
 		updates: calls.updates,
 		...(traceLayouts ? summarizeLayoutTrace(traceEvents) : {}),
 		...census,
+	};
+}
+
+function summarizeFidelity(stats, rest, grid) {
+	if (stats.wrongExamples.length)
+		process.stdout.write(`  ${grid} wrong cells, e.g. ${stats.wrongExamples.slice(0, 3).join('; ')}
+`);
+	if (rest.wrongCells > 0)
+		process.stdout.write(`  ${grid} WRONG AT REST: ${rest.wrongExamples.slice(0, 3).join('; ')}
+`);
+	return {
+		fidelityFrames: stats.frames,
+		cellFrames: stats.cellFrames,
+		// Share of visible cell-frames not showing their final content.
+		wrongCellPct: (100 * stats.wrongCells) / Math.max(1, stats.cellFrames),
+		framesWithWrongPct: (100 * stats.framesWithWrong) / Math.max(1, stats.frames),
+		// Content changes of a cell that stayed in view, per 1,000 visible cell-frames.
+		changesPer1k: (1000 * stats.changes) / Math.max(1, stats.cellFrames),
+		changes: stats.changes,
+		// Wrong cells by kind, as % of visible cell-frames.
+		blankPct: (100 * stats.blank) / Math.max(1, stats.cellFrames),
+		incompletePct: (100 * stats.incomplete) / Math.max(1, stats.cellFrames),
+		otherContentPct: (100 * stats.otherContent) / Math.max(1, stats.cellFrames),
+		// After the last input, until every visible cell is final (-1: not within the 1.5 s tail).
+		settleMs: stats.settleMs,
+		// Must be 0: once scrolling settles every visible cell is right (validates the measure).
+		wrongAtRest: rest.wrongCells,
+		restCells: rest.cellFrames,
 	};
 }
 
@@ -311,13 +387,14 @@ const environment = {
 const results = [];
 try {
 	for (const scenario of SCENARIOS) {
-		const samples = Object.fromEntries(grids.map((grid) => [grid, []]));
+		const scenarioGrids = scenario.grids ?? grids;
+		const samples = Object.fromEntries(scenarioGrids.map((grid) => [grid, []]));
 		for (let r = 0; r < runs; r++) {
 			// Paired round: both grids back to back, alternating which goes first.
-			const order = r % 2 === 0 ? grids : [...grids].reverse();
+			const order = r % 2 === 0 ? scenarioGrids : [...scenarioGrids].reverse();
 			for (const grid of order) samples[grid].push(await runOnce(browser, grid, scenario));
 		}
-		for (const grid of grids) {
+		for (const grid of scenarioGrids) {
 			const list = samples[grid];
 			const metrics = Object.fromEntries(Object.keys(list[0]).map((key) => [key, spread(list.map((s) => s[key]))]));
 			results.push({
@@ -327,7 +404,7 @@ try {
 				spread: metrics,
 			});
 		}
-		if (grids.length === 2) {
+		if (!fidelity && scenarioGrids.length === 2) {
 			const ratios = samples.wit.map((w, i) => w.taskMs / samples.ag[i].taskMs);
 			results.push({ scenario: scenario.name, grid: 'ratio', witOverAgTaskMs: spread(ratios), rounds: runs });
 		}
@@ -338,33 +415,47 @@ try {
 }
 
 const fmt = (n, digits = 1) => (typeof n === 'number' ? n.toFixed(digits) : String(n));
-const table = results
-	.filter((r) => r.grid !== 'ratio')
-	.map((r) => ({
+const fidelityTable = () =>
+	results.map((r) => ({
 		scenario: r.scenario,
 		grid: r.grid,
-		'main thread ms (min-max)': `${fmt(r.taskMs, 0)} (${fmt(r.spread.taskMs.min, 0)}-${fmt(r.spread.taskMs.max, 0)})`,
-		'script ms': fmt(r.scriptMs, 0),
-		'layout ms': fmt(r.layoutMs, 0),
-		'style ms': fmt(r.styleMs, 0),
-		'layouts/frame': fmt(r.layoutCount / Math.max(1, r.frames), 2),
-		'ms/layout': fmt(r.layoutMs / Math.max(1, r.layoutCount), 2),
-		...(traceLayouts
-			? {
-					'trace layouts (forced)': `${fmt(r.traceLayouts, 0)} (${fmt(r.traceForcedLayouts, 0)})`,
-					'dirty objs/layout': fmt(r.traceDirtyPerLayout, 0),
-					'tree objs/layout': fmt(r.traceTreeObjectsPerLayout, 0),
-					'styled elements': fmt(r.traceStyledElements, 0),
-					'DOM rows/cells/els-per-cell': `${fmt(r.domRows, 0)}/${fmt(r.domCells, 0)}/${fmt(r.domElementsPerCell, 1)}`,
-					'DOM elements': fmt(r.domElements, 0),
-				}
-			: {}),
-		'input +ms/evt': fmt(r.inputOverheadMs, 2),
-		'p99 frame ms': fmt(r.p99Ms),
-		'dropped %': fmt(r.droppedPct),
-		'blank %': fmt(r.blankSamplesPct),
-		'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+		'wrong cells % (min-max)': `${fmt(r.wrongCellPct, 2)} (${fmt(r.spread.wrongCellPct.min, 2)}-${fmt(r.spread.wrongCellPct.max, 2)})`,
+		'frames with wrong %': fmt(r.framesWithWrongPct),
+		'changes in view /1k': fmt(r.changesPer1k, 2),
+		'blank / incomplete / other %': `${fmt(r.blankPct, 2)} / ${fmt(r.incompletePct, 2)} / ${fmt(r.otherContentPct, 2)}`,
+		'settle ms': fmt(r.settleMs, 0),
+		'wrong at rest': fmt(r.wrongAtRest, 0),
+		'cell-frames': fmt(r.cellFrames, 0),
 	}));
+const table = fidelity
+	? fidelityTable()
+	: results
+			.filter((r) => r.grid !== 'ratio')
+			.map((r) => ({
+				scenario: r.scenario,
+				grid: r.grid,
+				'main thread ms (min-max)': `${fmt(r.taskMs, 0)} (${fmt(r.spread.taskMs.min, 0)}-${fmt(r.spread.taskMs.max, 0)})`,
+				'script ms': fmt(r.scriptMs, 0),
+				'layout ms': fmt(r.layoutMs, 0),
+				'style ms': fmt(r.styleMs, 0),
+				'layouts/frame': fmt(r.layoutCount / Math.max(1, r.frames), 2),
+				'ms/layout': fmt(r.layoutMs / Math.max(1, r.layoutCount), 2),
+				...(traceLayouts
+					? {
+							'trace layouts (forced)': `${fmt(r.traceLayouts, 0)} (${fmt(r.traceForcedLayouts, 0)})`,
+							'dirty objs/layout': fmt(r.traceDirtyPerLayout, 0),
+							'tree objs/layout': fmt(r.traceTreeObjectsPerLayout, 0),
+							'styled elements': fmt(r.traceStyledElements, 0),
+							'DOM rows/cells/els-per-cell': `${fmt(r.domRows, 0)}/${fmt(r.domCells, 0)}/${fmt(r.domElementsPerCell, 1)}`,
+							'DOM elements': fmt(r.domElements, 0),
+						}
+					: {}),
+				'input +ms/evt': fmt(r.inputOverheadMs, 2),
+				'p99 frame ms': fmt(r.p99Ms),
+				'dropped %': fmt(r.droppedPct),
+				'blank %': fmt(r.blankSamplesPct),
+				'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+			}));
 console.log();
 console.table(table);
 for (const r of results.filter((x) => x.grid === 'ratio')) {
@@ -388,11 +479,15 @@ const report = {
 };
 const resultsDir = join(here, 'results');
 mkdirSync(resultsDir, { recursive: true });
-const file = join(resultsDir, `${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+const prefix = fidelity ? 'fidelity-' : '';
+if (fidelity)
+	report.method.metrics =
+		'Fidelity: after every frame, each fully visible cell is compared with its final content (text, plus bar width for renderer columns). Timings are not recorded: the sampling forces layout each frame.';
+const file = join(resultsDir, `${prefix}${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
 writeFileSync(file, JSON.stringify(report, null, 2));
-writeFileSync(join(resultsDir, 'latest.json'), JSON.stringify(report, null, 2));
+writeFileSync(join(resultsDir, `${prefix}latest.json`), JSON.stringify(report, null, 2));
 console.log(`\nwrote ${file}`);
-if (args.publish) {
+if (args.publish && !fidelity) {
 	const dataDir = join(here, '../../site/data/benchmarks');
 	mkdirSync(dataDir, { recursive: true });
 	writeFileSync(join(dataDir, 'wit-vs-ag.json'), JSON.stringify(report, null, 2) + '\n');

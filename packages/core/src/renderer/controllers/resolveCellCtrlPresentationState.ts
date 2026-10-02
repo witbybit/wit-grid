@@ -57,6 +57,8 @@ function scrollFallbackFreshness<TRowData>(input: ScrollCellPresentationInput<TR
 function resolvePresentationFreshness<TRowData>(presentation: ScrollCellPresentation, input: ScrollCellPresentationInput<TRowData>): VisualFreshness {
 	switch (presentation.kind) {
 		case 'buffered':
+			if (presentation.recordVersionsFrom && 'rowVersion' in presentation.recordVersionsFrom) return presentation.recordVersionsFrom;
+			return presentation.recordVersionsFrom ? snapshotFreshness(presentation.recordVersionsFrom) : scrollFallbackFreshness(input);
 		case 'primitive':
 		case 'live-renderer':
 		case 'frozen-portal':

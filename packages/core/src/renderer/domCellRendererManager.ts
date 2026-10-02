@@ -204,9 +204,14 @@ export class DomCellRendererManager<TRowData = unknown> {
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey;
 
-		this.unregisterActive(instance);
 		const keysChanged = instance.rendererKey !== params.rendererKey || instance.cellKey !== params.cellKey;
-		if (instance.cellKey !== params.cellKey) this.onCellKeyRetired?.(instance.cellKey);
+		const rendererKeyChanged = instance.rendererKey !== params.rendererKey;
+		const cellKeyChanged = instance.cellKey !== params.cellKey;
+		const parentChanged = instance.container.parentElement !== params.parentContainer;
+		const wasActive = this.activeByKey.get(instance.rendererKey) === instance;
+		if (wasActive && (rendererKeyChanged || parentChanged)) this.unregisterActive(instance);
+		else if (wasActive && cellKeyChanged) this.activeByCellKey.delete(instance.cellKey);
+		if (cellKeyChanged) this.onCellKeyRetired?.(instance.cellKey);
 		instance.rendererKey = params.rendererKey;
 		instance.cellKey = params.cellKey;
 		instance.value = params.value;
@@ -225,11 +230,12 @@ export class DomCellRendererManager<TRowData = unknown> {
 			instance.container.dataset.cellKey = params.cellKey;
 		}
 
-		if (instance.container.parentElement !== params.parentContainer) {
+		if (parentChanged) {
 			params.parentContainer.appendChild(instance.container);
 		}
-		this.removeSiblingContainers(instance.rendererKey, params.parentContainer, instance.container);
-		this.registerActive(instance);
+		if (parentChanged || rendererKeyChanged) this.removeSiblingContainers(instance.rendererKey, params.parentContainer, instance.container);
+		if (!wasActive || rendererKeyChanged || parentChanged) this.registerActive(instance);
+		else if (cellKeyChanged) this.activeByCellKey.set(instance.cellKey, instance);
 
 		if (needsUpdate) {
 			// Direct DOM call — zero React overhead

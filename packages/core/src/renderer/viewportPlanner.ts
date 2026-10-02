@@ -84,6 +84,17 @@ export class ViewportPlanner<TRowData = unknown> {
 	private prevTopology: CompiledColumnTopology | null = null;
 	private prevRenderedCenterColumns: ColumnInstanceId[] | null = null;
 	private rendererModeClassification: RendererModeClassification | null = null;
+	private columnIdsCache: {
+		topology: CompiledColumnTopology;
+		visibleStart: number;
+		visibleEnd: number;
+		renderedStart: number;
+		renderedEnd: number;
+		visible: ColumnInstanceId[];
+		rendered: ColumnInstanceId[];
+		pinnedLeft: ColumnInstanceId[];
+		pinnedRight: ColumnInstanceId[];
+	} | null = null;
 
 	private getRendererModeClassification(
 		compiledPlan: CompiledGridPlan<TRowData> | undefined,
@@ -127,8 +138,16 @@ export class ViewportPlanner<TRowData = unknown> {
 
 		const visibleColStart = window.visibleColStart ?? window.colStart;
 		const visibleColEnd = window.visibleColEnd ?? window.colEnd;
-		const visibleCenterColumns = columnIdsInRange(topology.center, visibleColStart, visibleColEnd);
-		const renderedCenterColumns = columnIdsInRange(topology.center, window.colStart, window.colEnd);
+		const cachedIds = this.columnIdsCache;
+		const sameTopology = cachedIds?.topology === topology;
+		const visibleCenterColumns =
+			sameTopology && cachedIds.visibleStart === visibleColStart && cachedIds.visibleEnd === visibleColEnd
+				? cachedIds.visible
+				: columnIdsInRange(topology.center, visibleColStart, visibleColEnd);
+		const renderedCenterColumns =
+			sameTopology && cachedIds.renderedStart === window.colStart && cachedIds.renderedEnd === window.colEnd
+				? cachedIds.rendered
+				: columnIdsInRange(topology.center, window.colStart, window.colEnd);
 		const prevRenderedCenterColumns = this.prevRenderedCenterColumns;
 		const columnWindowDelta =
 			this.prevTopology && prevRenderedCenterColumns
@@ -136,15 +155,42 @@ export class ViewportPlanner<TRowData = unknown> {
 					? computeColumnWindowDelta(this.prevTopology, topology)
 					: computeRoutineColumnWindowDelta(prevRenderedCenterColumns, renderedCenterColumns)
 				: undefined;
-		const pinnedLeftColumns = topology.left.map((placement) => placement.columnId);
-		const pinnedRightColumns = topology.right.map((placement) => placement.columnId);
+		const pinnedLeftColumns = sameTopology ? cachedIds.pinnedLeft : topology.left.map((placement) => placement.columnId);
+		const pinnedRightColumns = sameTopology ? cachedIds.pinnedRight : topology.right.map((placement) => placement.columnId);
+		// Updated in place: the planner runs every scroll frame.
+		if (cachedIds) {
+			cachedIds.topology = topology;
+			cachedIds.visibleStart = visibleColStart;
+			cachedIds.visibleEnd = visibleColEnd;
+			cachedIds.renderedStart = window.colStart;
+			cachedIds.renderedEnd = window.colEnd;
+			cachedIds.visible = visibleCenterColumns;
+			cachedIds.rendered = renderedCenterColumns;
+			cachedIds.pinnedLeft = pinnedLeftColumns;
+			cachedIds.pinnedRight = pinnedRightColumns;
+		} else {
+			this.columnIdsCache = {
+				topology,
+				visibleStart: visibleColStart,
+				visibleEnd: visibleColEnd,
+				renderedStart: window.colStart,
+				renderedEnd: window.colEnd,
+				visible: visibleCenterColumns,
+				rendered: renderedCenterColumns,
+				pinnedLeft: pinnedLeftColumns,
+				pinnedRight: pinnedRightColumns,
+			};
+		}
 
 		const liveColumnOverscan = rendererOptions?.liveReact?.columnOverscan ?? 0;
-		const liveCenterColumnWindow = columnIdsInRange(
-			topology.center,
-			Math.max(window.colStart, visibleColStart - liveColumnOverscan),
-			Math.min(window.colEnd, visibleColEnd + liveColumnOverscan)
-		);
+		const liveCenterColumnWindow =
+			liveColumnOverscan === 0 && visibleColStart >= window.colStart && visibleColEnd <= window.colEnd
+				? visibleCenterColumns
+				: columnIdsInRange(
+						topology.center,
+						Math.max(window.colStart, visibleColStart - liveColumnOverscan),
+						Math.min(window.colEnd, visibleColEnd + liveColumnOverscan)
+					);
 		const { liveColumns } = this.getRendererModeClassification(compiledPlan, topology);
 
 		const liveVisibleCells: CellAddress[] = [];

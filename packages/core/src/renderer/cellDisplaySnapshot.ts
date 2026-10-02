@@ -48,8 +48,13 @@ export function collectCellDecorationSnapshotMetadata(decorations: readonly Grid
 	let validationError: string | undefined;
 	for (const decoration of decorations) {
 		if (decoration.className) classNameSuffix += ` ${decoration.className}`;
+		if (decoration.kind === 'validationError') {
+			// Shown by the grid's validation tooltip (data-validation-error); a native title as well
+			// would pop a second, unstyled tooltip over it.
+			if (decoration.title) validationError = decoration.title;
+			continue;
+		}
 		if (decoration.title) insightTitle = insightTitle ? `${insightTitle}\n${decoration.title}` : decoration.title;
-		if (decoration.kind === 'validationError' && decoration.title) validationError = decoration.title;
 	}
 	return { classNameSuffix, insightTitle, validationError };
 }
@@ -152,7 +157,10 @@ function buildCellSnapshotKey(rowId: string, columnInstanceId: ColumnInstanceId 
 }
 
 export class CellDisplaySnapshotStore {
+	/** Insertion order is the eviction order (string keys, written only on set/delete). */
 	private readonly snapshots = new Map<string, CellDisplaySnapshot>();
+	/** Read index: every scrolled cell looks a snapshot up, so reads build no key string. */
+	private readonly byRow = new Map<string, Map<string, CellDisplaySnapshot>>();
 	private evictedSnapshotCount = 0;
 
 	constructor(private maxEntries = DEFAULT_CELL_DISPLAY_SNAPSHOT_CAPACITY) {}
@@ -168,7 +176,7 @@ export class CellDisplaySnapshotStore {
 	}
 
 	public get(rowId: string, columnInstanceId: ColumnInstanceId | string): CellDisplaySnapshot | undefined {
-		return this.snapshots.get(buildCellSnapshotKey(rowId, columnInstanceId));
+		return this.byRow.get(rowId)?.get(columnInstanceId);
 	}
 
 	public set(snapshot: CellDisplaySnapshot): void {
@@ -177,20 +185,36 @@ export class CellDisplaySnapshotStore {
 		// scroll must consume snapshots without mutating cache ownership.
 		this.snapshots.delete(key);
 		this.snapshots.set(key, snapshot);
+		let row = this.byRow.get(snapshot.rowId);
+		if (!row) {
+			row = new Map();
+			this.byRow.set(snapshot.rowId, row);
+		}
+		row.set(snapshot.columnInstanceId, snapshot);
 		while (this.snapshots.size > this.maxEntries) {
-			const oldestKey = this.snapshots.keys().next().value as string | undefined;
-			if (oldestKey === undefined) break;
-			this.snapshots.delete(oldestKey);
+			const oldest = this.snapshots.entries().next().value as [string, CellDisplaySnapshot] | undefined;
+			if (oldest === undefined) break;
+			this.snapshots.delete(oldest[0]);
+			this.unindex(oldest[1].rowId, oldest[1].columnInstanceId);
 			this.evictedSnapshotCount++;
 		}
 	}
 
 	public delete(rowId: string, columnInstanceId: ColumnInstanceId | string): void {
 		this.snapshots.delete(buildCellSnapshotKey(rowId, columnInstanceId));
+		this.unindex(rowId, columnInstanceId);
 	}
 
 	public clear(): void {
 		this.snapshots.clear();
+		this.byRow.clear();
+	}
+
+	private unindex(rowId: string, columnInstanceId: string): void {
+		const row = this.byRow.get(rowId);
+		if (!row) return;
+		row.delete(columnInstanceId);
+		if (row.size === 0) this.byRow.delete(rowId);
 	}
 
 	/** Read-only ownership gauge for deterministic long-session diagnostics. */
