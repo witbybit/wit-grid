@@ -91,6 +91,15 @@ const SCENARIOS = [
 		grids: ['wit-react'],
 		fidelityOnly: true,
 	},
+	{
+		name: 'vertical-react-getters',
+		title: 'Vertical scroll, React cells over valueGetters',
+		description: 'The React cell grid with every renderer column read through a valueGetter. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10, getters: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
 ]
 	.filter((s) => !args.only || s.name === args.only)
 	// Fidelity-only scenarios have no AG counterpart; they still time on request (--only=<name>), Wit alone.

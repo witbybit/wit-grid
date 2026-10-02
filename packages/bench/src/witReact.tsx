@@ -34,7 +34,9 @@ const columns: ColumnDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_,
 	// ?reactMode=live|html-snapshot|freeze picks the scroll presentation; default: none declared.
 	const mode = new URLSearchParams(location.search).get('reactMode');
 	const capabilities = mode ? { capabilities: { scrollPresentation: mode as 'live' | 'html-snapshot' | 'freeze' } } : {};
-	return { ...base, renderer: { kind: 'react' as const, component: BarCell, ...capabilities } };
+	// ?getters=1: the renderer columns read their value through a valueGetter (the #perf demo's Greeks shape).
+	const getter = new URLSearchParams(location.search).get('getters') === '1' ? { valueGetter: ({ row }: { row: BenchRow }) => row[`c${c}`] } : {};
+	return { ...base, ...getter, renderer: { kind: 'react' as const, component: BarCell, ...capabilities } };
 });
 const rows = makeRows(scenario);
 
