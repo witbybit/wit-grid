@@ -61,7 +61,7 @@ export interface DispatchCellPresentationInput<TRowData> {
  * resolver and telemetry use) belongs to exactly one:
  *  - text:     writes a string or placeholder; holds no portal.
  *  - live:     a portal (React) or DOM renderer mounted and updating.
- *  - snapshot: the last rendered content kept without a live update (frozen portal, html clone).
+ *  - snapshot: the last rendered content kept without a live update (frozen portal).
  *  - checkbox: the row-selection checkbox.
  */
 export type CellRenderState = 'text' | 'live' | 'snapshot' | 'checkbox';
@@ -71,12 +71,9 @@ const RENDER_STATE: Record<CellCtrlPresentationState['kind'], CellRenderState> =
 	primitive: 'text',
 	loading: 'text',
 	shell: 'text',
-	'text-impostor': 'text',
-	'html-pending': 'text',
 	'live-renderer': 'live',
 	'dom-update': 'live',
 	'frozen-portal': 'snapshot',
-	'html-snapshot': 'snapshot',
 	'checkbox-selector': 'checkbox',
 };
 

@@ -17,7 +17,7 @@ import type { GridNavigationOptions } from './interaction/GridInteractionControl
 
 export function hasImperativeRendererCapability<TRowData = unknown>(column: ColumnDef<TRowData>): boolean {
 	const caps = (column as InternalColumnDef<TRowData>).cellRendererCapabilities;
-	return caps?.scrollPresentation === 'live' && caps.live?.update === 'imperative';
+	return caps?.imperative === true;
 }
 
 export interface GridCellContentAdapter<TRowData = unknown> {

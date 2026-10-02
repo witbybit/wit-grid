@@ -120,7 +120,7 @@ const RowMenuPortalPool = memo(RowMenuPortalPoolInner) as typeof RowMenuPortalPo
  * never causes the row-portal tree to re-render, and a group-row expansion never causes
  * all cell wrappers to re-render.
  *
- * For cells with capabilities.live.update: 'imperative', updates bypass React's scheduler entirely —
+ * For cells with renderer kind 'imperativeReact', updates bypass React's scheduler entirely —
  * the grid calls ref.current.update() directly in the paint loop.
  */
 export function PortalManager<TRowData = unknown>({

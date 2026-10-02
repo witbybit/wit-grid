@@ -81,9 +81,8 @@ describe('React portal physical identity', () => {
 				header: 'Name',
 				width: 100,
 				renderer: {
-					kind: 'react',
+					kind: 'imperativeReact',
 					component: ImperativeRenderer,
-					capabilities: { scrollPresentation: 'live', live: { update: 'imperative' } },
 				},
 			},
 		];

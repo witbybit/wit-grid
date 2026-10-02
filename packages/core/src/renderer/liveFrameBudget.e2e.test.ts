@@ -28,7 +28,7 @@ function mountLiveGrid(rowCount: number, columns?: ColumnDef<LiveRow>[], rect?: 
 				header: 'Value',
 				width: 150,
 				cellRenderer: () => null,
-				cellRendererCapabilities: { scrollPresentation: 'live' } as any,
+				cellRendererCapabilities: { scroll: 'live' } as any,
 			} as any,
 		] satisfies ColumnDef<LiveRow>[]);
 	const store = new GridStore<LiveRow>({
@@ -37,7 +37,7 @@ function mountLiveGrid(rowCount: number, columns?: ColumnDef<LiveRow>[], rect?: 
 		defaultColWidth: 150,
 		getRowId: (row) => row.id,
 		rendererOptions: {
-			liveReact: {
+			live: {
 				rowOverscan: 2,
 				columnOverscan: 1,
 				maxMountsPerFrame: 100,
@@ -134,7 +134,7 @@ describe('LiveFrameBudget wiring — end to end sanity (unconfigured)', () => {
 					header: 'Live A',
 					width: 200,
 					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'live' } as any,
+					cellRendererCapabilities: { scroll: 'live' } as any,
 				} as any,
 				{ field: 'staticB', header: 'Static B', width: 200 },
 			],

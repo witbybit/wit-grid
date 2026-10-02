@@ -9,7 +9,7 @@ interface ModeRow {
 	value: string;
 }
 
-function mountGrid(mode: 'primitive' | 'live' | 'freeze' | 'html-snapshot') {
+function mountGrid(mode: 'primitive' | 'live' | 'text') {
 	vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 		cb(0);
 		return 1;
@@ -23,7 +23,7 @@ function mountGrid(mode: 'primitive' | 'live' | 'freeze' | 'html-snapshot') {
 			header: 'Value',
 			width: 150,
 			cellRenderer: isCustom ? () => null : undefined,
-			cellRendererCapabilities: isCustom ? ({ scrollPresentation: mode } as any) : undefined,
+			cellRendererCapabilities: isCustom ? ({ scroll: mode } as any) : undefined,
 		} as any,
 	];
 	const store = new GridStore<ModeRow>({
@@ -32,15 +32,11 @@ function mountGrid(mode: 'primitive' | 'live' | 'freeze' | 'html-snapshot') {
 		defaultColWidth: 150,
 		getRowId: (row) => row.id,
 		rendererOptions: {
-			liveReact: {
+			live: {
 				rowOverscan: 2,
 				columnOverscan: 1,
 				maxMountsPerFrame: 100,
 				maxUpdatesPerFrame: 100,
-			},
-			htmlSnapshot: {
-				allowShellWhenMissing: true,
-				allowTextFallbackWhenMissing: false,
 			},
 		},
 	});
@@ -86,8 +82,6 @@ describe('Scroll presentation mode telemetry benchmarks', () => {
 		expect(stats.cellsBoundDuringScroll).toBeGreaterThan(0);
 		expect(stats.portalMountsDuringScroll).toBe(0);
 		expect(stats.liveReactMountsDuringScroll).toBe(0);
-		expect(stats.htmlSnapshotHitsDuringScroll).toBe(0);
-		expect(stats.textImpostorUsesDuringScroll).toBe(0);
 
 		cleanup(grid);
 	});
@@ -105,8 +99,8 @@ describe('Scroll presentation mode telemetry benchmarks', () => {
 		cleanup(grid);
 	});
 
-	it('freeze mode does not fall back to raw text during scroll', () => {
-		const grid = mountGrid('freeze');
+	it('text mode mounts no portals during scroll', () => {
+		const grid = mountGrid('text');
 		const scrollViewport = grid.container.querySelector('.og-scroll-viewport') as HTMLDivElement;
 		scrollViewport.scrollTop = 400;
 		scrollViewport.dispatchEvent(new Event('scroll'));
@@ -115,22 +109,6 @@ describe('Scroll presentation mode telemetry benchmarks', () => {
 		expect(stats.liveReactMountsDuringScroll).toBe(0);
 		expect(stats.portalMountsDuringScroll).toBe(0);
 		expect(stats.rootTextContentWritesOnPortalCells).toBe(0);
-
-		cleanup(grid);
-	});
-
-	it('html-snapshot mode uses snapshot telemetry and never degrades to raw fallback text by default', () => {
-		const grid = mountGrid('html-snapshot');
-		const scrollViewport = grid.container.querySelector('.og-scroll-viewport') as HTMLDivElement;
-		scrollViewport.scrollTop = 400;
-		scrollViewport.dispatchEvent(new Event('scroll'));
-
-		const stats = grid.renderer.getRenderStats();
-		expect(stats.liveReactMountsDuringScroll).toBe(0);
-		expect(stats.textImpostorUsesDuringScroll).toBe(0);
-		const snapshotCells = Array.from(grid.container.querySelectorAll<HTMLElement>('.og-cell[data-col-field="value"]'));
-		expect(snapshotCells.some((cell) => cell.dataset.contentMode === 'fallback')).toBe(false);
-		expect(snapshotCells.some((cell) => cell.dataset.contentMode === 'pending' || cell.dataset.contentMode === 'portal')).toBe(true);
 
 		cleanup(grid);
 	});

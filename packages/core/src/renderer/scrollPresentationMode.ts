@@ -1,39 +1,16 @@
 import { isDomCellRenderer, type CellScrollPresentation, type ColumnDef, type InternalColumnDef } from '../columnDef.js';
+import { defaultRendererScroll } from '../models/ColumnModel.js';
+
+/** A column's resolved scroll presentation: `'primitive'` for non-renderer cells, else its normalized `scroll`. */
+export type ResolvedScrollPresentation = 'primitive' | CellScrollPresentation;
 
 /**
- * Resolves a column's scroll presentation mode. Non-renderer columns are always 'primitive';
- * renderer columns without an explicit `scrollPresentation` default to 'freeze' (normalized onto
- * `cellRendererCapabilities` by ColumnModel.normalizeColumn — see normalizeRendererCapabilities).
+ * Reads a column's scroll presentation. Defaults live in ColumnModel's normalization, which stamps
+ * `scroll` onto `cellRendererCapabilities`; a raw `cellRenderer` set without a `renderer` spec is
+ * the only un-normalized case and takes the same default.
  */
-export function getCellScrollPresentation<TRowData>(col: ColumnDef<TRowData>): CellScrollPresentation {
+export function getCellScrollPresentation<TRowData>(col: ColumnDef<TRowData>): ResolvedScrollPresentation {
 	const internal = col as InternalColumnDef<TRowData>;
 	if (!internal.cellRenderer) return 'primitive';
-	// A raw DOM `cellRenderer` (no `renderer` spec) is not normalized; it gets the DOM default too.
-	return internal.cellRendererCapabilities?.scrollPresentation ?? (isDomCellRenderer(internal.cellRenderer) ? 'update' : 'freeze');
-}
-
-export function isPrimitivePresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	return getCellScrollPresentation(col) === 'primitive';
-}
-
-export function isLivePresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	return getCellScrollPresentation(col) === 'live';
-}
-
-export function isFreezePresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	return getCellScrollPresentation(col) === 'freeze';
-}
-
-export function isTextImpostorPresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	return getCellScrollPresentation(col) === 'text-impostor';
-}
-
-export function isHtmlSnapshotPresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	return getCellScrollPresentation(col) === 'html-snapshot';
-}
-
-/** True for `scrollPresentation: 'live'` columns configured for imperative (ref-based) updates. */
-export function isImperativeLivePresentation<TRowData>(col: ColumnDef<TRowData>): boolean {
-	const internal = col as InternalColumnDef<TRowData>;
-	return internal.cellRendererCapabilities?.scrollPresentation === 'live' && internal.cellRendererCapabilities?.live?.update === 'imperative';
+	return internal.cellRendererCapabilities?.scroll ?? defaultRendererScroll(isDomCellRenderer(internal.cellRenderer));
 }

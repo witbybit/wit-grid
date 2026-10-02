@@ -79,7 +79,7 @@ export default function FlightRecorderLab() {
 				field: 'status',
 				header: 'Live state',
 				width: 140,
-				renderer: { kind: 'react' as const, component: StatusPulse, capabilities: { scrollPresentation: 'freeze' as const } },
+				renderer: { kind: 'react' as const, component: StatusPulse, capabilities: { scroll: 'text' as const } },
 			},
 		],
 		[]

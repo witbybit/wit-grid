@@ -36,7 +36,7 @@ const grids = args.grid ? [args.grid] : ['wit', 'ag'];
 // (layout objects dirtied, objects in the tree, forced layouts) and why elements were restyled
 // or re-laid out. Counts, not time: tracing itself costs main-thread time, so trace runs are for
 // diagnosis, never for the ratio. The counts are only deterministic where the grid's behaviour
-// does not depend on time: the DOM-update budget (rendererOptions.domUpdate.maxMsPerFrame) is
+// does not depend on time: the DOM-update budget (rendererOptions.live.maxMsPerFrame) is
 // time-based, so under tracing it defers far more DOM-renderer cells than in a normal run and
 // the DOM-renderer scenario's counts describe a slower grid, not the real one.
 const traceLayouts = Boolean(args.trace);
@@ -170,7 +170,7 @@ async function runOnce(browser, grid, scenario) {
 	for (const [key, value] of Object.entries(scenario.query)) url.searchParams.set(key, String(value));
 	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
 	if (fidelity) url.searchParams.set('fidelity', '1');
-	// --react-mode=<live|html-snapshot|freeze> sets the React cells' scroll presentation (wit-react page).
+	// --react-mode=<live|text> sets the React cells' scroll presentation (wit-react page).
 	if (args['react-mode'] && grid === 'wit-react') url.searchParams.set('reactMode', args['react-mode']);
 	if (args['react-mounts'] && grid === 'wit-react') url.searchParams.set('reactMounts', args['react-mounts']);
 	await page.goto(url.href);
@@ -240,7 +240,6 @@ async function runOnce(browser, grid, scenario) {
 					'cellSlotRebinds',
 					'domUpdatesDuringScroll',
 					'domUpdatesDeferredDuringScroll',
-					'textImpostorUsesDuringScroll',
 					'motionCellsDecoratedAfterScroll',
 					'fidelityCellsDecoratedAfterScroll',
 				];

@@ -96,7 +96,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'delta',
 			header: 'Delta Δ',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -109,7 +109,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'gamma',
 			header: 'Gamma Γ',
 			width: 95,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -122,7 +122,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'vega',
 			header: 'Vega ν',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -135,7 +135,7 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			field: 'theta',
 			header: 'Theta θ',
 			width: 90,
-			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: GreeksRenderer, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['price', 'quantity'],
 			valueGetter: ({ row }) => {
 				const vol = parseFloat(row.quantity) || 20;
@@ -152,10 +152,9 @@ export function createPerformanceColumns(massiveColumns: boolean): ColumnDef<Per
 			header: 'Risk Rating',
 			width: 110,
 			cellEditor: StatusDropdownEditor,
-			// scrollPresentation: 'html-snapshot' — LOW/MEDIUM/HIGH risk badges keep their glow and
-			// color during fast scroll without any React re-render. The static clone is replaced by
-			// the live portal on the next post-scroll fidelity pass.
-			renderer: { kind: 'react', component: RiskBadgeRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+			// scroll: 'text' — during fast scroll, cells entering view show the rating as plain text
+			// instead of mounting the badge; the real badge mounts once scrolling settles.
+			renderer: { kind: 'react', component: RiskBadgeRenderer, capabilities: { scroll: 'text' } },
 			valueGetter: ({ row }) => (row.status === 'Active' ? 'LOW' : row.status === 'Pending' ? 'MEDIUM' : 'HIGH'),
 		},
 	];
@@ -182,41 +181,43 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			field: 'service',
 			header: 'Microservice',
 			width: 140,
-			// scrollPresentation: 'html-snapshot' — after the first fidelity render the grid captures
-			// the badge's styled HTML (colored left-border pill) and injects it as a static clone
-			// during scroll. The service chip looks exactly the same while the grid is in motion.
-			renderer: { kind: 'react', component: ServiceBadgeRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+			// scroll: 'text' — cells entering view during scroll show the service name as text;
+			// the styled chip mounts once scrolling settles.
+			renderer: { kind: 'react', component: ServiceBadgeRenderer, capabilities: { scroll: 'text' } },
 		},
 		{
 			field: 'rendererLive',
 			header: 'Live Rebind',
 			width: 170,
-			// scrollPresentation: 'live' — the real renderer mounts/updates on every scroll frame,
-			// unlike every other column here which freezes or shows an impostor during scroll.
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'live', scrollState: true } },
+			// scroll: 'live' — the real renderer mounts/updates during scroll (within the per-frame
+			// budget), unlike the other columns here which show stand-in text until scrolling settles.
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scroll: 'live', scrollState: true } },
 			valueGetter: ({ row }) => `live|${row.service}`,
 		},
 		{
 			field: 'rendererDefer',
 			header: 'Defer Stable',
 			width: 170,
-			// Plain text impostor — shows raw "defer|INFO scroll-idle" text during scroll.
-			// Compare with the Snap column next to it to see the visual difference.
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			// Default text stand-in — shows the raw "defer|INFO" text during scroll.
+			// Compare with the Custom Scroll Text column next to it.
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['severity'],
 			valueGetter: ({ row }) => `defer|${row.severity}`,
 		},
 		{
 			field: 'rendererSnap',
-			header: 'Defer + Snap',
+			header: 'Custom Scroll Text',
 			width: 185,
-			// scrollPresentation: 'html-snapshot' opt-in — same renderer and data as "Defer Stable" but
-			// the grid captures the badge HTML after each fidelity render and replays it during scroll.
-			// Scroll fast and compare: this column shows styled chips, the one to its left shows text.
+			// scroll: 'text' with scrollText — same renderer and data as "Defer Stable", but the stand-in
+			// text during scroll is shortened to the severity. Scroll fast and compare the two columns.
 			renderer: {
 				kind: 'react',
 				component: RendererStrategyProbe,
-				capabilities: { scrollPresentation: 'html-snapshot', scrollState: true },
+				capabilities: {
+					scroll: 'text',
+					scrollState: true,
+					scrollText: ({ formattedValue }) => formattedValue.split('|')[1] ?? formattedValue,
+				},
 			},
 			valueGetterDependencies: ['severity'],
 			valueGetter: ({ row }) => `defer|${row.severity}`,
@@ -225,15 +226,15 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			field: 'severity',
 			header: 'Severity',
 			width: 120,
-			// scrollPresentation: 'html-snapshot' — the CRITICAL/ERROR/WARNING risk badges preserve
-			// their glow colors and typography during scroll without any React re-render.
-			renderer: { kind: 'react', component: RiskBadgeRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+			// scroll: 'text' — the severity shows as plain text while scrolling; the badge mounts
+			// once scrolling settles.
+			renderer: { kind: 'react', component: RiskBadgeRenderer, capabilities: { scroll: 'text' } },
 		},
 		{
 			field: 'rendererFallback',
 			header: 'Defer Freeze',
 			width: 175,
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['latencyMs'],
 			valueGetter: ({ row }) => `defer|${row.latencyMs}ms`,
 		},
@@ -241,7 +242,7 @@ export function createServerColumns(): ColumnDef<ServerAuditRow>[] {
 			field: 'rendererDestroy',
 			header: 'Destroy Recycle',
 			width: 180,
-			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scrollPresentation: 'freeze', scrollState: true } },
+			renderer: { kind: 'react', component: RendererStrategyProbe, capabilities: { scroll: 'text', scrollState: true } },
 			valueGetterDependencies: ['ipAddress'],
 			valueGetter: ({ row }) => `destroy|${row.ipAddress}`,
 		},
@@ -369,7 +370,7 @@ export function createCustomColumns(): ColumnDef<CustomShowcaseRow>[] {
 			renderer: {
 				kind: 'react',
 				component: PriceBadgeRenderer,
-				capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true, update: 'react' } },
+				capabilities: { scroll: 'live' },
 			},
 		},
 		{
@@ -379,7 +380,7 @@ export function createCustomColumns(): ColumnDef<CustomShowcaseRow>[] {
 			renderer: {
 				kind: 'react',
 				component: StarRatingRenderer,
-				capabilities: { scrollPresentation: 'live', live: { priority: 'high', update: 'react', allowEmergencyShell: true } },
+				capabilities: { scroll: 'live' },
 			},
 		},
 		{
@@ -389,7 +390,7 @@ export function createCustomColumns(): ColumnDef<CustomShowcaseRow>[] {
 			renderer: {
 				kind: 'react',
 				component: ProgressBarRenderer,
-				capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true, update: 'react' } },
+				capabilities: { scroll: 'live' },
 			},
 			cellEditor: ProgressSliderEditor,
 		},
@@ -400,7 +401,7 @@ export function createCustomColumns(): ColumnDef<CustomShowcaseRow>[] {
 			renderer: {
 				kind: 'react',
 				component: StatusBadgeRenderer,
-				capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true, update: 'react' } },
+				capabilities: { scroll: 'live' },
 			},
 			cellEditor: StatusDropdownEditor,
 			headerMenuComponent: StatusHeaderFilter,

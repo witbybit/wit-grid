@@ -143,23 +143,23 @@ const COLUMNS: ColumnDef<HoldingRow>[] = [
 		header: 'Price',
 		width: 100,
 		sortable: true,
-		renderer: { kind: 'react', component: PriceRenderer, capabilities: { scrollPresentation: 'freeze' } },
+		renderer: { kind: 'react', component: PriceRenderer, capabilities: { scroll: 'text' } },
 	},
 	{
 		field: 'change',
 		header: 'Change $',
 		width: 100,
 		sortable: true,
-		renderer: { kind: 'react', component: ChangeRenderer, capabilities: { scrollPresentation: 'freeze' } },
+		renderer: { kind: 'react', component: ChangeRenderer, capabilities: { scroll: 'text' } },
 	},
 	{
 		field: 'changePct',
 		header: 'Change %',
 		width: 105,
 		sortable: true,
-		// scrollPresentation: 'html-snapshot' — the ▲/▼ badge with its green/red tinted background and
-		// border is captured after each fidelity render and replayed as a static clone during scroll.
-		renderer: { kind: 'react', component: ChangePctRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+		// scroll: 'text' — cells entering view during scroll show the value as text; the ▲/▼ badge
+		// mounts once scrolling settles.
+		renderer: { kind: 'react', component: ChangePctRenderer, capabilities: { scroll: 'text' } },
 	},
 	{ field: 'marketCap', header: 'Mkt Cap', width: 100, sortable: true },
 	{ field: 'volume', header: 'Volume', width: 110, sortable: true },
@@ -171,9 +171,8 @@ const COLUMNS: ColumnDef<HoldingRow>[] = [
 		header: 'Status',
 		width: 90,
 		sortable: true,
-		// scrollPresentation: 'html-snapshot' — Active/Watch/Closed colored status chips are captured
-		// as static HTML after fidelity render, so the portfolio status column looks settled while scrolling.
-		renderer: { kind: 'react', component: StatusRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+		// scroll: 'text' — status chips show as text while scrolling and mount once it settles.
+		renderer: { kind: 'react', component: StatusRenderer, capabilities: { scroll: 'text' } },
 	},
 ];
 

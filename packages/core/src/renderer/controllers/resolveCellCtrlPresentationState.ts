@@ -63,17 +63,6 @@ function resolvePresentationFreshness<TRowData>(presentation: ScrollCellPresenta
 		case 'live-renderer':
 		case 'frozen-portal':
 			return presentation.recordVersionsFrom ? snapshotFreshness(presentation.recordVersionsFrom) : scrollFallbackFreshness(input);
-		case 'html-snapshot':
-			return 'rowVersion' in presentation.recordVersionsFrom
-				? presentation.recordVersionsFrom
-				: snapshotFreshness(presentation.recordVersionsFrom);
-		case 'text-impostor':
-			return 'recordVersionsFrom' in presentation
-				? 'rowVersion' in presentation.recordVersionsFrom
-					? presentation.recordVersionsFrom
-					: snapshotFreshness(presentation.recordVersionsFrom)
-				: presentation.recordVersions;
-		case 'html-pending':
 		case 'shell':
 			return presentation.recordVersions;
 		case 'dom-update':
@@ -110,25 +99,16 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	state.className = presentation.className;
 	state.title = title;
 	state.validationError = validationError;
-	state.requiresFidelity =
-		presentation.kind === 'primitive' ||
-		presentation.kind === 'frozen-portal' ||
-		presentation.kind === 'shell' ||
-		presentation.kind === 'text-impostor' ||
-		presentation.kind === 'html-pending' ||
-		presentation.kind === 'html-snapshot';
+	state.requiresFidelity = presentation.kind === 'primitive' || presentation.kind === 'frozen-portal' || presentation.kind === 'shell';
 	state.freshness = freshness;
 	state.contentMode = 'contentMode' in presentation ? presentation.contentMode : undefined;
 	state.formattedValue = formattedValue;
 	state.portalKey = portalKey;
-	state.html = 'frozenHtml' in presentation ? presentation.frozenHtml : undefined;
 	state.markDirty = 'markDirty' in presentation ? presentation.markDirty : undefined;
 	state.isEditing = 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing;
 	state.isFocused = 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused;
 	state.forceLiveInteractive = 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined;
 	state.keepVersionFresh = 'keepVersionFresh' in presentation ? presentation.keepVersionFresh : undefined;
-	state.captureFrozenHtml = 'captureFrozenHtml' in presentation ? presentation.captureFrozenHtml : undefined;
-	state.textImpostorSource = 'source' in presentation ? presentation.source : undefined;
 	state.recordVersions =
 		'recordVersionsFrom' in presentation
 			? presentation.recordVersionsFrom
@@ -143,7 +123,7 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	cellCtrl.visualState.readOnly = presentation.className.includes('og-cell-readonly');
 	cellCtrl.valueState.formattedValue = formattedValue ?? '';
 	cellCtrl.valueState.displayText = cellCtrl.valueState.formattedValue;
-	cellCtrl.valueState.loading = presentation.kind === 'html-pending';
+	cellCtrl.valueState.loading = false;
 	cellCtrl.valueState.empty = !cellCtrl.valueState.formattedValue;
 	return cellCtrl;
 }

@@ -50,47 +50,28 @@ export interface ValueSetterParams<TRowData = unknown> {
  * never occur mid-motion. The renderer callback is told `isScrolling: true` honestly for both.
  *
  * - 'scroll-force-live' — the narrow force-live-interactive-exception mount: an actively editing/
- *   focused cell on a `'freeze'`-mode column that must mount live despite not opting into
- *   `scrollPresentation: 'live'` (see scrollCellPresentation.ts's ScrollCellPresentation union).
- * - 'scroll-live' — an ordinary `scrollPresentation: 'live'` column's mount/update on this scroll
- *   frame. Expected to fire on every scroll frame for these columns, unlike the rare force-live
- *   exception above.
+ *   focused cell on a 'text'-mode column that must mount live despite not opting into
+ *   'live' (see scrollCellPresentation.ts's ScrollCellPresentation union).
+ * - 'scroll-live' — an ordinary 'live' column's mount/update on this scroll frame. Expected to
+ *   fire on every scroll frame for these columns, unlike the rare force-live exception above.
  */
 export type CellRendererPhase = 'initial' | 'scroll' | 'scroll-force-live' | 'scroll-live' | 'scroll-idle' | 'interaction' | 'edit' | 'destroy';
 
-/**
- * What a renderer's cell shows while the grid is actively scrolling. This is the ONE field that
- * chooses the scroll presentation mode — mode-specific config lives in the matching sub-object
- * below and is only valid alongside its own mode (enforced at column normalization time).
- *
- * - `'primitive'`    — Fast text/class presentation. Default for non-renderer cells.
- * - `'live'`         — The real renderer is mounted/updated during active scroll. Highest
- *                       fidelity, highest cost. No text fallback, no HTML snapshot fallback, no
- *                       stale previous portal, no blank cell.
- * - `'freeze'`       — An existing live renderer may remain visually frozen during scroll. New/
- *                       cold cells show a shell/loading placeholder until fidelity catches up.
- *                       Default for columns with a renderer but no explicit scrollPresentation.
- * - `'text-impostor'`— Shows an explicit cheap text/chip stand-in (`textImpostor.render`) during
- *                       scroll.
- * - `'html-snapshot'`— Replays a captured inert HTML clone during scroll. Missing HTML shows a
- *                       shell/pending placeholder, not raw text, unless explicitly allowed.
- */
-/**
- * What a renderer column's cells show while the grid is actively scrolling.
- * - `'update'` (DOM renderers only, and their default): a cell entering during scroll calls the
- *   renderer's `update()` in place, within the per-frame budget (`GridRendererOptions.domUpdate`).
- *   The cell is final when drawn, so nothing is redone when scrolling settles; only cells beyond
- *   the budget show a stand-in until then.
- * - `'freeze'` (React renderers' default): mounted content stays frozen; entering cells show a
- *   cheap stand-in and the real renderer mounts once scrolling settles.
- * - `'live'`: the renderer mounts/updates on every scroll frame.
- * - `'text-impostor'`, `'html-snapshot'`: explicit stand-ins, see their capabilities.
- */
-export type CellScrollPresentation = 'primitive' | 'live' | 'freeze' | 'update' | 'text-impostor' | 'html-snapshot';
+/** What a renderer column's cells show while the grid is scrolling. */
+export type CellScrollPresentation = 'text' | 'live';
 
 export interface CellRendererCapabilities {
-	/** Chooses what this column's cells show while the grid is actively scrolling. */
-	scrollPresentation?: CellScrollPresentation;
+	/**
+	 * `'text'` (React renderers' default): cells entering view during scroll show stand-in text
+	 * (`scrollText`, else the formatted value); renderers already mounted stay as they are; the real
+	 * renderer mounts once scrolling settles. `'live'` (DOM renderers' default): the renderer
+	 * mounts/updates during scroll within the per-frame budget (`rendererOptions.live`); cells over
+	 * budget show stand-in text for that frame and are completed after.
+	 */
+	scroll?: CellScrollPresentation;
+
+	/** Stand-in text shown during scroll (and for over-budget live cells). Default: the formatted value. */
+	scrollText?: (params: { value: unknown; formattedValue: string }) => string;
 
 	/**
 	 * When true, the renderer is also updated when only `isScrolling` or `phase` changes, e.g. to
@@ -99,50 +80,18 @@ export interface CellRendererCapabilities {
 	 * cost nothing.
 	 */
 	scrollState?: boolean;
-
-	/** Only valid for `scrollPresentation: 'live'`. */
-	live?: {
-		/**
-		 * `'react'` (default) updates through React's scheduler. `'imperative'` calls
-		 * `ref.current.update()` directly, bypassing React's scheduler entirely — the cell
-		 * renderer must be a forwardRef component exposing `ImperativeCellHandle`. Ideal for
-		 * real-time feeds (tick data, live prices) where even setState latency is too high.
-		 */
-		update?: 'react' | 'imperative';
-		priority?: 'high' | 'normal' | 'low';
-		allowEmergencyShell?: boolean;
-	};
-
-	/** Only valid for `scrollPresentation: 'text-impostor'`. */
-	textImpostor?: {
-		/** Returns a cheap plain-text/chip representation of the cell value to show during scroll. */
-		render: (params: { value: unknown; formattedValue: string }) => string;
-	};
-
-	/** Only valid for `scrollPresentation: 'html-snapshot'`. */
-	htmlSnapshot?: {
-		strict?: boolean;
-		freshness?: 'row-version-only' | 'visual';
-		allowShellWhenMissing?: boolean;
-		allowTextFallbackWhenMissing?: boolean;
-		invalidateOnWidthChange?: boolean;
-		invalidateOnHeightChange?: boolean;
-	};
 }
 
 /**
  * @internal Normalized form of CellRendererCapabilities produced by ColumnModel.normalizeColumn —
- * scrollPresentation is always resolved to a concrete mode (never undefined).
+ * `scroll` is always resolved (never undefined).
  */
 export interface NormalizedCellRendererCapabilities extends CellRendererCapabilities {
-	scrollPresentation: CellScrollPresentation;
+	scroll: CellScrollPresentation;
+	/** A React renderer updated through its ref (`renderer.kind: 'imperativeReact'`), bypassing React's scheduler. */
+	imperative?: boolean;
 }
 
-/**
- * Grid-level renderer policy — global virtualization behavior, budgets, and caches for the scroll
- * presentation modes. Deliberately NOT part of ColumnDef: windowing/budget/cache policy is a grid-
- * wide concern, not a per-column one.
- */
 /** What an aggregate renderer receives. */
 export interface AggregateRendererParams<TRowData = unknown> {
 	value: unknown;
@@ -160,29 +109,22 @@ export interface DomAggregateRenderer<TRowData = unknown> {
 	): { update?(params: AggregateRendererParams<TRowData>): void; destroy?(): void } | void;
 }
 
+/**
+ * Grid-level renderer policy — global virtualization behavior and budgets for the scroll
+ * presentation modes. Deliberately NOT part of ColumnDef: windowing/budget policy is a grid-wide
+ * concern, not a per-column one.
+ */
 export interface GridRendererOptions {
-	/** Per-frame budget for DOM renderers updating in place during scroll (`scrollPresentation: 'update'`). */
-	domUpdate?: {
-		/** Milliseconds of in-frame DOM renderer work allowed per frame before cells fall back to a stand-in. Default 4. */
+	/** Budgets for `scroll: 'live'` renderer columns. */
+	live?: {
+		/** DOM renderers: milliseconds of in-frame renderer work allowed per frame before cells show stand-in text. Default 4. */
 		maxMsPerFrame?: number;
-	};
-	liveReact?: {
+		/** React renderers: fresh mounts allowed per frame. */
+		maxMountsPerFrame?: number;
+		/** React renderers: updates allowed per frame. */
+		maxUpdatesPerFrame?: number;
 		rowOverscan?: number;
 		columnOverscan?: number;
-		maxMountsPerFrame?: number;
-		maxUpdatesPerFrame?: number;
-		allowEmergencyShell?: boolean;
-	};
-	htmlSnapshot?: {
-		maxSnapshots?: number;
-		maxTotalBytes?: number;
-		maxSingleSnapshotBytes?: number;
-		defaultStrict?: boolean;
-		allowShellWhenMissing?: boolean;
-		allowTextFallbackWhenMissing?: boolean;
-	};
-	textImpostor?: {
-		allowRawValueFallback?: boolean;
 	};
 	/** Full-width rows (detail rows, full-width group rows) entering during scroll. */
 	fullWidth?: {
@@ -193,7 +135,7 @@ export interface GridRendererOptions {
 
 // ─── Imperative handle ────────────────────────────────────────────────────────
 
-/** Exposed via forwardRef on renderers with capabilities.live.update === 'imperative' */
+/** Exposed via forwardRef on renderers with kind 'imperativeReact' */
 export interface ImperativeCellHandle<TRowData = unknown> {
 	update(params: CellRendererProps<TRowData>): void;
 }
@@ -271,6 +213,11 @@ export type ColumnRendererSpec<TRowData = unknown> =
 	| { kind: 'text' }
 	| { kind: 'dom'; renderer: DomCellRenderer<TRowData>; capabilities?: CellRendererCapabilities }
 	| { kind: 'react'; component: unknown; capabilities?: CellRendererCapabilities }
+	/**
+	 * A React renderer updated through `ref.current.update()` (`ImperativeCellHandle`), bypassing React's
+	 * scheduler entirely — the component must be a forwardRef exposing the handle. Ideal for real-time
+	 * feeds (tick data, live prices). Always `scroll: 'live'`.
+	 */
 	| { kind: 'imperativeReact'; component: unknown; capabilities?: CellRendererCapabilities };
 
 // ─── Column render plan (produced by ColumnModel) ─────────────────────────────
@@ -278,10 +225,10 @@ export type ColumnRendererSpec<TRowData = unknown> =
 export type ColumnRenderMode =
 	| 'primitive' // No renderer; raw/text value only
 	| 'primitive-formatted' // No renderer; value goes through a getter or formatter
-	| 'custom-live' // React portal mounted/updated every scroll frame (scrollPresentation:'live')
+	| 'custom-live' // React portal mounted/updated every scroll frame (scroll:'live')
 	| 'custom' // React portal frozen/impostor'd during scroll; refreshed only on data change
 	| 'custom-dom' // DomCellRenderer — direct DOM manipulation, no React overhead
-	| 'custom-imperative' // React portal with scrollPresentation:'live', live.update:'imperative'
+	| 'custom-imperative' // React portal updated imperatively (kind 'imperativeReact')
 	| 'loading'; // Loading skeleton row
 
 export interface ColumnRenderPlan<TData = unknown> {

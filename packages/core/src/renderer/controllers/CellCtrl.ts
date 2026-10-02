@@ -1,4 +1,4 @@
-import type { CellScrollPresentation, ColumnInstanceId } from '../../columnDef.js';
+import type { ColumnInstanceId } from '../../columnDef.js';
 import type { CellDisplaySnapshot } from '../cellDisplaySnapshot.js';
 import type { CellContentMode } from '../cellSlot.js';
 import type { VisualFreshness } from '../visualFreshness.js';
@@ -18,33 +18,19 @@ export interface ControllerWorkToken {
 }
 
 export interface CellCtrlPresentationState {
-	kind:
-		| 'buffered'
-		| 'primitive'
-		| 'loading'
-		| 'checkbox-selector'
-		| 'live-renderer'
-		| 'dom-update'
-		| 'frozen-portal'
-		| 'shell'
-		| 'text-impostor'
-		| 'html-snapshot'
-		| 'html-pending';
+	kind: 'buffered' | 'primitive' | 'loading' | 'checkbox-selector' | 'live-renderer' | 'dom-update' | 'frozen-portal' | 'shell';
 	className: string;
 	title?: string | null;
 	validationError?: string;
 	contentMode?: CellContentMode;
 	formattedValue?: string;
 	portalKey?: string;
-	html?: string;
 	requiresFidelity: boolean;
 	markDirty?: boolean;
 	isEditing?: boolean;
 	isFocused?: boolean;
 	forceLiveInteractive?: boolean;
 	keepVersionFresh?: boolean;
-	captureFrozenHtml?: boolean;
-	textImpostorSource?: 'explicit' | 'fallback';
 	recordVersions?: VisualFreshness | CellDisplaySnapshot;
 	freshness: VisualFreshness;
 }
@@ -79,7 +65,6 @@ export interface CellCtrl {
 	readonly field: string;
 	readonly colField: string;
 	colIndex: number;
-	scrollPresentation: CellScrollPresentation;
 	freshness: VisualFreshness | undefined;
 
 	valueState: {
@@ -130,7 +115,6 @@ export interface CreateCellCtrlInput {
 	colId?: string;
 	colField: string;
 	colIndex?: number;
-	scrollPresentation?: CellScrollPresentation;
 	freshness?: VisualFreshness;
 }
 
@@ -167,7 +151,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 		field: input.colField,
 		colField: input.colField,
 		colIndex: input.colIndex ?? -1,
-		scrollPresentation: input.scrollPresentation ?? 'primitive',
 		freshness: input.freshness,
 		valueState: {
 			value: undefined,
@@ -213,7 +196,6 @@ export function rekeyCellCtrl(cellCtrl: CellCtrl, input: CreateCellCtrlInput): v
 	target.rowIndex = input.rowIndex ?? -1;
 	target.rowCtrlKey = input.rowCtrlKey ?? input.rowId;
 	target.colIndex = input.colIndex ?? -1;
-	target.scrollPresentation = input.scrollPresentation ?? 'primitive';
 	target.freshness = input.freshness;
 	const value = target.valueState;
 	value.value = undefined;

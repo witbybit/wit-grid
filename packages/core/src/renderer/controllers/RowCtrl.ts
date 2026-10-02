@@ -1,4 +1,4 @@
-import type { CellScrollPresentation, ColumnInstanceId } from '../../columnDef.js';
+import type { ColumnInstanceId } from '../../columnDef.js';
 import type { VisualFreshness } from '../visualFreshness.js';
 import type { CellControllerKey, CellCtrl } from './CellCtrl.js';
 import { CellCtrlStore } from './CellCtrlStore.js';
@@ -19,7 +19,6 @@ export interface CellCtrlMetadata {
 	colId?: string;
 	colField: string;
 	colIndex?: number;
-	scrollPresentation?: CellScrollPresentation;
 	freshness?: VisualFreshness;
 }
 
@@ -49,7 +48,6 @@ export function getOrCreateCellCtrl<TRowData>(
 		colId: metadata.colId,
 		colField: metadata.colField,
 		colIndex: metadata.colIndex,
-		scrollPresentation: metadata.scrollPresentation,
 		freshness: metadata.freshness,
 	});
 	rowCtrl.cellKeysByColumnInstanceId.set(columnInstanceId, result.cellCtrl.key);

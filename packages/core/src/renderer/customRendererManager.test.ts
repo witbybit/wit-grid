@@ -152,7 +152,7 @@ describe('CustomRendererManager – scroll state is opt-in', () => {
 		};
 		const parent = document.createElement('div');
 		const base = acquireParams(0, 0, parent);
-		const col = { field: 'c0', cellRendererCapabilities: { scrollPresentation: 'freeze', ...(scrollState ? { scrollState: true } : {}) } } as any;
+		const col = { field: 'c0', cellRendererCapabilities: { scroll: 'text', ...(scrollState ? { scrollState: true } : {}) } } as any;
 		manager.acquire({ ...base, col, isScrolling: true, phase: 'scroll' });
 		notifications = 0;
 		// Scroll ends: only isScrolling and phase change.

@@ -25,8 +25,6 @@ const columns: ColumnDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_,
 		...base,
 		renderer: {
 			kind: 'dom' as const,
-			// ?domLive=1 opts the DOM renderers into live in-frame updates during scroll.
-			...(new URLSearchParams(location.search).get('domLive') === '1' ? { capabilities: { scrollPresentation: 'live' as const } } : {}),
 			renderer: {
 				mount(el: HTMLElement, params: { value: unknown }) {
 					const { bar, label } = createBarElements(el);

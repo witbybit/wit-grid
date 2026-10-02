@@ -3,12 +3,10 @@ import type { RowNode } from '../../rowNode.js';
 import type { CellCtrl, ControllerWorkToken } from '../controllers/CellCtrl.js';
 import { isControllerWorkStillValid } from '../controllers/CellCtrl.js';
 import type { RowCellBinderDeps } from '../rowCellBinder.js';
-import type { CellSlot } from '../cellSlot.js';
 
 export type RendererMountReason = 'scroll-live' | 'scroll-force-live' | 'full-bind';
 export type RendererUpdateReason = 'scroll-live' | 'full-bind' | 'fidelity';
 export type RendererReleaseReason = 'scrolled-out' | 'destroyed' | 'edited' | 'invalidated';
-export type HtmlCaptureReason = 'freeze' | 'full-bind';
 
 export interface CellRendererLifecycle<TRowData = unknown> {
 	mountLive(input: {
@@ -59,18 +57,6 @@ export interface CellRendererLifecycle<TRowData = unknown> {
 	}): void;
 	/** `portalKey` names the portal to release when it differs from the cell's current binding key. */
 	release(input: { reason: RendererReleaseReason; cellElement?: HTMLDivElement; portalKey?: string }): void;
-	captureHtml(input: {
-		cellCtrl: CellCtrl;
-		host: HTMLElement;
-		reason: HtmlCaptureReason;
-		token: ControllerWorkToken;
-		/** The host's already-serialized innerHTML, when the caller just read it — avoids a second
-		 *  full-subtree serialization. Omitted means read `host.innerHTML` here. */
-		html?: string;
-		colField: string;
-		rowHeight?: number;
-		colWidth?: number;
-	}): void;
 }
 
 export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TRowData>): CellRendererLifecycle<TRowData> {
@@ -136,27 +122,6 @@ export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TR
 		},
 		release({ reason, cellElement, portalKey }) {
 			if (cellElement) deps.releaseCellPortal(cellElement, false, reason, portalKey);
-		},
-		captureHtml({ cellCtrl, host, token, colField, rowHeight, colWidth, html: serializedHtml }) {
-			if (!isControllerWorkStillValid({ token, cellCtrl, attachedSlotInstanceId: cellCtrl.lifecycle.attachedSlotInstanceId })) return;
-			const html = serializedHtml ?? host.innerHTML;
-
-			if (!html) return;
-			if (deps.engine.htmlScrollSnapshots.createSnapshot) {
-				deps.engine.htmlScrollSnapshots.set(
-					deps.engine.htmlScrollSnapshots.createSnapshot({
-						rowId: cellCtrl.rowId,
-						columnInstanceId: cellCtrl.columnInstanceId,
-						colField,
-						html,
-						freshness: token.freshness,
-						rowHeight,
-						colWidth,
-					})
-				);
-			} else {
-				deps.engine.htmlScrollSnapshots.set(cellCtrl.rowId, cellCtrl.columnInstanceId, html, token.freshness, rowHeight, colWidth);
-			}
 		},
 	};
 }

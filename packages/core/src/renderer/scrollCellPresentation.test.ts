@@ -31,10 +31,7 @@ it('BOUNDARY: scrollCellPresentation.ts must not import RowCellBinderDeps or any
 function makeDeps(overrides: Partial<ScrollCellPresentationDeps> = {}): ScrollCellPresentationDeps {
 	return {
 		getCellPortalHost: vi.fn(() => null),
-		getRowHeight: vi.fn(() => 40),
-		getColWidth: vi.fn(() => 100),
 		getCheapDisplayValue: vi.fn(() => ''),
-		getFrozenHtmlSnapshot: vi.fn(() => undefined),
 		...overrides,
 	};
 }
@@ -100,7 +97,7 @@ describe('resolveScrollCellPresentation', () => {
 		expect(presentation.markDirty).toBe(true);
 	});
 
-	it('resolves a fresh custom-live snapshot for a portal-capable column to an impostor variant, not a live mount', () => {
+	it('resolves a fresh custom-live snapshot for a portal-capable column to its stand-in text, not a live mount', () => {
 		const snapshot = {
 			rowId: 'r1',
 			colField: 'name',
@@ -128,141 +125,27 @@ describe('resolveScrollCellPresentation', () => {
 				snapshot,
 			})
 		);
-		expect(presentation.kind).toBe('text-impostor');
-		if (presentation.kind !== 'text-impostor') throw new Error('unreachable');
+		expect(presentation.kind).toBe('primitive');
+		if (presentation.kind !== 'primitive') throw new Error('unreachable');
 		expect(presentation.formattedValue).toBe('Fallback name');
-		expect(presentation.source).toBe('fallback');
 	});
 
-	it('resolves to impostor-html when a matching frozen HTML snapshot is available for this identity', () => {
-		const snapshot = {
-			rowId: 'r1',
-			colField: 'name',
-			rowVersion: 3,
-			globalVersion: 7,
-			insightVersion: 0,
-			styleVersion: 0,
-			loadingVersion: 0,
-			selectionVersion: 0,
-			baseClassName: 'og-cell',
-			stateClassName: '',
-			decorationClassName: '',
-			classTokens: ['og-cell'],
-			className: 'og-cell',
-			contentKind: 'impostor' as const,
-			contentMode: 'fallback' as const,
-			formattedValue: 'Fallback name',
-			title: '',
-		};
-		const deps = makeDeps({
-			getRowHeight: () => 40,
-			getFrozenHtmlSnapshot: (rowId, colField, expected) =>
-				rowId === 'r1' && colField === 'name' && expected.rowVersion === 3 ? { html: '<span>frozen</span>' } : undefined,
-		});
+	it("applies scrollText to a DOM renderer's over-budget stand-in", () => {
+		const scrollText = vi.fn(({ formattedValue }: { formattedValue: string }) => `chip:${formattedValue}`);
 		const presentation = resolveScrollCellPresentation(
-			deps,
+			makeDeps({ getCheapDisplayValue: () => 'Name 1' }),
 			baseInput({
 				col: {
 					field: 'name',
-					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'html-snapshot' },
+					cellRenderer: { mount: () => ({ update() {} }) },
+					cellRendererCapabilities: { scroll: 'live', scrollText },
 				} as any,
-				ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
-				snapshot,
+				ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom-dom' }] } } as any,
 			})
 		);
-		expect(presentation.kind).toBe('html-snapshot');
-		if (presentation.kind !== 'html-snapshot') throw new Error('unreachable');
-		expect(presentation.frozenHtml).toBe('<span>frozen</span>');
-	});
-
-	it('falls back to impostor-text when the frozen HTML snapshot is missing and allowTextFallbackWhenMissing is set', () => {
-		const snapshot = {
-			rowId: 'r1',
-			colField: 'name',
-			rowVersion: 3,
-			globalVersion: 7,
-			insightVersion: 0,
-			styleVersion: 0,
-			loadingVersion: 0,
-			selectionVersion: 0,
-			baseClassName: 'og-cell',
-			stateClassName: '',
-			decorationClassName: '',
-			classTokens: ['og-cell'],
-			className: 'og-cell',
-			contentKind: 'impostor' as const,
-			contentMode: 'fallback' as const,
-			formattedValue: 'Fallback name',
-			title: '',
-		};
-		const deps = makeDeps({
-			getRowHeight: () => 60, // row has been resized since the HTML was captured at height 40
-			// The row-height gate now lives inside the store (via the rowHeight arg) — this mock
-			// stands in for a store that refuses a stale-height capture, exactly as the real
-			// HtmlScrollSnapshotStore does.
-			getFrozenHtmlSnapshot: (_rowId, _colField, _expected, rowHeight) => (rowHeight === 40 ? { html: '<span>frozen</span>' } : undefined),
-		});
-		const presentation = resolveScrollCellPresentation(
-			deps,
-			baseInput({
-				col: {
-					field: 'name',
-					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'html-snapshot', htmlSnapshot: { allowTextFallbackWhenMissing: true } },
-				} as any,
-				ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
-				snapshot,
-			})
-		);
-		expect(presentation.kind).toBe('text-impostor');
-		if (presentation.kind !== 'text-impostor') throw new Error('unreachable');
-		expect(presentation.source).toBe('fallback');
-	});
-
-	it('shows the cell text when the frozen HTML snapshot is missing; a strict column keeps the pending shell', () => {
-		const snapshot = {
-			rowId: 'r1',
-			colField: 'name',
-			rowVersion: 3,
-			globalVersion: 7,
-			insightVersion: 0,
-			styleVersion: 0,
-			loadingVersion: 0,
-			selectionVersion: 0,
-			baseClassName: 'og-cell',
-			stateClassName: '',
-			decorationClassName: '',
-			classTokens: ['og-cell'],
-			className: 'og-cell',
-			contentKind: 'impostor' as const,
-			contentMode: 'fallback' as const,
-			formattedValue: 'Fallback name',
-			title: '',
-		};
-		const resolve = (htmlSnapshot: Record<string, unknown> | undefined, defaultStrict = false) =>
-			resolveScrollCellPresentation(
-				makeDeps({
-					getFrozenHtmlSnapshot: () => undefined,
-					getCheapDisplayValue: () => 'Name 1',
-					getHtmlSnapshotDefaults: () => ({ allowShellWhenMissing: true, allowTextFallbackWhenMissing: true, defaultStrict }),
-				}),
-				baseInput({
-					col: {
-						field: 'name',
-						cellRenderer: () => null,
-						cellRendererCapabilities: { scrollPresentation: 'html-snapshot', ...(htmlSnapshot ? { htmlSnapshot } : {}) },
-					} as any,
-					ctx: { ...baseInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
-					snapshot,
-				})
-			);
-		const byDefault = resolve(undefined);
-		expect(byDefault.kind).toBe('text-impostor');
-		expect((byDefault as { formattedValue?: string }).formattedValue).not.toBe('');
-		expect(resolve({ strict: true }).kind).toBe('html-pending');
-		expect(resolve(undefined, true).kind).toBe('html-pending');
-		expect(resolve({ allowTextFallbackWhenMissing: false }).kind).toBe('html-pending');
+		expect(presentation.kind).toBe('dom-update');
+		if (presentation.kind !== 'dom-update') throw new Error('unreachable');
+		expect(presentation.formattedValue).toBe('chip:Name 1');
 	});
 
 	it('BLOCKER: never mounts a cold portal-capable cell during normal (non-editing, non-focused) active scroll', () => {
@@ -281,7 +164,7 @@ describe('resolveScrollCellPresentation', () => {
 		expect(presentation.kind).not.toBe('portal-mount');
 		expect(presentation.kind).not.toBe('live-renderer');
 		// Must degrade to a deterministic, non-mounting placeholder/impostor instead.
-		expect(['shell', 'text-impostor', 'html-snapshot', 'primitive']).toContain(presentation.kind);
+		expect(['shell', 'dom-update', 'primitive']).toContain(presentation.kind);
 	});
 
 	it('BLOCKER: an actively-focused portal-capable cell with no snapshot and no live content uses the explicit force-live exception, not the generic portal-mount case', () => {

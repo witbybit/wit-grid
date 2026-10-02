@@ -72,14 +72,14 @@ function createAuditColumns(count = 1200): ColumnDef<AuditPerfRow>[] {
 			header: 'Microservice',
 			width: 140,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 		},
 		{
 			field: 'rendererLive',
 			header: 'Live Rebind',
 			width: 170,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 			valueGetter: ({ row }) => `live|${row.service}`,
 		},
 		{
@@ -87,7 +87,7 @@ function createAuditColumns(count = 1200): ColumnDef<AuditPerfRow>[] {
 			header: 'Defer Stable',
 			width: 170,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 			valueGetterDependencies: ['severity'],
 			valueGetter: ({ row }) => `defer|${row.severity}`,
 		},
@@ -96,14 +96,14 @@ function createAuditColumns(count = 1200): ColumnDef<AuditPerfRow>[] {
 			header: 'Severity',
 			width: 120,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 		},
 		{
 			field: 'rendererFallback',
 			header: 'Fallback Cache',
 			width: 175,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 			valueGetterDependencies: ['latencyMs'],
 			valueGetter: ({ row }) => `fallback|${row.latencyMs}ms`,
 		},
@@ -112,7 +112,7 @@ function createAuditColumns(count = 1200): ColumnDef<AuditPerfRow>[] {
 			header: 'Destroy Recycle',
 			width: 180,
 			cellRenderer: renderer,
-			cellRendererCapabilities: { scrollPresentation: 'freeze' },
+			cellRendererCapabilities: { scroll: 'text' },
 			valueGetterDependencies: ['ipAddress'],
 			valueGetter: ({ row }) => `destroy|${row.ipAddress}`,
 		},
@@ -129,7 +129,7 @@ function createAuditColumns(count = 1200): ColumnDef<AuditPerfRow>[] {
 			...(index % 7 === 0
 				? {
 						cellRenderer: renderer,
-						cellRendererCapabilities: { scrollPresentation: 'freeze' as const },
+						cellRendererCapabilities: { scroll: 'text' as const },
 					}
 				: {}),
 			...(index % 11 === 0
@@ -744,9 +744,9 @@ describe('Server demo ruthless runtime performance contracts', () => {
 		cleanupGrid(grid);
 	}, 20_000);
 
-	it("BLOCKER: with scrollPresentation 'freeze', a cold, never-before-seen DOM-renderer cell never mounts during active scroll", async () => {
-		// DOM renderers default to 'update' (drawn in place within a frame budget — see
-		// domUpdatePresentation.e2e.test.ts). An explicit 'freeze' keeps this original guarantee.
+	it("BLOCKER: with scroll 'text', a cold, never-before-seen DOM-renderer cell never mounts during active scroll", async () => {
+		// DOM renderers default to 'live' (drawn in place within a frame budget — see
+		// dom-live presentation e2e test). An explicit 'text' keeps this original guarantee.
 		// mode:'custom-dom' is NOT in the impostor-capable set (custom-live/custom-imperative/custom) —
 		// this is the real compiled-plan shape for any column using a DOM cell renderer. Scrolling a
 		// never-before-visited window of such columns into view previously fell through to a synchronous
@@ -778,7 +778,7 @@ describe('Server demo ruthless runtime performance contracts', () => {
 							return { update: () => {}, destroy: () => {} };
 						},
 					} as any,
-					capabilities: { scrollPresentation: 'freeze' },
+					capabilities: { scroll: 'text' },
 				},
 			},
 		];
@@ -1226,7 +1226,7 @@ describe('Server demo ruthless runtime performance contracts', () => {
 				header: `Col ${i}`,
 				width: 120 + (i % 4) * 20,
 				cellRenderer: () => null,
-				cellRendererCapabilities: { scrollPresentation: 'freeze' as const },
+				cellRendererCapabilities: { scroll: 'text' as const },
 				valueGetter: i % 5 === 0 ? ({ row }: { row: AuditPerfRow }) => `m${i}|${row.severity}` : undefined,
 			};
 		});

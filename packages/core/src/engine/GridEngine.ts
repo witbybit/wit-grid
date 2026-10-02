@@ -86,7 +86,6 @@ import type { GridCommitResult as InternalGridCommitResult } from './GridChangeA
 import { GridDomainSubscriptionHub } from './GridDomainSubscriptionHub.js';
 import { normalizeInitialActiveEdit, normalizeInitialSelection } from './normalizeInitialInteractionState.js';
 import { CellDisplaySnapshotStore, type CellDisplaySnapshot } from '../renderer/cellDisplaySnapshot.js';
-import { HtmlScrollSnapshotStore } from '../renderer/htmlScrollSnapshotStore.js';
 import { RowCtrlStore } from '../renderer/controllers/RowCtrlStore.js';
 import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
 import { mapRowsUpdatedDispatchPayload, type PublicRowNodeDispatchDeps } from './publicRowNodeDispatch.js';
@@ -259,7 +258,6 @@ export class GridEngine<TRowData = unknown> {
 	// Per-row version map for zero-allocation mutation tracking.
 	public readonly rowVersions = new Map<string, number>();
 	public readonly cellDisplaySnapshots = new CellDisplaySnapshotStore();
-	public readonly htmlScrollSnapshots: HtmlScrollSnapshotStore;
 	/** Owns RowCtrl/CellCtrl semantic identity — see controllers/RowCtrlStore.ts. */
 	public readonly rowCtrls = new RowCtrlStore<TRowData>();
 	/** Grid-wide scroll presentation policy — see columnDef.ts's GridRendererOptions. */
@@ -297,10 +295,6 @@ export class GridEngine<TRowData = unknown> {
 		this.getContainerElement = config.getContainerElement ?? (() => null);
 		this.rendererOptions = config.rendererOptions;
 		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
-		this.htmlScrollSnapshots = new HtmlScrollSnapshotStore(config.rendererOptions?.htmlSnapshot?.maxTotalBytes, {
-			maxEntries: config.rendererOptions?.htmlSnapshot?.maxSnapshots,
-			maxSingleEntryBytes: config.rendererOptions?.htmlSnapshot?.maxSingleSnapshotBytes,
-		});
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
 		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows

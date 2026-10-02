@@ -121,9 +121,6 @@ export interface RenderStats {
 	liveReactEmergencyShellsDuringScroll?: number;
 	domUpdatesDuringScroll?: number;
 	domUpdatesDeferredDuringScroll?: number;
-	htmlSnapshotHitsDuringScroll?: number;
-	htmlSnapshotMissesDuringScroll?: number;
-	textImpostorUsesDuringScroll?: number;
 	cellSlotsRetained?: number;
 	cellSlotsEvictedDuringTopology?: number;
 	cellSlotsCreatedDuringTopology?: number;
@@ -240,9 +237,6 @@ export function createEmptyRenderStats(): RenderStats {
 		liveReactEmergencyShellsDuringScroll: 0,
 		domUpdatesDuringScroll: 0,
 		domUpdatesDeferredDuringScroll: 0,
-		htmlSnapshotHitsDuringScroll: 0,
-		htmlSnapshotMissesDuringScroll: 0,
-		textImpostorUsesDuringScroll: 0,
 		cellSlotsRetained: 0,
 		cellSlotsEvictedDuringTopology: 0,
 		cellSlotsCreatedDuringTopology: 0,
@@ -288,7 +282,7 @@ export interface RenderRuntimeStats {
 	styleHookCallsDuringScroll: number;
 	integrityComputesDuringScroll: number;
 	forceLiveMountsDuringScroll: number;
-	/** scrollPresentation:'live' mounts/updates during scroll — see renderer/rowCellBinder.ts. */
+	/** `scroll: 'live'` mounts/updates during scroll — see renderer/rowCellBinder.ts. */
 	liveReactMountsDuringScroll: number;
 	/** Live-mode work admitted for cells that were in the overscan band rather than the visible
 	 *  viewport. Counted when the scroll-time live path actually executes for an overscan cell. */
@@ -297,15 +291,12 @@ export interface RenderRuntimeStats {
 	 *  separately from liveReactMountsDuringScroll by liveFrameBudget.ts. */
 	liveReactUpdatesDuringScroll: number;
 	/** A live-mount was deferred to a shell/pending placeholder because maxMountsPerFrame was
-	 *  exhausted this frame (see liveFrameBudget.ts, GridRendererOptions.liveReact). */
+	 *  exhausted this frame (see liveFrameBudget.ts, GridRendererOptions.live). */
 	liveReactEmergencyShellsDuringScroll: number;
-	/** DOM renderer cells updated in place during scroll (`scrollPresentation: 'update'`). */
+	/** DOM renderer cells updated in place during scroll (`scroll: 'live'` on a DOM renderer). */
 	domUpdatesDuringScroll: number;
 	/** DOM renderer cells the frame's DOM-update budget refused (stand-in until scroll settles). */
 	domUpdatesDeferredDuringScroll: number;
-	htmlSnapshotHitsDuringScroll: number;
-	htmlSnapshotMissesDuringScroll: number;
-	textImpostorUsesDuringScroll: number;
 	cellSlotsRetained: number;
 	cellSlotsEvictedDuringTopology: number;
 	cellSlotsCreatedDuringTopology: number;
@@ -381,9 +372,6 @@ export function createRenderRuntimeStats(): RenderRuntimeStats {
 		liveReactEmergencyShellsDuringScroll: 0,
 		domUpdatesDuringScroll: 0,
 		domUpdatesDeferredDuringScroll: 0,
-		htmlSnapshotHitsDuringScroll: 0,
-		htmlSnapshotMissesDuringScroll: 0,
-		textImpostorUsesDuringScroll: 0,
 		cellSlotsRetained: 0,
 		cellSlotsEvictedDuringTopology: 0,
 		cellSlotsCreatedDuringTopology: 0,

@@ -10,11 +10,9 @@ import { RenderEngine } from './renderEngine.js';
 import { CellSlot } from './cellSlot.js';
 import { RowCtrlStore } from './controllers/RowCtrlStore.js';
 import { getOrCreateCellCtrl } from './controllers/RowCtrl.js';
-import { createCellCtrl } from './controllers/CellCtrl.js';
 import { resolveScrollCellPresentation, type ScrollCellPresentationDeps, type ScrollCellPresentationInput } from './scrollCellPresentation.js';
 import { bindCellDuringScroll, bindCellFull, type RowCellBinderDeps } from './rowCellBinder.js';
 import { resolveRowPresentation } from './rowPresentationResolver.js';
-import { applySnapshotCellPresentation as applyHtmlSnapshotCellPresentation } from './binders/snapshotCellBinder.js';
 import { isOverscanLiveCell } from './binders/binderShared.js';
 import { createCellDisplaySnapshot, CellDisplaySnapshotStore, MAX_CELL_DISPLAY_SNAPSHOT_CAPACITY } from './cellDisplaySnapshot.js';
 import { DataModel } from '../models/DataModel.js';
@@ -135,10 +133,7 @@ describe('CellCtrl / RowCtrl lifetime is bounded by the rendered window', () => 
 function makeScrollDeps(overrides: Partial<ScrollCellPresentationDeps> = {}): ScrollCellPresentationDeps {
 	return {
 		getCellPortalHost: vi.fn(() => null),
-		getRowHeight: vi.fn(() => 40),
-		getColWidth: vi.fn(() => 100),
 		getCheapDisplayValue: vi.fn(() => ''),
-		getFrozenHtmlSnapshot: vi.fn(() => undefined),
 		...overrides,
 	};
 }
@@ -316,7 +311,7 @@ describe('scroll presentation fixes', () => {
 		}
 	});
 
-	it('explicit text-impostor columns reuse the full-bind impostor text from a fresh snapshot', () => {
+	it('text columns reuse the full-bind stand-in text from a fresh snapshot', () => {
 		const render = vi.fn(({ formattedValue }: { formattedValue: string }) => `chip:${formattedValue}`);
 		const snapshot = createCellDisplaySnapshot({
 			rowId: 'r1',
@@ -340,17 +335,17 @@ describe('scroll presentation fixes', () => {
 				col: {
 					field: 'name',
 					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'text-impostor', textImpostor: { render } },
+					cellRendererCapabilities: { scroll: 'text', scrollText: render },
 				} as any,
 				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
 			})
 		);
-		if (presentation.kind !== 'text-impostor') throw new Error('unreachable');
+		if (presentation.kind !== 'primitive') throw new Error('unreachable');
 		expect(presentation.formattedValue).toBe('chip:Formatted Name');
 		expect(render).not.toHaveBeenCalled();
 	});
 
-	it('explicit text-impostor without a snapshot hands the renderer the real field value', () => {
+	it('scrollText without a snapshot is handed the real field value', () => {
 		const render = vi.fn(({ value }: { value: unknown }) => `v:${String(value)}`);
 		const presentation = resolveScrollCellPresentation(
 			makeScrollDeps({ getCheapDisplayValue: () => 'Name 1', hasFormula: () => false }),
@@ -358,13 +353,14 @@ describe('scroll presentation fixes', () => {
 				col: {
 					field: 'name',
 					cellRenderer: () => null,
-					cellRendererCapabilities: { scrollPresentation: 'text-impostor', textImpostor: { render } },
+					cellRendererCapabilities: { scroll: 'text', scrollText: render },
 				} as any,
 				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
 			})
 		);
-		if (presentation.kind !== 'text-impostor') throw new Error('unreachable');
+		if (presentation.kind !== 'shell') throw new Error('unreachable');
 		expect(render).toHaveBeenCalledWith({ value: 'Name 1', formattedValue: 'Name 1' });
+		expect(presentation.formattedValue).toBe('v:Name 1');
 	});
 });
 
@@ -407,7 +403,6 @@ function fullBindEngine(data: Record<string, unknown>, rowVersion = 1) {
 		selectionVersion: 0,
 		rowVersions: { get: vi.fn(() => rowVersion) },
 		cellDisplaySnapshots: { get: vi.fn(() => undefined), set: vi.fn() },
-		htmlScrollSnapshots: { get: vi.fn(() => undefined), set: vi.fn() } as any,
 		data,
 		hasFormula: vi.fn(() => false),
 		getCheapDisplayValue: vi.fn(() => ''),
@@ -464,7 +459,7 @@ describe('value formatter inputs and caching', () => {
 	});
 });
 
-describe('custom-dom scrollPresentation', () => {
+describe('custom-dom scroll presentation', () => {
 	function bindDomCell(capabilities: Record<string, unknown> | undefined) {
 		const mountCellImmediately = vi.fn();
 		const cellSlot = new CellSlot(document.createElement('div'));
@@ -506,15 +501,15 @@ describe('custom-dom scrollPresentation', () => {
 		return { mountCellImmediately, cellSlot };
 	}
 
-	it('honours an explicit scrollPresentation:"live" by updating the DOM renderer in-frame', () => {
-		const { mountCellImmediately, cellSlot } = bindDomCell({ scrollPresentation: 'live' });
+	it('updates a DOM renderer in-frame by default (scroll live)', () => {
+		const { mountCellImmediately, cellSlot } = bindDomCell(undefined);
 		expect(mountCellImmediately).toHaveBeenCalledTimes(1);
 		expect(mountCellImmediately.mock.calls[0][0]).toMatchObject({ value: 42, isScrolling: true });
 		expect(cellSlot.lastContentMode).toBe('portal');
 	});
 
-	it('keeps the default (freeze) for DOM renderers without an explicit live presentation', () => {
-		const { mountCellImmediately } = bindDomCell({ scrollPresentation: 'freeze' });
+	it('never mounts a cold DOM renderer cell during scroll when it opts into scroll text', () => {
+		const { mountCellImmediately } = bindDomCell({ scroll: 'text' });
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 	});
 });
@@ -568,41 +563,6 @@ describe('DOM write reductions', () => {
 		expect(slot.contentElement.textContent).toBe('Bob');
 		slot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', 'empty', undefined, '');
 		expect(slot.contentElement.childNodes.length).toBe(0);
-	});
-
-	it('html-snapshot binds skip rewriting the host when it still holds the same HTML', () => {
-		const cellSlot = new CellSlot(document.createElement('div'));
-		const host = cellSlot.getOrCreatePortalHost();
-		const cellCtrl = createCellCtrl('r1', 'coli1' as any, 'name');
-		cellCtrl.presentationState = {
-			kind: 'html-snapshot',
-			className: 'og-cell',
-			html: '<b>frozen</b>',
-			requiresFidelity: true,
-			freshness: cellCtrl.presentationState.freshness,
-		};
-		const deps = makeBinderDeps({}, { ensureCellPortalHost: () => host });
-		const input = {
-			deps,
-			cellCtrl,
-			rowCtrl: {} as any,
-			cellSlot,
-			viewportPlan: null,
-			geometry: { rowIndex: 0, colIndex: 0, left: 0, right: -1, width: 100, dragShift: 0, lane: 'center' as const },
-			runtime: { globalVersion: 1, rowSlotId: 'slot-1', slotGeneration: 0 },
-			phase: 'scroll' as const,
-			rowVersion: 1,
-		};
-		applyHtmlSnapshotCellPresentation(input);
-		const written = host.firstChild;
-		expect(host.innerHTML).toBe('<b>frozen</b>');
-		applyHtmlSnapshotCellPresentation(input);
-		expect(host.firstChild).toBe(written);
-
-		// Anything else touching the host forces a rewrite.
-		host.innerHTML = '<i>live</i>';
-		applyHtmlSnapshotCellPresentation(input);
-		expect(host.innerHTML).toBe('<b>frozen</b>');
 	});
 });
 

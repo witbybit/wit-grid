@@ -1,3 +1,4 @@
+import type { InternalColumnDef } from '../../columnDef.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { PortalRendererHandle } from '../cellRendererHandle.js';
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
@@ -28,12 +29,14 @@ function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<
 	return isOverscanLiveCell(input.viewportPlan.liveCells.overscan, input.geometry.rowIndex, input.cellCtrl.columnInstanceId);
 }
 
-/** Renders the over-budget emergency shell for a live cell that couldn't be granted this frame's
- * budget: the cell's text, as the default stand-in shows, rather than a blank cell. */
+/** Renders the stand-in for a live cell that couldn't be granted this frame's budget: the cell's
+ * `scrollText` (else its cheap text), rather than a blank cell. */
 function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
-	const standIn = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
+	const cheap = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
+	const scrollText = (runtime.mount?.col as InternalColumnDef<TRowData> | undefined)?.cellRendererCapabilities?.scrollText;
+	const standIn = scrollText ? scrollText({ value: runtime.mount?.value, formattedValue: cheap }) || cheap : cheap;
 	deps.incrementLiveReactEmergencyShellsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
@@ -237,10 +240,8 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		// An over-budget update keeps the mounted content, unless the slot was just recycled to
 		// another row: that content is the previous row's, so it must not stay visible.
 		if (!isFreshMount && cellSlot.rowId === cellCtrl.rowId) return;
-		if (deps.allowLiveEmergencyShell?.() ?? true) {
-			applyLiveMountEmergencyShell(input);
-			return;
-		}
+		applyLiveMountEmergencyShell(input);
+		return;
 	}
 	if (input.phase === 'scroll') {
 		if (isFreshMount) deps.incrementLiveReactMountsDuringScroll?.();
@@ -279,17 +280,6 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	recordHeldPortal(cellSlot, presentation.portalKey!);
 	cellSlot.lastMountedRowVersion = rowVersion;
 	cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
-	if (input.phase === 'full-bind' && cellCtrl.scrollPresentation === 'html-snapshot') {
-		lifecycle.captureHtml({
-			cellCtrl,
-			host: ensuredPortalHost,
-			reason: 'full-bind',
-			token,
-			colField: cellCtrl.field,
-			rowHeight: runtime.rowHeight,
-			colWidth: runtime.colWidth,
-		});
-	}
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(

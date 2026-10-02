@@ -1453,7 +1453,7 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 				renderer: {
 					kind: 'react',
 					component: ProjectNameRenderer,
-					capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true } },
+					capabilities: { scroll: 'live' },
 				},
 			},
 			{
@@ -1463,7 +1463,7 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 				renderer: {
 					kind: 'react',
 					component: LocationRenderer,
-					capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true } },
+					capabilities: { scroll: 'live' },
 				},
 			},
 			{
@@ -1485,7 +1485,7 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 				renderer: {
 					kind: 'react',
 					component: ComplianceRenderer,
-					capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true } },
+					capabilities: { scroll: 'live' },
 				},
 			},
 			{
@@ -1508,7 +1508,7 @@ export default function ProjectsComplianceDemo({ onGridReady }: ProjectsComplian
 				renderer: {
 					kind: 'react',
 					component: ActionsRenderer,
-					capabilities: { scrollPresentation: 'live', live: { priority: 'high', allowEmergencyShell: true } },
+					capabilities: { scroll: 'live' },
 				},
 			},
 		],

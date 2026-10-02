@@ -31,7 +31,6 @@ import {
 } from './cellDisplaySnapshot.js';
 import type { VisualFreshness } from './visualFreshness.js';
 import type { ScrollCellPresentationDeps, ScrollCellPresentationInput } from './scrollCellPresentation.js';
-import { getCellScrollPresentation, isHtmlSnapshotPresentation, isTextImpostorPresentation } from './scrollPresentationMode.js';
 import {
 	dispatchCellPresentation,
 	type CellBindGeometry,
@@ -121,7 +120,7 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	incrementCellSlotRebinds?: () => void;
 	incrementIntegrityComputesDuringScroll?: () => void;
 	incrementForceLiveMountsDuringScroll?: () => void;
-	/** scrollPresentation:'live' fresh portal mounts during scroll — distinct from the rare
+	/** `scroll: 'live'` fresh portal mounts during scroll — distinct from the rare
 	 *  forceLiveMountsDuringScroll interactive exception (see scrollCellPresentation.ts), and from
 	 *  incrementLiveReactUpdatesDuringScroll (re-renders of an already-mounted live cell). */
 	incrementLiveReactMountsDuringScroll?: () => void;
@@ -130,12 +129,12 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	incrementLiveReactUpdatesDuringScroll?: () => void;
 	incrementLiveReactOverscanMountsDuringScroll?: () => void;
 	/** A live-mount was deferred to a shell/pending placeholder because the frame's mount budget was
-	 *  exhausted (see liveFrameBudget.ts, GridRendererOptions.liveReact). */
+	 *  exhausted (see liveFrameBudget.ts, GridRendererOptions.live). */
 	incrementLiveReactEmergencyShellsDuringScroll?: () => void;
 	/** Returns false when this frame's live-mode budget for `kind` is exhausted. Omitted (or a
 	 *  caller-side default of always-true) means unlimited — see liveFrameBudget.ts. */
 	tryConsumeLiveBudget?: (kind: 'mount' | 'update') => boolean;
-	/** Admits one in-frame DOM renderer update ('update' presentation) against the frame's DOM-work budget. */
+	/** Admits one in-frame DOM renderer update (`scroll: 'live'` on a DOM renderer) against the frame's DOM-work budget. */
 	tryConsumeDomUpdateBudget?: () => boolean;
 	/** Computes (and caches) a getter/formula cell's display text within the frame's budget; undefined when over it. */
 	primeDisplayValueInFrame?: (rowId: string, colField: string) => string | undefined;
@@ -145,14 +144,6 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	incrementDomUpdatesDuringScroll?: () => void;
 	/** A DOM renderer cell the frame budget refused (shown as a stand-in until scroll settles). */
 	incrementDomUpdatesDeferredDuringScroll?: () => void;
-	/** Whether an over-budget fresh mount may fall back to an emergency shell instead of mounting
-	 *  anyway. Omitted defaults to true (shell allowed). */
-	allowLiveEmergencyShell?: () => boolean;
-	incrementHtmlSnapshotHitsDuringScroll?: () => void;
-	incrementHtmlSnapshotMissesDuringScroll?: () => void;
-	incrementTextImpostorUsesDuringScroll?: () => void;
-	/** Grid-level defaults for scrollPresentation:'html-snapshot' columns that don't override them. */
-	getHtmlSnapshotDefaults?: () => { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean; defaultStrict?: boolean };
 	getSnapshotVisualVersions: () => SnapshotVisualVersions;
 	/** Live column-reorder preview offset (px) for a displayed column index.
 	 *  0 outside an active header drag. Only consulted on the full-bind path. */
@@ -346,7 +337,6 @@ function attachCellCtrl<TRowData>(
 		if (request.rowIndex !== undefined) cellCtrl.rowIndex = request.rowIndex;
 		cellCtrl.rowCtrlKey = rowCtrl.rowId;
 		if (request.colIndex !== undefined) cellCtrl.colIndex = request.colIndex;
-		cellCtrl.scrollPresentation = getCellScrollPresentation(col as InternalColumnDef<TRowData>);
 		if (rowCtrl.cellKeysByColumnInstanceId.get(instanceId) !== cellCtrl.key) rowCtrl.cellKeysByColumnInstanceId.set(instanceId, cellCtrl.key);
 		rowCtrlStore.stats.cellCtrlsReused++;
 	} else {
@@ -364,7 +354,6 @@ function attachCellCtrl<TRowData>(
 			colId: col.colId ?? col.field,
 			colField: col.field,
 			colIndex: request.colIndex,
-			scrollPresentation: getCellScrollPresentation(col as InternalColumnDef<TRowData>),
 		};
 		// A slot recycled to another row: hand its controller over rather than releasing it and
 		// allocating a new one (only where the release would have happened anyway).
@@ -402,60 +391,22 @@ function recordCellCtrlPhysicalBinding<TRowData>(cellCtrl: CellCtrl, cellSlot: C
 
 /**
  * Per-binder-deps adapter onto the resolver's narrow ScrollCellPresentationDeps. Built once per
- * deps object (not once per cell); `ctx` is re-pointed at the current frame's context before each
- * resolve. The resolver never retains its deps, so sharing one adapter is safe.
+ * deps object (not once per cell). The resolver never retains its deps, so sharing one adapter is safe.
  */
-interface ScrollPresentationDepsAdapter<TRowData> extends ScrollCellPresentationDeps {
-	ctx: ScrollRenderContext<TRowData> | null;
-}
+const scrollDepsByBinderDeps = new WeakMap<object, ScrollCellPresentationDeps>();
 
-const scrollPresentationDepsByBinderDeps = new WeakMap<object, ScrollPresentationDepsAdapter<any>>();
-
-function createScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): ScrollPresentationDepsAdapter<TRowData> {
-	const adapter: ScrollPresentationDepsAdapter<TRowData> = {
-		ctx: null,
-		getCellPortalHost: (cell) => deps.getCellPortalHost(cell),
-		getRowHeight: (idx) => deps.engine.geometry?.rowHeights?.[idx],
-		getColWidth: (idx) => adapter.ctx?.plan?.colWidths?.[idx],
-		getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
-		primeDisplayValue: (rowId, colField) => deps.primeDisplayValueInFrame?.(rowId, colField),
-		getCachedCellValue: (rowId, colField) => deps.engine.data?.getCachedCellValue?.(rowId, colField),
-		hasFormula: (rowId, colField) => deps.engine.hasFormula?.(rowId, colField) ?? true,
-		getFrozenHtmlSnapshot: (rowId, columnInstanceId, expected, rowHeight, colWidth) => {
-			const store = deps.engine.htmlScrollSnapshots as
-				| {
-						getFresh?: (input: {
-							rowId: string;
-							columnInstanceId: ColumnInstanceId;
-							expectedFreshness: any;
-							rowHeight?: number;
-							colWidth?: number;
-							policy: 'visual';
-						}) => any;
-						get?: (
-							rowId: string,
-							columnInstanceId: ColumnInstanceId | string,
-							expected: any,
-							options?: { rowHeight?: number; colWidth?: number; mode?: 'visual' }
-						) => any;
-				  }
-				| undefined;
-			return store?.getFresh
-				? store.getFresh({ rowId, columnInstanceId, expectedFreshness: expected, rowHeight, colWidth, policy: 'visual' })
-				: store?.get?.(rowId, columnInstanceId, expected, { rowHeight, colWidth, mode: 'visual' });
-		},
-		getHtmlSnapshotDefaults: deps.getHtmlSnapshotDefaults ? () => deps.getHtmlSnapshotDefaults!() : undefined,
-	};
-	return adapter;
-}
-
-function getScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>, ctx: ScrollRenderContext<TRowData>): ScrollCellPresentationDeps {
-	let adapter = scrollPresentationDepsByBinderDeps.get(deps) as ScrollPresentationDepsAdapter<TRowData> | undefined;
+function getScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): ScrollCellPresentationDeps {
+	let adapter = scrollDepsByBinderDeps.get(deps);
 	if (!adapter) {
-		adapter = createScrollPresentationDeps(deps);
-		scrollPresentationDepsByBinderDeps.set(deps, adapter);
+		adapter = {
+			getCellPortalHost: (cell) => deps.getCellPortalHost(cell),
+			getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
+			primeDisplayValue: (rowId, colField) => deps.primeDisplayValueInFrame?.(rowId, colField),
+			getCachedCellValue: (rowId, colField) => deps.engine.data?.getCachedCellValue?.(rowId, colField),
+			hasFormula: (rowId, colField) => deps.engine.hasFormula?.(rowId, colField) ?? true,
+		};
+		scrollDepsByBinderDeps.set(deps, adapter);
 	}
-	adapter.ctx = ctx;
 	return adapter;
 }
 
@@ -704,12 +655,10 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 				: access.value != null
 					? String(access.value)
 					: deps.engine.getCheapDisplayValue(node.id, col.field);
-		const textImpostorRender = isTextImpostorPresentation(col)
-			? (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render
-			: undefined;
+		const scrollText = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollText;
 		portalImpostorValue =
-			textImpostorRender != null
-				? textImpostorRender({ value: access.value, formattedValue: formattedForImpostor }) || formattedForImpostor
+			scrollText != null
+				? scrollText({ value: access.value, formattedValue: formattedForImpostor }) || formattedForImpostor
 				: formattedForImpostor;
 	} else {
 		if (access.isLoading) {
@@ -930,7 +879,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		input.isWarmBindingVersionFresh = isWarmBindingVersionFresh;
 		input.rowVersion = rowVersion;
 		input.cellKey = cellKey;
-		resolveCellCtrlScrollPresentationState(cellCtrl, getScrollPresentationDeps(deps, ctx), input);
+		resolveCellCtrlScrollPresentationState(cellCtrl, getScrollPresentationDeps(deps), input);
 
 		// 3. Dispatch to the mode-specific binder — enqueues fidelity work, updates mounted slot bookkeeping.
 		dispatchCellPresentation(

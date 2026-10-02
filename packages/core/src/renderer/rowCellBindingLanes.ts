@@ -892,11 +892,11 @@ function bindHierarchyRowCell<TRowData>(
 	let text = '';
 	if (value !== undefined && !col.checkboxSelection) {
 		try {
-			// The column's formatter, else its text impostor (the renderer's cheap text form), else raw.
-			const impostor = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.textImpostor?.render;
+			// The column's formatter, else its scrollText (the renderer's cheap text form), else raw.
+			const scrollText = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollText;
 			if (col.valueFormatter) text = col.valueFormatter({ value, rowData: undefined as TRowData, colDef: col, rowId: row.id });
 			else if (value === null) text = '';
-			else text = (impostor && impostor({ value, formattedValue: String(value) })) || String(value);
+			else text = (scrollText && scrollText({ value, formattedValue: String(value) })) || String(value);
 		} catch (error) {
 			reportRendererFault(deps.engine, 'aggregate-format', error, { rowId: row.id, rowIndex, colField: col.field, colIndex });
 			text = String(value);

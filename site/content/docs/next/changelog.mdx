@@ -11,6 +11,31 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Changed — two scroll choices for custom renderers: `text` and `live`
+
+A custom renderer now picks one of two behaviors during scroll with `capabilities.scroll`. `'text'` (the React
+default) shows stand-in text for cells entering view and mounts the renderer once scrolling settles. `'live'` (the
+DOM default) mounts and updates the renderer during scroll within a per-frame budget; a cell over budget shows
+stand-in text for that frame and is completed right after, so it is never blank. `scrollText` sets the stand-in
+text. Grid-level tuning moves to one option, `rendererOptions.live`. HTML snapshots are removed. See
+[Renderer Capabilities](/docs/next/renderer-capabilities).
+
+**Breaking:** the old options are removed, with no deprecation period.
+
+| Removed                                                                                                          | Use instead                                                |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `scrollPresentation: 'freeze'`                                                                                   | `scroll: 'text'` (the React default, so usually delete it) |
+| `scrollPresentation: 'update'`                                                                                   | `scroll: 'live'` (the DOM default, so usually delete it)   |
+| `scrollPresentation: 'live'`                                                                                     | `scroll: 'live'`                                           |
+| `scrollPresentation: 'text-impostor'` + `textImpostor.render`                                                    | `scroll: 'text'` + `scrollText`                            |
+| `scrollPresentation: 'html-snapshot'` + `htmlSnapshot`                                                           | `scroll: 'text'`; HTML snapshots no longer exist           |
+| `live.update: 'imperative'`                                                                                      | renderer `kind: 'imperativeReact'`                         |
+| `live.priority`, `live.allowEmergencyShell`                                                                      | none; over-budget cells always show stand-in text          |
+| `rendererOptions.domUpdate.maxMsPerFrame`                                                                        | `rendererOptions.live.maxMsPerFrame`                       |
+| `rendererOptions.liveReact` (overscan, mount and update limits)                                                  | `rendererOptions.live` (same names)                        |
+| `rendererOptions.htmlSnapshot`, `rendererOptions.textImpostor`                                                   | none                                                       |
+| render counters `htmlSnapshotHitsDuringScroll`, `htmlSnapshotMissesDuringScroll`, `textImpostorUsesDuringScroll` | none                                                       |
+
 ### Changed — one data-write API: `transaction`
 
 `api.transaction({ rows, cells })` writes rows and cells together as one atomic change with one undo entry, and

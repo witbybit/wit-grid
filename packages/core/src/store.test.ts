@@ -3069,9 +3069,10 @@ describe('GridStore undo and redo functionality', () => {
 		const plan = store.engine.columns.getCompiledPlan();
 		expect(plan.columnPlans.map((columnPlan) => columnPlan.mode)).toEqual(['primitive', 'custom-dom', 'custom', 'custom-imperative']);
 		expect(plan.displayedColumns[1].cellRenderer).toBe(domRenderer);
-		expect(plan.displayedColumns[2].cellRendererCapabilities?.scrollPresentation).toBe('freeze');
-		expect(plan.displayedColumns[3].cellRendererCapabilities?.scrollPresentation).toBe('live');
-		expect(plan.displayedColumns[3].cellRendererCapabilities?.live?.update).toBe('imperative');
+		expect(plan.displayedColumns[1].cellRendererCapabilities?.scroll).toBe('live');
+		expect(plan.displayedColumns[2].cellRendererCapabilities?.scroll).toBe('text');
+		expect(plan.displayedColumns[3].cellRendererCapabilities?.scroll).toBe('live');
+		expect(plan.displayedColumns[3].cellRendererCapabilities?.imperative).toBe(true);
 		expect(plan.hasCustomRenderers).toBe(true);
 		expect(plan.hasDomRenderers).toBe(true);
 	});

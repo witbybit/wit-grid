@@ -176,8 +176,8 @@ export class RowRenderer<TRowData = unknown> {
 	 *  scroll execution. Null before the first recycleViewport call. */
 	public currentViewportPlan: ViewportPlan | null = null;
 	/** Per-frame live-mode mount/update budget (see liveFrameBudget.ts), read by
-	 *  RowCellBinderDeps.tryConsumeLiveBudget/allowLiveEmergencyShell via stateHost: this. Reset each
-	 *  recycleViewport call; reconfigured whenever GridRendererOptions.liveReact may have changed. */
+	 *  RowCellBinderDeps.tryConsumeLiveBudget via stateHost: this. Reset each
+	 *  recycleViewport call; reconfigured whenever GridRendererOptions.live may have changed. */
 	public readonly liveFrameBudget = new LiveFrameBudget();
 	/** Live column-reorder preview source, wired by RenderEngine to the
 	 *  ColumnInteractionController. Returns 0 outside an active header drag. */
@@ -404,7 +404,7 @@ export class RowRenderer<TRowData = unknown> {
 
 		// ── Live-mode frame budget ────────────────────────────────────────────────────
 		// rendererOptions is immutable; reconfiguring every frame is redundant but cheap.
-		this.liveFrameBudget.configure(this.engine.rendererOptions?.liveReact, this.engine.rendererOptions?.domUpdate);
+		this.liveFrameBudget.configure(this.engine.rendererOptions?.live);
 		this.liveFrameBudget.resetFrame();
 
 		// ── Slot count management ─────────────────────────────────────────────────────
