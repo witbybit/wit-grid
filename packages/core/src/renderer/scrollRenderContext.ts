@@ -1,6 +1,7 @@
 import type { CompiledGridPlan } from '../columnDef.js';
 import type { ActiveEditState, CanonicalGridCellPointer, GridCellRangeBounds } from '../api/GridApi.js';
 import type { InternalGridState } from '../state/GridState.js';
+import type { CompiledStyleRules } from '../styling/styleRules.js';
 
 export interface ScrollRenderContext<TRowData = unknown> {
 	isScrolling: boolean;
@@ -25,6 +26,8 @@ export interface ScrollRenderContext<TRowData = unknown> {
 	activeEdit: ActiveEditState | null;
 
 	hasDeferredCellStyleRules: boolean;
+	/** The grid's compiled style rules, for cell rules evaluated as cells enter view during scroll. */
+	compiledStyleRules?: CompiledStyleRules<TRowData>;
 	hasCustomRenderers: boolean;
 	hasInsightDecorations: boolean;
 

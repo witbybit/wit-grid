@@ -2430,7 +2430,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('keeps custom cell classes during scroll and defers heavier cell hooks until idle', async () => {
+	it('draws cell style-rule classes on cells entering view during scroll, without semantic reads', async () => {
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 			callbacks.push(cb);
@@ -2474,33 +2474,18 @@ describe('RenderEngine', () => {
 		scrollViewport.scrollTop = 2400;
 		scrollViewport.dispatchEvent(new Event('scroll'));
 
-		// Run scroll frame — cell hooks must not fire yet
+		// Run scroll frame: style rules are evaluated on the row as cells enter view (conditional
+		// formatting never flickers in after scroll), without any semantic cell read.
 		callbacks[0](0);
-		expect(cellClass).not.toHaveBeenCalled();
+		expect(cellClass).toHaveBeenCalled();
 		const statsDuringScroll = renderer.getRenderStats();
 		expect(statsDuringScroll.cellAccessReadsDuringScroll).toBe(0);
 		expect(statsDuringScroll.cellClassComputesDuringScroll).toBe(0);
-		expect(statsDuringScroll.dirtyCellsMarkedDuringScroll).toBeGreaterThan(0);
-
-		// Flush scroll-end chain (4 RAF ticks → finishScrolling) and post-scroll decoration
-		let i = 1;
-		while (i < callbacks.length) {
-			callbacks[i](0);
-			i++;
-		}
-		await Promise.resolve();
-		await Promise.resolve();
-		while (i < callbacks.length) {
-			callbacks[i](0);
-			i++;
-		}
-
-		expect(cellClass).toHaveBeenCalled();
-		const statsAfterScroll = renderer.getRenderStats();
-		expect(statsAfterScroll.postScrollDirtyCellsDecorated).toBeGreaterThan(0);
-		expect(statsAfterScroll.postScrollMotionChunks).toBeGreaterThan(0);
-		expect(statsAfterScroll.motionCellsDecoratedAfterScroll).toBeGreaterThan(0);
-		expect(statsAfterScroll.fidelityCellsDecoratedAfterScroll).toBe(0);
+		const enteringCells = [...container.querySelectorAll<HTMLElement>('.og-row .og-cell[data-row-id]')].filter(
+			(cell) => Number(cell.dataset.rowId?.replace(/\D/g, '')) >= 60
+		);
+		expect(enteringCells.length).toBeGreaterThan(0);
+		expect(enteringCells.every((cell) => cell.classList.contains('custom-cell'))).toBe(true);
 
 		renderer.unmount();
 		controller.dispose();

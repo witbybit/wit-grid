@@ -253,7 +253,8 @@ export class RenderScrollPipeline<TRowData = unknown> {
 			scrollCtx.selectionChangedDuringScroll = this.deps.engine.selectionVersion !== this.deps.rowRenderer.scrollStartSelectionVersion;
 			scrollCtx.globalChangedDuringScroll = state.globalVersion !== this.deps.rowRenderer.scrollStartGlobalVersion;
 			scrollCtx.activeEdit = interaction.activeEdit.active;
-			scrollCtx.hasDeferredCellStyleRules = compileStyleRules(state.styleRules).hasCellRules;
+			scrollCtx.compiledStyleRules = compileStyleRules(state.styleRules);
+			scrollCtx.hasDeferredCellStyleRules = scrollCtx.compiledStyleRules.hasCellRules;
 			scrollCtx.hasCustomRenderers = plan.hasCustomRenderers;
 			scrollCtx.hasInsightDecorations = this.deps.engine.insights.size > 0;
 			scrollCtx.plan = plan;
