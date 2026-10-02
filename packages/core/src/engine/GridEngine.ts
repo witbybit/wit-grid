@@ -316,6 +316,31 @@ export class GridEngine<TRowData = unknown> {
 				this.data.clearValueGetterCache(node.id);
 			}
 		});
+		// Data integrity follows every row-level write (setRows, sync and async transactions, their
+		// undo): changed and added rows are re-validated after commit, removed rows lose their issues.
+		this.eventBus.addEventListener(GridEventName.rowsUpdated, (event) => {
+			if (!this.dataIntegrity) return;
+			const changed = event.payload.changedNodes ?? [];
+			const added = event.payload.addedNodes ?? [];
+			const removed = event.payload.removedNodes ?? [];
+			// Populating an empty grid (its first rows arriving) is data loading, not a write to re-validate.
+			const isInitialLoad =
+				changed.length === 0 &&
+				removed.length === 0 &&
+				added.length > 0 &&
+				asRowOrderCapableModel(this.rowModel)?.getSourceRowCount?.() === added.length;
+			const rowIds = isInitialLoad ? [] : [...changed, ...added].map((node) => node.id);
+			const removedRowIds = removed.map((node) => node.id);
+			if (rowIds.length === 0 && removedRowIds.length === 0) return;
+			void this.dataIntegrity.validateRowsAfterWrite(rowIds, removedRowIds).catch((error) => {
+				this.runtimeFaults.report({
+					source: 'grid-change',
+					operation: 'auto-validate-row-writes',
+					error,
+					context: { changed: rowIds.length, removed: removedRowIds.length },
+				});
+			});
+		});
 		this.runtimeFaults = new RuntimeFaultReporter<TRowData>({
 			emit: (fault) => this.eventBus.dispatchEvent(GridEventName.runtimeFault, fault),
 			observe: (fault) =>

@@ -333,6 +333,11 @@ export class RowDataStore<T> {
 		return this.sourceOrder.map((id) => this.rowsById.get(id)!);
 	}
 
+	/** Number of rows in the store, without copying the order. */
+	public getRowCount(): number {
+		return this.sourceOrder.length;
+	}
+
 	public getSourceOrder(): string[] {
 		return this.sourceOrder.slice();
 	}

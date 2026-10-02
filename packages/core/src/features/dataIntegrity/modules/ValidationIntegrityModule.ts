@@ -45,7 +45,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		return this.options.enabled !== false;
 	}
 
-	shouldAutoValidateWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldAutoValidateWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		if (!this.isEnabled()) return false;
 		const validateOnEdit = this.options.validateOnEdit ?? true;
 		const validateOnPaste = this.options.validateOnPaste ?? validateOnEdit;
@@ -56,6 +56,8 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 				return validateOnPaste;
 			case 'fill':
 				return validateOnFill;
+			case 'transaction':
+				return this.options.validateOnTransaction ?? validateOnEdit;
 			case 'api':
 			case 'edit':
 			case 'undo':
@@ -64,7 +66,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		}
 	}
 
-	shouldPreflightWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldPreflightWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		if (!this.isEnabled()) return false;
 		const validateOnSubmit = this.options.validateOnSubmit === true;
 		const validateOnPaste = this.options.validateOnPaste ?? validateOnSubmit;
@@ -75,6 +77,9 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 				return validateOnPaste;
 			case 'fill':
 				return validateOnFill;
+			case 'transaction':
+				// Row data from setRows / transactions (streams, servers) is validated after it commits.
+				return false;
 			case 'api':
 			case 'edit':
 			case 'undo':
@@ -83,7 +88,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		}
 	}
 
-	shouldPreflightWriteSync(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldPreflightWriteSync(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		return this.shouldPreflightWrite(source);
 	}
 
@@ -207,16 +212,45 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 
 	async validateRow(rowId: string): Promise<readonly GridIntegrityIssue[]> {
 		if (!this.isEnabled()) return _EMPTY;
+		const newIssues = await this._collectRowIssues(rowId);
+		if (newIssues === null) return _EMPTY;
+		const retained = this.getIssues().filter((issue) => issue.rowId !== rowId);
+		this._commitIssues('integrity:validation:set-issues', [...retained, ...newIssues]);
+		this.deps.requestRepaint();
+		return newIssues;
+	}
 
+	/**
+	 * After a row-level write (setRows, a transaction): re-validates every rule of the rows it
+	 * changed or added and drops the issues of rows it removed — one commit for the whole write.
+	 */
+	async validateRowsAfterWrite(input: { rowIds: readonly string[]; removedRowIds: readonly string[]; validate: boolean }): Promise<void> {
+		if (!this.isEnabled()) return;
+		const removed = new Set(input.removedRowIds);
+		const touched = new Set(input.validate ? input.rowIds : []);
+		const hadIssues = this.getIssues().some((issue) => issue.rowId !== undefined && (removed.has(issue.rowId) || touched.has(issue.rowId)));
+		if (touched.size === 0 && !hadIssues) return;
+		const newIssues: GridIntegrityIssue[] = [];
+		for (const rowId of touched) {
+			const issues = await this._collectRowIssues(rowId);
+			if (issues) newIssues.push(...issues);
+		}
+		if (!hadIssues && newIssues.length === 0) return;
+		const retained = this.getIssues().filter((issue) => issue.rowId === undefined || (!removed.has(issue.rowId) && !touched.has(issue.rowId)));
+		this._commitIssues('integrity:validation:set-issues', [...retained, ...newIssues]);
+		this.deps.requestRepaint();
+	}
+
+	/** Every cell and row rule's issues for one row; null when the row is not in the row model. */
+	private async _collectRowIssues(rowId: string): Promise<GridIntegrityIssue[] | null> {
 		const api = this.deps.getApi();
 		const rowModel = this.deps.getRowModel();
 		const node = rowModel?.getRowNodeById?.(rowId) ?? null;
-		if (!node) return _EMPTY;
+		if (!node) return null;
 
 		const row = (node.data ?? {}) as TRowData;
 		const newIssues: GridIntegrityIssue[] = [];
 		const state = this.deps.ctx.getState();
-
 		for (const rule of this.options.cellRules ?? []) {
 			if (!_fieldInColumns(rule.field, state.columns)) continue;
 			const rawValue = this.deps.data.getRawCellValue(rowId, rule.field);
@@ -253,9 +287,6 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 			}
 		}
 
-		const retained = this.getIssues().filter((issue) => issue.rowId !== rowId);
-		this._commitIssues('integrity:validation:set-issues', [...retained, ...newIssues]);
-		this.deps.requestRepaint();
 		return newIssues;
 	}
 

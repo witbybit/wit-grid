@@ -305,6 +305,8 @@ export interface GroupMetaCapableRowModel {
 
 export interface RowOrderCapableModel {
 	getRowOrder(): string[];
+	/** Number of source rows, without copying the order. */
+	getSourceRowCount(): number;
 	setRowOrder(rowIds: string[]): void;
 }
 
@@ -1745,6 +1747,7 @@ export class ClientRowModelController<TData = unknown>
 	public getCurrentPageDataNodes = (): RowNode<TData>[] => this.getFilteredDataNodes();
 
 	public getRowOrder = (): string[] => this.dataStore.getSourceOrder();
+	public getSourceRowCount = (): number => this.dataStore.getRowCount();
 
 	public setRowOrder = (rowIds: string[]): void => {
 		this.dataStore.setRowOrder(rowIds);

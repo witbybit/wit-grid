@@ -199,6 +199,12 @@ export interface GridValidationIntegrityOptions<TRowData> {
 	readonly validateOnSubmit?: boolean;
 	readonly validateOnPaste?: boolean;
 	readonly validateOnFill?: boolean;
+	/**
+	 * Re-validate rows written by setRows or a row transaction (sync or async) right after they
+	 * commit: changed and added rows run every cell and row rule. Rows a write removes always lose
+	 * their issues. Never blocks the write. Default: validateOnEdit.
+	 */
+	readonly validateOnTransaction?: boolean;
 	readonly showInlineErrors?: boolean;
 	readonly defaultScope?: GridIntegrityScope;
 	readonly cellRules?: readonly GridCellIntegrityRule<TRowData>[];
