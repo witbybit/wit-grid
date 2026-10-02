@@ -135,6 +135,9 @@ const emptyFidelity = (): FidelityStats => ({
 	otherExamples: [],
 });
 
+/** A signature without its bar-width segment (`|<n>%`): what a stand-in shows. */
+const withoutBar = (signature: string): string => signature.replace(/\|[\d.]+%/, '');
+
 /** Visible text plus the visible bar's width: what a viewer actually sees in the cell. */
 function readSignature(cell: HTMLElement): string {
 	const text = cell.innerText.trim();
@@ -200,12 +203,13 @@ export function installMeasurement(options: {
 				if (signature !== expected) {
 					wrong++;
 					if (signature === '') stats.blank++;
-					else if (signature === expected.split('|')[0]) stats.incomplete++;
+					// Incomplete: the right text (and decoration) without the renderer's bar.
+					else if (signature === withoutBar(expected)) stats.incomplete++;
 					else stats.otherContent++;
 					const example = `${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`;
 					if (stats.wrongExamples.length < 8) stats.wrongExamples.push(example);
 					// Stale or another row's content is the kind that matters: keep its examples apart.
-					if (signature !== '' && signature !== expected.split('|')[0] && stats.otherExamples.length < 8) stats.otherExamples.push(example);
+					if (signature !== '' && signature !== withoutBar(expected) && stats.otherExamples.length < 8) stats.otherExamples.push(example);
 				}
 				const previous = lastSeen.get(key);
 				if (previous !== undefined && previous !== signature) stats.changes++;
