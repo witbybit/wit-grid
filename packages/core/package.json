@@ -39,7 +39,8 @@
 		"watch": "tsc --watch",
 		"typecheck": "tsc --noEmit && node ../../scripts/check-core-test-typecheck.mjs",
 		"lint": "eslint src --max-warnings=0",
-		"test": "vitest run"
+		"test": "vitest run",
+		"test:perf": "vitest run --mode perf src/perf/longSessionResilience.test.ts src/renderer/serverRuntimePerformance.test.ts"
 	},
 	"keywords": [
 		"headless",
