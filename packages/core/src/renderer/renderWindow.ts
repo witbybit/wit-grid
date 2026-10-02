@@ -1,6 +1,7 @@
 import type { GridEngine } from '../engine/GridEngine.js';
 
 import { asStickyGroupMetaCapableVisualRowModel } from '../rowModel.js';
+import type { VisualRowModel } from '../rowModel.js';
 
 export interface StickyGroupStackItem {
 	groupId: string;
@@ -64,7 +65,7 @@ export interface ViewportDelta {
 	hasChanges: boolean;
 }
 
-function getStickyGroupMeta(rowModel: import('../rowModel.js').VisualRowModel<unknown> | null): Map<number, number> | null {
+function getStickyGroupMeta(rowModel: VisualRowModel<unknown> | null): Map<number, number> | null {
 	return asStickyGroupMetaCapableVisualRowModel(rowModel)?.getStickyGroupMeta() ?? null;
 }
 

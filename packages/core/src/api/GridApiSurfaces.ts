@@ -59,6 +59,7 @@ import type {
 	SelectRowsOptions,
 } from './GridApi.js';
 import type { RowNodeTransaction } from '../rowTransactions.js';
+import type { RowModel } from '../rowModel.js';
 
 export interface GridDataApi<TRowData = unknown> {
 	getStateSnapshot(): GridStateSnapshot<TRowData>;
@@ -329,7 +330,7 @@ export interface GridPluginRuntime<TRowData = unknown> extends GridApi<TRowData>
 	getVisibleRowRange(): { startIdx: number; endIdx: number };
 	getColumnIndex(colField: string): number;
 	getColumnField(colIndex: number): string | null;
-	getRowModel(): import('../rowModel.js').RowModel<TRowData> | null;
+	getRowModel(): RowModel<TRowData> | null;
 	reportRuntimeFault(fault: RuntimeFaultInput): RuntimeFault;
 }
 
@@ -375,8 +376,8 @@ export interface GridHostRuntime<TRowData = unknown> {
 }
 
 export interface GridCompositionRuntime<TRowData = unknown> {
-	registerRowModel(rowModel: import('../rowModel.js').RowModel<TRowData>): void;
-	getRowModel(): import('../rowModel.js').RowModel<TRowData> | null;
+	registerRowModel(rowModel: RowModel<TRowData>): void;
+	getRowModel(): RowModel<TRowData> | null;
 	triggerCellNotifications(rowId: string): void;
 	batchedUpdates: boolean;
 	registerCellSubscription(sub: CellSubscription): void;

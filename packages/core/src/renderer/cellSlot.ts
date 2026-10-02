@@ -6,6 +6,7 @@ import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
 import { createCellInstanceRendererKey } from './identityKeys.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+import type { HierarchyCellParts } from './hierarchyCell.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
 export interface CellCtrlOwner {
@@ -288,7 +289,7 @@ export class CellSlot<TRowData = unknown> {
 		}
 	}
 	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
-	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
+	public hierarchyParts: HierarchyCellParts | null = null;
 
 	// JS-side mirrors of DOM state, so steady-state binds never read the DOM back.
 

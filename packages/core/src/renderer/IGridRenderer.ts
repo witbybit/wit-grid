@@ -1,6 +1,7 @@
 import type { CellRendererPhase, ColumnDef } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { VisualRow } from '../visualRow.js';
+import type { RowRendererSpec } from '../rows/hierarchyConfig.js';
 
 /**
  * Explicit renderer lifecycle operation type.
@@ -107,7 +108,7 @@ export interface GridRowContentMount<TRowData = unknown> {
 	container: HTMLElement;
 	visualRow: VisualRow<TRowData>;
 	/** The configured renderer for this row (`detail.renderer` / `grouping.rowRenderer`), when not a DOM one core mounts itself. */
-	renderer?: import('../rows/hierarchyConfig.js').RowRendererSpec<TRowData>;
+	renderer?: RowRendererSpec<TRowData>;
 }
 
 export interface GridRowContentUnmount {
