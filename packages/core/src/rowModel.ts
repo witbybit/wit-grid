@@ -1337,8 +1337,17 @@ export class ClientRowModelController<TData = unknown>
 	}
 
 	public replaceRowsStructurally(rows: readonly TData[]): RowModelWriteResult<TData> {
-		this.dataStore.setRows(rows as TData[]);
-		return { visualChange: 'full' };
+		const result = this.dataStore.replaceRows(rows as TData[]);
+		return {
+			addedNodes: result.added,
+			removedNodes: result.removed,
+			updatedNodes: result.changedNodes,
+			changedFieldsByRow: result.changedFieldsByRow,
+			changedValuesByRow: result.changedValuesByRow,
+			// Same ids in the same order: only the changed rows' fields changed (targeted, like a
+			// row update). Anything else moved rows, so the projection is rebuilt.
+			visualChange: !result.sameOrder ? 'full' : result.changedNodes.length > 0 ? 'partial' : 'none',
+		};
 	}
 
 	public updateRowsStructurally(updater: (rows: TData[]) => TData[]): RowModelWriteResult<TData> {

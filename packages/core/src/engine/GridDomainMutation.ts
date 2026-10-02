@@ -373,7 +373,7 @@ function createRowsUpdatedEvents<TRowData>(params: {
 	const addedNodes = params.addedNodes ?? [];
 	const removedNodes = params.removedNodes ?? [];
 	const changedValuesByRow = params.changedValuesByRow;
-	if (!changedValuesByRow && changedNodes.length === 0 && addedNodes.length === 0 && removedNodes.length === 0) {
+	if ((!changedValuesByRow || changedValuesByRow.size === 0) && changedNodes.length === 0 && addedNodes.length === 0 && removedNodes.length === 0) {
 		return [];
 	}
 	return [
@@ -1027,13 +1027,21 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 				apply(commitContext) {
 					const rowModel = asClientStructuralRowModel<TRowData>(commitContext.getRowModel())!;
 					const writeResult = rowModel.replaceRowsStructurally(mutation.rows as TRowData[]);
-					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, 'value-only');
+					// Field-level effects for changed rows (getter caches, getter/formula dependents, row
+					// versions) exactly as a row update; a full replace rebuilds the projection on top.
+					const writeEffects = commitContext.applyStructuralWriteEffects?.(writeResult);
+					const isFull = writeResult.visualChange === 'full';
+					const allFields = new Set<string>();
+					if (!isFull && writeResult.changedFieldsByRow) {
+						for (const fields of writeResult.changedFieldsByRow.values()) for (const f of fields) allFields.add(f);
+					}
+					const impact: RowWriteImpact = isFull ? 'insert' : allFields.size > 0 ? rowModel.classifyFieldMutation(allFields) : 'value-only';
+					if (!isFull) requestLayoutTransitionCaptureForImpact(commitContext, impact);
+					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, isFull ? 'value-only' : impact);
 					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
-					// Every row may carry new data under the same id and order (a React app passing edited
-					// copies), which the reconcile sees as no structural change: without a data
-					// invalidation the repaint finds each visible cell's versions fresh and keeps its old
-					// text until the row is rebound by scrolling.
-					if (writeResult.visualChange === 'full') invalidations.push({ kind: 'full', reason: 'data' });
+					// Rows added, removed or reordered: the reconcile may still see "no change" when only the
+					// order moved, so the data invalidation guarantees the visible cells are rebuilt.
+					if (isFull) invalidations.push({ kind: 'full', reason: 'data' });
 					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),
@@ -1045,6 +1053,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 							removedNodes: writeResult.removedNodes,
 						}),
 						requestRender: changed,
+						cellChanges: writeEffects?.cellChanges,
 					};
 				},
 			};

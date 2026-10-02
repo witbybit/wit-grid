@@ -303,11 +303,8 @@ export class GridEngine<TRowData = unknown> {
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
 		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows
-		// permanently removed via a structural transaction (grid.applyTransaction({ remove: [...] })).
-		// Known gap, not a regression: a full row-data replace (setRowData) does not emit
-		// removedNodes (see RowDataStore.setRows/replaceRowsStructurally), so it isn't swept here
-		// (cellDisplaySnapshots are not swept either). A sweep() against the full live-rowId set
-		// would close that gap but costs O(total rows) per event.
+		// permanently removed by a transaction or by setRows (RowDataStore.replaceRows reports the
+		// ids that disappeared). cellDisplaySnapshots are not swept here.
 		this.eventBus.addEventListener(GridEventName.rowsUpdated, (event) => {
 			const removedNodes = event.payload.removedNodes;
 			if (!removedNodes || removedNodes.length === 0) return;
