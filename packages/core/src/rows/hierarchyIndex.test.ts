@@ -101,7 +101,7 @@ describe('hierarchy selection (grid API)', () => {
 		store.setFilterModel({ category: { type: 'text', operator: 'equals', value: 'Cloud' } });
 		expect(store.getDescendantRowIds('group:region=EMEA')).toEqual(['1', '2']);
 
-		store.applyTransaction({ add: [{ id: '5', region: 'EMEA', category: 'Cloud' }] });
+		store.transaction({ rows: { add: [{ id: '5', region: 'EMEA', category: 'Cloud' }] } });
 		expect(store.getDescendantRowIds('group:region=EMEA')).toEqual(['1', '2', '5']);
 		controller.dispose();
 		store.destroy();

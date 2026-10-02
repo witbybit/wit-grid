@@ -866,7 +866,7 @@ Application code coordinates with the spreadsheet engine through the standard `G
 | **`subscribeToKey`**     | `(key: string, listener: Listener) => () => void`                                   | Subscribes selectively to updates for a specific coordinate key.        |
 | **`addEventListener`**   | `(type: string, cb: GridEventListener) => () => void`                               | Registers grid-wide action hooks (e.g. `cellValueChanged`).             |
 | **`undo` / `redo`**      | `() => void`                                                                        | Traverse through state mutation journal history.                        |
-| **`batchCellValues`**    | `(updates: BatchCellUpdate[], source?: string) => void`                             | Applies multiple cell mutations atomically as a single undo entry.      |
+| **`transaction`**        | `(tx: GridTransaction, options?: { async?: boolean }) => GridTransactionResult`     | Writes rows and cells atomically as a single undo entry.                |
 | **`setColumnVisible`**   | `(colField: string, visible: boolean) => void`                                      | Shows or hides a column without removing it from the schema.            |
 | **`autoSizeColumn`**     | `(colField: string, opts?: AutoSizeColumnOptions) => void`                          | Resizes a column to fit its widest rendered cell content.               |
 | **`autoSizeAllColumns`** | `(opts?: AutoSizeAllColumnsOptions) => void`                                        | Resizes all visible columns to fit their content simultaneously.        |

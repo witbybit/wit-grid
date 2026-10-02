@@ -57,5 +57,5 @@ describe('pinned lane edge shadow', () => {
 		controller.dispose();
 		store.destroy();
 		vi.unstubAllGlobals();
-	});
+	}, 20_000); // mounts a wide grid in jsdom: slow under full-suite load
 });

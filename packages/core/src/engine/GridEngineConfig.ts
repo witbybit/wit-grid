@@ -92,7 +92,7 @@ export interface GridEngineConfig<TRowData = unknown> {
 	 *  and missing-capture defaults, text-impostor defaults. See columnDef.ts's GridRendererOptions. */
 	rendererOptions?: GridRendererOptions;
 	/**
-	 * How long `applyTransactionAsync` waits before applying queued transactions, in ms. When unset,
+	 * How long `transaction(tx, { async: true })` waits before committing queued transactions, in ms. When unset,
 	 * they are applied on the next animation frame.
 	 */
 	asyncTransactionWaitMs?: number;

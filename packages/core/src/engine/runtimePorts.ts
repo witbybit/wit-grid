@@ -52,7 +52,6 @@ export interface CellAccessRuntime<TRowData = unknown> {
 	deselectRows: (rowIds: string[]) => void;
 	scrollToRow: (rowId: string, options?: { select?: boolean }) => void;
 	setCellValue: (rowId: string, field: string, value: unknown) => import('../api/GridApi.js').GridWriteResult;
-	applyTransaction: (input: { update?: TRowData[] }) => unknown;
 	refreshRows: () => void;
 	getRowModelType: () => 'client' | 'infinite' | 'server';
 }

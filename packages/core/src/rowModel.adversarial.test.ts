@@ -278,7 +278,7 @@ describe('ClientRowModelController — adversarial differential invariants', () 
 		controller.dispose();
 	});
 
-	it('applyTransaction add+remove in the same call preserves invariants', () => {
+	it('transaction add+remove in the same call preserves invariants', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (row) => row.id,
 			columns: COLUMNS,

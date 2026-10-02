@@ -126,7 +126,7 @@ describe('Budget: targeted cell invalidation — no unrelated subscription fanou
 		controller.dispose();
 	});
 
-	it('applyTransaction with 100 updates produces exactly 1 incremental pipeline run', () => {
+	it('transaction with 100 row updates produces exactly 1 incremental pipeline run', () => {
 		const { store, controller, inst } = makeStore(10_000);
 		inst.reset();
 
@@ -137,12 +137,12 @@ describe('Budget: targeted cell invalidation — no unrelated subscription fanou
 			status: 'Active',
 			category: 'A',
 		}));
-		store.applyTransaction({ update: updates });
+		store.transaction({ rows: { update: updates } });
 
 		const incremental = inst.get(GridMetric.ROW_MUTATION_INCREMENTAL);
 		const full = inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD);
-		expect(incremental, 'applyTransaction must produce at least one incremental pipeline run').toBeGreaterThanOrEqual(1);
-		expect(full, 'applyTransaction must not trigger a full pipeline rebuild').toBe(0);
+		expect(incremental, 'row transaction must produce at least one incremental pipeline run').toBeGreaterThanOrEqual(1);
+		expect(full, 'row transaction must not trigger a full pipeline rebuild').toBe(0);
 
 		controller.dispose();
 	});
@@ -196,9 +196,9 @@ describe('Budget: state reads are bounded per scroll operation', () => {
 	});
 });
 
-// ── Scenario: setData full rebuild vs. applyTransaction incremental ──────────
+// ── Scenario: setData full rebuild vs. transaction incremental ──────────
 
-describe('Budget: setData vs applyTransaction pipeline classification', () => {
+describe('Budget: setData vs row transaction pipeline classification', () => {
 	it('setRows triggers exactly one full pipeline rebuild', () => {
 		const { store, controller, inst } = makeStore();
 		inst.reset();
@@ -212,21 +212,21 @@ describe('Budget: setData vs applyTransaction pipeline classification', () => {
 		controller.dispose();
 	});
 
-	it('applyTransaction with only updates does not trigger a full rebuild', () => {
+	it('transaction with only row updates does not trigger a full rebuild', () => {
 		const { store, controller, inst } = makeStore(10_000);
 		inst.reset();
 
-		store.applyTransaction({ update: [{ id: 'r0', name: 'X', value: 1, status: 'Active', category: 'A' }] });
+		store.transaction({ rows: { update: [{ id: 'r0', name: 'X', value: 1, status: 'Active', category: 'A' }] } });
 
 		const full = inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD);
-		expect(full, 'update-only applyTransaction must not trigger a full rebuild').toBe(0);
+		expect(full, 'update-only row transaction must not trigger a full rebuild').toBe(0);
 
 		controller.dispose();
 	});
 });
 
 describe('Budget: canonical bulk write paths stay incremental at throughput', () => {
-	it('large rectangular batchCellValues write stays incremental and preserves cell values', () => {
+	it('large rectangular cell transaction write stays incremental and preserves cell values', () => {
 		const { store, controller, inst } = makeStore(10_000);
 		inst.reset();
 
@@ -239,7 +239,7 @@ describe('Budget: canonical bulk write paths stay incremental at throughput', ()
 			];
 		}).flat();
 
-		const result = store.batchCellValues(updates, 'paste');
+		const result = store.transaction({ cells: updates, source: 'paste' });
 		expect(result.status).toBe('applied');
 		expect(store.getCellValue('r0', 'name')).toBe('Batch 0');
 		expect(store.getCellValue('r249', 'value')).toBe(2490);

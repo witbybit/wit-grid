@@ -18,7 +18,7 @@ export interface PublicRowNodeDispatchDeps<TRowData = unknown> {
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, field: string, value: unknown): GridWriteResult;
-	batchCellValues(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
+	writeCells(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
 	setExpanded(id: string, expanded: boolean): void;
 	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;

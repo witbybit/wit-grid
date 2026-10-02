@@ -336,7 +336,7 @@ describe('Performance Benchmarks', () => {
 			const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
 			try {
 				for (let i = 0; i < 20; i++) {
-					store.applyTransaction({ update: [{ ...rows[i]!, quantity: -i - 1 }] });
+					store.transaction({ rows: { update: [{ ...rows[i]!, quantity: -i - 1 }] } });
 				}
 				expect(cloneSpy).not.toHaveBeenCalled();
 			} finally {
@@ -350,11 +350,11 @@ describe('Performance Benchmarks', () => {
 				const rows = makeRows(count);
 				const { store, controller } = makeGrid(rows);
 				// Warm up, then take the best of several runs to damp scheduler noise.
-				for (let i = 0; i < 5; i++) store.applyTransaction({ update: [{ ...rows[i]!, quantity: 1_000 + i }] });
+				for (let i = 0; i < 5; i++) store.transaction({ rows: { update: [{ ...rows[i]!, quantity: 1_000 + i }] } });
 				let best = Infinity;
 				for (let run = 0; run < 5; run++) {
 					const start = performance.now();
-					for (let i = 0; i < 20; i++) store.applyTransaction({ update: [{ ...rows[i]!, quantity: run * 100 + i }] });
+					for (let i = 0; i < 20; i++) store.transaction({ rows: { update: [{ ...rows[i]!, quantity: run * 100 + i }] } });
 					best = Math.min(best, performance.now() - start);
 				}
 				controller.dispose();

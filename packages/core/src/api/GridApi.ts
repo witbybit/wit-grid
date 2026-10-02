@@ -107,7 +107,8 @@ export interface CellPointer {
 	colId: string;
 }
 
-export interface BatchCellValueUpdate {
+/** One cell write in a transaction: goes through the column's value setter, formulas and validation. */
+export interface GridCellWrite {
 	rowId: string;
 	colField: string;
 	value: unknown;
@@ -325,14 +326,40 @@ export interface RowDataTransaction<TData = unknown> {
 
 export type { RowNodeTransaction } from '../rowTransactions.js';
 
+/**
+ * The one data write. Row deltas and cell writes commit atomically — one change, one undo entry,
+ * one repaint of exactly what changed — together with any grid state in the same call.
+ */
 export interface GridTransaction<TRowData = unknown> {
+	/** Rows to add (optionally at `addIndex`), update (matched by id) or remove. */
+	rows?: RowDataTransaction<TRowData>;
+	/** Cell writes, through each column's value setter, formulas and validation. */
+	cells?: GridCellWrite[];
+	/** Where the cell writes come from, for validation policy and history. Default: 'api'. */
+	source?: 'api' | 'paste' | 'fill';
 	columns?: ColumnDef<TRowData>[];
-	rows?: TRowData[];
-	rowTransaction?: RowDataTransaction<TRowData>;
 	sortModel?: SortModel | null;
 	filterModel?: FilterModel | null;
 	pins?: { left?: number; right?: number; top?: number; bottom?: number };
 }
+
+export interface GridTransactionOptions {
+	/**
+	 * Queue the transaction and commit it before the next frame, merged with other queued row-only
+	 * transactions into one commit and one render (high-frequency feeds), after awaiting async
+	 * validation of its cell writes. The promise resolves once it has committed.
+	 */
+	async?: boolean;
+}
+
+/** A transaction's outcome: the write status plus the row nodes and cells it touched. */
+export type GridTransactionResult<TRowData = unknown> = GridWriteResult & {
+	readonly rows: RowNodeTransaction<TRowData>;
+	readonly cells: {
+		readonly committed: readonly GridCellWrite[];
+		readonly rejected: readonly { readonly cell: GridCellWrite; readonly reason: string }[];
+	};
+};
 
 export type { ColumnState, GridCellRangeBounds };
 

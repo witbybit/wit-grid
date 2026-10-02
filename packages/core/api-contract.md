@@ -22,7 +22,6 @@ Exports (310):
 - `areServerSideRoutesEqual` — value
 - `AutoSizeAllColumnsOptions` — type
 - `AutoSizeColumnOptions` — type
-- `BatchCellValueUpdate` — type
 - `buildFilterByValue` — value
 - `BUILT_IN_THEME_METADATA` — value
 - `BUILT_IN_THEME_ORDER` — value
@@ -131,6 +130,7 @@ Exports (310):
 - `GridCellPointer` — type
 - `GridCellRange` — type
 - `GridCellRangeBounds` — type
+- `GridCellWrite` — type
 - `GridCommitResult` — type
 - `GridConflictIntegrityOptions` — type
 - `GridContextMenuHandle` — type

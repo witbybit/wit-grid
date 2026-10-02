@@ -189,66 +189,6 @@ export class RowDataStore<T> {
 		return id;
 	}
 
-	public updateRows(updater: RowUpdate<T>): RowTransactionResult<T> {
-		const currentRows = this.sourceOrder.map((id) => this.rowsById.get(id)!.data);
-		const nextRows = updater(currentRows);
-
-		if (nextRows.length !== this.sourceOrder.length) {
-			return {
-				changedNodes: [],
-				changedFieldsByRow: new Map(),
-				changedValuesByRow: new Map(),
-				mismatch: true,
-			};
-		}
-
-		const changedNodes: RowNode<T>[] = [];
-		const changedFieldsByRow = new Map<string, Set<string>>();
-		const changedValuesByRow = new Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>();
-
-		for (let i = 0; i < this.sourceOrder.length; i++) {
-			const currentId = this.sourceOrder[i];
-			const node = this.rowsById.get(currentId)!;
-			const nextRow = nextRows[i];
-			if (nextRow == null) {
-				return {
-					changedNodes: [],
-					changedFieldsByRow: new Map(),
-					changedValuesByRow: new Map(),
-					mismatch: true,
-				};
-			}
-
-			const nextId = this.getRowId(nextRow);
-			if (node.id !== nextId) {
-				return {
-					changedNodes: [],
-					changedFieldsByRow: new Map(),
-					changedValuesByRow: new Map(),
-					mismatch: true,
-				};
-			}
-
-			const prevRow = node.data;
-			if (prevRow !== nextRow) {
-				const diff = diffRows(prevRow, nextRow);
-				if (diff) {
-					node.setData(nextRow);
-					changedNodes.push(node);
-					changedFieldsByRow.set(node.id, diff.changedFields);
-					changedValuesByRow.set(node.id, diff.changedValues);
-				}
-			}
-		}
-
-		return {
-			changedNodes,
-			changedFieldsByRow,
-			changedValuesByRow,
-			mismatch: false,
-		};
-	}
-
 	public applyTransaction(transaction: { add?: T[]; addIndex?: number; remove?: T[]; update?: T[] }): StoreTransactionResult<T> {
 		const added: RowNode<T>[] = [];
 		const removed: RowNode<T>[] = [];

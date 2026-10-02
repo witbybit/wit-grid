@@ -32,7 +32,7 @@ export class SpreadsheetFillEngine<TRowData = unknown> {
 	public fillRange(source: GridCellRange, target: GridCellRange): void {
 		const plan = this.buildFillPlan(source, target);
 		if (plan.updates.length > 0) {
-			const result = this.engine.batchCellValues(plan.updates, 'fill');
+			const result = this.engine.transaction({ cells: plan.updates, source: 'fill' });
 			if (isWriteBlockedResult(result)) {
 				dispatchWriteBlockedEvent(
 					this.engine.dispatchEvent.bind(this.engine),
@@ -71,7 +71,7 @@ export class SpreadsheetFillEngine<TRowData = unknown> {
 			}
 			return { status: 'noop' };
 		}
-		const result = await this.engine.batchCellValuesAsync(plan.updates, 'fill');
+		const result = await this.engine.transactionAsync({ cells: plan.updates, source: 'fill' });
 		if (isWriteBlockedResult(result)) {
 			dispatchWriteBlockedEvent(
 				this.engine.dispatchEvent.bind(this.engine),

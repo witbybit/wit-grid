@@ -19,6 +19,19 @@ edited afterward. For a plain list of what shipped in each release (not just bre
 
 Tracks work that will ship in the release after [1.4](/docs/1.4).
 
+### One data-write API: `transaction`
+
+**Why:** rows and cells used to be written through separate methods, each with its own undo entry, result shape
+and async variant. `api.transaction()` covers them all, atomically.
+
+**What changed:** `applyTransaction`, `applyTransactionAsync`, `flushAsyncTransactions`, `batchCellValues`,
+`batchCellValuesAsync`, `setCellValueAsync` and `updateRows` are removed, as are the `rowTransaction` and full
+`rows` fields of `transaction()`. The type `BatchCellValueUpdate` is now `GridCellWrite`.
+
+**Fix:** use the replacements listed in the [Changelog](/docs/next/changelog) and
+[Transactions](/docs/next/transactions). The row nodes of a transaction are now at `result.rows`, and `result`
+is never `null`.
+
 ### Text-only cells no longer contain `.og-cell-content`
 
 **Why:** a cell of a column with no custom renderer only ever shows text, so its content wrapper was one more

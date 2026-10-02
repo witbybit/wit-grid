@@ -404,7 +404,12 @@ describe('Plan 142 - cross-feature composition gauntlets', () => {
 		expect(clipboard.writeText).toHaveBeenCalledWith('Child B');
 
 		const beforeMoveIndex = store.getVisualIndexByRowId('child-b');
-		store.updateRows((rows) => rows.map((row) => (row.id === 'child-b' ? { ...row, parentId: 'other' } : row)));
+		store.setRows(
+			store
+				.rows()
+				.getAll()
+				.map((row) => (row.id === 'child-b' ? { ...row, parentId: 'other' } : row))
+		);
 
 		expect(store.getState().selection.focus).toEqual(expect.objectContaining({ rowId: 'child-b', colField: 'name' }));
 		expect(store.getSelectedRowIds()).toEqual(['child-b']);
