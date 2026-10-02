@@ -152,6 +152,9 @@ export const CORE_STYLES = `
     order: 0;
     left: 0;
     border-right: 1px solid var(--og-pin-left-border-color, var(--og-border-color));
+  }
+
+  .og-scrolled-left .og-layer-floating-filter-left {
     box-shadow: var(--og-pin-left-shadow, none);
   }
 
@@ -159,6 +162,9 @@ export const CORE_STYLES = `
     order: 2;
     right: 0;
     border-left: 1px solid var(--og-pin-right-border-color, var(--og-border-color));
+  }
+
+  .og-scrolled-right .og-layer-floating-filter-right {
     box-shadow: var(--og-pin-right-shadow, none);
   }
 
@@ -698,8 +704,11 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-right: 1px solid var(--og-pin-left-border-color);
-    box-shadow: var(--og-pin-left-shadow);
     background-color: var(--og-header-bg);
+  }
+
+  .og-scrolled-left .og-layer-header-left {
+    box-shadow: var(--og-pin-left-shadow);
   }
 
   .og-layer-header-right {
@@ -714,8 +723,11 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-left: 1px solid var(--og-pin-right-border-color);
-    box-shadow: var(--og-pin-right-shadow);
     background-color: var(--og-header-bg);
+  }
+
+  .og-scrolled-right .og-layer-header-right {
+    box-shadow: var(--og-pin-right-shadow);
   }
 
   /*
@@ -1165,15 +1177,22 @@ export const CORE_STYLES = `
   .og-row-pin-left {
     left: 0;
     border-right: 1px solid var(--og-pin-left-border-color);
-    box-shadow: var(--og-pin-left-shadow);
     clip-path: inset(0 -32px 0 0);
+  }
+
+  /* The edge shadow only while content is scrolled under the lane; at rest the border alone. */
+  .og-scrolled-left .og-row-pin-left {
+    box-shadow: var(--og-pin-left-shadow);
+  }
+
+  .og-scrolled-right .og-row-pin-right {
+    box-shadow: var(--og-pin-right-shadow);
   }
 
   .og-row-pin-right {
     right: 0;
     margin-left: auto;
     border-left: 1px solid var(--og-pin-right-border-color);
-    box-shadow: var(--og-pin-right-shadow);
     clip-path: inset(0 0 0 -32px);
   }
 
