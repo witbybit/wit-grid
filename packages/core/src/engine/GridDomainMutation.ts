@@ -1029,6 +1029,11 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 					const writeResult = rowModel.replaceRowsStructurally(mutation.rows as TRowData[]);
 					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, 'value-only');
 					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
+					// Every row may carry new data under the same id and order (a React app passing edited
+					// copies), which the reconcile sees as no structural change: without a data
+					// invalidation the repaint finds each visible cell's versions fresh and keeps its old
+					// text until the row is rebound by scrolling.
+					if (writeResult.visualChange === 'full') invalidations.push({ kind: 'full', reason: 'data' });
 					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),
