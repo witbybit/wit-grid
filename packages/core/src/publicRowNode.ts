@@ -74,7 +74,7 @@ export interface GridRowNodeFacadeSource<TRowData = unknown> {
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, field: string, value: unknown): GridWriteResult;
-	batchCellValues(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
+	writeCells(updates: ReadonlyArray<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
 	setExpanded(id: string, expanded: boolean): void;
 	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
@@ -233,12 +233,12 @@ export function createGridRowNodeFacade<TRowData>(
 		setData(data: TRowData): GridWriteResult {
 			const current = getCurrentData();
 			if (!isWriteableLoadedDataRow() || current == null) return rejectedResult(`Row '${input.id}' is not writable in its current state.`);
-			return source.batchCellValues(toRowReplaceUpdates(source, input.id, current, data));
+			return source.writeCells(toRowReplaceUpdates(source, input.id, current, data));
 		},
 		updateData(partial: Partial<TRowData>): GridWriteResult {
 			const current = getCurrentData();
 			if (!isWriteableLoadedDataRow() || current == null) return rejectedResult(`Row '${input.id}' is not writable in its current state.`);
-			return source.batchCellValues(toRowPatchUpdates(source, input.id, current, partial));
+			return source.writeCells(toRowPatchUpdates(source, input.id, current, partial));
 		},
 		setDataValue(field: string, value: unknown): GridWriteResult {
 			if (!isWriteableLoadedDataRow()) return rejectedResult(`Row '${input.id}' is not writable in its current state.`);

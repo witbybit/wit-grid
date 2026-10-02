@@ -666,10 +666,7 @@ export class GridTraceReplay {
 			result = store.setCellValue(command.rowId, command.colField, command.value);
 			cells = [readCell(store, command.rowId, command.colField)];
 		} else if (command.kind === 'batch-cells') {
-			result = store.batchCellValues(
-				command.updates.map((update) => ({ ...update })),
-				'api'
-			);
+			result = store.transaction({ cells: command.updates.map((update) => ({ ...update })) });
 			cells = command.updates.map((update) => readCell(store, update.rowId, update.colField));
 		} else if (command.kind === 'select-cell') {
 			store.selectCell({ rowId: command.rowId, colField: command.colField });

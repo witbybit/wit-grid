@@ -2,14 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
 import type { RowDataTransaction } from '../api/GridApi.js';
 import type { RowNodeTransaction } from '../rowTransactions.js';
+import type { GridEngineTransaction } from './GridEngine.js';
+import type { GridTransactionResult } from '../api/GridApi.js';
 
 type Row = { id: string; v: number };
 
-/** A tiny ordered store with applyTransaction semantics, to compare queued vs sequential results. */
+/** A tiny ordered store with transaction semantics, to compare queued vs sequential results. */
 function makeStore(initial: Row[]) {
 	let rows = initial.slice();
 	const applied: RowDataTransaction<Row>[] = [];
-	const apply = (tx: RowDataTransaction<Row>): RowNodeTransaction<Row> => {
+	const apply = (engineTx: GridEngineTransaction<Row>): GridTransactionResult<Row> => {
+		const tx = engineTx.rows ?? {};
 		applied.push(tx);
 		const node = (row: Row) => ({ id: row.id, data: row }) as unknown as RowNodeTransaction<Row>['add'][number];
 		const removedIds = new Set((tx.remove ?? []).map((r) => r.id));
@@ -26,7 +29,11 @@ function makeStore(initial: Row[]) {
 		const adds = tx.add ?? [];
 		if (tx.addIndex !== undefined) rows.splice(tx.addIndex, 0, ...adds);
 		else rows.push(...adds);
-		return { add: adds.map(node), update: updated.map(node), remove: removed.map(node) };
+		return {
+			status: 'applied',
+			rows: { add: adds.map(node), update: updated.map(node), remove: removed.map(node) } as RowNodeTransaction<Row>,
+			cells: { committed: [], rejected: [] },
+		} as unknown as GridTransactionResult<Row>;
 	};
 	return {
 		apply,
@@ -58,7 +65,7 @@ describe('AsyncTransactionQueue', () => {
 	it('combines independent transactions into one applied transaction', () => {
 		const store = makeStore(rows(5));
 		const { queue, runScheduled } = makeQueue(store);
-		for (let i = 0; i < 5; i++) queue.enqueue({ update: [{ id: `r${i}`, v: 100 + i }] });
+		for (let i = 0; i < 5; i++) queue.enqueue({ rows: { update: [{ id: `r${i}`, v: 100 + i }] } });
 		expect(store.applied).toHaveLength(0);
 		runScheduled();
 		expect(store.applied).toHaveLength(1);
@@ -77,11 +84,11 @@ describe('AsyncTransactionQueue', () => {
 			{ add: [{ id: 'n1', v: 9 }] }, // re-added after removal
 		];
 		const sequential = makeStore(rows(4));
-		for (const tx of txs) sequential.apply(tx);
+		for (const tx of txs) sequential.apply({ rows: tx });
 
 		const queued = makeStore(rows(4));
 		const { queue } = makeQueue(queued);
-		for (const tx of txs) queue.enqueue(tx);
+		for (const tx of txs) queue.enqueue({ rows: tx });
 		queue.flush();
 
 		expect(queued.rows).toEqual(sequential.rows);
@@ -93,31 +100,44 @@ describe('AsyncTransactionQueue', () => {
 		const { queue } = makeQueue(store);
 		const a = vi.fn();
 		const b = vi.fn();
-		queue.enqueue({ update: [{ id: 'r0', v: 7 }] }, a);
-		queue.enqueue({ add: [{ id: 'x', v: 8 }], remove: [{ id: 'r2', v: 2 }] }, b);
+		queue.enqueue({ rows: { update: [{ id: 'r0', v: 7 }] } }, a);
+		queue.enqueue({ rows: { add: [{ id: 'x', v: 8 }], remove: [{ id: 'r2', v: 2 }] } }, b);
 		queue.flush();
-		expect(a.mock.calls[0][0].update.map((n: { id: string }) => n.id)).toEqual(['r0']);
-		expect(a.mock.calls[0][0].add).toEqual([]);
-		expect(b.mock.calls[0][0].add.map((n: { id: string }) => n.id)).toEqual(['x']);
-		expect(b.mock.calls[0][0].remove.map((n: { id: string }) => n.id)).toEqual(['r2']);
+		expect(a.mock.calls[0][0].rows.update.map((n: { id: string }) => n.id)).toEqual(['r0']);
+		expect(a.mock.calls[0][0].rows.add).toEqual([]);
+		expect(b.mock.calls[0][0].rows.add.map((n: { id: string }) => n.id)).toEqual(['x']);
+		expect(b.mock.calls[0][0].rows.remove.map((n: { id: string }) => n.id)).toEqual(['r2']);
 	});
 
 	it('schedules one flush for many enqueues, and a manual flush cancels it', () => {
 		const store = makeStore(rows(2));
 		const schedule = vi.fn(() => () => {});
 		const queue = new AsyncTransactionQueue<Row>({ apply: store.apply, getRowId: (r) => r.id, schedule });
-		queue.enqueue({ update: [{ id: 'r0', v: 1 }] });
-		queue.enqueue({ update: [{ id: 'r1', v: 1 }] });
+		queue.enqueue({ rows: { update: [{ id: 'r0', v: 1 }] } });
+		queue.enqueue({ rows: { update: [{ id: 'r1', v: 1 }] } });
 		expect(schedule).toHaveBeenCalledTimes(1);
 		queue.flush();
 		expect(queue.pendingCount).toBe(0);
+	});
+
+	it('applies a transaction with cell writes on its own, in order, between merged row transactions', () => {
+		const store = makeStore(rows(4));
+		const { queue } = makeQueue(store);
+		queue.enqueue({ rows: { update: [{ id: 'r0', v: 10 }] } });
+		queue.enqueue({ rows: { update: [{ id: 'r1', v: 11 }] } });
+		queue.enqueue({ cells: [{ rowId: 'r2', colField: 'v', value: 12 }] });
+		queue.enqueue({ rows: { update: [{ id: 'r3', v: 13 }] } });
+		queue.flush();
+		// r0+r1 merged, the cell transaction alone (no row part), then r3.
+		expect(store.applied).toHaveLength(3);
+		expect(store.rows.map((r) => r.v)).toEqual([10, 11, 2, 13]);
 	});
 
 	it('drops pending transactions on destroy without calling back', () => {
 		const store = makeStore(rows(2));
 		const { queue } = makeQueue(store);
 		const cb = vi.fn();
-		queue.enqueue({ update: [{ id: 'r0', v: 1 }] }, cb);
+		queue.enqueue({ rows: { update: [{ id: 'r0', v: 1 }] } }, cb);
 		queue.destroy();
 		queue.flush();
 		expect(store.applied).toHaveLength(0);
@@ -165,10 +185,10 @@ describe('AsyncTransactionQueue – randomized equivalence with sequential appli
 				txs.push(tx);
 			}
 			const sequential = makeStore(start);
-			for (const tx of txs) sequential.apply(tx);
+			for (const tx of txs) sequential.apply({ rows: tx });
 			const queued = makeStore(start);
 			const { queue } = makeQueue(queued);
-			for (const tx of txs) queue.enqueue(tx);
+			for (const tx of txs) queue.enqueue({ rows: tx });
 			queue.flush();
 			expect(queued.rows, `trial ${trial}`).toEqual(sequential.rows);
 		}

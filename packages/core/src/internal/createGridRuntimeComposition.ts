@@ -62,11 +62,8 @@ export function createGridRuntimeComposition<TRowData>({
 		isRowLoading: (rowId: string) => runtime.isRowLoading(rowId),
 		getDataRowAtVisualIndex: (index: number) => runtime.getDataRowAtVisualIndex(index),
 		setRows: (rows: TRowData[]) => runtime.setRows(rows),
-		updateRows: (updater: (rows: TRowData[]) => TRowData[]) => runtime.updateRows(updater),
-		applyTransaction: (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => runtime.applyTransaction(transaction),
-		applyTransactionAsync: (transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void) =>
-			runtime.applyTransactionAsync(transaction, callback),
-		flushAsyncTransactions: () => runtime.flushAsyncTransactions(),
+		transaction: runtime.transaction,
+		flushTransactions: () => runtime.flushTransactions(),
 		getRowOrder: () => runtime.getRowOrder(),
 		setRowOrder: (rowIds: string[]) => runtime.setRowOrder(rowIds),
 		refreshRows: () => runtime.refreshRows(),
@@ -87,11 +84,6 @@ export function createGridRuntimeComposition<TRowData>({
 		setFormula: (rowId: string, colField: string, formula: string) => runtime.setFormula(rowId, colField, formula),
 		clearFormula: (rowId: string, colField: string) => runtime.clearFormula(rowId, colField),
 		setCellValue: (rowId: string, colField: string, value: unknown) => runtime.setCellValue(rowId, colField, value),
-		setCellValueAsync: (rowId: string, colField: string, value: unknown) => runtime.setCellValueAsync(rowId, colField, value),
-		batchCellValues: (updates: { rowId: string; colField: string; value: unknown }[], source?: 'paste' | 'api' | 'fill') =>
-			runtime.batchCellValues(updates, source),
-		batchCellValuesAsync: (updates: { rowId: string; colField: string; value: unknown }[], source?: 'paste' | 'api' | 'fill') =>
-			runtime.batchCellValuesAsync(updates, source),
 		selectCell: (pointer: GridCellPointer | null, source?: GridSelectionSource) => runtime.selectCell(pointer, source),
 		selectRange: (start: GridCellPointer | null, end: GridCellPointer | null, source?: GridSelectionSource) =>
 			runtime.selectRange(start, end, source),

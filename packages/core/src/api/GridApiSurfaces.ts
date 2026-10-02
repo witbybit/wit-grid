@@ -34,7 +34,7 @@ import type {
 	ActiveEditState,
 	AutoSizeAllColumnsOptions,
 	AutoSizeColumnOptions,
-	BatchCellValueUpdate,
+	GridCellWrite,
 	CellState,
 	CellSubscription,
 	GridCellAccess,
@@ -49,6 +49,9 @@ import type {
 	GridSnapshotSelectorListener,
 	GridStateSnapshot,
 	GridWriteResult,
+	GridTransaction,
+	GridTransactionOptions,
+	GridTransactionResult,
 	RowDataTransaction,
 	RowSelectionChangeResult,
 	RowSelectionGesture,
@@ -63,17 +66,22 @@ export interface GridDataApi<TRowData = unknown> {
 	isRowLoading(rowId: string): boolean;
 	getDataRowAtVisualIndex(index: number): TRowData | null;
 	setRows(rows: TRowData[]): GridWriteResult;
-	updateRows(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult;
-	applyTransaction(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null;
 	/**
-	 * Queues a transaction to apply with others before the next frame, in call order. Independent
-	 * transactions are applied together as one commit and one render, which suits high-frequency
-	 * feeds. The callback receives this transaction's own result. Any synchronous write (including
-	 * applyTransaction) applies the queue first, so writes always land in the order they were made.
+	 * The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)
+	 * commit atomically — one change, one undo entry, one repaint of what changed — with any grid
+	 * state (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it
+	 * with other queued row-only transactions into one commit before the next frame (high-frequency
+	 * feeds), awaits async validation of its cells, and resolves once committed. Any synchronous
+	 * write commits the queue first, so writes land in call order.
 	 */
-	applyTransactionAsync(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void;
-	/** Applies queued applyTransactionAsync transactions immediately. */
-	flushAsyncTransactions(): void;
+	transaction(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>;
+	transaction(transaction: GridTransaction<TRowData>, options: GridTransactionOptions & { async: true }): Promise<GridTransactionResult<TRowData>>;
+	transaction(
+		transaction: GridTransaction<TRowData>,
+		options?: GridTransactionOptions
+	): GridTransactionResult<TRowData> | Promise<GridTransactionResult<TRowData>>;
+	/** Commits queued async transactions now. */
+	flushTransactions(): void;
 	getRowOrder(): string[];
 	setRowOrder(rowIds: string[]): GridWriteResult;
 	refreshRows(): void;
@@ -93,10 +101,8 @@ export interface GridDataApi<TRowData = unknown> {
 	hasFormula(rowId: string, colField: string): boolean;
 	setFormula(rowId: string, colField: string, formula: string): void;
 	clearFormula(rowId: string, colField: string): void;
+	/** One cell: shorthand for `transaction({ cells: [{ rowId, colField, value }] })`. */
 	setCellValue(rowId: string, colField: string, value: unknown): GridWriteResult;
-	setCellValueAsync(rowId: string, colField: string, value: unknown): Promise<GridWriteResult>;
-	batchCellValues(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): GridWriteResult;
-	batchCellValuesAsync(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): Promise<GridWriteResult>;
 	getRowNode(rowId: string): GridRowNode<TRowData> | undefined;
 	getDisplayedRowAtIndex(index: number): GridRowNode<TRowData> | undefined;
 	getRowIndexById(rowId: string): number | undefined;

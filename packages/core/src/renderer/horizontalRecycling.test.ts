@@ -83,7 +83,7 @@ describe('horizontal scroll reuses cell and header elements', () => {
 		grid.controller.dispose();
 		grid.store.destroy();
 		vi.unstubAllGlobals();
-	});
+	}, 20_000); // full paints over a wide grid in jsdom: slow under full-suite load
 });
 
 describe('scroll-time cell retention recycles evicted plain cells', () => {

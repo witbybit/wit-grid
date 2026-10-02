@@ -9,7 +9,7 @@ interface Row {
 }
 
 describe('RowCtrlStore — row-removal hook wired into GridEngine', () => {
-	it('a row removed via applyTransaction is swept from RowCtrlStore, not leaked forever', () => {
+	it('a row removed via transaction is swept from RowCtrlStore, not leaked forever', () => {
 		const columns: ColumnDef<Row>[] = [{ field: 'name', header: 'Name' }];
 		const store = new GridStore<Row>({ columns, getRowId: (r) => r.id });
 		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
@@ -31,7 +31,7 @@ describe('RowCtrlStore — row-removal hook wired into GridEngine', () => {
 		rowCtrl.cellKeysByColumnInstanceId.set('x' as any, cellCtrl.key);
 		expect(store.engine.rowCtrls.get('r1')).toBeDefined();
 
-		store.applyTransaction({ remove: [{ id: 'r1', name: 'A' }] });
+		store.transaction({ rows: { remove: [{ id: 'r1', name: 'A' }] } });
 
 		expect(store.engine.rowCtrls.get('r1')).toBeUndefined();
 		// r2 was never removed — its slot (if any) is untouched by the sweep.
@@ -50,8 +50,8 @@ describe('RowCtrlStore — row-removal hook wired into GridEngine', () => {
 		});
 
 		const rowCtrl = store.engine.rowCtrls.getOrCreate('r1');
-		store.applyTransaction({ add: [{ id: 'r2', name: 'B' }] });
-		store.applyTransaction({ update: [{ id: 'r1', name: 'A-updated' }] });
+		store.transaction({ rows: { add: [{ id: 'r2', name: 'B' }] } });
+		store.transaction({ rows: { update: [{ id: 'r1', name: 'A-updated' }] } });
 
 		expect(store.engine.rowCtrls.get('r1')).toBe(rowCtrl);
 

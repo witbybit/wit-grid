@@ -192,7 +192,7 @@ describe('ClipboardController', () => {
 
 		// clip.readText must have been called (proves paste reached clipboard read)
 		expect(clip.readText).toHaveBeenCalled();
-		// cellsPasted event proves batchCellValues ran
+		// cellsPasted event proves the cell transaction ran
 		const cellsPastedHandler = vi.fn();
 		// Check the row's raw data was updated
 		const row = store.getRowModel()?.getRawRowById('1');
@@ -287,7 +287,12 @@ describe('ClipboardController', () => {
 		const ctrl = makeController(store);
 		const handler = vi.fn();
 		store.addEventListener(GridEventName.cellsPasted, handler);
-		vi.spyOn(store.engine, 'batchCellValues').mockReturnValue({ status: 'rejected', reason: 'blocked' });
+		vi.spyOn(store.engine, 'transaction').mockReturnValue({
+			status: 'rejected',
+			reason: 'blocked',
+			rows: { add: [], update: [], remove: [] },
+			cells: { committed: [], rejected: [] },
+		});
 
 		clip.setStored('Gamma');
 		store.selectCell({ rowId: '1', colField: 'name' });

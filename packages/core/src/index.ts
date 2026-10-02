@@ -225,7 +225,7 @@ export {
 } from './filterOperations.js';
 export type { CsvExportOptions } from './export/csvExport.js';
 export type { GridContextMenuItem, GridContextMenuOptions } from './contextMenu.js';
-export type { BatchCellValueUpdate } from './api/GridApi.js';
+export type { GridCellWrite, GridTransaction, GridTransactionOptions, GridTransactionResult } from './api/GridApi.js';
 export type {
 	GridIntegrityApi,
 	GridCommitResult,

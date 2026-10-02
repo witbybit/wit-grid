@@ -484,7 +484,7 @@ export default function CrudValidationDemo({ onGridReady, editTrigger, arrowKeyN
 		const api = apiRef.current;
 		if (!api) return;
 		const newRow = makeEmployee();
-		api.applyTransaction({ add: [newRow] });
+		api.transaction({ rows: { add: [newRow] } });
 	}, []);
 
 	const handleWriteBlocked = useCallback((blocked: GridWriteBlockedEventPayload) => {

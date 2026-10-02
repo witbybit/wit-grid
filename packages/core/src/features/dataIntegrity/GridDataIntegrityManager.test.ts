@@ -60,7 +60,7 @@ function recreateManager(store: GridStore<TestRow>): GridDataIntegrityManager<Te
 			rowModelKind: 'client',
 		}),
 		capabilityManager: engine.capabilityManager,
-		commitCells: (updates) => engine.batchCellValues(updates as { rowId: string; colField: string; value: unknown }[], 'api'),
+		commitCells: (updates) => engine.transaction({ cells: updates as { rowId: string; colField: string; value: unknown }[], source: 'api' }),
 		applyRowPatch: (rowId, patch) => {
 			if (!store.getRowNodeById(rowId)?.data) {
 				return {
@@ -68,7 +68,12 @@ function recreateManager(store: GridStore<TestRow>): GridDataIntegrityManager<Te
 					reason: 'row unavailable in current row-model scope',
 				} as const;
 			}
-			return store.updateRows((rows) => rows.map((row) => (row.id === rowId ? ({ ...row, ...patch } as TestRow) : row)));
+			return store.setRows(
+				store
+					.rows()
+					.getAll()
+					.map((row) => (row.id === rowId ? ({ ...row, ...patch } as TestRow) : row))
+			);
 		},
 		requestIntegrityRepaint: () => {},
 	});

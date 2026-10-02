@@ -116,6 +116,8 @@ import type {
 	RowDataTransaction,
 	RowNodeTransaction,
 	GridTransaction,
+	GridTransactionOptions,
+	GridTransactionResult,
 	RowSelectionGesture,
 	RowSelectionChangeResult,
 	SelectRowsOptions,
@@ -304,7 +306,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			deselectRows: (rowIds) => this.deselectRows(rowIds),
 			scrollToRow: (rowId, options) => this.scrollToRow(rowId, options),
 			setCellValue: (rowId, colField, value) => this.setCellValue(rowId, colField, value),
-			batchCellValues: (updates, source) => this.engine.batchCellValues(updates, source),
+			writeCells: (updates) => this.engine.transaction({ cells: updates }),
 			setExpanded: (id, expanded) => this.setExpanded(id, expanded),
 			setDetailOpen: (rowId, open) => this.setDetailOpen(rowId, open),
 			refreshRows: () => this.refreshRows(),
@@ -433,32 +435,11 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	/**
-	 * Updates a single cell value. Triggers valueSetter, undo history, and formula recalculation.
-	 *
-	 * For bulk mutations prefer `updateRows` (functional mapper) or `applyTransaction`
-	 * (structured add/remove/update). Calling this in a loop fires O(N) individual
-	 * invalidations instead of one coalesced batch.
+	 * Writes one cell: shorthand for `transaction({ cells: [{ rowId, colField, value }] })`. Runs the
+	 * column's value setter, validation, formulas and undo. Several cells, or rows and cells together,
+	 * go in one `transaction` (one change, one undo entry).
 	 */
 	public setCellValue = (rowId: string, colField: string, value: unknown): GridWriteResult => this.engine.setCellValue(rowId, colField, value);
-
-	public setCellValueAsync = (rowId: string, colField: string, value: unknown): Promise<GridWriteResult> =>
-		this.engine.setCellValueAsync(rowId, colField, value);
-
-	/**
-	 * Applies multiple cell value writes as a single atomic operation.
-	 * valueSetter runs per-cell, but notifications, cellValueChanged events, and undo
-	 * are coalesced — one RAF flush and one undo entry for the entire batch.
-	 * Use this instead of looping setCellValue for paste, clear, and programmatic bulk edits.
-	 */
-	public batchCellValues = (
-		updates: { rowId: string; colField: string; value: unknown }[],
-		source: 'paste' | 'api' | 'fill' = 'api'
-	): GridWriteResult => this.engine.batchCellValues(updates, source);
-
-	public batchCellValuesAsync = (
-		updates: { rowId: string; colField: string; value: unknown }[],
-		source: 'paste' | 'api' | 'fill' = 'api'
-	): Promise<GridWriteResult> => this.engine.batchCellValuesAsync(updates, source);
 
 	public getCellState = (rowId: string, colField: string): CellState => {
 		const column = this.engine.columns.getColumnDef(colField);
@@ -1003,50 +984,47 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public getRowOrder = (): string[] => this.getClientStructuralRowModel()?.getRowOrder() ?? [];
 	public setRowOrder = (rowIds: string[]): GridWriteResult => this.engine.setRowOrder(rowIds);
 
-	public updateRows = (updater: (rows: TRowData[]) => TRowData[]): GridWriteResult => {
-		this.assertClientStructuralRowModel('updateRows');
-		return this.engine.updateRows(updater);
-	};
-
-	public applyTransaction = (transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {
-		return this.engine.applyTransaction(transaction);
-	};
-
-	public applyTransactionAsync = (
-		transaction: RowDataTransaction<TRowData>,
-		callback?: (result: RowNodeTransaction<TRowData> | null) => void
-	): void => {
-		this.engine.applyTransactionAsync(transaction, callback);
-	};
-
-	public flushAsyncTransactions = (): void => {
-		this.engine.flushAsyncTransactions();
-	};
-
-	public transaction = (transaction: GridTransaction<TRowData>): RowNodeTransaction<TRowData> | null => {
-		let rowResult: RowNodeTransaction<TRowData> | null = null;
+	/**
+	 * The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)
+	 * commit atomically — one change, one undo entry, one repaint of what changed — together with
+	 * any grid state (columns, sort, filter, pins) in the same call. With `{ async: true }` it is
+	 * queued, merged with other queued row-only transactions into one commit before the next frame,
+	 * and resolves once committed.
+	 */
+	public transaction: {
+		(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>;
+		(transaction: GridTransaction<TRowData>, options: GridTransactionOptions & { async: true }): Promise<GridTransactionResult<TRowData>>;
+		(
+			transaction: GridTransaction<TRowData>,
+			options?: GridTransactionOptions
+		): GridTransactionResult<TRowData> | Promise<GridTransactionResult<TRowData>>;
+	} = ((transaction: GridTransaction<TRowData>, options?: GridTransactionOptions) => {
+		const { rows, cells, source } = transaction;
+		const hasState = !!transaction.columns || 'sortModel' in transaction || 'filterModel' in transaction || !!transaction.pins;
+		const applyState = hasState ? () => this.applyTransactionState(transaction) : undefined;
+		if (rows) this.assertClientStructuralRowModel('transaction');
+		const engineTransaction = { rows, cells, source, applyState };
+		if (options?.async) return this.engine.transactionAsync(engineTransaction);
+		if (!applyState) return this.engine.transaction(engineTransaction);
+		let result: GridTransactionResult<TRowData> | undefined;
 		this.engine.batch(() => {
-			if (transaction.columns) {
-				this.setColumns(transaction.columns);
-			}
-			if (transaction.rows) {
-				this.setRows(transaction.rows);
-			}
-			if (transaction.rowTransaction) {
-				rowResult = this.applyTransaction(transaction.rowTransaction);
-			}
-			if ('sortModel' in transaction) {
-				this.setSortModel(transaction.sortModel ?? null);
-			}
-			if ('filterModel' in transaction) {
-				this.setFilterModel(transaction.filterModel ?? null);
-			}
-			if (transaction.pins) {
-				this.setViewportPins(transaction.pins);
-			}
+			applyState();
+			result = this.engine.transaction({ rows, cells, source });
 		});
-		return rowResult;
+		return result!;
+	}) as GridStore<TRowData>['transaction'];
+
+	/** Commits queued async transactions now. */
+	public flushTransactions = (): void => {
+		this.engine.flushTransactions();
 	};
+
+	private applyTransactionState(transaction: GridTransaction<TRowData>): void {
+		if (transaction.columns) this.setColumns(transaction.columns);
+		if ('sortModel' in transaction) this.setSortModel(transaction.sortModel ?? null);
+		if ('filterModel' in transaction) this.setFilterModel(transaction.filterModel ?? null);
+		if (transaction.pins) this.setViewportPins(transaction.pins);
+	}
 
 	public refreshRows = (): void => {
 		this.getRowModel()?.refresh();

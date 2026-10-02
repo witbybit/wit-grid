@@ -295,6 +295,21 @@ export function installMeasurement(options: {
 	};
 }
 
+/**
+ * Tick scenarios: each tick hands the grid a new rows array in which one visible row is an edited
+ * copy — what a React app does with immutable state. `replace` gives the array to the grid.
+ */
+export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) => void): void {
+	let rows = initial;
+	(window as unknown as { benchTick: (i: number) => void }).benchTick = (i: number) => {
+		const k = i % 12;
+		const next = rows.slice();
+		next[k] = { ...rows[k], c1: (Number(rows[k].c1) + 1) % 1000 };
+		rows = next;
+		replace(next);
+	};
+}
+
 export function markReady(): void {
 	(window as unknown as { benchReady: boolean }).benchReady = true;
 }

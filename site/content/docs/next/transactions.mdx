@@ -1,26 +1,28 @@
 ---
-title: Row Transactions
-description: Add, update and remove rows without replacing the whole dataset, synchronously or batched per frame.
+title: Transactions
+description: One call to change rows and cells together, atomically, synchronously or batched per frame.
 icon: ArrowLeftRight
 ---
 
-A transaction changes some rows and leaves the rest alone. Wit Grid keeps sort, filter, grouping, selection
-and scroll position through it, and only reworks the rows the transaction touches. Transactions are available
-on the client-side row model.
+`api.transaction()` is the one way to write data. A transaction can add, update and remove rows, write cells,
+and change grid state (columns, sort, filter, pins), and it commits all of it as one change: one undo entry, one
+repaint of what changed. Wit Grid keeps sort, filter, grouping, selection and scroll position through it, and
+only reworks the rows and cells the transaction touches. Row changes are available on the client-side row model.
 
 ## Choosing a write
 
-| Method                               | Use it for                                                         |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| `setRows(rows)`                      | Replacing the whole dataset, such as loading a new file.           |
-| `updateRows(updater)`                | Rewriting many rows with a function over the current rows.         |
-| `applyTransaction(transaction)`      | Adding, updating or removing specific rows, applied immediately.   |
-| `applyTransactionAsync(transaction)` | High-frequency changes, applied together before the next frame.    |
-| `setCellValue(rowId, field, value)`  | Changing one cell, with the column's validation and editing rules. |
+| Method                              | Use it for                                                                 |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| `setRows(rows)`                     | Handing the grid your latest rows array. Only the rows that differ update. |
+| `transaction(tx)`                   | Adding, updating or removing rows and writing cells, applied immediately.  |
+| `transaction(tx, { async: true })`  | High-frequency changes, applied together before the next frame.            |
+| `setCellValue(rowId, field, value)` | Shorthand for a transaction with one cell write.                           |
+| `flushTransactions()`               | Committing queued async transactions now.                                  |
 
-## `applyTransaction`
+## `transaction`
 
-A transaction lists rows to add, update and remove. Rows are matched to existing rows by `getRowId`.
+A transaction lists rows to add, update and remove, and cells to write. Rows are matched to existing rows by
+`getRowId`.
 
 ```tsx
 import type { GridApi } from '@eregister/wit-grid-react';
@@ -28,31 +30,87 @@ import type { GridApi } from '@eregister/wit-grid-react';
 type Trade = { id: string; symbol: string; price: number };
 
 export function applyFills(api: GridApi<Trade>) {
-	const result = api.applyTransaction({
-		add: [{ id: 't-104', symbol: 'MSFT', price: 431.2 }],
-		update: [{ id: 't-101', symbol: 'AAPL', price: 227.9 }],
-		remove: [{ id: 't-099', symbol: 'TSLA', price: 0 }],
+	const result = api.transaction({
+		rows: {
+			add: [{ id: 't-104', symbol: 'MSFT', price: 431.2 }],
+			update: [{ id: 't-101', symbol: 'AAPL', price: 227.9 }],
+			remove: [{ id: 't-099', symbol: 'TSLA', price: 0 }],
+		},
 	});
-	// result lists the row nodes that were added, updated and removed, or is null if the
-	// row model does not support transactions.
-	return result;
+	// result.status is 'applied', 'noop' or 'rejected'; result.rows lists the row nodes that were
+	// added, updated and removed (empty lists when there were none).
+	return result.rows.add[0];
 }
 ```
 
-| Field      | Effect                                                                                               |
-| ---------- | ---------------------------------------------------------------------------------------------------- |
-| `add`      | Rows to insert. They are appended in source order unless `addIndex` is set.                          |
-| `addIndex` | Source position to insert the added rows at.                                                         |
-| `update`   | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored. |
-| `remove`   | Rows to remove, matched by id. Only the id needs to be right.                                        |
+| Field                                         | Effect                                                                                                  |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `rows.add`                                    | Rows to insert. They are appended in source order unless `rows.addIndex` is set.                        |
+| `rows.addIndex`                               | Source position to insert the added rows at.                                                            |
+| `rows.update`                                 | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored.    |
+| `rows.remove`                                 | Rows to remove, matched by id. Only the id needs to be right.                                           |
+| `cells`                                       | Cell writes, `{ rowId, colField, value }`, through each column's value setter, formulas and validation. |
+| `source`                                      | Where the cell writes come from: `'api'` (default), `'paste'` or `'fill'`. Picks the validation policy. |
+| `columns`, `sortModel`, `filterModel`, `pins` | Grid state applied in the same commit.                                                                  |
 
-A transaction is one undo step: `api.undo()` reverts all of it. Small transactions update the displayed order
-in place, re-sorting and re-filtering only the rows they touch; large ones rebuild the view once.
+The result is the write status plus what was touched:
 
-## `applyTransactionAsync`
+- `status`: `'applied'`, `'noop'` when nothing changed, or `'rejected'` (with a `reason`).
+- `rows`: the public row nodes that were added, updated and removed.
+- `cells`: `committed` (the writes that landed) and `rejected` (each with the `reason`).
+
+A transaction is atomic and one undo step: `api.undo()` reverts all of it, rows and cells together. Small
+transactions update the displayed order in place, re-sorting and re-filtering only the rows they touch; large
+ones rebuild the view once.
+
+### Rows and cells together
+
+```tsx
+import type { GridApi } from '@eregister/wit-grid-react';
+
+type Line = { id: string; qty: number; price: number; total: number };
+
+export function addLineAndDiscount(api: GridApi<Line>) {
+	return api.transaction({
+		rows: { add: [{ id: 'l-9', qty: 1, price: 40, total: 40 }] },
+		cells: [{ rowId: 'l-1', colField: 'price', value: 18 }],
+	});
+}
+```
+
+Cell writes are checked before anything commits. If a cell is rejected by validation the whole transaction is
+rejected and nothing changes.
+
+## `setRows`
+
+`setRows(rows)` takes the full dataset and works out what changed: rows are matched by id, a row passed as the
+same object is untouched, a new object for a known id is compared field by field, and ids that appear or
+disappear are added or removed. That makes it the natural call for immutable state, such as a store or a React
+`useState` array where you replace one row and keep the rest:
+
+```tsx
+import type { GridApi } from '@eregister/wit-grid-react';
+
+type Task = { id: string; title: string; done: boolean };
+
+export function toggle(api: GridApi<Task>, tasks: Task[], id: string) {
+	api.setRows(tasks.map((task) => (task.id === id ? { ...task, done: !task.done } : task)));
+}
+```
+
+Only the edited row repaints, and selection, scroll position and the rest of the grid are left alone. To read
+the current rows for a change like this, use `api.rows().getAll()`.
+
+## `setCellValue`
+
+`api.setCellValue(rowId, field, value)` changes one cell with the column's validation and editing rules. It is
+shorthand for `transaction({ cells: [{ rowId, colField: field, value }] })`.
+
+## Async transactions
 
 For data that arrives many times a second, such as a price feed or a websocket stream, queue each change with
-`applyTransactionAsync`. Queued transactions are applied together just before the next frame.
+`transaction(tx, { async: true })`. Queued transactions are committed together just before the next frame, and
+the returned promise resolves with that transaction's result once it has committed.
 
 ```tsx
 import type { GridApi } from '@eregister/wit-grid-react';
@@ -62,19 +120,22 @@ type Quote = { id: string; bid: number; ask: number };
 export function connectFeed(api: GridApi<Quote>, socket: WebSocket) {
 	socket.addEventListener('message', (event) => {
 		const quote = JSON.parse(String(event.data)) as Quote;
-		api.applyTransactionAsync({ update: [quote] });
+		void api.transaction({ rows: { update: [quote] } }, { async: true });
 	});
 }
 ```
 
 - **Order is kept.** Transactions are applied in the order they were queued. Any synchronous write, such as
-  `applyTransaction`, `setRows` or `setCellValue`, applies the queue first, so writes always land in the order
+  `transaction`, `setRows` or `setCellValue`, applies the queue first, so writes always land in the order
   your code made them.
-- **Independent changes are combined.** Consecutive transactions that touch different rows are applied as one
-  transaction: one commit, one pass over the row model and one render. A transaction that touches a row changed
-  earlier in the same batch, or that uses `addIndex`, is applied separately, so no intermediate change is lost.
-- **Each transaction gets its own result.** Pass a callback as the second argument to receive the row nodes
-  that transaction added, updated or removed.
+- **Independent changes are combined.** Consecutive row-only transactions that touch different rows are applied
+  as one transaction: one commit, one pass over the row model and one render. A transaction that touches a row
+  changed earlier in the same batch, that uses `addIndex`, or that writes cells or grid state is applied on its
+  own, so no intermediate change is lost.
+- **Each transaction gets its own result.** The promise resolves with the row nodes that transaction added,
+  updated or removed.
+- **Async validation is awaited.** If a cell rule is asynchronous, the transaction waits for it before it is
+  queued, and resolves as rejected if validation blocks it.
 - **One undo step per batch** when transactions were combined.
 
 ```tsx
@@ -82,24 +143,24 @@ import type { GridApi } from '@eregister/wit-grid-react';
 
 type Order = { id: string; status: string };
 
-export function markFilled(api: GridApi<Order>, order: Order) {
-	api.applyTransactionAsync({ update: [{ ...order, status: 'filled' }] }, (result) => {
-		console.log(
-			'updated',
-			result?.update.map((node) => node.id)
-		);
-	});
+export async function markFilled(api: GridApi<Order>, order: Order) {
+	const result = await api.transaction({ rows: { update: [{ ...order, status: 'filled' }] } }, { async: true });
+	console.log(
+		'updated',
+		result.rows.update.map((node) => node.id)
+	);
 }
 ```
 
-Call `api.flushAsyncTransactions()` to apply the queue immediately. Destroying the grid drops anything still
-queued, and those callbacks are not called.
+Call `api.flushTransactions()` to commit the queue immediately. The promises resolve a moment after the flush,
+so `await` them when you need the result. Destroying the grid drops anything still queued, and those promises
+never resolve.
 
 ### Timing
 
-By default the queue is applied on the next animation frame. To collect changes over a longer window, set
-`asyncTransactionWaitMs` in the grid's initial state; the queue is then applied that many milliseconds after the
-first queued transaction.
+By default the queue is committed on the next animation frame. To collect changes over a longer window, set
+`asyncTransactionWaitMs` in the grid's initial state; the queue is then committed that many milliseconds after
+the first queued transaction.
 
 ```tsx
 import { Grid } from '@eregister/wit-grid-react';
@@ -113,9 +174,17 @@ export function TickerGrid({ ticks }: { ticks: Tick[] }) {
 }
 ```
 
+## Data integrity
+
+Row-level writes keep validation current. After `setRows` or a transaction (sync or async) commits, the rows it
+changed or added are re-validated against every cell and row rule, and the rows it removed drop their issues.
+This runs after the commit and never blocks the write. Set `validation.validateOnTransaction` to `false` to turn
+it off; it defaults to the value of `validateOnEdit`. Cell writes are different: they are validated before they
+commit, and a rejected cell rejects the transaction.
+
 ## Row models
 
-Transactions change rows the grid holds in memory, so they work with the client-side row model. With the
-infinite and server-side row models the server owns the data: refresh from the server instead (see
-[Server-side data](/docs/next/server-side-data)). On those models `applyTransaction` returns `null` and
-changes nothing.
+Row changes work on rows the grid holds in memory, so they need the client-side row model. With the infinite and
+server-side row models the server owns the data: refresh from the server instead (see
+[Server-side data](/docs/next/server-side-data)). On those models a transaction with `rows` throws an
+unsupported-operation error and changes nothing.

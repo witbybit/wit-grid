@@ -10,6 +10,7 @@ import type {
 	GridSelectionSource,
 	GridWriteRejection,
 	GridWriteResult,
+	GridTransactionResult,
 	RowDataTransaction,
 	RowNodeTransaction,
 	RowSelectionChangeResult,
@@ -303,11 +304,8 @@ export class GridEngine<TRowData = unknown> {
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
 		// Sweep RowCtrl/CellCtrl identity, rowVersions and valueGetter cache entries for rows
-		// permanently removed via a structural transaction (grid.applyTransaction({ remove: [...] })).
-		// Known gap, not a regression: a full row-data replace (setRowData) does not emit
-		// removedNodes (see RowDataStore.setRows/replaceRowsStructurally), so it isn't swept here
-		// (cellDisplaySnapshots are not swept either). A sweep() against the full live-rowId set
-		// would close that gap but costs O(total rows) per event.
+		// permanently removed by a transaction or by setRows (RowDataStore.replaceRows reports the
+		// ids that disappeared). cellDisplaySnapshots are not swept here.
 		this.eventBus.addEventListener(GridEventName.rowsUpdated, (event) => {
 			const removedNodes = event.payload.removedNodes;
 			if (!removedNodes || removedNodes.length === 0) return;
@@ -318,6 +316,31 @@ export class GridEngine<TRowData = unknown> {
 				this.rowVersions.delete(node.id);
 				this.data.clearValueGetterCache(node.id);
 			}
+		});
+		// Data integrity follows every row-level write (setRows, sync and async transactions, their
+		// undo): changed and added rows are re-validated after commit, removed rows lose their issues.
+		this.eventBus.addEventListener(GridEventName.rowsUpdated, (event) => {
+			if (!this.dataIntegrity) return;
+			const changed = event.payload.changedNodes ?? [];
+			const added = event.payload.addedNodes ?? [];
+			const removed = event.payload.removedNodes ?? [];
+			// Populating an empty grid (its first rows arriving) is data loading, not a write to re-validate.
+			const isInitialLoad =
+				changed.length === 0 &&
+				removed.length === 0 &&
+				added.length > 0 &&
+				asRowOrderCapableModel(this.rowModel)?.getSourceRowCount?.() === added.length;
+			const rowIds = isInitialLoad ? [] : [...changed, ...added].map((node) => node.id);
+			const removedRowIds = removed.map((node) => node.id);
+			if (rowIds.length === 0 && removedRowIds.length === 0) return;
+			void this.dataIntegrity.validateRowsAfterWrite(rowIds, removedRowIds).catch((error) => {
+				this.runtimeFaults.report({
+					source: 'grid-change',
+					operation: 'auto-validate-row-writes',
+					error,
+					context: { changed: rowIds.length, removed: removedRowIds.length },
+				});
+			});
 		});
 		this.runtimeFaults = new RuntimeFaultReporter<TRowData>({
 			emit: (fault) => this.eventBus.dispatchEvent(GridEventName.runtimeFault, fault),
@@ -394,7 +417,6 @@ export class GridEngine<TRowData = unknown> {
 			deselectRows: (rowIds) => this.deselectRowIds(rowIds, 'api'),
 			scrollToRow: () => {},
 			setCellValue: (rowId, field, value) => this.setCellValue(rowId, field, value),
-			applyTransaction: (input) => this.applyTransaction(input),
 			refreshRows: () => this.rowModel?.refresh(),
 			getRowModelType: () =>
 				asServerSideControllableRowModel(this.rowModel) ? 'server' : asInfiniteControllableRowModel(this.rowModel) ? 'infinite' : 'client',
@@ -550,7 +572,7 @@ export class GridEngine<TRowData = unknown> {
 			getCellValue: (rowId, colField) => this.data.getCellValue(rowId, colField),
 			getCheapDisplayValue: (rowId, colField) => this.data.getCheapDisplayValue(rowId, colField),
 			getRawRowById: (rowId) => this.rowModel?.getRawRowById(rowId) ?? null,
-			batchCellValues: (updates, source) => this.batchCellValues(updates, source),
+			writeCells: (updates, source) => this.transaction({ cells: updates, source }),
 			dispatchEvent: (type, payload) => this.eventBus.dispatchEvent(type, payload),
 			validateWriteProposal: (updates, source) => this.dataIntegrity?.validateWriteProposal(updates, source) ?? Promise.resolve([]),
 			checkCapability: (action, p) => this.capabilityManager.can(action, p),
@@ -617,7 +639,7 @@ export class GridEngine<TRowData = unknown> {
 				scheduler: defaultGridScheduler,
 				rowProvider,
 				capabilityManager: this.capabilityManager,
-				commitCells: (updates) => this.batchCellValues(updates as import('../api/GridApi.js').BatchCellValueUpdate[], 'api'),
+				commitCells: (updates) => this.transaction({ cells: updates as import('../api/GridApi.js').GridCellWrite[] }),
 				applyRowPatch: (rowId, patch) => {
 					const row = this.rowModel?.getRawRowById(rowId);
 					if (!row) {
@@ -795,43 +817,90 @@ export class GridEngine<TRowData = unknown> {
 		);
 	}
 
-	/** Queued row transactions for applyTransactionAsync; flushed before any other commit. */
+	/** Queued async transactions; flushed before any other commit, so writes land in call order. */
 	private readonly asyncTransactions = new AsyncTransactionQueue<TRowData>({
-		apply: (transaction) => this.applyTransaction(transaction),
+		apply: (item) => this.applyQueuedTransaction(item),
 		getRowId: (row) => this.getRowId(row),
 		schedule: (flush) => scheduleAsyncTransactionFlush(flush, this.asyncTransactionWaitMs),
 	});
 	private asyncTransactionWaitMs: number | undefined;
 
 	/**
-	 * Queues a row transaction and applies it with the others queued before the next frame, in call
-	 * order. Independent transactions (disjoint rows, no addIndex) are applied as one, so a burst of
-	 * streaming updates costs one commit and one render. Any synchronous write flushes the queue first.
+	 * The one data write: row deltas and cell writes commit atomically as one change (one undo entry,
+	 * one repaint of what changed). Cell writes are validated first (preflight policy) and go through
+	 * each column's value setter and formulas; rows are validated after commit (data integrity).
 	 */
-	public applyTransactionAsync(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void {
-		this.asyncTransactions.enqueue(transaction, callback);
+	public transaction(transaction: GridEngineTransaction<TRowData>): GridTransactionResult<TRowData> {
+		return this.commitTransaction(transaction, true);
 	}
 
-	/** Applies queued async transactions now. */
-	public flushAsyncTransactions(): void {
+	/**
+	 * Async transaction: awaits async validation of its cell writes, then queues it to commit before
+	 * the next frame, merged with other queued row-only transactions into one commit and one render.
+	 * Resolves once committed (or rejected by validation).
+	 */
+	public async transactionAsync(transaction: GridEngineTransaction<TRowData>): Promise<GridTransactionResult<TRowData>> {
+		const cells = transaction.cells ?? [];
+		if (cells.length > 0) {
+			const failure = await this.validateWriteProposalAsync(toWriteProposals(cells), transaction.source ?? 'api');
+			if (failure) return withNoTransactionChanges<TRowData>(failure, cells, failure.status === 'rejected' ? failure.reason : 'rejected');
+		}
+		return new Promise((resolve) => this.asyncTransactions.enqueue(transaction, resolve));
+	}
+
+	/** Commits queued async transactions now. */
+	public flushTransactions(): void {
 		this.asyncTransactions.flush();
 	}
 
-	public applyTransaction(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null {
-		const execution = this.changeApplier.commitDetailed({
-			reason: 'rows:apply-transaction',
-			domainMutations: [{ kind: 'row-transaction', transaction }],
+	private applyQueuedTransaction(transaction: GridEngineTransaction<TRowData>): GridTransactionResult<TRowData> {
+		if (!transaction.applyState) return this.commitTransaction(transaction, false);
+		let result: GridTransactionResult<TRowData> | undefined;
+		this.batch(() => {
+			transaction.applyState!();
+			result = this.commitTransaction(transaction, false);
 		});
-		const result = execution.appliedMutations[0]?.result as InternalRowNodeTransaction<TRowData> | undefined;
-		return result ? mapInternalRowNodeTransaction(this.getPublicRowNodeDispatchDeps(), result) : null;
+		return result!;
+	}
+
+	private commitTransaction(transaction: GridEngineTransaction<TRowData>, preflight: boolean): GridTransactionResult<TRowData> {
+		const source = transaction.source ?? 'api';
+		const cells = transaction.cells ?? [];
+		const rows = transaction.rows;
+		const hasRows = !!rows && !!(rows.add?.length || rows.update?.length || rows.remove?.length);
+		if (preflight && cells.length > 0) {
+			const failure = this.validateWriteProposalSync(toWriteProposals(cells), source);
+			if (failure) return withNoTransactionChanges<TRowData>(failure, cells, failure.status === 'rejected' ? failure.reason : 'rejected');
+		}
+		if (!hasRows && cells.length === 0) return withNoTransactionChanges<TRowData>({ status: 'noop' }, [], '');
+		const domainMutations: import('./GridDomainMutation.js').GridDomainMutation<TRowData>[] = [];
+		if (hasRows) domainMutations.push({ kind: 'row-transaction', transaction: rows! });
+		if (cells.length > 0) domainMutations.push({ kind: 'batch-cell', updates: [...cells], undoable: true, source });
+		const execution = this.changeApplier.commitDetailed({
+			reason: hasRows && cells.length > 0 ? 'data:transaction' : hasRows ? 'rows:apply-transaction' : 'data:batch-cell-values',
+			domainMutations,
+		});
+		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), source);
+
+		const rowsResult = hasRows ? (execution.appliedMutations[0]?.result as InternalRowNodeTransaction<TRowData> | undefined) : undefined;
+		const cellsResult =
+			cells.length > 0 ? (execution.appliedMutations[hasRows ? 1 : 0]?.result as BatchCellCommitSummary | undefined) : undefined;
+		return {
+			...this.toGridWriteResult(execution.result),
+			rows: rowsResult ? mapInternalRowNodeTransaction(this.getPublicRowNodeDispatchDeps(), rowsResult) : EMPTY_ROW_NODE_TRANSACTION,
+			cells: {
+				committed: (cellsResult?.committed ?? []).map((change) => ({
+					rowId: change.rowId,
+					colField: change.colField,
+					value: change.newRawValue,
+				})),
+				rejected: (cellsResult?.rejected ?? []).map((entry) => ({ cell: entry.update, reason: entry.reason })),
+			},
+		} as GridTransactionResult<TRowData>;
 	}
 
 	public replaceRows(rows: readonly TRowData[]): GridWriteResult {
 		return this.toGridWriteResult(this.changeApplier.commit({ reason: 'rows:replace', domainMutations: [{ kind: 'replace-rows', rows }] }));
-	}
-
-	public updateRows(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult {
-		return this.toGridWriteResult(this.changeApplier.commit({ reason: 'rows:update', domainMutations: [{ kind: 'batch-row-update', updater }] }));
 	}
 
 	public updateExpansionState(updater: (expansion: InternalGridState<TRowData>['expansion']) => InternalGridState<TRowData>['expansion']): void {
@@ -924,7 +993,7 @@ export class GridEngine<TRowData = unknown> {
 			deselectRows: (rowIds) => this.deselectRowIds(rowIds, 'api'),
 			scrollToRow: () => {},
 			setCellValue: (targetRowId, field, value) => this.setCellValue(targetRowId, field, value),
-			batchCellValues: (updates) => this.batchCellValues(updates as import('../api/GridApi.js').BatchCellValueUpdate[], 'api'),
+			writeCells: (updates) => this.transaction({ cells: updates as import('../api/GridApi.js').GridCellWrite[] }),
 			setExpanded: (id, expanded) => this.groupingFeature.setExpanded(id, expanded),
 			setDetailOpen: (rowId, open) => this.groupingFeature.setDetailOpen(rowId, open),
 			refreshRows: () => this.rowModel?.refresh(),
@@ -1144,53 +1213,6 @@ export class GridEngine<TRowData = unknown> {
 			domainMutations: [{ kind: 'cell-value', rowId, colField, value, undoable, source: 'api' }],
 		});
 		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), 'api');
-		return this.toGridWriteResult(execution.result);
-	}
-
-	public async setCellValueAsync(rowId: string, colField: string, value: unknown, undoable = true): Promise<GridWriteResult> {
-		const validationFailure = await this.validateWriteProposalAsync([{ rowId, colField, proposedValue: value }], 'api');
-		if (validationFailure) return validationFailure;
-		const execution = this.changeApplier.commitDetailed({
-			reason: 'data:set-cell-value',
-			domainMutations: [{ kind: 'cell-value', rowId, colField, value, undoable, source: 'api' }],
-		});
-		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), 'api');
-		return this.toGridWriteResult(execution.result);
-	}
-
-	public batchCellValues(
-		updates: { rowId: string; colField: string; value: unknown }[],
-		source: 'paste' | 'api' | 'fill' = 'api'
-	): GridWriteResult {
-		const validationFailure = this.validateWriteProposalSync(
-			updates.map((update) => ({ rowId: update.rowId, colField: update.colField, proposedValue: update.value })),
-			source
-		);
-		if (validationFailure) return validationFailure;
-
-		const execution = this.changeApplier.commitDetailed({
-			reason: 'data:batch-cell-values',
-			domainMutations: [{ kind: 'batch-cell', updates, undoable: true, source }],
-		});
-		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), source);
-		return this.toGridWriteResult(execution.result);
-	}
-
-	public async batchCellValuesAsync(
-		updates: { rowId: string; colField: string; value: unknown }[],
-		source: 'paste' | 'api' | 'fill' = 'api'
-	): Promise<GridWriteResult> {
-		const validationFailure = await this.validateWriteProposalAsync(
-			updates.map((update) => ({ rowId: update.rowId, colField: update.colField, proposedValue: update.value })),
-			source
-		);
-		if (validationFailure) return validationFailure;
-
-		const execution = this.changeApplier.commitDetailed({
-			reason: 'data:batch-cell-values',
-			domainMutations: [{ kind: 'batch-cell', updates, undoable: true, source }],
-		});
-		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), source);
 		return this.toGridWriteResult(execution.result);
 	}
 
@@ -1686,4 +1708,36 @@ function _createEmptyIntegrityState<TRowData>(): GridIntegrityState<TRowData> {
 		serverReport: null,
 		summary: { status: 'clean', totalIssues: 0, blockingIssues: 0, warnings: 0, errors: 0, bySource: {} },
 	};
+}
+
+/** What the engine commits for a transaction; `applyState` carries grid state set in the same call. */
+export interface GridEngineTransaction<TRowData> {
+	rows?: RowDataTransaction<TRowData>;
+	cells?: readonly import('../api/GridApi.js').GridCellWrite[];
+	source?: 'api' | 'paste' | 'fill';
+	/** Grid state (columns, sort, filter, pins) applied in the same batch, before the data commit. */
+	applyState?: () => void;
+}
+
+interface BatchCellCommitSummary {
+	committed: readonly { rowId: string; colField: string; newRawValue: unknown }[];
+	rejected: readonly { update: import('../api/GridApi.js').GridCellWrite; reason: string }[];
+}
+
+const EMPTY_ROW_NODE_TRANSACTION = Object.freeze({ add: [], update: [], remove: [] }) as unknown as RowNodeTransaction<never>;
+
+function toWriteProposals(cells: readonly import('../api/GridApi.js').GridCellWrite[]) {
+	return cells.map((cell) => ({ rowId: cell.rowId, colField: cell.colField, proposedValue: cell.value }));
+}
+
+function withNoTransactionChanges<TRowData>(
+	result: GridWriteResult,
+	cells: readonly import('../api/GridApi.js').GridCellWrite[],
+	reason: string
+): GridTransactionResult<TRowData> {
+	return {
+		...result,
+		rows: EMPTY_ROW_NODE_TRANSACTION,
+		cells: { committed: [], rejected: cells.map((cell) => ({ cell, reason })) },
+	} as GridTransactionResult<TRowData>;
 }

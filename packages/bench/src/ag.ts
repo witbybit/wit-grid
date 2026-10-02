@@ -5,6 +5,7 @@ import {
 	formatNumbers,
 	rendererCalls,
 	installMeasurement,
+	installTicker,
 	makeRows,
 	markReady,
 	paintBar,
@@ -45,12 +46,16 @@ const columnDefs: ColDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_,
 	...(c >= scenario.domCols && formatNumbers && c % 3 !== 0 ? { valueFormatter: (p: { value: unknown }) => formatBenchValue(p.value) } : {}),
 }));
 
-createGrid(container, {
+const initialRows = makeRows(scenario);
+const gridApi = createGrid(container, {
 	columnDefs,
-	rowData: makeRows(scenario),
+	rowData: initialRows,
 	getRowId: (p) => p.data.id,
 	onFirstDataRendered: () => requestAnimationFrame(() => requestAnimationFrame(markReady)),
 });
+
+// AG Grid diffs a new rowData by getRowId and refreshes only the changed rows.
+installTicker(initialRows, (rows) => gridApi.setGridOption('rowData', rows));
 
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.ag-grid-viewport'),

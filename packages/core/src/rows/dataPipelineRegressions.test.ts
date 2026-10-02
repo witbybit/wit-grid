@@ -49,7 +49,7 @@ describe('transaction undo snapshot (delta, by reference)', () => {
 		const cloneSpy = vi.spyOn(globalThis, 'structuredClone');
 
 		const updated = { ...rows[42]!, price: -1 };
-		expect(() => store.applyTransaction({ update: [updated] })).not.toThrow();
+		expect(() => store.transaction({ rows: { update: [updated] } })).not.toThrow();
 		expect(cloneSpy).not.toHaveBeenCalled();
 		expect(store.getRowNodeById('r42')?.data.price).toBe(-1);
 
@@ -64,7 +64,7 @@ describe('transaction undo snapshot (delta, by reference)', () => {
 		const rows = makeRows(5);
 		const { store, controller } = createGrid(rows);
 		const node1 = store.getRowNodeById('r1');
-		store.applyTransaction({ remove: [rows[1]!], add: [{ id: 'x', name: 'X', price: 99 }], addIndex: 0 });
+		store.transaction({ rows: { remove: [rows[1]!], add: [{ id: 'x', name: 'X', price: 99 }], addIndex: 0 } });
 		expect(store.getRowOrder()).toEqual(['x', 'r0', 'r2', 'r3', 'r4']);
 		store.undo();
 		expect(store.getRowOrder()).toEqual(['r0', 'r1', 'r2', 'r3', 'r4']);
@@ -88,7 +88,7 @@ describe('live re-sort with a quick filter active', () => {
 		expect(store.getVisualIndexByRowId('r0')).toBe(9);
 		expect(store.getVisualIndexByRowId('r1')).toBe(0);
 
-		store.applyTransaction({ update: [{ id: 'r9', name: 'Item 9', price: -5 }] });
+		store.transaction({ rows: { update: [{ id: 'r9', name: 'Item 9', price: -5 }] } });
 		expect(store.getVisualIndexByRowId('r9')).toBe(0);
 		controller.dispose();
 	});
@@ -107,7 +107,7 @@ describe('live re-sort with a quick filter active', () => {
 		store.setQuickFilter('item');
 		store.setQuickFilter('ITEM 1');
 		expect(store.getVisualIndexByRowId('r1')).toBe(0);
-		store.applyTransaction({ update: [{ id: 'r2', name: 'Item 1b', price: 2 }] });
+		store.transaction({ rows: { update: [{ id: 'r2', name: 'Item 1b', price: 2 }] } });
 		store.setQuickFilter('item 1');
 		expect(store.getVisualIndexByRowId('r2')).not.toBeNull();
 		controller.dispose();
@@ -129,7 +129,7 @@ describe('incremental sort relocation', () => {
 	it('uses source order as the tiebreak after appends', () => {
 		const { store, controller } = createGrid(makeRows(3));
 		store.setSortModel([{ colId: 'price', sort: 'asc' }]);
-		store.applyTransaction({ add: [{ id: 'n', name: 'N', price: 1 }] });
+		store.transaction({ rows: { add: [{ id: 'n', name: 'N', price: 1 }] } });
 		// r1 and n tie on price 1; r1 comes first in source order.
 		expect(store.getVisualIndexByRowId('r1')).toBe(1);
 		expect(store.getVisualIndexByRowId('n')).toBe(2);

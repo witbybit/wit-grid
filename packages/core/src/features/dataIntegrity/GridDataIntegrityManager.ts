@@ -401,15 +401,15 @@ export class GridDataIntegrityManager<TRowData> implements GridInsightLayer {
 		return this.validationModule.validateCell(rowId, colField);
 	}
 
-	shouldAutoValidateWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldAutoValidateWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		return this.validationModule?.shouldAutoValidateWrite(source) ?? false;
 	}
 
-	shouldPreflightWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldPreflightWrite(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		return this.validationModule?.shouldPreflightWrite(source) ?? false;
 	}
 
-	shouldPreflightWriteSync(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo'): boolean {
+	shouldPreflightWriteSync(source: 'api' | 'edit' | 'fill' | 'paste' | 'undo' | 'redo' | 'transaction'): boolean {
 		return this.validationModule?.shouldPreflightWriteSync(source) ?? false;
 	}
 
@@ -419,6 +419,12 @@ export class GridDataIntegrityManager<TRowData> implements GridInsightLayer {
 	): Promise<void> {
 		if (!this.validationModule || !this.shouldAutoValidateWrite(source)) return;
 		await this.validationModule.validateCells(cells);
+	}
+
+	/** A row-level write committed: validate its changed/added rows (per policy), drop removed rows' issues. */
+	async validateRowsAfterWrite(rowIds: readonly string[], removedRowIds: readonly string[]): Promise<void> {
+		if (!this.validationModule) return;
+		await this.validationModule.validateRowsAfterWrite({ rowIds, removedRowIds, validate: this.shouldAutoValidateWrite('transaction') });
 	}
 
 	async validateWriteProposal(

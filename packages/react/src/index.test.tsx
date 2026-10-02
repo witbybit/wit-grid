@@ -88,8 +88,17 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		});
 		expect(screen.getByTestId('focused-cell').textContent).toBe('1:name');
 
+		// globalVersion tracks the row projection: an edited value is a targeted update (the cell
+		// repaints, the projection stays), adding a row rebuilds it.
 		act(() => {
 			grid.api.setRows([{ id: '1', name: 'Product B' }]);
+		});
+		expect(screen.getByTestId('data-version').textContent).toBe('2');
+		act(() => {
+			grid.api.setRows([
+				{ id: '1', name: 'Product B' },
+				{ id: '2', name: 'Product C' },
+			]);
 		});
 		expect(screen.getByTestId('data-version').textContent).toBe('3');
 

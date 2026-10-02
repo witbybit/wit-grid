@@ -118,7 +118,7 @@ describe('group and total rows as cell rows', () => {
 			grouping: { by: ['region'], defaultExpanded: true },
 			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
 		});
-		grid.store.applyTransaction({ update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 100 }] });
+		grid.store.transaction({ rows: { update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 100 }] } });
 		grid.renderer.fullPaint();
 		expect(grid.cellOf(grid.rowAt(0), 'amount')?.textContent).toBe('$120');
 		grid.destroy();
@@ -480,7 +480,7 @@ describe('full-width row renderer specs', () => {
 			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
 		});
 		expect(grid.container.textContent).toContain('EMEA: 30');
-		grid.store.applyTransaction({ update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 110 }] });
+		grid.store.transaction({ rows: { update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 110 }] } });
 		grid.renderer.fullPaint();
 		expect(update).toHaveBeenCalled();
 		expect(grid.container.textContent).toContain('EMEA: 130');
@@ -711,7 +711,7 @@ describe('aggregateRenderer', () => {
 		expect(amount(0).querySelector('.bar')?.textContent).toBe('30');
 		expect(mounts).toEqual([30, 5]);
 
-		store.applyTransaction({ update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 15 }] });
+		store.transaction({ rows: { update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 15 }] } });
 		renderer.fullPaint();
 		expect(updates).toEqual([35]);
 		expect(amount(0).querySelector('.bar')?.textContent).toBe('35');

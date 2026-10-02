@@ -169,7 +169,7 @@ export default function App() {
 				quantity: (Math.floor(Math.random() * 60) + 15).toString(),
 			});
 		});
-		activeApi.applyTransaction({ update: updates });
+		activeApi.transaction({ rows: { update: updates } });
 		performance.measure('wit-grid-demo-bulk-calculation', { start, end: performance.now() });
 		performance.mark('wit-grid-demo-grid-action');
 	}, [activeApi]);
@@ -198,17 +198,20 @@ export default function App() {
 				return;
 			}
 			const rowIdSet = new Set(rowIds);
-			activeApi.updateRows((currentRows) =>
-				currentRows.map((row) => {
-					if (!rowIdSet.has(row.id)) return row;
-					const next = { ...row } as any;
-					for (const field of columns) {
-						if (action === 'fill') next[field] = '100';
-						else if (action === 'clear') next[field] = 0;
-						else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
-					}
-					return next;
-				})
+			activeApi.setRows(
+				activeApi
+					.rows()
+					.getAll()
+					.map((row) => {
+						if (!rowIdSet.has(row.id)) return row;
+						const next = { ...row } as any;
+						for (const field of columns) {
+							if (action === 'fill') next[field] = '100';
+							else if (action === 'clear') next[field] = 0;
+							else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
+						}
+						return next;
+					})
 			);
 			performance.mark('wit-grid-demo-range-action');
 		},

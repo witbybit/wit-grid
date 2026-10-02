@@ -23,7 +23,7 @@ function getRowNode<TData>(controller: ClientRowModelController<TData>, index: n
 }
 
 function doUpdateRows<T>(ctrl: ClientRowModelController<T>, updater: (rows: T[]) => T[]): void {
-	const wr = ctrl.updateRowsStructurally(updater);
+	const wr = ctrl.replaceRowsStructurally(updater(ctrl.getAllDataNodes().map((node) => node.data)));
 	const allFields = new Set<string>();
 	if (wr.changedFieldsByRow) {
 		for (const fields of wr.changedFieldsByRow.values()) {
@@ -818,7 +818,7 @@ describe('GroupRowMeta', () => {
 	});
 });
 
-describe('Phase 068 — filter membership shortcut in updateRows()', () => {
+describe('Phase 068 — filter membership shortcut in setRows()', () => {
 	interface FRow {
 		id: string;
 		name: string;
@@ -949,7 +949,7 @@ describe('Phase 068 — filter membership shortcut in updateRows()', () => {
 	});
 });
 
-describe('Phase 068 — sort relocation in updateRows()', () => {
+describe('Phase 068 — sort relocation in setRows()', () => {
 	interface SRow {
 		id: string;
 		name: string;
@@ -1105,7 +1105,7 @@ describe('Phase 068 — sort relocation in updateRows()', () => {
 	});
 });
 
-describe('Phase 068 — incremental insert/remove in applyTransaction()', () => {
+describe('Phase 068 — incremental insert/remove in transaction()', () => {
 	interface TRow {
 		id: string;
 		name: string;
@@ -1427,8 +1427,8 @@ describe('Plan 083 — incremental index maintenance', () => {
 			columns: store.getState().columns,
 		});
 
-		// updateRowsStructurally + reconcileAfterDataWrite triggers the sort-key mutation path
-		const writeResult = ctrl.updateRowsStructurally((rows) => rows.map((r) => (r.id === '3' ? { ...r, value: 5 } : r)));
+		// replaceRowsStructurally + reconcileAfterDataWrite triggers the sort-key mutation path
+		const writeResult = ctrl.replaceRowsStructurally(ctrl.getAllDataNodes().map((n) => (n.id === '3' ? { ...n.data, value: 5 } : n.data)));
 		const impact = ctrl.classifyFieldMutation(new Set(['value']));
 		ctrl.reconcileAfterDataWrite(writeResult, impact);
 
@@ -1499,7 +1499,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		return null;
 	}
 
-	it('group sum stays consistent after leaf salary update via applyTransaction', () => {
+	it('group sum stays consistent after leaf salary update via row transaction', () => {
 		const rows: AggRow[] = [
 			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
 			{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 20 },
@@ -1509,7 +1509,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		const before = getGroupAggregates(controller, 'group:category=Eng');
 		expect(before?.salary).toBe(300); // 100 + 200
 
-		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] } });
 
 		const after = getGroupAggregates(controller, 'group:category=Eng');
 		expect(after?.salary).toBe(350); // 150 + 200 — was stale (300) before Plan 092 fix
@@ -1525,7 +1525,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		store.updateGrouping({ totals: { groups: 'bottom', grand: 'bottom' } });
 		const reconcile = vi.spyOn(controller, 'reconcileAfterDataWrite');
 
-		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] } });
 
 		const result = reconcile.mock.results.at(-1)?.value as RowModelRefreshResult;
 		const ids = Array.from({ length: controller.getVisualRowCount() }, (_, i) => controller.getVisualRow(i)!.id);
@@ -1549,7 +1549,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		// Rows: 0 group Eng, 1 Alice, 2 total Eng, 3 group Ops, 4 Cara, 5 total Ops.
 		store.engine.invalidation.consume();
 
-		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 150, bonus: 10 }] } });
 		const frame = store.engine.invalidation.consume();
 
 		expect(frame.rowRanges).toContainEqual(expect.objectContaining({ startIndex: 0, endIndex: 0 }));
@@ -1560,7 +1560,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		store.destroy();
 	});
 
-	it('group average stays consistent after leaf bonus update via applyTransaction', () => {
+	it('group average stays consistent after leaf bonus update via row transaction', () => {
 		const rows: AggRow[] = [
 			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 20 },
 			{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 40 },
@@ -1570,7 +1570,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		const before = getGroupAggregates(controller, 'group:category=Eng');
 		expect(before?.bonus).toBe(30); // avg(20, 40) = 30
 
-		store.applyTransaction({ update: [{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 60 }] });
+		store.transaction({ rows: { update: [{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 60 }] } });
 
 		const after = getGroupAggregates(controller, 'group:category=Eng');
 		expect(after?.bonus).toBe(40); // avg(20, 60) = 40 — was stale (30) before Plan 092 fix
@@ -1583,7 +1583,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		];
 		const { store, controller } = makeAggStore(rows);
 
-		store.applyTransaction({ update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 200, bonus: 10 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'Alice', category: 'Eng', salary: 200, bonus: 10 }] } });
 
 		expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(200);
 		// Mkt group must be unchanged
@@ -1600,7 +1600,7 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		store.setInstrumentation(inst);
 		inst.reset();
 
-		store.applyTransaction({ update: [{ id: '1', name: 'Alice Renamed', category: 'Eng', salary: 100, bonus: 10 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'Alice Renamed', category: 'Eng', salary: 100, bonus: 10 }] } });
 
 		const full = inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD);
 		// A non-aggregation, non-sort, non-filter, non-group field update must NOT trigger a full rebuild.

@@ -87,10 +87,12 @@ describe('experimental causal flight-recorder integration', () => {
 		});
 		expect(api.setCellValue('r:雪\0', 'value', 3).status).toBe('applied');
 		expect(api.setCellValue('missing', 'value', 7).status).not.toBe('applied');
-		api.batchCellValues([
-			{ rowId: 'r:雪\0', colField: 'value', value: 4 },
-			{ rowId: 'r:雪\0', colField: 'other', value: 5 },
-		]);
+		api.transaction({
+			cells: [
+				{ rowId: 'r:雪\0', colField: 'value', value: 4 },
+				{ rowId: 'r:雪\0', colField: 'other', value: 5 },
+			],
+		});
 		api.setFormula('formula', 'other', '=[source:value]*2');
 		const formulaSequence = getFlightRecorderSnapshot(api).events.at(-1)?.sequence ?? 0;
 		api.setCellValue('source', 'value', 6);

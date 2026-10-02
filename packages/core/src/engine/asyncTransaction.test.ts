@@ -19,13 +19,13 @@ afterEach(() => {
 	vi.useRealTimers();
 });
 
-describe('applyTransactionAsync', () => {
+describe('transaction(tx, { async: true })', () => {
 	it('applies nothing until the flush, then applies a burst of updates as one commit', () => {
 		vi.useFakeTimers();
 		const api = makeGrid();
 		const rowsUpdated = vi.fn();
 		api.addEventListener(GridEventName.rowsUpdated, rowsUpdated);
-		for (let i = 0; i < 20; i++) api.applyTransactionAsync({ update: [{ id: `r${i}`, price: 1000 + i }] });
+		for (let i = 0; i < 20; i++) void api.transaction({ rows: { update: [{ id: `r${i}`, price: 1000 + i }] } }, { async: true });
 		expect(api.getCellValue('r0', 'price')).toBe(0);
 		expect(rowsUpdated).not.toHaveBeenCalled();
 
@@ -38,26 +38,27 @@ describe('applyTransactionAsync', () => {
 
 	it('keeps call order: a synchronous write applies the queue first', () => {
 		const api = makeGrid();
-		api.applyTransactionAsync({ update: [{ id: 'r1', price: 111 }] });
+		void api.transaction({ rows: { update: [{ id: 'r1', price: 111 }] } }, { async: true });
 		// A later synchronous write to the same cell must win, as if both were synchronous.
-		api.applyTransaction({ update: [{ id: 'r1', price: 222 }] });
+		api.transaction({ rows: { update: [{ id: 'r1', price: 222 }] } });
 		expect(api.getCellValue('r1', 'price')).toBe(222);
 
-		api.applyTransactionAsync({ update: [{ id: 'r2', price: 5 }] });
+		void api.transaction({ rows: { update: [{ id: 'r2', price: 5 }] } }, { async: true });
 		api.setCellValue('r2', 'price', 6);
 		expect(api.getCellValue('r2', 'price')).toBe(6);
 		api.destroy();
 	});
 
-	it("calls back with each transaction's own result", () => {
+	it("resolves each promise with the transaction's own result", async () => {
 		const api = makeGrid();
 		const first = vi.fn();
 		const second = vi.fn();
-		api.applyTransactionAsync({ update: [{ id: 'r3', price: 1 }] }, first);
-		api.applyTransactionAsync({ add: [{ id: 'new', price: 2 }] }, second);
-		api.flushAsyncTransactions();
-		expect(first.mock.calls[0][0].update.map((n: { id: string }) => n.id)).toEqual(['r3']);
-		expect(second.mock.calls[0][0].add.map((n: { id: string }) => n.id)).toEqual(['new']);
+		const p1 = api.transaction({ rows: { update: [{ id: 'r3', price: 1 }] } }, { async: true }).then(first);
+		const p2 = api.transaction({ rows: { add: [{ id: 'new', price: 2 }] } }, { async: true }).then(second);
+		api.flushTransactions();
+		await Promise.all([p1, p2]);
+		expect(first.mock.calls[0][0].rows.update.map((n: { id: string }) => n.id)).toEqual(['r3']);
+		expect(second.mock.calls[0][0].rows.add.map((n: { id: string }) => n.id)).toEqual(['new']);
 		expect(api.getCellValue('new', 'price')).toBe(2);
 		api.destroy();
 	});
@@ -70,7 +71,7 @@ describe('applyTransactionAsync', () => {
 			getRowId: (row) => row.id,
 			initialState: { asyncTransactionWaitMs: 50 },
 		});
-		api.applyTransactionAsync({ update: [{ id: 'a', price: 2 }] });
+		void api.transaction({ rows: { update: [{ id: 'a', price: 2 }] } }, { async: true });
 		vi.advanceTimersByTime(49);
 		expect(api.getCellValue('a', 'price')).toBe(1);
 		vi.advanceTimersByTime(1);
@@ -78,11 +79,27 @@ describe('applyTransactionAsync', () => {
 		api.destroy();
 	});
 
+	it('commits rows and cells together in one undo entry once flushed', async () => {
+		const api = makeGrid();
+		const committed = api.transaction(
+			{ rows: { add: [{ id: 'new', price: 1 }] }, cells: [{ rowId: 'r0', colField: 'price', value: 77 }] },
+			{ async: true }
+		);
+		api.flushTransactions();
+		const result = await committed;
+		expect(result.status).toBe('applied');
+		expect(result.rows.add.map((n) => n.id)).toEqual(['new']);
+		expect(api.getCellValue('r0', 'price')).toBe(77);
+		api.undo();
+		expect(api.getCellValue('r0', 'price')).toBe(0);
+		api.destroy();
+	});
+
 	it('drops pending transactions when the grid is destroyed', () => {
 		vi.useFakeTimers();
 		const api = makeGrid();
 		const callback = vi.fn();
-		api.applyTransactionAsync({ update: [{ id: 'r0', price: 9 }] }, callback);
+		void api.transaction({ rows: { update: [{ id: 'r0', price: 9 }] } }, { async: true }).then(callback);
 		api.destroy();
 		vi.runAllTimers();
 		expect(callback).not.toHaveBeenCalled();

@@ -20,7 +20,7 @@ interface ClipboardContext<TRowData> {
 	getCellValue(rowId: string, colField: string): unknown;
 	getCheapDisplayValue(rowId: string, colField: string): string;
 	getRawRowById(rowId: string): TRowData | null;
-	batchCellValues(updates: { rowId: string; colField: string; value: unknown }[], source: 'paste' | 'api' | 'fill'): GridWriteResult;
+	writeCells(updates: { rowId: string; colField: string; value: unknown }[], source: 'paste' | 'api' | 'fill'): GridWriteResult;
 	dispatchEvent<K extends keyof GridEventPayloadMap<TRowData>>(type: K, payload: GridEventPayloadMap<TRowData>[K]): void;
 	validateWriteProposal?: (
 		updates: readonly { rowId: string; colField: string; proposedValue: unknown }[],
@@ -175,7 +175,7 @@ export class ClipboardController<TRowData = unknown> {
 					);
 					return;
 				}
-				const result = this.c.batchCellValues(updates, 'paste');
+				const result = this.c.writeCells(updates, 'paste');
 				if (result.status === 'applied' || result.status === 'noop') {
 					this.c.dispatchEvent(GridEventName.cellsPasted, { rowCount: pastedRows, colCount: pastedCols });
 					if (blockedCapabilityCells.length > 0 && blockedCapabilityReason) {
