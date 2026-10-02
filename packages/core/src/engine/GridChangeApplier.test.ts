@@ -382,6 +382,7 @@ describe('GridChangeApplier', () => {
 			update: [],
 		};
 		const rowModel = {
+			kind: 'client',
 			captureTransactionSnapshot: vi.fn(() => ({ modelType: 'test', snapshot: {} })),
 			replaceRowsStructurally: vi.fn(),
 			applyTransactionStructurally: vi.fn(() => resultPayload),
@@ -436,6 +437,7 @@ describe('GridChangeApplier', () => {
 		let rows: TestRow[] = [{ id: '1', name: 'A' }];
 		let rowOrder = ['1'];
 		const rowModel = {
+			kind: 'client',
 			captureTransactionSnapshot: vi.fn(() => ({
 				modelType: 'test',
 				snapshot: {

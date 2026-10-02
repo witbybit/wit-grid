@@ -370,17 +370,7 @@ export function classifyWriteImpact(rowModel: RowModel<unknown> | null, changedF
 }
 
 export function asClientStructuralRowModel<TRowData = unknown>(rowModel: RowModel<TRowData> | null): ClientStructuralRowModel<TRowData> | null {
-	return hasFunctions(rowModel, [
-		'captureTransactionSnapshot',
-		'restoreTransactionSnapshot',
-		'replaceRowsStructurally',
-		'applyTransactionStructurally',
-		'writeCellValueStructurally',
-		'reconcileAfterDataWrite',
-		'classifyFieldMutation',
-	])
-		? (rowModel as unknown as ClientStructuralRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'client' ? (rowModel as unknown as ClientStructuralRowModel<TRowData>) : null;
 }
 
 /**
@@ -426,7 +416,11 @@ export interface RowModelTransactionSnapshot<TRowData = unknown> {
 }
 
 /** Shared row-model contract used across engine and rendering code. */
+/** Which row model this is: client-side rows, infinite blocks, or the server-side row model. */
+export type RowModelKind = 'client' | 'infinite' | 'server';
+
 export interface RowModel<TRowData = unknown> extends RowModelViewportAccess<TRowData> {
+	readonly kind: RowModelKind;
 	refresh(reason?: RowRefreshReason): RowModelRefreshResult;
 }
 
@@ -482,17 +476,13 @@ export function asRowOrderCapableModel(rowModel: RowModel<unknown> | null): RowO
 export function asInfiniteControllableRowModel<TRowData = unknown>(
 	rowModel: RowModel<TRowData> | null
 ): InfiniteControllableRowModel<TRowData> | null {
-	return hasFunctions(rowModel, ['purgeCache', 'setDatasource', 'loadVisibleBlocks'])
-		? (rowModel as unknown as InfiniteControllableRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'infinite' ? (rowModel as unknown as InfiniteControllableRowModel<TRowData>) : null;
 }
 
 export function asServerSideControllableRowModel<TRowData = unknown>(
 	rowModel: RowModel<TRowData> | null
 ): ServerSideControllableRowModel<TRowData> | null {
-	return hasFunctions(rowModel, ['setServerSideDatasource', 'refreshServerSide', 'purgeServerSide', 'getServerSideStoreState'])
-		? (rowModel as unknown as ServerSideControllableRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'server' ? (rowModel as unknown as ServerSideControllableRowModel<TRowData>) : null;
 }
 
 export function asStickyGroupMetaCapableVisualRowModel(rowModel: VisualRowModel<unknown> | null): StickyGroupMetaCapableVisualRowModel | null {
@@ -1045,6 +1035,7 @@ export class ClientRowModelController<TData = unknown>
 		ClientStructuralRowModel<TData>,
 		CapableRowModel
 {
+	public readonly kind = 'client' as const;
 	private readonly runtime: ClientRowModelRuntime<TData>;
 	private dataStore: RowDataStore<TData>;
 	private readonly getRowHeight: ClientRowModelOptions<TData>['getRowHeight'];

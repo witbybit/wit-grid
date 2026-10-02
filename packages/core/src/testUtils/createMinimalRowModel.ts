@@ -1,4 +1,4 @@
-import type { RowModel, RowModelRefreshResult } from '../rowModel.js';
+import type { RowModel, RowModelKind, RowModelRefreshResult } from '../rowModel.js';
 import type { VisualRow } from '../visualRow.js';
 import type { RowNode } from '../rowNode.js';
 
@@ -20,6 +20,8 @@ export function createMinimalRowModel<TRowData>(options: MinimalRowModelOptions<
 	};
 
 	return {
+		// A viewport-only test double: no row model kind's capabilities, so it matches no capability probe.
+		kind: 'minimal' as unknown as RowModelKind,
 		getVisualRow: (index) => options.visualRows[index] ?? null,
 		getVisualRowCount: () => options.visualRows.length,
 		getKnownRowCount: () => options.visualRows.length,

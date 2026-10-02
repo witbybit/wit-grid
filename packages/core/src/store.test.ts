@@ -3475,6 +3475,7 @@ describe('GridStore undo and redo functionality', () => {
 		const getServerSideStoreState = vi.fn(() => storeState);
 		const rowModel = {
 			...createMinimalRowModel<TestRow>({ visualRows: [] }),
+			kind: 'server' as const,
 			setServerSideDatasource,
 			refreshServerSide,
 			purgeServerSide,
