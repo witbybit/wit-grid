@@ -2043,32 +2043,6 @@ export const CORE_STYLES = `
     background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.12));
   }
 
-  /* Group and Detail Rows */
-  .og-group-row-content {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    width: 100%;
-    user-select: none;
-    cursor: pointer;
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--og-focus-ring, #3b82f6) 13%, transparent), color-mix(in srgb, var(--og-selection-bg, rgba(59, 130, 246, 0.1)) 40%, transparent) 44%, transparent),
-      var(--og-group-row-bg);
-    color: var(--og-group-row-text);
-    font-size: var(--og-group-row-font-size);
-    font-weight: var(--og-group-row-font-weight);
-    gap: 10px;
-    overflow: hidden;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-    transition: background-color 0.15s ease;
-  }
-
-  .og-group-row-content:hover {
-    background:
-      linear-gradient(90deg, color-mix(in srgb, var(--og-focus-ring, #3b82f6) 18%, transparent), color-mix(in srgb, var(--og-selection-bg, rgba(59, 130, 246, 0.1)) 50%, transparent) 44%, transparent),
-      var(--og-group-row-hover-bg);
-  }
-
   .og-group-row-toggle {
     width: 18px;
     height: 18px;
