@@ -227,6 +227,9 @@ describe('sticky group headers as cell rows', () => {
 		expect(layer.style.top).toMatch(/^\d+(\.\d+)?px$/);
 		const labels = [...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent);
 		expect(labels).toEqual(['EMEA', 'Cloud']);
+		// A child pushed up by its next sibling must slide under its parent, not over it.
+		const [outer, inner] = [...layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')];
+		expect(Number(outer.style.zIndex)).toBeGreaterThan(Number(inner.style.zIndex));
 		const emea = layer.querySelector('[data-row-id="group:region=EMEA"]')!;
 		expect(emea.querySelector('.og-row-pin-left .og-cell-hierarchy')).not.toBeNull();
 		expect(emea.querySelector('[data-col-field="amount"]')?.textContent).toBe('$40');

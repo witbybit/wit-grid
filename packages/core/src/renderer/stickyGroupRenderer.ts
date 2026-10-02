@@ -142,7 +142,9 @@ export class StickyGroupRenderer<TRowData = unknown> {
 			host.top = top;
 			el.style.transform = `translate3d(0, ${top}px, 0)`;
 		}
-		const zIndex = 34 + Math.min(item.depth, 8);
+		// Outer levels stack above inner ones: a header pushed up by the next sibling slides under its
+		// parent instead of being drawn over it.
+		const zIndex = 34 + 8 - Math.min(item.depth, 8);
 		if (host.zIndex !== zIndex) {
 			host.zIndex = zIndex;
 			el.style.zIndex = String(zIndex);
