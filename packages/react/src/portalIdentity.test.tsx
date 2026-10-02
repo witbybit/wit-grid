@@ -81,9 +81,8 @@ describe('React portal physical identity', () => {
 				header: 'Name',
 				width: 100,
 				renderer: {
-					kind: 'react',
+					kind: 'imperativeReact',
 					component: ImperativeRenderer,
-					capabilities: { scrollPresentation: 'live', live: { update: 'imperative' } },
 				},
 			},
 		];
@@ -112,18 +111,53 @@ describe('portal store imperative write-back', () => {
 		const container = document.createElement('div');
 		const col = { field: 'name', header: 'Name' } as ColumnDef<Row>;
 		const node = { id: '1', data: { id: '1', name: 'A' } };
-		store.mountCell('k', container, 'A', node, col, false, false, 'initial', false, false, false, IDENTITY);
+		store.mountCell('k', container, {
+			value: 'A',
+			node,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'initial',
+			isScrolling: false,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
 		const notified = vi.fn();
 		store.subscribeToCell('k', notified);
 		store.registerImperativeUpdater('k', () => true);
 
 		const node2 = { id: '1', data: { id: '1', name: 'B' } };
-		expect(store.tryImperativeUpdate('k', 'B', node2, col, false, false, 'scroll-live', true, true, false, IDENTITY)).toBe(true);
+		expect(
+			store.tryImperativeUpdate('k', {
+				value: 'B',
+				node: node2,
+				col,
+				isEditing: false,
+				isLoading: false,
+				phase: 'scroll-live',
+				isScrolling: true,
+				isFocused: true,
+				isSelected: false,
+				physicalIdentity: IDENTITY,
+			})
+		).toBe(true);
 
 		expect(store.getCellData('k')).toMatchObject({ value: 'B', node: node2, phase: 'scroll-live', isScrolling: true, isFocused: true });
 		expect(notified).not.toHaveBeenCalled();
 		// The mountCell no-op check now compares against the written-back payload.
-		store.mountCell('k', container, 'B', node2, col, false, false, 'scroll-live', true, true, false, IDENTITY);
+		store.mountCell('k', container, {
+			value: 'B',
+			node: node2,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: true,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
 		expect(notified).not.toHaveBeenCalled();
 	});
 
@@ -131,10 +165,34 @@ describe('portal store imperative write-back', () => {
 		const store = createPortalStore<Row>();
 		const col = { field: 'name', header: 'Name' } as ColumnDef<Row>;
 		const node = { id: '1', data: { id: '1', name: 'A' } };
-		store.mountCell('k', document.createElement('div'), 'A', node, col, false, false, 'initial', false, false, false, IDENTITY);
+		store.mountCell('k', document.createElement('div'), {
+			value: 'A',
+			node,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'initial',
+			isScrolling: false,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
 		store.registerImperativeUpdater('k', () => false);
 
-		expect(store.tryImperativeUpdate('k', 'B', node, col, false, false, 'initial', false, false, false, IDENTITY)).toBe(false);
+		expect(
+			store.tryImperativeUpdate('k', {
+				value: 'B',
+				node,
+				col,
+				isEditing: false,
+				isLoading: false,
+				phase: 'initial',
+				isScrolling: false,
+				isFocused: false,
+				isSelected: false,
+				physicalIdentity: IDENTITY,
+			})
+		).toBe(false);
 		expect(store.getCellData('k')?.value).toBe('A');
 	});
 
@@ -142,7 +200,18 @@ describe('portal store imperative write-back', () => {
 		const store = createPortalStore<Row>();
 		const container = document.createElement('div');
 		const col = { field: 'name', header: 'Name' } as ColumnDef<Row>;
-		store.mountCell('k', container, 'A', { id: '1', data: { id: '1', name: 'A' } }, col, false, false, 'initial', false, false, false, IDENTITY);
+		store.mountCell('k', container, {
+			value: 'A',
+			node: { id: '1', data: { id: '1', name: 'A' } },
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'initial',
+			isScrolling: false,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
 		store.unmountCell('k', container, false, { ...IDENTITY });
 		expect(store.getDebugStats().cellPortalCount).toBe(0);
 	});

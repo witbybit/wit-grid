@@ -290,16 +290,6 @@ export class CellSlot<TRowData = unknown> {
 	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
 	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
 
-	/**
-	 * The last frozen-HTML string written into the portal host by the html-snapshot binder, plus the
-	 * host's first/last child right after that write. A repeat bind with the same HTML skips the
-	 * innerHTML write only while those boundary nodes are still in place — any other writer (a live
-	 * portal mount, a release clearing the host) replaces them and forces a rewrite.
-	 */
-	public lastSnapshotHtml: string | undefined = undefined;
-	public lastSnapshotHtmlFirst: ChildNode | null = null;
-	public lastSnapshotHtmlLast: ChildNode | null = null;
-
 	// JS-side mirrors of DOM state, so steady-state binds never read the DOM back.
 
 	private lastDatasetColumnInstanceId: string | undefined = undefined;

@@ -8,37 +8,24 @@
 	type ColumnRenderMode,
 	type CompiledGridPlan,
 	type CellRendererCapabilities,
+	type CellScrollPresentation,
 	type NormalizedCellRendererCapabilities,
 } from '../columnDef.js';
 import type { ColumnModelRuntime } from '../engine/runtimePorts.js';
 import { IndexMapper } from './IndexMapper.js';
 
-/**
- * Normalizes a renderer's capabilities to a concrete scroll presentation mode and validates that
- * only the config matching that mode was supplied — an ambiguous combination (e.g. `live` config
- * on a `text-impostor` column) fails fast at column-definition time instead of silently poisoning
- * the scroll-time resolver with a config the active mode never reads.
- */
+/** The one place a renderer column's scroll presentation default lives: DOM renderers update in place, React renderers show stand-in text. */
+export function defaultRendererScroll(domRenderer: boolean): CellScrollPresentation {
+	return domRenderer ? 'live' : 'text';
+}
+
+/** Normalizes a renderer's capabilities, resolving `scroll` to a concrete mode. */
 export function normalizeRendererCapabilities(
 	cap: CellRendererCapabilities | undefined,
-	options: { domRenderer?: boolean } = {}
+	options: { domRenderer?: boolean; imperative?: boolean } = {}
 ): NormalizedCellRendererCapabilities {
-	const mode = cap?.scrollPresentation ?? (options.domRenderer ? 'update' : 'freeze');
-	if (mode === 'update' && !options.domRenderer) {
-		throw new Error("Wit Grid: scrollPresentation:'update' is only valid for DOM renderers (renderer.kind 'dom').");
-	}
-
-	if (mode !== 'live' && cap?.live) {
-		throw new Error("Wit Grid: capabilities.live is only valid with scrollPresentation:'live'.");
-	}
-	if (mode !== 'text-impostor' && cap?.textImpostor) {
-		throw new Error("Wit Grid: capabilities.textImpostor is only valid with scrollPresentation:'text-impostor'.");
-	}
-	if (mode !== 'html-snapshot' && cap?.htmlSnapshot) {
-		throw new Error("Wit Grid: capabilities.htmlSnapshot is only valid with scrollPresentation:'html-snapshot'.");
-	}
-
-	return { ...cap, scrollPresentation: mode };
+	if (options.imperative) return { ...cap, scroll: 'live', imperative: true };
+	return { ...cap, scroll: cap?.scroll ?? defaultRendererScroll(!!options.domRenderer) };
 }
 
 /**
@@ -141,8 +128,8 @@ export class ColumnModel<TRowData = unknown> {
 					const caps = col.cellRendererCapabilities;
 					if (isDomCellRenderer(col.cellRenderer)) {
 						mode = 'custom-dom';
-					} else if (caps?.scrollPresentation === 'live') {
-						mode = caps.live?.update === 'imperative' ? 'custom-imperative' : 'custom-live';
+					} else if (caps?.scroll === 'live') {
+						mode = caps.imperative ? 'custom-imperative' : 'custom-live';
 					} else {
 						mode = 'custom';
 					}
@@ -187,14 +174,10 @@ export class ColumnModel<TRowData = unknown> {
 			return {
 				...column,
 				cellRenderer: renderer.component as InternalColumnDef<TRowData>['cellRenderer'],
-				cellRendererCapabilities: normalizeRendererCapabilities({
-					...renderer.capabilities,
-					scrollPresentation: 'live',
-					live: { ...renderer.capabilities?.live, update: 'imperative' },
-				}),
+				cellRendererCapabilities: normalizeRendererCapabilities(renderer.capabilities, { imperative: true }),
 			};
 		}
-		// kind === 'react': default to 'freeze' (full portal, frozen/impostor'd during scroll)
+		// kind === 'react': defaults to 'text' (full portal, stand-in text for entering cells during scroll)
 		return {
 			...column,
 			cellRenderer: renderer.component as InternalColumnDef<TRowData>['cellRenderer'],

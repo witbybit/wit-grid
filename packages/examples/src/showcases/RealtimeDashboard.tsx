@@ -495,8 +495,8 @@ function createDashboardColumns(isLight: boolean): ColumnDef<DashboardStockRow>[
 			headerGroup: 'Market Data',
 			renderer: {
 				kind: 'dom',
-				// DOM renderers default to scrollPresentation 'update': cells entering during scroll are
-				// redrawn in place within the frame budget, so the sparkline never shows a stand-in.
+				// DOM renderers default to scroll: 'live': cells entering during scroll are
+				// redrawn in place within the frame budget, so the sparkline rarely shows a stand-in.
 				renderer: createSparklineRenderer(isLight),
 			},
 		},

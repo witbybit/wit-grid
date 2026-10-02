@@ -65,20 +65,18 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 			const cellKey = `slot-${slot}:name`;
 			const identity = makeIdentity(`cell-${index}`, `slot-${slot}`, index + 1);
 			const unsubscribeCell = store.subscribeToCell?.(cellKey, vi.fn());
-			store.mountCell(
-				cellKey,
-				containers[slot]!,
-				`value-${index}`,
-				makeNode(`row-${index}`),
-				COLUMN,
-				false,
-				false,
-				undefined,
-				false,
-				false,
-				false,
-				identity
-			);
+			store.mountCell(cellKey, containers[slot]!, {
+				value: `value-${index}`,
+				node: makeNode(`row-${index}`),
+				col: COLUMN,
+				isEditing: false,
+				isLoading: false,
+				phase: undefined,
+				isScrolling: false,
+				isFocused: false,
+				isSelected: false,
+				physicalIdentity: identity,
+			});
 			store.registerImperativeUpdater?.(cellKey, () => true);
 			if (index % 5 === 0) {
 				store.mountRow?.(`detail:${index}`, containers[slot]!, makeDetailRow(`detail:${index}`));
@@ -120,68 +118,62 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const nodeB = makeNode('row-b', 'New');
 		const updater = vi.fn(() => true);
 
-		store.mountCell(
-			'slot-0:name',
-			container,
-			'Old',
-			nodeA,
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci1', 'slot-0', 1)
-		);
+		store.mountCell('slot-0:name', container, {
+			value: 'Old',
+			node: nodeA,
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci1', 'slot-0', 1),
+		});
 		store.registerImperativeUpdater?.('slot-0:name', updater);
 
 		expect(
-			store.tryImperativeUpdate?.(
-				'slot-0:name',
-				'Old+',
-				nodeA,
-				COLUMN,
-				false,
-				false,
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				makeIdentity('ci1', 'slot-0', 1)
-			)
+			store.tryImperativeUpdate?.('slot-0:name', {
+				value: 'Old+',
+				node: nodeA,
+				col: COLUMN,
+				isEditing: false,
+				isLoading: false,
+				phase: undefined,
+				isScrolling: undefined,
+				isFocused: undefined,
+				isSelected: undefined,
+				physicalIdentity: makeIdentity('ci1', 'slot-0', 1),
+			})
 		).toBe(true);
 		expect(updater).toHaveBeenCalledTimes(1);
 
-		store.mountCell(
-			'slot-0:name',
-			container,
-			'New',
-			nodeB,
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci1', 'slot-0', 2)
-		);
+		store.mountCell('slot-0:name', container, {
+			value: 'New',
+			node: nodeB,
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci1', 'slot-0', 2),
+		});
 
 		expect(
-			store.tryImperativeUpdate?.(
-				'slot-0:name',
-				'STALE',
-				nodeA,
-				COLUMN,
-				false,
-				false,
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				makeIdentity('ci1', 'slot-0', 1)
-			)
+			store.tryImperativeUpdate?.('slot-0:name', {
+				value: 'STALE',
+				node: nodeA,
+				col: COLUMN,
+				isEditing: false,
+				isLoading: false,
+				phase: undefined,
+				isScrolling: undefined,
+				isFocused: undefined,
+				isSelected: undefined,
+				physicalIdentity: makeIdentity('ci1', 'slot-0', 1),
+			})
 		).toBe(false);
 		expect(updater).toHaveBeenCalledTimes(1);
 		expect(store.getCellData?.('slot-0:name')?.value).toBe('New');
@@ -193,36 +185,33 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const container = document.createElement('div');
 		const updater = vi.fn(() => true);
 
-		store.mountCell(
-			'slot-0:name',
-			container,
-			'Current',
-			makeNode('row-a', 'Current'),
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci2', 'slot-0', 7)
-		);
+		store.mountCell('slot-0:name', container, {
+			value: 'Current',
+			node: makeNode('row-a', 'Current'),
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci2', 'slot-0', 7),
+		});
 		store.registerImperativeUpdater?.('slot-0:name', updater);
 
 		expect(
-			store.tryImperativeUpdate?.(
-				'slot-0:name',
-				'STALE-WRONG-SLOT',
-				makeNode('row-a', 'Current'),
-				COLUMN,
-				false,
-				false,
-				undefined,
-				undefined,
-				undefined,
-				undefined,
-				makeIdentity('ci2', 'slot-1', 7)
-			)
+			store.tryImperativeUpdate?.('slot-0:name', {
+				value: 'STALE-WRONG-SLOT',
+				node: makeNode('row-a', 'Current'),
+				col: COLUMN,
+				isEditing: false,
+				isLoading: false,
+				phase: undefined,
+				isScrolling: undefined,
+				isFocused: undefined,
+				isSelected: undefined,
+				physicalIdentity: makeIdentity('ci2', 'slot-1', 7),
+			})
 		).toBe(false);
 		expect(updater).not.toHaveBeenCalled();
 	});
@@ -231,20 +220,18 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const store = createPortalStore<TestRow>();
 		const container = document.createElement('div');
 
-		store.mountCell(
-			'slot-0:name',
-			container,
-			'Current',
-			makeNode('row-a', 'Current'),
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci3', 'slot-0', 2)
-		);
+		store.mountCell('slot-0:name', container, {
+			value: 'Current',
+			node: makeNode('row-a', 'Current'),
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci3', 'slot-0', 2),
+		});
 
 		store.unmountCell('slot-0:name', container, false, makeIdentity('ci3', 'slot-0', 1));
 		expect(store.getCellData?.('slot-0:name')?.value).toBe('Current');
@@ -270,20 +257,18 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 				const cellKey = `row-${nextCellId}:name`;
 				const generation = nextCellId;
 				nextCellId++;
-				store.mountCell(
-					cellKey,
-					container,
-					`value-${cellKey}`,
-					makeNode(cellKey, `value-${cellKey}`),
-					COLUMN,
-					false,
-					false,
-					undefined,
-					undefined,
-					undefined,
-					undefined,
-					makeIdentity(`ci-${generation}`, `slot-${container === cellContainers[0] ? 0 : 1}`, generation)
-				);
+				store.mountCell(cellKey, container, {
+					value: `value-${cellKey}`,
+					node: makeNode(cellKey, `value-${cellKey}`),
+					col: COLUMN,
+					isEditing: false,
+					isLoading: false,
+					phase: undefined,
+					isScrolling: undefined,
+					isFocused: undefined,
+					isSelected: undefined,
+					physicalIdentity: makeIdentity(`ci-${generation}`, `slot-${container === cellContainers[0] ? 0 : 1}`, generation),
+				});
 				activeCellByContainer.set(container, cellKey);
 			} else if (op === 1) {
 				const container = cellContainers[lcgInt(rng, cellContainers.length)];
@@ -332,20 +317,18 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const store = createPortalStore<TestRow>();
 		const container = document.createElement('div');
 
-		store.mountCell(
-			'ci-a:name',
-			container,
-			'A',
-			makeNode('row-a'),
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci-a', 'slot-0', 0)
-		);
+		store.mountCell('ci-a:name', container, {
+			value: 'A',
+			node: makeNode('row-a'),
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci-a', 'slot-0', 0),
+		});
 
 		store.unmountCell('ci-a:name', container, false, makeIdentity('ci-b', 'slot-0', 0));
 		expect(store.getCellData?.('ci-a:name')?.value).toBe('A');
@@ -355,20 +338,18 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const store = createPortalStore<TestRow>();
 		const container = document.createElement('div');
 
-		store.mountCell(
-			'ci-c:name',
-			container,
-			'C',
-			makeNode('row-c'),
-			COLUMN,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			makeIdentity('ci-c', 'slot-0', 0, 1)
-		);
+		store.mountCell('ci-c:name', container, {
+			value: 'C',
+			node: makeNode('row-c'),
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: makeIdentity('ci-c', 'slot-0', 0, 1),
+		});
 
 		// rowBindingGeneration 0 vs 1 — cell was hot-unbound and rebound
 		store.unmountCell('ci-c:name', container, false, makeIdentity('ci-c', 'slot-0', 0, 0));
@@ -379,12 +360,23 @@ describe('createPortalStore — adversarial lifecycle invariants', () => {
 		const store = createPortalStore<TestRow>();
 		const container = document.createElement('div');
 
-		store.mountCell('ci-d:name', container, 'D', makeNode('row-d'), COLUMN, false, false, undefined, undefined, undefined, undefined, {
-			cellInstanceId: 'ci-d',
-			rowSlotId: 'slot-0',
-			slotGeneration: 0,
-			rowBindingGeneration: 0,
-			portalHostId: 'ci-d-ph',
+		store.mountCell('ci-d:name', container, {
+			value: 'D',
+			node: makeNode('row-d'),
+			col: COLUMN,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
+				cellInstanceId: 'ci-d',
+				rowSlotId: 'slot-0',
+				slotGeneration: 0,
+				rowBindingGeneration: 0,
+				portalHostId: 'ci-d-ph',
+			},
 		});
 
 		store.unmountCell('ci-d:name', container, false, {

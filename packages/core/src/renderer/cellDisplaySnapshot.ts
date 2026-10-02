@@ -3,7 +3,7 @@ import type { GridCellDecoration } from '../insights/insightTypes.js';
 import type { ColumnInstanceId } from '../columnDef.js';
 import type { VisualFreshness } from './visualFreshness.js';
 
-export type CellDisplayContentKind = CellContentMode | 'portal-live' | 'portal-frozen' | 'impostor';
+export type CellDisplayContentKind = CellContentMode | 'portal-live' | 'stand-in';
 
 /**
  * Snapshot authority is a bounded working set, not a per-dataset mirror. This comfortably covers

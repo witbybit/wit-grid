@@ -4,7 +4,19 @@
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Grid, type ColumnDef } from '../../react/src/index.js';
-import { installMeasurement, makeRows, markReady, readScenario, rendererCalls, type BenchRow } from './common.js';
+import {
+	installMeasurement,
+	installTicker,
+	makeRows,
+	markReady,
+	middleVisibleRowIndex,
+	readScenario,
+	rendererCalls,
+	type BenchRow,
+	HOT_CLASS,
+	isHotValue,
+	styledCells,
+} from './common.js';
 
 const scenario = readScenario();
 const container = document.getElementById('grid')!;
@@ -31,20 +43,31 @@ function BarCell({ value }: { value: unknown }) {
 const columns: ColumnDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_, c) => {
 	const base = { field: `c${c}`, header: `Col ${c}`, width: 110 };
 	if (c >= scenario.domCols) return base;
-	// ?reactMode=live|html-snapshot|freeze picks the scroll presentation; default: none declared.
+	// ?reactMode=live|text picks the scroll presentation; default: none declared ('text').
 	const mode = new URLSearchParams(location.search).get('reactMode');
-	const capabilities = mode ? { capabilities: { scrollPresentation: mode as 'live' | 'html-snapshot' | 'freeze' } } : {};
+	const capabilities = mode ? { capabilities: { scroll: mode as 'live' | 'text' } } : {};
 	// ?getters=1: the renderer columns read their value through a valueGetter (the #perf demo's Greeks shape).
 	const getter = new URLSearchParams(location.search).get('getters') === '1' ? { valueGetter: ({ row }: { row: BenchRow }) => row[`c${c}`] } : {};
 	return { ...base, ...getter, renderer: { kind: 'react' as const, component: BarCell, ...capabilities } };
 });
 const rows = makeRows(scenario);
 
-// ?reactMounts=<n> caps live React mounts per frame (rendererOptions.liveReact.maxMountsPerFrame).
+// ?reactMounts=<n> caps live React mounts per frame (rendererOptions.live.maxMountsPerFrame).
 const reactMounts = new URLSearchParams(location.search).get('reactMounts');
-const rendererOptions = reactMounts ? { liveReact: { maxMountsPerFrame: Number(reactMounts) } } : undefined;
+const rendererOptions = reactMounts ? { live: { maxMountsPerFrame: Number(reactMounts) } } : undefined;
 
-createRoot(container).render(<Grid<BenchRow> columns={columns} rows={rows} getRowId={(row) => row.id} rendererOptions={rendererOptions} />);
+const root = createRoot(container);
+const styleRules = styledCells
+	? [{ kind: 'cell' as const, when: (row: BenchRow, col: { field: string }) => isHotValue(row[col.field]), cellClass: HOT_CLASS }]
+	: undefined;
+const render = (current: BenchRow[]) =>
+	root.render(
+		<Grid<BenchRow> columns={columns} rows={current} getRowId={(row) => row.id} rendererOptions={rendererOptions} styleRules={styleRules} />
+	);
+render(rows);
+// Tick scenarios edit a renderer cell (c1) of the row in the middle of the viewport, through the
+// React way of updating data: a new rows prop.
+installTicker(rows, render, (i) => middleVisibleRowIndex('.og-rows-container > .og-row') ?? i % 12);
 
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.og-scroll-viewport'),

@@ -16,8 +16,13 @@ export function readScenario(): Scenario {
 	return { rows: Number(q.get('rows') ?? 100_000), cols: Number(q.get('cols') ?? 50), domCols: Number(q.get('domCols') ?? 0) };
 }
 
-/** The value makeRows puts in a cell, from its ids alone (`r<row>`, `c<col>`). */
+/** Values a tick scenario has edited, by `<rowId>/<colId>`: the cell's current value from then on. */
+const editedValues = new Map<string, string | number>();
+
+/** The value a cell holds: its edited value, else what makeRows put there from its ids (`r<row>`, `c<col>`). */
 function cellValue(rowId: string, colId: string): string | number {
+	const edited = editedValues.get(`${rowId}/${colId}`);
+	if (edited !== undefined) return edited;
 	const r = Number(rowId.slice(1));
 	const c = Number(colId.slice(1));
 	return c % 3 === 0 ? `R${r}C${c}` : (r * 31 + c * 17) % 1000;
@@ -30,7 +35,20 @@ export function formatBenchValue(value: unknown): string {
 	return `$${String(value)}`;
 }
 
+/**
+ * ?styled=1: a cell style rule marks every numeric cell above 500 with `bench-hot`, and fidelity
+ * judges the class too: a decorated cell must show its decoration, not only its text.
+ */
+export const styledCells = new URLSearchParams(location.search).get('styled') === '1';
+export const HOT_CLASS = 'bench-hot';
+export const isHotValue = (value: unknown): boolean => typeof value === 'number' && value > 500;
+
 export function expectedSignature(rowId: string, colId: string, domCols: number): string {
+	const base = expectedContentSignature(rowId, colId, domCols);
+	return styledCells && isHotValue(cellValue(rowId, colId)) ? `${base}|hot` : base;
+}
+
+function expectedContentSignature(rowId: string, colId: string, domCols: number): string {
 	const value = cellValue(rowId, colId);
 	if (formatNumbers && typeof value === 'number' && Number(colId.slice(1)) >= domCols) return formatBenchValue(value);
 	return Number(colId.slice(1)) < domCols ? `${value}|${(typeof value === 'number' ? value : 0) / 10}%` : String(value);
@@ -100,6 +118,7 @@ interface FidelityStats {
 	/** ms from the last input until the first frame with every visible cell final (-1: never). */
 	settleMs: number;
 	wrongExamples: string[];
+	otherExamples: string[];
 }
 
 const emptyFidelity = (): FidelityStats => ({
@@ -113,13 +132,15 @@ const emptyFidelity = (): FidelityStats => ({
 	otherContent: 0,
 	settleMs: -1,
 	wrongExamples: [],
+	otherExamples: [],
 });
 
 /** Visible text plus the visible bar's width: what a viewer actually sees in the cell. */
 function readSignature(cell: HTMLElement): string {
 	const text = cell.innerText.trim();
 	const bar = cell.querySelector<HTMLElement>('.bench-bar');
-	return bar && bar.getClientRects().length > 0 ? `${text}|${bar.style.width}` : text;
+	const content = bar && bar.getClientRects().length > 0 ? `${text}|${bar.style.width}` : text;
+	return styledCells && cell.classList.contains(HOT_CLASS) ? `${content}|hot` : content;
 }
 
 /**
@@ -181,8 +202,10 @@ export function installMeasurement(options: {
 					if (signature === '') stats.blank++;
 					else if (signature === expected.split('|')[0]) stats.incomplete++;
 					else stats.otherContent++;
-					if (stats.wrongExamples.length < 8)
-						stats.wrongExamples.push(`${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`);
+					const example = `${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`;
+					if (stats.wrongExamples.length < 8) stats.wrongExamples.push(example);
+					// Stale or another row's content is the kind that matters: keep its examples apart.
+					if (signature !== '' && signature !== expected.split('|')[0] && stats.otherExamples.length < 8) stats.otherExamples.push(example);
 				}
 				const previous = lastSeen.get(key);
 				if (previous !== undefined && previous !== signature) stats.changes++;
@@ -298,16 +321,34 @@ export function installMeasurement(options: {
 /**
  * Tick scenarios: each tick hands the grid a new rows array in which one visible row is an edited
  * copy — what a React app does with immutable state. `replace` gives the array to the grid.
+ * `pickRow` chooses the edited row's index (default: one of the first 12, in view at rest); the
+ * edit is recorded so fidelity judges cells against their current value.
  */
-export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) => void): void {
+export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) => void, pickRow?: (i: number) => number): void {
 	let rows = initial;
 	(window as unknown as { benchTick: (i: number) => void }).benchTick = (i: number) => {
-		const k = i % 12;
+		const k = pickRow?.(i) ?? i % 12;
 		const next = rows.slice();
-		next[k] = { ...rows[k], c1: (Number(rows[k].c1) + 1) % 1000 };
+		const value = (Number(rows[k].c1) + 1) % 1000;
+		next[k] = { ...rows[k], c1: value };
+		editedValues.set(`${rows[k].id}/c1`, value);
 		rows = next;
 		replace(next);
 	};
+}
+
+/** A row in the middle of the viewport: its index, read from the rendered rows' cells. */
+export function middleVisibleRowIndex(rowsSelector: string): number | undefined {
+	const rows = document.querySelectorAll<HTMLElement>(rowsSelector);
+	const viewportMiddle = window.innerHeight / 2;
+	for (const row of rows) {
+		const box = row.getBoundingClientRect();
+		if (box.top <= viewportMiddle && box.bottom >= viewportMiddle) {
+			const id = row.querySelector<HTMLElement>('.og-cell')?.dataset.rowId;
+			if (id) return Number(id.slice(1));
+		}
+	}
+	return undefined;
 }
 
 export function markReady(): void {

@@ -186,7 +186,7 @@ function hashIndex(str: string): number {
  *   renderer: {
  *     kind: 'react',
  *     component: CheckboxCellRenderer,
- *     capabilities: { scrollPresentation: 'freeze' },
+ *     capabilities: { scroll: 'text' },
  *   },
  * }];
  * ```

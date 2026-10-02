@@ -39,7 +39,7 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	colBuffer?: number;
 	overscanAdaptive?: boolean;
 	runtimeLimits?: GridInitialState<TRowData>['runtimeLimits'];
-	/** Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only. */
+	/** Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only. */
 	rendererOptions?: GridInitialState<TRowData>['rendererOptions'];
 	columnTypes?: Record<string, ColumnTypeDefinition<TRowData>>;
 	styleRules?: StyleRule<TRowData>[];

@@ -43,7 +43,6 @@ describe('ViewportPlanner', () => {
 		expect(plan.frame).toBe(1);
 		expect(plan.columnWindowDelta).toBeUndefined();
 		expect(plan.renderWindow.rowStart).toBe(0);
-		expect(plan.liveCells.visible).toEqual([]);
 		expect(plan.liveCells.overscan).toEqual([]);
 	});
 
@@ -132,7 +131,7 @@ describe('ViewportPlanner', () => {
 			topology,
 			new Set(),
 			makePlan(cols, 0, 0, 1),
-			{ liveReact: { rowOverscan: 10, columnOverscan: 10 } }
+			{ live: { rowOverscan: 10, columnOverscan: 10 } }
 		);
 		expect(plan.liveRowRange).toEqual({ start: 10, end: 19 });
 		expect(plan.liveCenterColumnWindow).toEqual(['b', 'c', 'd']);
@@ -157,18 +156,14 @@ describe('ViewportPlanner', () => {
 			{
 				...compiledPlan,
 				displayedColumns: cols.map((col, index) =>
-					index === 1 || index === 2
-						? ({ ...col, cellRendererCapabilities: { scrollPresentation: 'live' } } as InternalColumnDef<unknown>)
-						: col
+					index === 1 || index === 2 ? ({ ...col, cellRendererCapabilities: { scroll: 'live' } } as InternalColumnDef<unknown>) : col
 				),
 			} as CompiledGridPlan<unknown>,
-			{ liveReact: { rowOverscan: 999, columnOverscan: 999 } }
+			{ live: { rowOverscan: 999, columnOverscan: 999 } }
 		);
-		expect(plan.liveCells.visible.every((cell) => cell.rowIndex >= plan.renderedRows.start && cell.rowIndex <= plan.renderedRows.end)).toBe(true);
 		expect(plan.liveCells.overscan.every((cell) => cell.rowIndex >= plan.renderedRows.start && cell.rowIndex <= plan.renderedRows.end)).toBe(
 			true
 		);
-		expect(plan.liveCells.visible.every((cell) => plan.renderedCenterColumns.includes(cell.columnInstanceId))).toBe(true);
 		expect(plan.liveCells.overscan.every((cell) => plan.renderedCenterColumns.includes(cell.columnInstanceId))).toBe(true);
 	});
 
@@ -179,7 +174,7 @@ describe('ViewportPlanner', () => {
 			Object.defineProperty(column, 'cellRendererCapabilities', {
 				get() {
 					rendererModeReads++;
-					return { scrollPresentation: 'live' };
+					return { scroll: 'live' };
 				},
 			});
 			return column;
@@ -209,18 +204,16 @@ describe('ViewportPlanner', () => {
 			pinRightCols: 2,
 		};
 		const planner = new ViewportPlanner();
-		const plan = planner.computePlan(window, countedTopology, new Set(), compiledPlan, { liveReact: { columnOverscan: 2 } });
+		const plan = planner.computePlan(window, countedTopology, new Set(), compiledPlan, { live: { columnOverscan: 2 } });
 
-		// 2 pinned columns on each side plus 9 rendered center columns, across 3 visible rows.
-		expect(plan.liveCells.visible).toHaveLength(27);
+		// The 2 overscan center columns on each side of the 5 visible ones, across 3 visible rows.
 		expect(plan.liveCells.overscan).toHaveLength(12);
-		expect(plan.liveCells.visible.length + plan.liveCells.overscan.length).toBe(39);
 		// Three bounded center slices read 5 + 9 + 9 placements plus their range boundaries,
 		// rather than walking all 996 center columns.
 		expect(centerPlacementReads).toBeLessThanOrEqual(30);
 		expect(rendererModeReads).toBe(1_000);
 
-		planner.computePlan(window, countedTopology, new Set(), compiledPlan, { liveReact: { columnOverscan: 2 } });
+		planner.computePlan(window, countedTopology, new Set(), compiledPlan, { live: { columnOverscan: 2 } });
 		// Renderer mode classification is retained while both compiled-plan and topology versions match.
 		expect(rendererModeReads).toBe(1_000);
 	});

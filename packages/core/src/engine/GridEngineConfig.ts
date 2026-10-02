@@ -88,8 +88,7 @@ export interface GridEngineConfig<TRowData = unknown> {
 	overscanAdaptive?: boolean;
 	/** Returns the host container element. Used by auto-size and any feature that needs DOM measurements. */
 	getContainerElement?: () => HTMLElement | null;
-	/** Grid-wide scroll presentation policy — live-mode overscan/budgets, html-snapshot cache limits
-	 *  and missing-capture defaults, text-impostor defaults. See columnDef.ts's GridRendererOptions. */
+	/** Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. See columnDef.ts's GridRendererOptions. */
 	rendererOptions?: GridRendererOptions;
 	/**
 	 * How long `transaction(tx, { async: true })` waits before committing queued transactions, in ms. When unset,

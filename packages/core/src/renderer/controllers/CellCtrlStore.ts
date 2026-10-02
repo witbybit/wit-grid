@@ -43,7 +43,6 @@ export class CellCtrlStore<TRowData = unknown> {
 			existing.rowIndex = input.rowIndex ?? existing.rowIndex;
 			existing.rowCtrlKey = input.rowCtrlKey ?? existing.rowCtrlKey;
 			existing.colIndex = input.colIndex ?? existing.colIndex;
-			existing.scrollPresentation = input.scrollPresentation ?? existing.scrollPresentation;
 			existing.freshness = input.freshness ?? existing.freshness;
 			return { cellCtrl: existing, created: false };
 		}

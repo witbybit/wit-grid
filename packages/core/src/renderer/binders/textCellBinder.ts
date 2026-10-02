@@ -1,15 +1,13 @@
 import { recordCellSlotMountedVisualVersions, type CellContentMode } from '../cellSlot.js';
-import { isHtmlSnapshotPresentation } from '../scrollPresentationMode.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
 
 /**
  * The `text` render state: every outcome that writes a string (or a placeholder mode) into the
- * cell and holds no portal — plain primitive text, buffered off-screen content, loading skeletons,
- * freeze-mode shells, text impostors (explicit or fallback) and the html-snapshot pending shell.
- * They differ only in the content mode written, whether the cell is marked dirty for the
- * post-scroll repaint, how mounted versions are recorded, and which telemetry counter moves;
- * the write itself is shared. Releasing a previously held portal is the dispatcher's job.
+ * cell and holds no portal — plain primitive text, buffered off-screen content, loading skeletons
+ * and stand-in text. They differ only in the content mode written, whether the cell is
+ * marked dirty for the post-scroll repaint, and how mounted versions are recorded; the write itself
+ * is shared. Releasing a previously held portal is the dispatcher's job.
  */
 export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
@@ -43,28 +41,10 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 			markDirty = false;
 			versions = 'none';
 			break;
-		case 'shell':
+		case 'stand-in':
 			contentMode = presentation.contentMode ?? 'fallback';
 			markDirty = true;
 			versions = 'mounted';
-			break;
-		case 'html-pending':
-			if (isScroll) deps.incrementHtmlSnapshotMissesDuringScroll?.();
-			contentMode = 'pending';
-			text = '';
-			markDirty = true;
-			versions = 'mounted';
-			break;
-		case 'text-impostor':
-			contentMode = presentation.contentMode ?? 'fallback';
-			markDirty = true;
-			if (presentation.textImpostorSource === 'fallback') {
-				if (runtime.mount && isHtmlSnapshotPresentation(runtime.mount.col)) deps.incrementHtmlSnapshotMissesDuringScroll?.();
-				versions = 'stamp';
-			} else {
-				if (isScroll) deps.incrementTextImpostorUsesDuringScroll?.();
-				versions = 'mounted';
-			}
 			break;
 		default:
 			throw new Error(`applyTextCellPresentation: '${presentation.kind}' is not a text render state`);

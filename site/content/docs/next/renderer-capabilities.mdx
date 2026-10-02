@@ -1,43 +1,74 @@
 ---
 title: Renderer Capabilities
-description: Control what a custom cell renderer shows during active scroll — the core scroll-performance tradeoff.
+description: Choose what a custom cell renderer shows during active scroll — stand-in text or the live renderer.
 icon: Gauge
 ---
 
-This is the mechanism behind the "cell-level micro-subscriptions bypass re-renders" claim on the homepage. Any
-column with a custom renderer ([`renderer`](/docs/next/columns#renderers-and-editors) — DOM, React, or
-imperative React) can opt into a **scroll presentation** mode that decides what that cell shows while the grid
-is actively scrolling, independent of what it shows at rest.
+Any column with a custom renderer ([`renderer`](/docs/next/columns#renderers-and-editors) — DOM, React, or
+imperative React) can choose what its cells show while the grid is actively scrolling. There are two choices:
+**text** and **live**.
 
 <Callout title='Why this exists' type='info'>
-	Re-mounting or re-rendering every custom cell renderer on every scroll frame is the single biggest cost in a virtualized grid with rich cells.
-	`scrollPresentation` lets you trade fidelity for speed per column — a sparkline column can freeze mid-scroll where a live ticking price column
-	cannot.
+	Mounting or re-rendering every custom cell on every scroll frame is the biggest cost in a virtualized grid with rich cells. `scroll` lets you
+	decide per column how much of that work to do mid-scroll.
 </Callout>
 
-## The six modes
+## `text` and `live`
 
-`scrollPresentation` is the one field that chooses the mode; each mode has its own config sub-object, valid only
-alongside that mode.
+Set the choice with `scroll` under the renderer's `capabilities`:
 
-| Mode            | What shows during active scroll                                                          | Cost    |
-| --------------- | ---------------------------------------------------------------------------------------- | ------- |
-| `primitive`     | N/A — default for columns with no custom renderer. Fast text/class presentation always.  | Lowest  |
-| `update`        | DOM renderers only: entering cells are redrawn in place, within a per-frame budget.      | Low     |
-| `freeze`        | The existing rendered cell stays visually frozen. New/cold cells show the cell's text.   | Low     |
-| `text-impostor` | An explicit cheap text/chip stand-in you provide (`textImpostor.render`).                | Low     |
-| `html-snapshot` | A captured inert HTML clone of the cell, replayed during scroll.                         | Medium  |
-| `live`          | The real renderer is mounted/updated on every scroll frame. No fallback, no placeholder. | Highest |
+| `scroll` | What cells entering view show during scroll                                                                             | Default for     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------- | --------------- |
+| `text`   | Stand-in text. Renderers already mounted stay as they are. The real renderer mounts once scrolling settles.             | React renderers |
+| `live`   | The real renderer, mounted or updated during scroll within the per-frame budget. Never blank (see below for the limit). | DOM renderers   |
 
-With no explicit `scrollPresentation`, a DOM renderer (`kind: 'dom'`) uses `update` and a React renderer uses
-`freeze`. `primitive` is the default for columns with no renderer at all — there's nothing to freeze or snapshot.
+Columns with no custom renderer draw plain text and need no setting.
 
-## `update` — DOM renderers, redrawn in place
+```typescript
+{
+	field: 'status',
+	header: 'Status',
+	renderer: {
+		kind: 'react',
+		component: StatusBadge,
+		capabilities: { scroll: 'live' },
+	},
+}
+```
 
-A DOM renderer's `update()` is a direct DOM write with no React involved, so it is cheap enough to run inside
-the scroll frame. With `update`, a cell that scrolls into view calls your renderer's `update()` with its new
-row, or `mount()` the first time a slot uses it. The cell is final as drawn: nothing is redone when scrolling
-stops, and cells that stay in view are not touched at all.
+## `text` — stand-in text during scroll
+
+With `text`, a cell that scrolls into view shows plain text instead of mounting the component. When scrolling stops,
+the real renderer mounts. Cells that were already drawn before the scroll started keep their renderer.
+
+The text is the cell's formatted value. To show something different, give the column a `scrollText` function. It
+receives the raw and formatted value and returns a plain string:
+
+```typescript
+{
+	field: 'severity',
+	header: 'Severity',
+	renderer: {
+		kind: 'react',
+		component: SeverityBadge,
+		capabilities: {
+			scroll: 'text',
+			scrollText: ({ value, formattedValue }) => `● ${formattedValue || String(value)}`,
+		},
+	},
+}
+```
+
+`scrollText` returns a string only — no JSX or DOM. Use it for a short label that reads well in a hurry.
+
+## `live` — the real renderer during scroll
+
+Use `live` when the component itself must be visible while scrolling: bars, badges, avatars, or anything where
+text would look wrong.
+
+DOM renderers are `live` by default. A DOM renderer's `update()` is a direct DOM write with no React involved, so it
+is cheap enough to run inside the scroll frame. A cell that scrolls into view calls your renderer's `update()` with
+its new row, or `mount()` the first time a slot uses it. Cells that stay in view are not touched.
 
 ```typescript
 const SparklineRenderer = {
@@ -52,102 +83,18 @@ const SparklineRenderer = {
 	},
 };
 
-// No capabilities needed: 'update' is the DOM renderer default.
+// No capabilities needed: DOM renderers are 'live' by default.
 const column = { field: 'trend', header: 'Trend', renderer: { kind: 'dom', renderer: SparklineRenderer } };
 ```
 
-The work is budgeted by time: `rendererOptions.domUpdate.maxMsPerFrame` (default 4 ms) caps how much DOM
-renderer work runs in one frame. Cells beyond the budget show a plain-text stand-in and are drawn once scrolling
-settles. A React renderer cannot use `update`; mounting React inside a scroll frame is what `freeze` exists to
-avoid.
+React renderers are `text` by default. Set `scroll: 'live'` to mount and update them during scroll too. In the
+bench (100,000 rows, 10 React columns, real wheel input) this draws every visible cell correctly on every frame
+for about 28% more main-thread time than `text`.
 
-## `live` — real-time cells
+### The per-frame budget
 
-Use `live` for cells that must never show stale data, even mid-scroll: ticking prices, live status, anything
-where a frozen frame would be actively misleading.
-
-```typescript
-{
-	field: 'price',
-	header: 'Price',
-	renderer: {
-		kind: 'imperativeReact',
-		component: LivePriceRenderer,
-		capabilities: {
-			scrollPresentation: 'live',
-			live: { update: 'imperative', priority: 'high' },
-		},
-	},
-}
-```
-
-`live.update` chooses how the cell repaints on each tick:
-
-- **`'react'`** (default) — updates flow through React's scheduler, like a normal re-render.
-- **`'imperative'`** — the grid calls `ref.current.update()` directly on a `forwardRef` component
-  exposing [`ImperativeCellHandle`](/docs/next/grid-api), bypassing React's scheduler entirely. Use this for the
-  highest-frequency feeds, where even `setState` latency is too much.
-
-The [Realtime Dashboard example](/docs/next/examples) renders exactly this pattern — its "Change %" column is an
-imperative `live` renderer, its "Price" column is a DOM renderer on the default `update`, and its "Volume" column
-is a plain memoized React renderer with no special `scrollPresentation` (implicitly `freeze`) — one grid, three
-renderer strategies, side by side.
-
-## `text-impostor` — cheap stand-in during scroll
-
-Use `text-impostor` when the full renderer is expensive to mount but a plain string is enough for the eye to
-track while scrolling — a rich status badge that becomes plain text mid-scroll, for example.
-
-```typescript
-{
-	field: 'status',
-	header: 'Status',
-	renderer: {
-		kind: 'react',
-		component: StatusBadge,
-		capabilities: {
-			scrollPresentation: 'text-impostor',
-			textImpostor: {
-				render: ({ value, formattedValue }) => formattedValue || String(value ?? ''),
-			},
-		},
-	},
-}
-```
-
-`textImpostor.render` receives the raw and formatted cell value and returns a plain string — no JSX, no DOM
-nodes. It's rendered as cheap text for the duration of the scroll gesture, then swapped back for the real
-renderer once scrolling settles.
-
-## `html-snapshot` — replay a captured clone
-
-Use `html-snapshot` for renderers that are expensive to mount fresh but whose _appearance_ barely changes
-between paints — a sparkline canvas, a heavy chart cell. The grid captures an inert HTML clone once and replays
-it during scroll instead of re-mounting.
-
-```typescript
-{
-	field: 'price',
-	header: 'Price',
-	renderer: {
-		kind: 'dom',
-		renderer: SparklineRenderer,
-		capabilities: {
-			scrollPresentation: 'html-snapshot',
-			htmlSnapshot: { allowShellWhenMissing: true },
-		},
-	},
-}
-```
-
-| `htmlSnapshot` option          | Default      | Effect                                                                                                   |
-| ------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------- |
-| `strict`                       | grid default | When true, a missing snapshot never falls back to raw text or a stale clone: it shows the shell instead. |
-| `freshness`                    | —            | `'row-version-only'` invalidates only when row data changes; `'visual'` also tracks visual-only changes. |
-| `allowShellWhenMissing`        | `true`       | Show a loading shell instead of nothing when no snapshot exists yet.                                     |
-| `allowTextFallbackWhenMissing` | `true`       | Show the cell's text instead of a shell when no snapshot exists yet (ignored when `strict`).             |
-| `invalidateOnWidthChange`      | —            | Re-capture when the column is resized.                                                                   |
-| `invalidateOnHeightChange`     | —            | Re-capture when the row height changes.                                                                  |
+Live work is budgeted so a fast scroll cannot starve the frame. A cell the budget cannot reach in time shows its
+stand-in text for that frame (never blank, never another row's content) and is completed right after.
 
 ## `scrollState` — reacting to scrolling
 
@@ -172,11 +119,34 @@ A renderer that draws differently while scrolling opts in with `scrollState`:
 Without `scrollState`, the `isScrolling` and `phase` a renderer receives reflect its last update, not the live
 scroll state.
 
+## Imperative renderers for high-frequency cells
+
+For cells that change many times per second, such as a ticking price, even a React state update per tick is
+too much. Declare the column as `kind: 'imperativeReact'`. The grid then calls `ref.current.update()` directly on a
+`forwardRef` component that exposes [`ImperativeCellHandle`](/docs/next/grid-api), bypassing React's scheduler.
+
+```tsx
+const LivePrice = React.forwardRef<ImperativeCellHandle<Row>, CellRendererProps<Row, number>>((props, ref) => {
+	const spanRef = React.useRef<HTMLSpanElement>(null);
+	React.useImperativeHandle(ref, () => ({
+		update(next) {
+			if (spanRef.current) spanRef.current.textContent = next.formattedValue || String(next.value);
+		},
+	}));
+	return <span ref={spanRef}>{props.formattedValue || props.value}</span>;
+});
+
+const column = { field: 'price', header: 'Price', renderer: { kind: 'imperativeReact', component: LivePrice } };
+```
+
+Use this only where ordinary updates show dropped frames under your real data volume: your component owns its DOM
+updates. The [Realtime Dashboard example](/docs/next/examples) shows all three strategies side by side — an
+imperative React "Change %" column, a DOM "Price" column, and a plain React "Volume" column.
+
 ## Grid-level budgets
 
-Per-column capabilities choose _which_ mode a column uses. `rendererOptions` on `<Grid>` controls the _shared
-budget_ every `update`, `live` and `html-snapshot` column draws from — this is grid-wide policy, not a per-column setting,
-because it's about total frame budget across every visible cell:
+`rendererOptions.live` on `<Grid>` sets the shared per-frame budget for every `live` cell. It is grid-wide because
+it limits total work across all visible cells:
 
 ```tsx
 <Grid
@@ -184,18 +154,22 @@ because it's about total frame budget across every visible cell:
 	columns={columns}
 	getRowId={(row) => row.id}
 	rendererOptions={{
-		domUpdate: { maxMsPerFrame: 4 },
-		liveReact: { maxMountsPerFrame: 12, maxUpdatesPerFrame: 40, allowEmergencyShell: true },
-		htmlSnapshot: { maxSnapshots: 500, maxTotalBytes: 8_000_000 },
+		live: { maxMsPerFrame: 4, maxMountsPerFrame: 12, maxUpdatesPerFrame: 40, rowOverscan: 2, columnOverscan: 1 },
 	}}
 />
 ```
 
+| Option               | Default   | Effect                                                                                      |
+| -------------------- | --------- | ------------------------------------------------------------------------------------------- |
+| `maxMsPerFrame`      | `4`       | Milliseconds of DOM renderer work per frame.                                                |
+| `maxMountsPerFrame`  | unlimited | New React renderers mounted per frame.                                                      |
+| `maxUpdatesPerFrame` | unlimited | Updates to already-mounted React renderers per frame.                                       |
+| `rowOverscan`        | `0`       | Extra rows beyond the viewport that are prepared for live work, so they are ready on entry. |
+| `columnOverscan`     | `0`       | Extra columns beyond the viewport that are prepared for live work.                          |
+
 <Callout title='Tune this before you need to' type='warn'>
-	`liveReact` is unlimited by default: every visible `live` cell mounts and updates on every frame. If a dashboard with many `live` columns drops
-	frames under heavy scroll, cap `liveReact.maxMountsPerFrame` / `maxUpdatesPerFrame`; a cell over the cap shows its text for that frame (never
-	another row's content) and is redrawn when scrolling settles. The tradeoff is exactly the one `scrollPresentation` exists to make explicit: more
-	fidelity per frame costs more per frame.
+	React `live` cells are unlimited by default. If a dashboard with many `live` columns drops frames under heavy scroll, cap `maxMountsPerFrame` and
+	`maxUpdatesPerFrame`. A cell over the cap shows its stand-in text for that frame and is completed right after.
 </Callout>
 
 ## The rendering window
@@ -238,16 +212,11 @@ renders more rows and cells during fast scrolls.
 When `runtimeLimits` bind, the overscan gives way first: rows and columns in view are always kept, and only the
 margin shrinks.
 
-## Choosing a mode
+## Choosing
 
-- Nothing custom on the cell → don't set `scrollPresentation` at all (`primitive`).
-- DOM renderer → leave the default (`update`): cells are drawn in place during scroll.
-- React renderer, appearance rarely changes → leave the default (`freeze`). Cells entering view during scroll show
-  their text until scrolling settles, then the component.
-- React renderer whose component must show while scrolling (bars, badges, avatars) → `live`. In the bench
-  (100,000 rows, 10 React columns, real wheel input) this draws every visible cell correctly on every frame, for about
-  28% more main-thread time than `freeze`; the cost is the React re-renders, so a mount cap saves little.
-- Custom renderer, expensive to mount, appearance mostly static mid-scroll → `html-snapshot`.
-- Custom renderer, cheap plain-text equivalent exists → `text-impostor`.
-- Data changes multiple times per second and staleness would mislead → `live`, with `update: 'imperative'` only
-  once `update: 'react'` actually shows dropped frames under your real data volume.
+- Nothing custom on the cell → no setting needed.
+- DOM renderer → leave the default (`live`): cells are drawn in place during scroll.
+- React renderer, stand-in text is fine mid-scroll → leave the default (`text`), and add `scrollText` if the
+  formatted value is not the best label.
+- React renderer whose component must show while scrolling → `scroll: 'live'`.
+- Data changes many times per second and a React update per tick drops frames → `kind: 'imperativeReact'`.

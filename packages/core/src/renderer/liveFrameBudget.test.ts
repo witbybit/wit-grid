@@ -33,11 +33,4 @@ describe('LiveFrameBudget', () => {
 		budget.resetFrame();
 		expect(budget.tryConsume('mount')).toBe(true);
 	});
-
-	it('allowEmergencyShell defaults to true, reflects configured value', () => {
-		const budget = new LiveFrameBudget();
-		expect(budget.allowEmergencyShell).toBe(true);
-		budget.configure({ allowEmergencyShell: false });
-		expect(budget.allowEmergencyShell).toBe(false);
-	});
 });
