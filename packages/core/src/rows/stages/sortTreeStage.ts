@@ -1,6 +1,7 @@
 import type { RowTreeNode } from './types.js';
 import type { SortModel } from '../../rowModel.js';
-import { type ColumnDef, RowNode } from '../../store.js';
+import type { RowNode } from '../../store.js';
+import { type ColumnDef } from '../../store.js';
 import type { GroupDef } from '../RowPipeline.js';
 import { createRowPipelineContext } from '../pipelineContext.js';
 import { compareSortKeys, toSortKey, type SortKey } from '../sortKeys.js';

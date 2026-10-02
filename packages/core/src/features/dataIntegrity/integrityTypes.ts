@@ -2,8 +2,6 @@ import type { ColumnDef } from '../../columnDef.js';
 import type { GridApi, GridWriteResult } from '../../api/GridApi.js';
 import type {
 	GridCellConflict,
-	GridCellDiff,
-	GridConflictSource,
 	GridDiffModel,
 	GridDiffResult,
 	GridIntegrityIssue,

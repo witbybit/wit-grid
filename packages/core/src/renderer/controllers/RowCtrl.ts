@@ -1,7 +1,7 @@
 import type { ColumnInstanceId } from '../../columnDef.js';
 import type { VisualFreshness } from '../visualFreshness.js';
 import type { CellControllerKey, CellCtrl } from './CellCtrl.js';
-import { CellCtrlStore } from './CellCtrlStore.js';
+import type { CellCtrlStore } from './CellCtrlStore.js';
 
 export interface RowCtrl<TRowData = unknown> {
 	readonly rowId: string;

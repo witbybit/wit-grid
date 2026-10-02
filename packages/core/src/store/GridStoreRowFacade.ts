@@ -1,4 +1,4 @@
-import type { GridWriteResult, RowDataTransaction, RowNodeTransaction } from '../api/GridApi.js';
+import type { GridWriteResult } from '../api/GridApi.js';
 import type { GridIntegrityIssue } from '../features/dataIntegrity/integrityTypes.js';
 import type { GridRowsAccessor } from '../api/GridApi.js';
 import type { RowModel, RowLoadState } from '../rowModel.js';

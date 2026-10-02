@@ -1,6 +1,6 @@
 import type { GridEventListener, GridEventPayloadMap } from '../api/GridEvents.js';
-import { GridEventName } from '../api/GridEvents.js';
-import type { ColumnDef, CompiledGridPlan } from '../columnDef.js';
+import type { GridEventName } from '../api/GridEvents.js';
+import type { ColumnDef } from '../columnDef.js';
 import type { FormulaCellCoordinate } from '../calculations/dagEngine.js';
 import type { GeometryModel } from '../models/GeometryModel.js';
 import type { RowModel, RowModelRefreshResult } from '../rowModel.js';

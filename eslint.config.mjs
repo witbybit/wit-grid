@@ -20,4 +20,12 @@ export default [
 			'@typescript-eslint/no-empty-object-type': 'off',
 		},
 	},
+	{
+		files: ['packages/core/src/**/*.ts'],
+		ignores: ['**/*.test.ts'],
+		rules: {
+			// Types come from top-level `import type`, never inline `import('...').Name` annotations.
+			'@typescript-eslint/consistent-type-imports': ['error', { disallowTypeAnnotations: true, fixStyle: 'separate-type-imports' }],
+		},
+	},
 ];

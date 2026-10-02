@@ -3,7 +3,7 @@ import type { SortModel, FilterModel, QuickFilterModel, GroupRowMeta } from '../
 import { applyClientFilterOnly, applyClientSortAndFilter } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import { applyQueryModelFilter } from '../query/evaluateQueryModel.js';
-import { RowNode } from '../rowNode.js';
+import type { RowNode } from '../rowNode.js';
 import { FLAT_HIERARCHY, type VisualRow } from '../visualRow.js';
 import { createRowPipelineContext } from './pipelineContext.js';
 import { groupStage } from './stages/groupStage.js';

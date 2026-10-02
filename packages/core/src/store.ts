@@ -1,8 +1,5 @@
 import type {
-	FilterModel,
 	QuickFilterModel,
-	SortModel,
-	RowModel,
 	ClientStructuralRowModel,
 	InfiniteControllableRowModel,
 	ServerSideControllableRowModel,
@@ -21,7 +18,10 @@ import {
 	asCapableRowModel,
 	UnsupportedRowModelOperationError,
 } from './rowModel.js';
-import type { GridDomainVersions } from './state/GridDomainVersions.js';
+
+import type { GridCapabilitiesConfig, GridCapabilityAction, GridCapabilityParams, GridCapabilityResult } from './capabilities/capabilityTypes.js';
+import type { GridDataIntegrityConfig, GridIntegrityApi } from './features/dataIntegrity/integrityTypes.js';
+import type { RuntimeFaultInput } from './diagnostics/RuntimeFaultReporter.js';
 export type { RowModel, RowRefreshReason, RowModelRefreshResult } from './rowModel.js';
 import type { InfiniteDatasource } from './infiniteRowModel.js';
 import type { ServerSideDatasource, ServerSideRefreshOptions, ServerSideStoreSnapshot } from './serverSideRowModel.js';
@@ -97,7 +97,7 @@ export * from './api/GridApi.js';
 export * from './api/GridEvents.js';
 export type { GridInitialState, ColumnState, GridCellRangeBounds } from './state/GridState.js';
 // ── Internal imports (for use by definitions in this file) ───────────────────
-import { RowNode } from './rowNode.js';
+import type { RowNode } from './rowNode.js';
 import type { ColumnDef, ColumnInstanceId, GridStyleRule } from './columnDef.js';
 import { validateColumns } from './columnDef.js';
 import type { VisualRow } from './visualRow.js';
@@ -113,8 +113,6 @@ import type {
 	GridPluginRuntime,
 	GridRowsAccessor,
 	GridWriteResult,
-	RowDataTransaction,
-	RowNodeTransaction,
 	GridTransaction,
 	GridTransactionOptions,
 	GridTransactionResult,
@@ -182,6 +180,8 @@ const _EMPTY_WS_STATE: GridWorkspaceState = {
 export interface GridStore<TRowData = unknown>
 	extends EngineForwards<TRowData, typeof PUBLIC_ENGINE_FORWARDS>, EngineForwards<TRowData, typeof INTERNAL_ENGINE_FORWARDS> {}
 
+// The interface above types the engine forwards that the constructor binds with Object.assign.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> {
 	public engine: GridEngine<TRowData>;
 	public readonly interactionController: GridInteractionController<TRowData>;
@@ -205,8 +205,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	constructor(
 		initialState: Partial<GridInitialState<TRowData>> = {},
 		engineOptions?: {
-			capabilities?: import('./capabilities/capabilityTypes.js').GridCapabilitiesConfig<TRowData>;
-			dataIntegrity?: import('./features/dataIntegrity/integrityTypes.js').GridDataIntegrityConfig<TRowData>;
+			capabilities?: GridCapabilitiesConfig<TRowData>;
+			dataIntegrity?: GridDataIntegrityConfig<TRowData>;
 		}
 	) {
 		// The hierarchy column is part of the column set from the first frame.
@@ -378,7 +378,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		});
 
 		// Wire up the lazy api ref so integrity modules can call GridApi methods in rules
-		this.engine.setApiRef(this as unknown as import('./api/GridApi.js').GridApi<TRowData>);
+		this.engine.setApiRef(this as unknown as GridApi<TRowData>);
 		this.integrity = this.engine.dataIntegrity?.buildApi() ?? makeNoopIntegrityApi<TRowData>();
 
 		// Apply persisted pin counts at construction time before any renders occur
@@ -684,12 +684,10 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	// ── Data Integrity API ─────────────────────────────────────────────────────
-	public integrity!: import('./features/dataIntegrity/integrityTypes.js').GridIntegrityApi<TRowData>;
+	public integrity!: GridIntegrityApi<TRowData>;
 
-	public can = (
-		action: import('./capabilities/capabilityTypes.js').GridCapabilityAction,
-		params: Partial<import('./capabilities/capabilityTypes.js').GridCapabilityParams<TRowData>> = {}
-	): import('./capabilities/capabilityTypes.js').GridCapabilityResult => this.engine.capabilityManager.can(action, params);
+	public can = (action: GridCapabilityAction, params: Partial<GridCapabilityParams<TRowData>> = {}): GridCapabilityResult =>
+		this.engine.capabilityManager.can(action, params);
 
 	public canEdit = (rowId: string, colField: string): boolean => this.engine.capabilityManager.can('edit', { rowId, colField }).allowed;
 
@@ -1036,8 +1034,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public resetRenderStats = (): void => this.hostFacade.resetRenderStats();
 	public getRuntimeFaults = () => this.hostFacade.getRuntimeFaults();
 	public clearRuntimeFaults = (): void => this.hostFacade.clearRuntimeFaults();
-	public reportRuntimeFault = (fault: import('./diagnostics/RuntimeFaultReporter.js').RuntimeFaultInput) =>
-		this.hostFacade.reportRuntimeFault(fault);
+	public reportRuntimeFault = (fault: RuntimeFaultInput) => this.hostFacade.reportRuntimeFault(fault);
 	public getTheme = (): ThemeTokens => this.hostFacade.getTheme();
 	public getThemeName = (): BuiltInThemeName | null => this.hostFacade.getThemeName();
 	public getAvailableThemes = (): BuiltInThemeName[] => this.hostFacade.getAvailableThemes();
