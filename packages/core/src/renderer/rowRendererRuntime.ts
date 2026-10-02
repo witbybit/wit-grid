@@ -239,10 +239,10 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 					this.deps.stateHost.renderStats.liveReactOverscanMounts = (this.deps.stateHost.renderStats.liveReactOverscanMounts || 0) + 1;
 				}
 			},
-			incrementLiveReactEmergencyShellsDuringScroll: () => {
+			incrementLiveReactStandInsDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.liveReactEmergencyShellsDuringScroll =
-						(this.deps.stateHost.renderStats.liveReactEmergencyShellsDuringScroll || 0) + 1;
+					this.deps.stateHost.renderStats.liveReactStandInsDuringScroll =
+						(this.deps.stateHost.renderStats.liveReactStandInsDuringScroll || 0) + 1;
 				}
 			},
 			tryConsumeLiveBudget: (kind: 'mount' | 'update') => {

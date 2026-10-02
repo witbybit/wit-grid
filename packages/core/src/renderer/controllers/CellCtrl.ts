@@ -18,7 +18,7 @@ export interface ControllerWorkToken {
 }
 
 export interface CellCtrlPresentationState {
-	kind: 'buffered' | 'primitive' | 'loading' | 'checkbox-selector' | 'live-renderer' | 'dom-update' | 'frozen-portal' | 'shell';
+	kind: 'buffered' | 'primitive' | 'loading' | 'checkbox-selector' | 'live-renderer' | 'dom-update' | 'frozen-portal' | 'stand-in';
 	className: string;
 	title?: string | null;
 	validationError?: string;

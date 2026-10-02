@@ -226,7 +226,7 @@ export type ColumnRenderMode =
 	| 'primitive' // No renderer; raw/text value only
 	| 'primitive-formatted' // No renderer; value goes through a getter or formatter
 	| 'custom-live' // React portal mounted/updated every scroll frame (scroll:'live')
-	| 'custom' // React portal frozen/impostor'd during scroll; refreshed only on data change
+	| 'custom' // React portal frozen/stood in for during scroll; refreshed only on data change
 	| 'custom-dom' // DomCellRenderer — direct DOM manipulation, no React overhead
 	| 'custom-imperative' // React portal updated imperatively (kind 'imperativeReact')
 	| 'loading'; // Loading skeleton row

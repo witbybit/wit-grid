@@ -41,7 +41,7 @@ import { buildCellPinClass, applyCellTitlesAndValidation, getScrollMountValue } 
 import { getOrCreateCellCtrl, createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
 import type { CellCtrl } from './controllers/CellCtrl.js';
 import { CellCtrlStore } from './controllers/CellCtrlStore.js';
-import { resolveCellCtrlPresentationState, resolveCellCtrlScrollPresentationState } from './controllers/resolveCellCtrlPresentationState.js';
+import { resolveCellCtrlPresentationState, resolveCellCtrlScrollDecisionState } from './controllers/resolveCellCtrlPresentationState.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 import type { ProgrammaticScrollTarget } from './programmaticScrollTarget.js';
@@ -128,9 +128,9 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	 *  from incrementLiveReactMountsDuringScroll by liveFrameBudget.ts. */
 	incrementLiveReactUpdatesDuringScroll?: () => void;
 	incrementLiveReactOverscanMountsDuringScroll?: () => void;
-	/** A live-mount was deferred to a shell/pending placeholder because the frame's mount budget was
+	/** A live-mount was deferred to a stand-in placeholder because the frame's mount budget was
 	 *  exhausted (see liveFrameBudget.ts, GridRendererOptions.live). */
-	incrementLiveReactEmergencyShellsDuringScroll?: () => void;
+	incrementLiveReactStandInsDuringScroll?: () => void;
 	/** Returns false when this frame's live-mode budget for `kind` is exhausted. Omitted (or a
 	 *  caller-side default of always-true) means unlimited — see liveFrameBudget.ts. */
 	tryConsumeLiveBudget?: (kind: 'mount' | 'update') => boolean;
@@ -395,7 +395,7 @@ function recordCellCtrlPhysicalBinding<TRowData>(cellCtrl: CellCtrl, cellSlot: C
  */
 const scrollDepsByBinderDeps = new WeakMap<object, ScrollCellPresentationDeps>();
 
-function getScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): ScrollCellPresentationDeps {
+function getScrollDecisionDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): ScrollCellPresentationDeps {
 	let adapter = scrollDepsByBinderDeps.get(deps);
 	if (!adapter) {
 		adapter = {
@@ -594,7 +594,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 	const scrollMode = plan.columnPlans[colIndex]?.mode;
 	let contentMode: CellContentMode = 'empty';
 	let formattedValue = '';
-	let portalImpostorValue = '';
+	let portalStandInValue = '';
 
 	if (col.checkboxSelection) {
 		const rowId = node.id;
@@ -649,17 +649,17 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 
 	if (((col as InternalColumnDef<TRowData>).cellRenderer || access.isEditing) && !access.isLoading) {
 		contentMode = 'portal';
-		const formattedForImpostor =
+		const formattedForStandIn =
 			access.value != null && col.valueFormatter
 				? col.valueFormatter({ value: access.value, rowData: node.data as TRowData, colDef: col, rowId: node.id })
 				: access.value != null
 					? String(access.value)
 					: deps.engine.getCheapDisplayValue(node.id, col.field);
 		const scrollText = (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.scrollText;
-		portalImpostorValue =
+		portalStandInValue =
 			scrollText != null
-				? scrollText({ value: access.value, formattedValue: formattedForImpostor }) || formattedForImpostor
-				: formattedForImpostor;
+				? scrollText({ value: access.value, formattedValue: formattedForStandIn }) || formattedForStandIn
+				: formattedForStandIn;
 	} else {
 		if (access.isLoading) {
 			contentMode = 'loading';
@@ -689,7 +689,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 				title: mergedTitle,
 				validationError: validationDecTitle,
 				contentMode,
-				formattedValue: contentMode === 'portal' ? portalImpostorValue : formattedValue,
+				formattedValue: contentMode === 'portal' ? portalStandInValue : formattedValue,
 				portalKey: contentMode === 'portal' ? stableKey : undefined,
 				freshness: { rowVersion, globalVersion: state.globalVersion, ...currentVisualVersions },
 				value: access.rawValue,
@@ -728,18 +728,18 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 	// WS2: assign the renderer handle based on the resolved content mode.
 	// Destroy the previous handle when the renderer kind or portal key changes.
 	assignRendererHandle(cellSlot, contentMode, formattedValue, stableKey);
-	const fullBindHasImpostorCapability = scrollMode === 'custom-live' || scrollMode === 'custom-imperative' || scrollMode === 'custom';
+	const fullBindHasStandInCapability = scrollMode === 'custom-live' || scrollMode === 'custom-imperative' || scrollMode === 'custom';
 	const snapshotContentKind =
 		contentMode === 'portal'
-			? !access.isEditing && fullBindHasImpostorCapability && portalImpostorValue !== ''
-				? 'impostor'
+			? !access.isEditing && fullBindHasStandInCapability && portalStandInValue !== ''
+				? 'stand-in'
 				: 'portal-live'
 			: contentMode;
-	const snapshotContentMode = contentMode === 'portal' && snapshotContentKind === 'impostor' ? ('fallback' as const) : contentMode;
+	const snapshotContentMode = contentMode === 'portal' && snapshotContentKind === 'stand-in' ? ('fallback' as const) : contentMode;
 	if (snapshotContentMode === 'fallback' && deps.engine.flightRecorder?.isActive()) {
-		deps.engine.flightRecorder.recordObservedFallback('cell-renderer', 'impostor-content');
+		deps.engine.flightRecorder.recordObservedFallback('cell-renderer', 'stand-in-content');
 	}
-	const snapshotFormattedValue = contentMode === 'portal' && snapshotContentKind === 'impostor' ? portalImpostorValue : formattedValue;
+	const snapshotFormattedValue = contentMode === 'portal' && snapshotContentKind === 'stand-in' ? portalStandInValue : formattedValue;
 	deps.engine.cellDisplaySnapshots.set(
 		createCellDisplaySnapshot({
 			rowId: node.id,
@@ -879,7 +879,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		input.isWarmBindingVersionFresh = isWarmBindingVersionFresh;
 		input.rowVersion = rowVersion;
 		input.cellKey = cellKey;
-		resolveCellCtrlScrollPresentationState(cellCtrl, getScrollPresentationDeps(deps), input);
+		resolveCellCtrlScrollDecisionState(cellCtrl, getScrollDecisionDeps(deps), input);
 
 		// 3. Dispatch to the mode-specific binder — enqueues fidelity work, updates mounted slot bookkeeping.
 		dispatchCellPresentation(

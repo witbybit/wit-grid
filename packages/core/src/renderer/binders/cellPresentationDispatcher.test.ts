@@ -257,11 +257,11 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
 		});
 
-		it(`stand-in text (${lane}): shows the shell text, never mounts`, () => {
+		it(`stand-in text (${lane}): shows the stand-in text, never mounts`, () => {
 			const deps = makeDeps();
 			const request = makeRequest(lane);
 			const presentation: ScrollCellPresentation = {
-				kind: 'shell',
+				kind: 'stand-in',
 				className: laneClass[lane],
 				contentMode: 'fallback',
 				formattedValue: '★ chip',
@@ -351,7 +351,7 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 		const request = makeRequest('center', { isRowRebind: true });
 		// The slot still holds the editor portal of the row that scrolled out.
 		request.cellSlot.renderer = new PortalRendererHandle('E4:MA.65:coli3');
-		const shell: ScrollCellPresentation = {
+		const standIn: ScrollCellPresentation = {
 			kind: 'frozen-portal',
 			className: laneClass.center,
 			portalCellKey: 'ck-new-row',
@@ -362,8 +362,8 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 			recordVersionsFrom: undefined,
 		};
 
-		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
-		dispatchCellPresentation(makeDispatchInput(deps, request, shell, 1));
+		dispatchCellPresentation(makeDispatchInput(deps, request, standIn, 1));
+		dispatchCellPresentation(makeDispatchInput(deps, request, standIn, 1));
 
 		expect(deps.releaseCellPortal).toHaveBeenCalledTimes(1);
 		expect(request.cellSlot.renderer).not.toBeInstanceOf(PortalRendererHandle);
@@ -413,7 +413,7 @@ describe('cellPresentationDispatcher — the one portal transition rule', () => 
 		['buffered text', { kind: 'buffered', contentMode: 'text', formattedValue: 'x', portalKey: undefined }, true],
 		['buffered keeping the portal', { kind: 'buffered', contentMode: 'portal', portalKey: 'held' }, false],
 		['loading', { kind: 'loading', formattedValue: '' }, true],
-		['shell', { kind: 'shell', contentMode: 'fallback', formattedValue: 'x' }, true],
+		['stand-in', { kind: 'stand-in', contentMode: 'fallback', formattedValue: 'x' }, true],
 		['frozen-portal of the same key', { kind: 'frozen-portal', portalKey: 'held' }, false],
 		['live renderer of the same key', { kind: 'live-renderer', portalKey: 'held' }, false],
 		['live renderer of another key', { kind: 'live-renderer', portalKey: 'other' }, true],

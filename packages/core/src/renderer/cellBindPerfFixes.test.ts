@@ -204,9 +204,9 @@ describe('scroll presentation fixes', () => {
 			})
 		);
 		expect(presentation.kind).not.toBe('frozen-portal');
-		expect(presentation.kind).toBe('shell');
-		if (presentation.kind !== 'shell') throw new Error('unreachable');
-		// A shell keeps no portal, so the dispatcher releases row A's portal (see cellPresentationDispatcher.test.ts).
+		expect(presentation.kind).toBe('stand-in');
+		if (presentation.kind !== 'stand-in') throw new Error('unreachable');
+		// A stand-in keeps no portal, so the dispatcher releases row A's portal (see cellPresentationDispatcher.test.ts).
 		expect(presentation.formattedValue).toBe('new row');
 	});
 
@@ -223,7 +223,7 @@ describe('scroll presentation fixes', () => {
 				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
 			})
 		);
-		if (presentation.kind !== 'shell') throw new Error(`expected a shell, got ${presentation.kind}`);
+		if (presentation.kind !== 'stand-in') throw new Error(`expected a stand-in, got ${presentation.kind}`);
 		expect(presentation.formattedValue).toBe('513');
 		expect(presentation.contentMode).toBe('fallback');
 	});
@@ -262,7 +262,7 @@ describe('scroll presentation fixes', () => {
 		const ctx = { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any;
 		const deps = makeScrollDeps({ hasFormula: () => false, getCheapDisplayValue: () => '', primeDisplayValue: prime });
 		const visible = resolveScrollCellPresentation(deps, scrollInput({ col: reactGetterCol, ctx }));
-		if (visible.kind !== 'shell') throw new Error(`expected shell, got ${visible.kind}`);
+		if (visible.kind !== 'stand-in') throw new Error(`expected stand-in, got ${visible.kind}`);
 		expect(visible.formattedValue).toBe('0.5123');
 		expect(visible.contentMode).toBe('fallback');
 
@@ -275,7 +275,7 @@ describe('scroll presentation fixes', () => {
 			makeScrollDeps({ hasFormula: () => false, getCheapDisplayValue: () => '', primeDisplayValue: () => undefined }),
 			scrollInput({ col: reactGetterCol, ctx })
 		);
-		if (over.kind !== 'shell') throw new Error(`expected shell, got ${over.kind}`);
+		if (over.kind !== 'stand-in') throw new Error(`expected stand-in, got ${over.kind}`);
 		expect(over.formattedValue).toBe('');
 
 		// A plain getter text column formats the computed value like the full bind.
@@ -323,7 +323,7 @@ describe('scroll presentation fixes', () => {
 			loadingVersion: 0,
 			selectionVersion: 0,
 			baseClassName: 'og-cell',
-			contentKind: 'impostor',
+			contentKind: 'stand-in',
 			contentMode: 'fallback',
 			formattedValue: 'chip:Formatted Name',
 			title: '',
@@ -358,7 +358,7 @@ describe('scroll presentation fixes', () => {
 				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any,
 			})
 		);
-		if (presentation.kind !== 'shell') throw new Error('unreachable');
+		if (presentation.kind !== 'stand-in') throw new Error('unreachable');
 		expect(render).toHaveBeenCalledWith({ value: 'Name 1', formattedValue: 'Name 1' });
 		expect(presentation.formattedValue).toBe('v:Name 1');
 	});

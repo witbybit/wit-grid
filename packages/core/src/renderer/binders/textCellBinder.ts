@@ -5,7 +5,7 @@ import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispat
 /**
  * The `text` render state: every outcome that writes a string (or a placeholder mode) into the
  * cell and holds no portal — plain primitive text, buffered off-screen content, loading skeletons
- * and stand-in text shells. They differ only in the content mode written, whether the cell is
+ * and stand-in text. They differ only in the content mode written, whether the cell is
  * marked dirty for the post-scroll repaint, and how mounted versions are recorded; the write itself
  * is shared. Releasing a previously held portal is the dispatcher's job.
  */
@@ -41,7 +41,7 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 			markDirty = false;
 			versions = 'none';
 			break;
-		case 'shell':
+		case 'stand-in':
 			contentMode = presentation.contentMode ?? 'fallback';
 			markDirty = true;
 			versions = 'mounted';

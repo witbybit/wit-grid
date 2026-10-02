@@ -70,7 +70,7 @@ const RENDER_STATE: Record<CellCtrlPresentationState['kind'], CellRenderState> =
 	buffered: 'text',
 	primitive: 'text',
 	loading: 'text',
-	shell: 'text',
+	'stand-in': 'text',
 	'live-renderer': 'live',
 	'dom-update': 'live',
 	'frozen-portal': 'snapshot',

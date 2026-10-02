@@ -2154,7 +2154,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('shows text impostor for newly bound custom cells during scroll; portal deferred to fidelity lane', () => {
+	it('shows text stand-in for newly bound custom cells during scroll; portal deferred to fidelity lane', () => {
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 			callbacks.push(cb);
@@ -2205,11 +2205,11 @@ describe('RenderEngine', () => {
 		// No pending cells — scroll frame never blocks on portal mounts.
 		const pendingCell = container.querySelector<HTMLDivElement>('.og-cell[data-content-mode="pending"]');
 		expect(pendingCell).toBeNull();
-		// custom cells show text impostor during scroll — no portal content until fidelity lane fires.
+		// custom cells show text stand-in during scroll — no portal content until fidelity lane fires.
 		const portalCell = container.querySelector<HTMLDivElement>('.og-cell[data-content-mode="portal"]');
 		expect(portalCell).toBeNull();
-		const impostorCell = container.querySelector<HTMLDivElement>('.og-cell[data-content-mode="empty"], .og-cell[data-content-mode="fallback"]');
-		expect(impostorCell).not.toBeNull();
+		const standInCell = container.querySelector<HTMLDivElement>('.og-cell[data-content-mode="empty"], .og-cell[data-content-mode="fallback"]');
+		expect(standInCell).not.toBeNull();
 
 		renderer.unmount();
 		controller.dispose();
@@ -2342,7 +2342,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('shows a cheap text impostor for a custom-live cell with no prewarm snapshot during scroll and defers portal mount to fidelity lane', async () => {
+	it('shows a cheap text stand-in for a custom-live cell with no prewarm snapshot during scroll and defers portal mount to fidelity lane', async () => {
 		const idleCallbacks: IdleRequestCallback[] = [];
 		vi.stubGlobal('requestIdleCallback', (cb: IdleRequestCallback) => {
 			idleCallbacks.push(cb);
@@ -2408,12 +2408,12 @@ describe('RenderEngine', () => {
 		scrollViewport.dispatchEvent(new Event('scroll'));
 
 		// Run scroll frame — row-60's custom-live cell has no prewarm snapshot.
-		// It must show a text impostor, not mount a portal during the gesture.
+		// It must show a text stand-in, not mount a portal during the gesture.
 		rafCallbacks[rafCallbacks.length - 1]?.(0);
 		const cellNode = container.querySelector('[data-row-id="row:row-60"]') as HTMLDivElement;
 		expect(cellNode).not.toBeNull();
 		const cellA = cellNode.querySelector('[data-col-field="a"]') as HTMLDivElement;
-		// Impostor (fallback text) during scroll — no live portal mount.
+		// Stand-in (fallback text) during scroll — no live portal mount.
 		expect(cellA.dataset.contentMode).not.toBe('portal');
 		expect(mountFn).not.toHaveBeenCalled();
 
@@ -3215,7 +3215,7 @@ describe('RenderEngine', () => {
 		expect(unmountCount).toBe(0);
 		expect(flushPortalContent).not.toHaveBeenCalled();
 		expect(stats.portalFlushesDuringScroll).toBe(0);
-		// New columns entering the viewport take the impostor path during scroll — no synchronous portal mounts.
+		// New columns entering the viewport take the stand-in path during scroll — no synchronous portal mounts.
 		expect(stats.portalMountsDuringScroll).toBe(0);
 
 		renderer.unmount();
@@ -3382,7 +3382,7 @@ describe('RenderEngine', () => {
 		callbacks[1](0);
 
 		const revealedCell = row10.querySelector('[data-col-field="col_6"]') as HTMLDivElement;
-		// custom cells always take the impostor path during scroll — emptied portal host is never
+		// custom cells always take the stand-in path during scroll — emptied portal host is never
 		// mistaken for authoritative content; the cell shows empty/fallback, not portal.
 		expect(revealedCell.dataset.contentMode).not.toBe('portal');
 
@@ -3967,7 +3967,7 @@ describe('RenderEngine', () => {
 		}
 	});
 
-	it('prewarms custom-live impostor snapshots just outside the visible band so horizontal re-entry avoids blank wake-up', async () => {
+	it('prewarms custom-live stand-in snapshots just outside the visible band so horizontal re-entry avoids blank wake-up', async () => {
 		const callbacks: FrameRequestCallback[] = [];
 		const idleCallbacks: Array<(deadline: { timeRemaining(): number; didTimeout: boolean }) => void> = [];
 		const previousRequestIdleCallback = (
@@ -4055,7 +4055,7 @@ describe('RenderEngine', () => {
 				rowId: 'row-10',
 				colField: 'col_2',
 				formattedValue: '10:2',
-				contentKind: 'impostor',
+				contentKind: 'stand-in',
 				contentMode: 'fallback',
 			});
 
@@ -4512,7 +4512,7 @@ describe('RenderEngine', () => {
 		store.destroy();
 	});
 
-	it('all custom and deferred columns show text impostor during scroll; portal deferred to fidelity lane', () => {
+	it('all custom and deferred columns show text stand-in during scroll; portal deferred to fidelity lane', () => {
 		vi.useFakeTimers();
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -4589,7 +4589,7 @@ describe('RenderEngine', () => {
 		const cell2 = row40.querySelector('[data-col-field="col2"]') as HTMLDivElement;
 		const cell3 = row40.querySelector('[data-col-field="col3"]') as HTMLDivElement;
 
-		// All portal-mode columns show text impostor during scroll — no synchronous portal mounts.
+		// All portal-mode columns show text stand-in during scroll — no synchronous portal mounts.
 		// col1 (mode='custom'), col2 (mode='custom-live'), col3 (mode='custom', defer) all defer to fidelity lane.
 		expect(cell1.dataset.contentMode).not.toBe('portal');
 		expect(cell2.dataset.contentMode).not.toBe('portal');
@@ -4603,7 +4603,7 @@ describe('RenderEngine', () => {
 		vi.useRealTimers();
 	});
 
-	it('cellRendererCapabilities: all portal-mode cells show text impostor during scroll; portal deferred to fidelity lane', () => {
+	it('cellRendererCapabilities: all portal-mode cells show text stand-in during scroll; portal deferred to fidelity lane', () => {
 		vi.useFakeTimers();
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -4684,10 +4684,10 @@ describe('RenderEngine', () => {
 
 		const row40 = container.querySelector('[data-row-id="row:row-40"]') as HTMLDivElement;
 		expect(row40).not.toBeNull();
-		// All portal-mode columns show text impostor during scroll — portal deferred to fidelity lane.
+		// All portal-mode columns show text stand-in during scroll — portal deferred to fidelity lane.
 		expect((row40.querySelector('[data-col-field="live"]') as HTMLDivElement).dataset.contentMode).not.toBe('portal');
 		const deferCell = row40.querySelector('[data-col-field="defer"]') as HTMLDivElement;
-		// defer cell has a cached display value ('Snapshot Defer 40') → prewarm snapshot tagged impostor → shows 'fallback'
+		// defer cell has a cached display value ('Snapshot Defer 40') → prewarm snapshot tagged stand-in → shows 'fallback'
 		expect(deferCell.dataset.contentMode).not.toBe('portal');
 		expect((row40.querySelector('[data-col-field="fallback"]') as HTMLDivElement).dataset.contentMode).not.toBe('portal');
 		// isScrolling:false always passed → customRendererMountsDuringScroll stays 0.
@@ -4699,7 +4699,7 @@ describe('RenderEngine', () => {
 		vi.useRealTimers();
 	});
 
-	it('deferred custom renderers show text impostor during scroll; portal content deferred to fidelity lane', () => {
+	it('deferred custom renderers show text stand-in during scroll; portal content deferred to fidelity lane', () => {
 		vi.useFakeTimers();
 		const callbacks: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
@@ -4755,7 +4755,7 @@ describe('RenderEngine', () => {
 
 		const row40 = container.querySelector('[data-row-id="row:row-40"]') as HTMLDivElement;
 		const deferCell = row40.querySelector('[data-col-field="defer"]') as HTMLDivElement;
-		// Deferred (custom) cells show text impostor during scroll — portal deferred to fidelity lane.
+		// Deferred (custom) cells show text stand-in during scroll — portal deferred to fidelity lane.
 		expect(deferCell.dataset.contentMode).not.toBe('portal');
 
 		renderer.unmount();
@@ -5093,7 +5093,7 @@ describe('RenderEngine', () => {
 		scrollViewport.scrollTop = 400;
 		scrollViewport.dispatchEvent(new Event('scroll'));
 
-		// After scroll: impostor path releases portals, full bind (via immediate RAF) restores them
+		// After scroll: stand-in path releases portals, full bind (via immediate RAF) restores them
 		// via warm cache. warmHits ≥ 4 (released + re-acquired), warmMisses stays at 5 (initial only).
 		const statsAfterScroll = renderer.portalMountManager.customRendererManager.getStats();
 		expect(statsAfterScroll.warmHits).toBeGreaterThanOrEqual(4); // warm cache restore from fidelity/full-bind

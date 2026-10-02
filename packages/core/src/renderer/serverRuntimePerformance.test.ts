@@ -747,7 +747,7 @@ describe('Server demo ruthless runtime performance contracts', () => {
 	it("BLOCKER: with scroll 'text', a cold, never-before-seen DOM-renderer cell never mounts during active scroll", async () => {
 		// DOM renderers default to 'live' (drawn in place within a frame budget — see
 		// dom-live presentation e2e test). An explicit 'text' keeps this original guarantee.
-		// mode:'custom-dom' is NOT in the impostor-capable set (custom-live/custom-imperative/custom) —
+		// mode:'custom-dom' is NOT in the stand-in-capable set (custom-live/custom-imperative/custom) —
 		// this is the real compiled-plan shape for any column using a DOM cell renderer. Scrolling a
 		// never-before-visited window of such columns into view previously fell through to a synchronous
 		// mountCellImmediately call (a live DOM-renderer mount) inside the scroll frame itself.
@@ -1013,7 +1013,7 @@ describe('Server demo ruthless runtime performance contracts', () => {
 		const missesAfter = statsAfter.warmMisses;
 
 		// custom-live portals are frozen in place during scroll — no extra warm misses from them.
-		// custom (defer) portals now use the impostor path: portal released during scroll, full bind
+		// custom (defer) portals now use the stand-in path: portal released during scroll, full bind
 		// (triggered by post-scroll RAF) restores via warm cache. New visible rows from the 120px scroll
 		// cold-mount fresh renderers for cells that were never previously mounted. Cap at 75.
 		expect(missesAfter).toBeLessThanOrEqual(missesBefore + 75);

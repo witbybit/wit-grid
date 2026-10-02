@@ -8,7 +8,7 @@ import { createCellCtrl } from '../controllers/CellCtrl.js';
 import { getColumnInstanceIdentity } from '../../columnDef.js';
 
 /**
- * Deterministic unit tests for the LiveFrameBudget mount/update/emergency-shell branching in
+ * Deterministic unit tests for the LiveFrameBudget mount/update/stand-in branching in
  * liveCellBinder.ts's 'live-mount' case — see liveFrameBudget.ts. These bypass a real virtualized
  * grid (where portal cellKeys recycle per physical CellSlot, so "fresh mount vs update" is hard to
  * force deterministically — see the caveat in liveFrameBudget.e2e.test.ts) and instead mock
@@ -49,7 +49,7 @@ function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: strin
 		incrementForceLiveMountsDuringScroll: vi.fn(),
 		incrementLiveReactMountsDuringScroll: vi.fn(),
 		incrementLiveReactUpdatesDuringScroll: vi.fn(),
-		incrementLiveReactEmergencyShellsDuringScroll: vi.fn(),
+		incrementLiveReactStandInsDuringScroll: vi.fn(),
 		getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		...overrides,
 	};
@@ -195,7 +195,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		expect(deps.tryConsumeLiveBudget).toHaveBeenCalledWith('mount');
 		expect(deps.incrementLiveReactMountsDuringScroll).toHaveBeenCalledTimes(1);
 		expect(deps.incrementLiveReactUpdatesDuringScroll).not.toHaveBeenCalled();
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactStandInsDuringScroll).not.toHaveBeenCalled();
 		expect(deps.portalMountManager.mountCellImmediately).toHaveBeenCalledTimes(1);
 	});
 
@@ -212,7 +212,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		expect(deps.portalMountManager.mountCellImmediately).toHaveBeenCalledTimes(1);
 	});
 
-	it('over budget + fresh mount: shows an emergency shell instead of mounting', () => {
+	it('over budget + fresh mount: shows an stand-in instead of mounting', () => {
 		const deps = makeDeps({
 			portalMountManager: { isCellMounted: vi.fn(() => false), mountCellImmediately: vi.fn() } as any,
 			tryConsumeLiveBudget: vi.fn(() => false),
@@ -220,7 +220,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		const request = makeRequest();
 		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
 
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).toHaveBeenCalledTimes(1);
+		expect(deps.incrementLiveReactStandInsDuringScroll).toHaveBeenCalledTimes(1);
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactMountsDuringScroll).not.toHaveBeenCalled();
 		expect(request.cellSlot.lastContentMode).toBe('pending');
@@ -237,7 +237,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactUpdatesDuringScroll).not.toHaveBeenCalled();
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactStandInsDuringScroll).not.toHaveBeenCalled();
 		expect(request.cellSlot.lastContentMode).toBe('portal');
 	});
 
@@ -252,7 +252,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
 
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).toHaveBeenCalledTimes(1);
+		expect(deps.incrementLiveReactStandInsDuringScroll).toHaveBeenCalledTimes(1);
 		expect(request.cellSlot.rowId).toBe('r1');
 		expect(request.cellSlot.lastContentMode).toBe('fallback');
 		expect(request.cellSlot.element.textContent).toContain('Name 1');

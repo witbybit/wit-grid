@@ -76,7 +76,7 @@ describe('bindCellDuringScroll', () => {
 			isInVisibleContent: true,
 		});
 
-		// custom-mode portals take the impostor path during scroll — no synchronous mount.
+		// custom-mode portals take the stand-in path during scroll — no synchronous mount.
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 		// stale previous-column value must not bleed through (isWarmBindingVersionFresh is false for a new slot)
@@ -1098,7 +1098,7 @@ describe('bindCellDuringScroll', () => {
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 	});
 
-	it('uses a fresh custom-live impostor snapshot during scroll instead of immediately mounting the portal', () => {
+	it('uses a fresh custom-live stand-in snapshot during scroll instead of immediately mounting the portal', () => {
 		const dirty = vi.fn();
 		const mountCellImmediately = vi.fn();
 		const cellSlot = new CellSlot(document.createElement('div'));
@@ -1122,7 +1122,7 @@ describe('bindCellDuringScroll', () => {
 					decorationClassName: '',
 					classTokens: ['og-cell', 'og-cell-readonly'],
 					className: 'og-cell og-cell-readonly',
-					contentKind: 'impostor',
+					contentKind: 'stand-in',
 					contentMode: 'fallback',
 					formattedValue: 'Fallback name',
 					title: 'Fallback title',
@@ -1194,7 +1194,7 @@ describe('bindCellDuringScroll', () => {
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 	});
 
-	it('synthesizes a cheap text impostor for a new custom-live cell with no prewarm snapshot instead of live-mounting during scroll', () => {
+	it('synthesizes a cheap text stand-in for a new custom-live cell with no prewarm snapshot instead of live-mounting during scroll', () => {
 		const dirty = vi.fn();
 		const mountCellImmediately = vi.fn();
 		const cellSlot = new CellSlot(document.createElement('div'));
@@ -1269,7 +1269,7 @@ describe('bindCellDuringScroll', () => {
 
 	it('BLOCKER: never live-mounts a cold custom-DOM-renderer cell during normal (non-editing, non-focused) active scroll', () => {
 		// mode:'custom-dom' is the real compiled-plan shape for a column using a DOM cell renderer
-		// (ColumnModel.ts sets this for isDomCellRenderer columns) — it is NOT in the impostor-capable
+		// (ColumnModel.ts sets this for isDomCellRenderer columns) — it is NOT in the stand-in-capable
 		// set (custom-live/custom-imperative/custom), so before this fix it fell straight through to a
 		// synchronous mountCellImmediately call on first scroll-in. Normal scroll must never mount any
 		// renderer type live, regardless of capability bucket.
@@ -1344,7 +1344,7 @@ describe('bindCellDuringScroll', () => {
 		expect(cellSlot.lastContentMode).not.toBe('portal');
 	});
 
-	it('uses impostor snapshot for a pinned-left custom-live cell during scroll, same as center lane', () => {
+	it('uses stand-in snapshot for a pinned-left custom-live cell during scroll, same as center lane', () => {
 		const dirty = vi.fn();
 		const mountCellImmediately = vi.fn();
 		const cellSlot = new CellSlot(document.createElement('div'));
@@ -1366,7 +1366,7 @@ describe('bindCellDuringScroll', () => {
 					decorationClassName: '',
 					classTokens: ['og-cell', 'og-cell-pinned-left'],
 					className: 'og-cell og-cell-pinned-left',
-					contentKind: 'impostor',
+					contentKind: 'stand-in',
 					contentMode: 'fallback',
 					formattedValue: 'Pinned value',
 					title: '',
@@ -1434,7 +1434,7 @@ describe('bindCellDuringScroll', () => {
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 	});
 
-	it('uses impostor snapshot for a pinned-right custom-live cell during scroll, same as center lane', () => {
+	it('uses stand-in snapshot for a pinned-right custom-live cell during scroll, same as center lane', () => {
 		const dirty = vi.fn();
 		const mountCellImmediately = vi.fn();
 		const cellSlot = new CellSlot(document.createElement('div'));
@@ -1456,7 +1456,7 @@ describe('bindCellDuringScroll', () => {
 					decorationClassName: '',
 					classTokens: ['og-cell', 'og-cell-pinned-right'],
 					className: 'og-cell og-cell-pinned-right',
-					contentKind: 'impostor',
+					contentKind: 'stand-in',
 					contentMode: 'fallback',
 					formattedValue: '99',
 					title: '',
@@ -2359,7 +2359,7 @@ describe('bindCellDuringScroll', () => {
 
 		// The cell had an empty portal host — no live content to freeze.
 		// The scroll frame must not call mountCellImmediately; instead, the cell
-		// is shown as a cheap text impostor and deferred to the post-scroll fidelity lane.
+		// is shown as a cheap text stand-in and deferred to the post-scroll fidelity lane.
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 		// No getCheapDisplayValue mock → empty fallback; cell shows 'empty' mode.

@@ -63,7 +63,7 @@ function resolvePresentationFreshness<TRowData>(presentation: ScrollCellPresenta
 		case 'live-renderer':
 		case 'frozen-portal':
 			return presentation.recordVersionsFrom ? snapshotFreshness(presentation.recordVersionsFrom) : scrollFallbackFreshness(input);
-		case 'shell':
+		case 'stand-in':
 			return presentation.recordVersions;
 		case 'dom-update':
 			return 'rowVersion' in presentation.recordVersions ? presentation.recordVersions : snapshotFreshness(presentation.recordVersions);
@@ -80,7 +80,7 @@ function getPresentationValidationError(presentation: ScrollCellPresentation): s
 	return 'validationError' in presentation ? presentation.validationError : undefined;
 }
 
-function hydrateCellCtrlFromScrollPresentation<TRowData>(
+function hydrateCellCtrlFromScrollDecision<TRowData>(
 	cellCtrl: CellCtrl,
 	presentation: ScrollCellPresentation,
 	input: ScrollCellPresentationInput<TRowData>
@@ -99,7 +99,7 @@ function hydrateCellCtrlFromScrollPresentation<TRowData>(
 	state.className = presentation.className;
 	state.title = title;
 	state.validationError = validationError;
-	state.requiresFidelity = presentation.kind === 'primitive' || presentation.kind === 'frozen-portal' || presentation.kind === 'shell';
+	state.requiresFidelity = presentation.kind === 'primitive' || presentation.kind === 'frozen-portal' || presentation.kind === 'stand-in';
 	state.freshness = freshness;
 	state.contentMode = 'contentMode' in presentation ? presentation.contentMode : undefined;
 	state.formattedValue = formattedValue;
@@ -159,12 +159,12 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
  * Scroll-phase resolve without the generic wrapper objects — the per-cell scroll bind path calls
  * this directly. Neither `deps` nor `input` is retained, so callers may pass reused scratch objects.
  */
-export function resolveCellCtrlScrollPresentationState<TRowData>(
+export function resolveCellCtrlScrollDecisionState<TRowData>(
 	cellCtrl: CellCtrl,
 	deps: ScrollCellPresentationDeps,
 	input: ScrollCellPresentationInput<TRowData>
 ): CellCtrl {
-	return hydrateCellCtrlFromScrollPresentation(cellCtrl, resolveScrollCellPresentation(deps, input), input);
+	return hydrateCellCtrlFromScrollDecision(cellCtrl, resolveScrollCellPresentation(deps, input), input);
 }
 
 export function resolveCellCtrlPresentationState<TRowData>(input: {
@@ -176,7 +176,7 @@ export function resolveCellCtrlPresentationState<TRowData>(input: {
 }): CellCtrl {
 	const { cellCtrl, context } = input;
 	if (context.scroll) {
-		return resolveCellCtrlScrollPresentationState(cellCtrl, context.scroll.deps, context.scroll.input);
+		return resolveCellCtrlScrollDecisionState(cellCtrl, context.scroll.deps, context.scroll.input);
 	}
 	if (context.fullBind) {
 		return hydrateCellCtrlFromFullBind(cellCtrl, context.fullBind);

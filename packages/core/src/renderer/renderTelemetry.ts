@@ -118,7 +118,7 @@ export interface RenderStats {
 	liveReactMountsDuringScroll?: number;
 	liveReactOverscanMounts?: number;
 	liveReactUpdatesDuringScroll?: number;
-	liveReactEmergencyShellsDuringScroll?: number;
+	liveReactStandInsDuringScroll?: number;
 	domUpdatesDuringScroll?: number;
 	domUpdatesDeferredDuringScroll?: number;
 	cellSlotsRetained?: number;
@@ -234,7 +234,7 @@ export function createEmptyRenderStats(): RenderStats {
 		liveReactMountsDuringScroll: 0,
 		liveReactOverscanMounts: 0,
 		liveReactUpdatesDuringScroll: 0,
-		liveReactEmergencyShellsDuringScroll: 0,
+		liveReactStandInsDuringScroll: 0,
 		domUpdatesDuringScroll: 0,
 		domUpdatesDeferredDuringScroll: 0,
 		cellSlotsRetained: 0,
@@ -290,9 +290,9 @@ export interface RenderRuntimeStats {
 	/** Same cellKey already mounted — a React re-render, not a fresh portal mount. Budgeted
 	 *  separately from liveReactMountsDuringScroll by liveFrameBudget.ts. */
 	liveReactUpdatesDuringScroll: number;
-	/** A live-mount was deferred to a shell/pending placeholder because maxMountsPerFrame was
+	/** A live-mount was deferred to a stand-in placeholder because maxMountsPerFrame was
 	 *  exhausted this frame (see liveFrameBudget.ts, GridRendererOptions.live). */
-	liveReactEmergencyShellsDuringScroll: number;
+	liveReactStandInsDuringScroll: number;
 	/** DOM renderer cells updated in place during scroll (`scroll: 'live'` on a DOM renderer). */
 	domUpdatesDuringScroll: number;
 	/** DOM renderer cells the frame's DOM-update budget refused (stand-in until scroll settles). */
@@ -369,7 +369,7 @@ export function createRenderRuntimeStats(): RenderRuntimeStats {
 		liveReactMountsDuringScroll: 0,
 		liveReactOverscanMounts: 0,
 		liveReactUpdatesDuringScroll: 0,
-		liveReactEmergencyShellsDuringScroll: 0,
+		liveReactStandInsDuringScroll: 0,
 		domUpdatesDuringScroll: 0,
 		domUpdatesDeferredDuringScroll: 0,
 		cellSlotsRetained: 0,

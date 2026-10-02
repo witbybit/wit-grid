@@ -112,7 +112,7 @@ describe('resolveScrollCellPresentation', () => {
 			decorationClassName: '',
 			classTokens: ['og-cell'],
 			className: 'og-cell',
-			contentKind: 'impostor' as const,
+			contentKind: 'stand-in' as const,
 			contentMode: 'fallback' as const,
 			formattedValue: 'Fallback name',
 			title: '',
@@ -149,7 +149,7 @@ describe('resolveScrollCellPresentation', () => {
 	});
 
 	it('BLOCKER: never mounts a cold portal-capable cell during normal (non-editing, non-focused) active scroll', () => {
-		// mode 'custom-dom' is deliberately NOT in the impostor-capable set (custom-live/custom-imperative/
+		// mode 'custom-dom' is deliberately NOT in the stand-in-capable set (custom-live/custom-imperative/
 		// custom) — this is exactly the real-world shape of a DOM-renderer column (ColumnModel.ts sets
 		// mode:'custom-dom' for isDomCellRenderer columns), which previously fell all the way through to
 		// a synchronous cold mount on first scroll-in. Normal scroll must never do this, regardless of
@@ -163,8 +163,8 @@ describe('resolveScrollCellPresentation', () => {
 		);
 		expect(presentation.kind).not.toBe('portal-mount');
 		expect(presentation.kind).not.toBe('live-renderer');
-		// Must degrade to a deterministic, non-mounting placeholder/impostor instead.
-		expect(['shell', 'dom-update', 'primitive']).toContain(presentation.kind);
+		// Must degrade to a deterministic, non-mounting placeholder/stand-in instead.
+		expect(['stand-in', 'dom-update', 'primitive']).toContain(presentation.kind);
 	});
 
 	it('BLOCKER: an actively-focused portal-capable cell with no snapshot and no live content uses the explicit force-live exception, not the generic portal-mount case', () => {

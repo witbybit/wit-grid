@@ -5,7 +5,7 @@ import type { CellSlot, CellContentMode } from './cellSlot.js';
 import type { CellDisplaySnapshot } from './cellDisplaySnapshot.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
 import { hasMountedDataVersionDrifted, type VisualFreshness } from './visualFreshness.js';
-import { getCellScrollPresentation } from './scrollPresentationMode.js';
+import { getCellScrollPresentation } from './cellScrollMode.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 
 /**
@@ -134,7 +134,7 @@ export function hasAuthoritativePortalHostContent<TRowData>(
 
 /**
  * Composite identity guard for freezing an already-mounted live portal in place during scroll
- * instead of replacing it with an impostor. Warm DOM (`lastPortalKey`, the portal host's own
+ * instead of replacing it with an stand-in. Warm DOM (`lastPortalKey`, the portal host's own
  * child content) may gate this decision only through this exact three-part check — a row rebind
  * means the warm content belongs to the OLD row identity and must never be trusted, and a
  * mismatched portal key means the warm content belongs to a different cell/edit session.
@@ -255,7 +255,7 @@ export type ScrollCellPresentation =
 			validationError: string | undefined;
 	  }
 	| {
-			kind: 'shell';
+			kind: 'stand-in';
 			className: string;
 			contentMode: CellContentMode;
 			formattedValue: string;
@@ -300,7 +300,7 @@ function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {
  * | 6 | `text` holding its own mounted renderer (see below)         | `frozen-portal`                          |
  * | 7 | React `text` whose prewarm snapshot holds stand-in text     | `primitive` (replays it)                 |
  * | 8 | editing or focused                                          | `live-renderer` (interactive exception)  |
- * | 9 | anything else (`text` entering view)                        | `shell` (stand-in text)                  |
+ * | 9 | anything else (`text` entering view)                        | `stand-in` (stand-in text)               |
  *
  * Results that are not final (`markDirty`, stand-in text, over-budget live cells) are completed
  * by the settle repair once scrolling stops; the binders only execute the result.
@@ -310,7 +310,7 @@ function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {
  * should show — never performs a DOM write, portal mount/release, or a semantic read (no
  * getCellValue/valueGetter/formula/style-rule/integrity call). `deps` is only used for read-only
  * inspection: checking whether a portal host already has live content, and reading the column's
- * cheap-display-value cache for the synthetic-impostor fallback (both already exempt from the
+ * cheap-display-value cache for the synthetic-stand-in fallback (both already exempt from the
  * no-semantic-read counters — see runtimePerformance.test.ts).
  */
 export function resolveScrollCellPresentation<TRowData>(
@@ -564,7 +564,7 @@ export function resolveScrollCellPresentation<TRowData>(
 	const warmText = canReuseWarmTextForIdentity(cellSlot, isWarmBindingVersionFresh);
 	const standIn = isShownWarmText(warmText) ? warmText.formattedValue : genericCheap;
 	return {
-		kind: 'shell',
+		kind: 'stand-in',
 		className: cellClassName,
 		contentMode: standIn !== '' ? 'fallback' : 'empty',
 		formattedValue: standIn,

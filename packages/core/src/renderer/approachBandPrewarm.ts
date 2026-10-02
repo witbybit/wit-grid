@@ -204,13 +204,13 @@ export class ApproachBandPrewarmer<TRowData = unknown> {
 			if (visualRow?.kind !== 'data') return true;
 			const col = columns[colIndex];
 			if (!col) return true;
-			const isImpostorEligible = compiledPlan.columnPlans[colIndex]?.mode === 'custom';
+			const isStandInEligible = compiledPlan.columnPlans[colIndex]?.mode === 'custom';
 			const rowId = visualRow.node.id;
 			if (hasFreshSnapshot(rowId, col.field)) return true;
 			const rawValue = col.valueGetter ? undefined : this.deps.engine.getRawCellValue(rowId, col.field);
 			const shouldPrimeFormula = typeof rawValue === 'string' && rawValue.startsWith('=');
 			const hasRegisteredFormula = this.deps.engine.hasFormula(rowId, col.field);
-			const shouldPrimeDisplayValue = col.valueGetter || shouldPrimeFormula || hasRegisteredFormula || isImpostorEligible;
+			const shouldPrimeDisplayValue = col.valueGetter || shouldPrimeFormula || hasRegisteredFormula || isStandInEligible;
 			const cellDecorations = this.deps.engine.insights.getCellDecorations(rowId, col.field);
 			const isFocused = isCellFocused(rowId, col, focusedCell);
 			const isSelected = isCellSelected(rowIndex, colIndex, selectionBounds);
@@ -282,14 +282,11 @@ export class ApproachBandPrewarmer<TRowData = unknown> {
 			// A getter/formula value that is not cached yet stays unformatted, as in the scroll bind path.
 			const formatterInput = shouldPrimeDisplayValue ? (primedValue ?? cachedValue) : rawValue;
 			const snapshotText =
-				col.valueFormatter &&
-				!isImpostorEligible &&
-				visualRow.node.data !== null &&
-				(!shouldPrimeDisplayValue || formatterInput !== undefined)
+				col.valueFormatter && !isStandInEligible && visualRow.node.data !== null && (!shouldPrimeDisplayValue || formatterInput !== undefined)
 					? formatPrewarmValue(col, formatterInput, visualRow.node)
 					: displayValue;
-			const snapshotContentKind = isImpostorEligible && snapshotText !== '' ? 'impostor' : snapshotText !== '' ? 'text' : 'empty';
-			const snapshotContentMode = isImpostorEligible && snapshotText !== '' ? 'fallback' : snapshotText !== '' ? 'text' : 'empty';
+			const snapshotContentKind = isStandInEligible && snapshotText !== '' ? 'stand-in' : snapshotText !== '' ? 'text' : 'empty';
+			const snapshotContentMode = isStandInEligible && snapshotText !== '' ? 'fallback' : snapshotText !== '' ? 'text' : 'empty';
 			this.deps.engine.cellDisplaySnapshots.set(
 				createCellDisplaySnapshot({
 					rowId,

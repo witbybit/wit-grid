@@ -94,9 +94,9 @@ describe('LiveFrameBudget wiring — end to end sanity (unconfigured)', () => {
 		// row id — see identityKeys.ts's createCellInstanceRendererKey), so once the pool is warm
 		// (as it is here, after the initial full mount), scrolling produces updates, not fresh mounts.
 		// Either counter firing proves the wiring runs; see liveCellBinder.budget.test.ts for the
-		// mount-vs-update/emergency-shell branch logic itself, tested directly and deterministically.
+		// mount-vs-update/stand-in branch logic itself, tested directly and deterministically.
 		expect(stats.liveReactMountsDuringScroll + stats.liveReactUpdatesDuringScroll).toBeGreaterThan(0);
-		expect(stats.liveReactEmergencyShellsDuringScroll || 0).toBe(0);
+		expect(stats.liveReactStandInsDuringScroll || 0).toBe(0);
 		expect(stats.liveReactOverscanMounts || 0).toBeGreaterThanOrEqual(0);
 
 		cleanup(grid);

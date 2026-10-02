@@ -31,13 +31,13 @@ function isOverscanLiveExecution<TRowData>(input: DispatchCellPresentationInput<
 
 /** Renders the stand-in for a live cell that couldn't be granted this frame's budget: the cell's
  * `scrollText` (else its cheap text), rather than a blank cell. */
-function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
+function applyLiveStandIn<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
 	const cheap = deps.engine.getCheapDisplayValue?.(cellCtrl.rowId, cellCtrl.field) ?? '';
 	const scrollText = (runtime.mount?.col as InternalColumnDef<TRowData> | undefined)?.cellRendererCapabilities?.scrollText;
 	const standIn = scrollText ? scrollText({ value: runtime.mount?.value, formattedValue: cheap }) || cheap : cheap;
-	deps.incrementLiveReactEmergencyShellsDuringScroll?.();
+	deps.incrementLiveReactStandInsDuringScroll?.();
 	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
@@ -240,7 +240,7 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		// An over-budget update keeps the mounted content, unless the slot was just recycled to
 		// another row: that content is the previous row's, so it must not stay visible.
 		if (!isFreshMount && cellSlot.rowId === cellCtrl.rowId) return;
-		applyLiveMountEmergencyShell(input);
+		applyLiveStandIn(input);
 		return;
 	}
 	if (input.phase === 'scroll') {
