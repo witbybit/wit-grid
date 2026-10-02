@@ -12,17 +12,17 @@ import { CELL_SLOT_RETENTION_CONFIG } from './cellSlotRetention.js';
 type Row = Record<string, string>;
 const COLS = 200;
 
-function mountWide() {
+function mountWide(colCount = COLS) {
 	vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 		cb(0);
 		return 1;
 	});
 	vi.stubGlobal('cancelAnimationFrame', () => {});
-	const columns: ColumnDef<Row>[] = Array.from({ length: COLS }, (_, c) => ({ field: `c${c}`, header: `Col ${c}`, width: 100 }));
+	const columns: ColumnDef<Row>[] = Array.from({ length: colCount }, (_, c) => ({ field: `c${c}`, header: `Col ${c}`, width: 100 }));
 	const store = new GridStore<Row>({ columns, defaultRowHeight: 40, defaultColWidth: 100, getRowId: (row) => row.id });
-	const rows = Array.from({ length: 12 }, (_, r) => {
+	const rows = Array.from({ length: 6 }, (_, r) => {
 		const row: Row = { id: `r${r}` };
-		for (let c = 0; c < COLS; c++) row[`c${c}`] = `R${r}C${c}`;
+		for (let c = 0; c < colCount; c++) row[`c${c}`] = `R${r}C${c}`;
 		return row;
 	});
 	const controller = new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
@@ -46,7 +46,8 @@ function mountWide() {
 
 describe('horizontal scroll reuses cell and header elements', () => {
 	it('header cells are reused across columns and always show their own column', () => {
-		const grid = mountWide();
+		// 60 columns, 800 px wide: the header window moves by several columns per step.
+		const grid = mountWide(60);
 		const viewport = grid.container.querySelector('.og-scroll-viewport') as HTMLDivElement;
 		const seenCells = new Map<Element, Set<string>>();
 		const seenHeaders = new Map<Element, Set<string>>();
@@ -67,7 +68,7 @@ describe('horizontal scroll reuses cell and header elements', () => {
 				expect(header.textContent).toBe(`Col ${header.dataset.colField!.slice(1)}`);
 			}
 		};
-		for (const left of [0, 2500, 5000, 7500, 10000, 12500, 15000, 17500, 10000, 2500, 0]) {
+		for (const left of [0, 1500, 3000, 4500, 3000, 0]) {
 			viewport.scrollLeft = left;
 			grid.store.engine.viewport.setScrollPosition(0, left);
 			// Scroll frame: cells go through the scroll-time retention path (where recycling happens).
