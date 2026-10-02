@@ -13,6 +13,9 @@ import {
 	readScenario,
 	rendererCalls,
 	type BenchRow,
+	HOT_CLASS,
+	isHotValue,
+	styledCells,
 } from './common.js';
 
 const scenario = readScenario();
@@ -54,8 +57,13 @@ const reactMounts = new URLSearchParams(location.search).get('reactMounts');
 const rendererOptions = reactMounts ? { live: { maxMountsPerFrame: Number(reactMounts) } } : undefined;
 
 const root = createRoot(container);
+const styleRules = styledCells
+	? [{ kind: 'cell' as const, when: (row: BenchRow, col: { field: string }) => isHotValue(row[col.field]), cellClass: HOT_CLASS }]
+	: undefined;
 const render = (current: BenchRow[]) =>
-	root.render(<Grid<BenchRow> columns={columns} rows={current} getRowId={(row) => row.id} rendererOptions={rendererOptions} />);
+	root.render(
+		<Grid<BenchRow> columns={columns} rows={current} getRowId={(row) => row.id} rendererOptions={rendererOptions} styleRules={styleRules} />
+	);
 render(rows);
 // Tick scenarios edit a renderer cell (c1) of the row in the middle of the viewport, through the
 // React way of updating data: a new rows prop.

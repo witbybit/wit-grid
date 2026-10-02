@@ -6,6 +6,7 @@
 //   pnpm bench:browser --only=vertical-text --runs=9 --grid=wit
 //   pnpm bench:browser --publish                # also update the docs comparison page's data
 //   pnpm bench:browser --fidelity               # what visible cells show each frame (flicker), not timing
+//   pnpm bench:gate                             # fidelity gate: Wit only, exits 1 on any regression
 //
 // Method: each round runs both grids back to back on the same scenario, alternating which goes
 // first, so machine drift (thermals, background load) hits both equally. Per metric we report the
@@ -28,10 +29,13 @@ const args = Object.fromEntries(
 		return [key, value ?? true];
 	})
 );
-const runs = Number(args.runs ?? 5);
+// --gate: the fidelity regression gate run before renderer commits (Wit grids only, 2 rounds).
+const gate = Boolean(args.gate);
+if (gate) args.fidelity = true;
+const runs = Number(args.runs ?? (gate ? 2 : 5));
 // --css=<variant> forwards an experimental CSS override to the Wit Grid page (see src/wit.ts).
 const cssVariant = args.css;
-const grids = args.grid ? [args.grid] : ['wit', 'ag'];
+const grids = args.grid ? [args.grid] : gate ? ['wit'] : ['wit', 'ag'];
 // --trace records Chrome's devtools.timeline trace and reports what each layout touched
 // (layout objects dirtied, objects in the tree, forced layouts) and why elements were restyled
 // or re-laid out. Counts, not time: tracing itself costs main-thread time, so trace runs are for
@@ -81,6 +85,36 @@ const SCENARIOS = [
 		query: { rows: 100_000, cols: 50, domCols: 0 },
 		ticks: 120,
 		noFidelity: true,
+	},
+	{
+		name: 'vertical-react-live',
+		title: 'Vertical scroll, live React cell renderers',
+		description:
+			"The React cell grid with scroll: 'live' on its renderer columns: every visible cell must be final on every frame. Wit only: fidelity runs.",
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		reactMode: 'live',
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-styled',
+		title: 'Vertical scroll, decorated cells',
+		description:
+			'The plain-text grid with a cell style rule on every numeric cell above 500; fidelity judges the class too. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 0, styled: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-react-styled',
+		title: 'Vertical scroll, decorated React cells',
+		description: 'The React cell grid with the same cell style rule; fidelity judges the class too. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10, styled: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
 	},
 	{
 		name: 'react-edits-at-rest',
@@ -192,7 +226,8 @@ async function runOnce(browser, grid, scenario) {
 	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
 	if (fidelity) url.searchParams.set('fidelity', '1');
 	// --react-mode=<live|text> sets the React cells' scroll presentation (wit-react page).
-	if (args['react-mode'] && grid === 'wit-react') url.searchParams.set('reactMode', args['react-mode']);
+	const reactMode = scenario.reactMode ?? args['react-mode'];
+	if (reactMode && grid === 'wit-react') url.searchParams.set('reactMode', reactMode);
 	if (args['react-mounts'] && grid === 'wit-react') url.searchParams.set('reactMounts', args['react-mounts']);
 	await page.goto(url.href);
 	await page.waitForFunction(() => window.benchReady === true, null, { timeout: 60_000 });
@@ -318,6 +353,9 @@ async function runOnce(browser, grid, scenario) {
 }
 
 function summarizeFidelity(stats, rest, grid) {
+	if (stats.otherExamples?.length)
+		process.stdout.write(`  ${grid} STALE/OTHER, e.g. ${stats.otherExamples.slice(0, 4).join('; ')}
+`);
 	if (stats.wrongExamples.length)
 		process.stdout.write(`  ${grid} wrong cells, e.g. ${stats.wrongExamples.slice(0, 3).join('; ')}
 `);
@@ -432,7 +470,7 @@ const environment = {
 const results = [];
 try {
 	for (const scenario of SCENARIOS) {
-		const scenarioGrids = scenario.grids ?? grids;
+		const scenarioGrids = gate ? (scenario.grids ?? grids).filter((grid) => grid !== 'ag') : (scenario.grids ?? grids);
 		const samples = Object.fromEntries(scenarioGrids.map((grid) => [grid, []]));
 		for (let r = 0; r < runs; r++) {
 			// Paired round: both grids back to back, alternating which goes first.
@@ -554,4 +592,31 @@ if (args.publish && !fidelity) {
 	});
 	writeFileSync(historyFile, JSON.stringify(history, null, 2) + '\n');
 	console.log(`published ${join(dataDir, 'wit-vs-ag.json')} (history: ${history.length} runs)`);
+}
+
+if (gate) {
+	// Every Wit cell is judged on what a viewer sees. Never allowed: a blank cell, another row's or a
+	// stale value, a wrong cell at rest, a grid that never settles. Stand-in text (shown during scroll
+	// by 'text' React cells by design) is allowed only there; every other mode must be exact.
+	const failures = [];
+	for (const r of results) {
+		if (r.grid === 'ratio') continue;
+		const scenario = SCENARIOS.find((s) => s.name === r.scenario);
+		const exact = r.grid !== 'wit-react' || scenario?.reactMode === 'live';
+		const fail = (why) => failures.push(`${r.scenario} (${r.grid}): ${why}`);
+		if (r.spread.blankPct.max > 0) fail(`blank cells ${fmt(r.spread.blankPct.max, 3)}%`);
+		// Edits at rest: an edited cell may be one sample behind (the sampler's frame callback can run
+		// before the grid's), but never more than that.
+		const staleLimit = r.scenario === 'react-edits-at-rest' ? 0.5 : 0.05;
+		if (r.spread.otherContentPct.max > staleLimit) fail(`stale or other-row content ${fmt(r.spread.otherContentPct.max, 3)}%`);
+		if (r.spread.wrongAtRest.max > 0) fail(`${r.spread.wrongAtRest.max} wrong cells at rest`);
+		if (r.spread.settleMs.max < 0 || r.spread.settleMs.max > 1000) fail(`settle ${fmt(r.spread.settleMs.max, 0)} ms`);
+		if (exact && !r.scenario.startsWith('react-edits') && r.spread.wrongCellPct.max > 0.25)
+			fail(`wrong cells ${fmt(r.spread.wrongCellPct.max, 2)}% in an exact mode`);
+	}
+	if (failures.length > 0) {
+		console.error(`\nFIDELITY GATE FAILED\n  ${failures.join('\n  ')}`);
+		process.exit(1);
+	}
+	console.log('\nfidelity gate passed');
 }

@@ -12,6 +12,9 @@ import {
 	paintBar,
 	readScenario,
 	type BenchRow,
+	HOT_CLASS,
+	isHotValue,
+	styledCells,
 } from './common.js';
 
 const scenario = readScenario();
@@ -62,6 +65,7 @@ if (cssVariant && CSS_VARIANTS[cssVariant]) {
 
 const initialRows = makeRows(scenario);
 const api = createClientGrid<BenchRow>({ columns, rows: initialRows, getRowId: (row) => row.id });
+if (styledCells) api.setStyleRules([{ kind: 'cell', when: (row, col) => isHotValue(row[col.field]), cellClass: HOT_CLASS }]);
 installTicker(initialRows, (rows) => api.setRows(rows));
 const host = mountGridHost(api, container);
 // Diagnostics only (bench --trace): the grid's own write counters for the measured window.

@@ -35,7 +35,20 @@ export function formatBenchValue(value: unknown): string {
 	return `$${String(value)}`;
 }
 
+/**
+ * ?styled=1: a cell style rule marks every numeric cell above 500 with `bench-hot`, and fidelity
+ * judges the class too: a decorated cell must show its decoration, not only its text.
+ */
+export const styledCells = new URLSearchParams(location.search).get('styled') === '1';
+export const HOT_CLASS = 'bench-hot';
+export const isHotValue = (value: unknown): boolean => typeof value === 'number' && value > 500;
+
 export function expectedSignature(rowId: string, colId: string, domCols: number): string {
+	const base = expectedContentSignature(rowId, colId, domCols);
+	return styledCells && isHotValue(cellValue(rowId, colId)) ? `${base}|hot` : base;
+}
+
+function expectedContentSignature(rowId: string, colId: string, domCols: number): string {
 	const value = cellValue(rowId, colId);
 	if (formatNumbers && typeof value === 'number' && Number(colId.slice(1)) >= domCols) return formatBenchValue(value);
 	return Number(colId.slice(1)) < domCols ? `${value}|${(typeof value === 'number' ? value : 0) / 10}%` : String(value);
@@ -105,6 +118,7 @@ interface FidelityStats {
 	/** ms from the last input until the first frame with every visible cell final (-1: never). */
 	settleMs: number;
 	wrongExamples: string[];
+	otherExamples: string[];
 }
 
 const emptyFidelity = (): FidelityStats => ({
@@ -118,13 +132,15 @@ const emptyFidelity = (): FidelityStats => ({
 	otherContent: 0,
 	settleMs: -1,
 	wrongExamples: [],
+	otherExamples: [],
 });
 
 /** Visible text plus the visible bar's width: what a viewer actually sees in the cell. */
 function readSignature(cell: HTMLElement): string {
 	const text = cell.innerText.trim();
 	const bar = cell.querySelector<HTMLElement>('.bench-bar');
-	return bar && bar.getClientRects().length > 0 ? `${text}|${bar.style.width}` : text;
+	const content = bar && bar.getClientRects().length > 0 ? `${text}|${bar.style.width}` : text;
+	return styledCells && cell.classList.contains(HOT_CLASS) ? `${content}|hot` : content;
 }
 
 /**
@@ -186,8 +202,10 @@ export function installMeasurement(options: {
 					if (signature === '') stats.blank++;
 					else if (signature === expected.split('|')[0]) stats.incomplete++;
 					else stats.otherContent++;
-					if (stats.wrongExamples.length < 8)
-						stats.wrongExamples.push(`${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`);
+					const example = `${key}: ${JSON.stringify(signature)} (expected ${JSON.stringify(expected)})`;
+					if (stats.wrongExamples.length < 8) stats.wrongExamples.push(example);
+					// Stale or another row's content is the kind that matters: keep its examples apart.
+					if (signature !== '' && signature !== expected.split('|')[0] && stats.otherExamples.length < 8) stats.otherExamples.push(example);
 				}
 				const previous = lastSeen.get(key);
 				if (previous !== undefined && previous !== signature) stats.changes++;
