@@ -83,6 +83,27 @@ const SCENARIOS = [
 		noFidelity: true,
 	},
 	{
+		name: 'react-edits-at-rest',
+		title: 'React cells edited at rest',
+		description:
+			'The React cell grid, not scrolling; every 16 ms the app passes new rows with one visible renderer cell edited. Every edit must show on the next frame. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		ticks: 120,
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'react-edits-during-scroll',
+		title: 'React cells edited during scroll',
+		description:
+			'The React cell grid scrolling, with one visible renderer cell edited on every wheel event (new rows prop). Edited cells must never show a stale value. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		ticks: 150,
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
 		name: 'vertical-formatted',
 		title: 'Vertical scroll, formatted numbers',
 		description: 'The plain-text grid with a valueFormatter on every numeric column ($<value>).',
@@ -194,7 +215,15 @@ async function runOnce(browser, grid, scenario) {
 	await page.evaluate(() => window.bench.start());
 	const { dx = 0, dy = 0, events } = scenario.wheel ?? { events: scenario.ticks };
 	const inputStart = performance.now();
-	if (scenario.ticks) {
+	if (scenario.ticks && scenario.wheel) {
+		// Data updates during input: one wheel event and one setRows-style replace per step.
+		for (let i = 0; i < events; i++) {
+			const sign = i < events / 2 ? 1 : -1;
+			await page.mouse.wheel(dx * sign, dy * sign);
+			await page.evaluate((i) => window.benchTick(i), i);
+			await page.waitForTimeout(16);
+		}
+	} else if (scenario.ticks) {
 		// Data updates instead of input: one setRows-style replace per tick.
 		for (let i = 0; i < events; i++) {
 			await page.evaluate((i) => window.benchTick(i), i);

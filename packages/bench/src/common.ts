@@ -16,8 +16,13 @@ export function readScenario(): Scenario {
 	return { rows: Number(q.get('rows') ?? 100_000), cols: Number(q.get('cols') ?? 50), domCols: Number(q.get('domCols') ?? 0) };
 }
 
-/** The value makeRows puts in a cell, from its ids alone (`r<row>`, `c<col>`). */
+/** Values a tick scenario has edited, by `<rowId>/<colId>`: the cell's current value from then on. */
+const editedValues = new Map<string, string | number>();
+
+/** The value a cell holds: its edited value, else what makeRows put there from its ids (`r<row>`, `c<col>`). */
 function cellValue(rowId: string, colId: string): string | number {
+	const edited = editedValues.get(`${rowId}/${colId}`);
+	if (edited !== undefined) return edited;
 	const r = Number(rowId.slice(1));
 	const c = Number(colId.slice(1));
 	return c % 3 === 0 ? `R${r}C${c}` : (r * 31 + c * 17) % 1000;
@@ -298,16 +303,34 @@ export function installMeasurement(options: {
 /**
  * Tick scenarios: each tick hands the grid a new rows array in which one visible row is an edited
  * copy — what a React app does with immutable state. `replace` gives the array to the grid.
+ * `pickRow` chooses the edited row's index (default: one of the first 12, in view at rest); the
+ * edit is recorded so fidelity judges cells against their current value.
  */
-export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) => void): void {
+export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) => void, pickRow?: (i: number) => number): void {
 	let rows = initial;
 	(window as unknown as { benchTick: (i: number) => void }).benchTick = (i: number) => {
-		const k = i % 12;
+		const k = pickRow?.(i) ?? i % 12;
 		const next = rows.slice();
-		next[k] = { ...rows[k], c1: (Number(rows[k].c1) + 1) % 1000 };
+		const value = (Number(rows[k].c1) + 1) % 1000;
+		next[k] = { ...rows[k], c1: value };
+		editedValues.set(`${rows[k].id}/c1`, value);
 		rows = next;
 		replace(next);
 	};
+}
+
+/** A row in the middle of the viewport: its index, read from the rendered rows' cells. */
+export function middleVisibleRowIndex(rowsSelector: string): number | undefined {
+	const rows = document.querySelectorAll<HTMLElement>(rowsSelector);
+	const viewportMiddle = window.innerHeight / 2;
+	for (const row of rows) {
+		const box = row.getBoundingClientRect();
+		if (box.top <= viewportMiddle && box.bottom >= viewportMiddle) {
+			const id = row.querySelector<HTMLElement>('.og-cell')?.dataset.rowId;
+			if (id) return Number(id.slice(1));
+		}
+	}
+	return undefined;
 }
 
 export function markReady(): void {
