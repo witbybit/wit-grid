@@ -1157,10 +1157,16 @@ export const CORE_STYLES = `
     contain: layout paint;
   }
 
+  /*
+   * Each row's lane casts the pinned-edge shadow; clipped to the outer side so a blur cannot spill
+   * over the rows above and below (overlapping row shadows read as a band on every row instead of
+   * one continuous edge).
+   */
   .og-row-pin-left {
     left: 0;
     border-right: 1px solid var(--og-pin-left-border-color);
     box-shadow: var(--og-pin-left-shadow);
+    clip-path: inset(0 -32px 0 0);
   }
 
   .og-row-pin-right {
@@ -1168,6 +1174,7 @@ export const CORE_STYLES = `
     margin-left: auto;
     border-left: 1px solid var(--og-pin-right-border-color);
     box-shadow: var(--og-pin-right-shadow);
+    clip-path: inset(0 0 0 -32px);
   }
 
   .og-row-selected .og-row-pin-left,
