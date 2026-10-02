@@ -89,7 +89,7 @@ export interface PortalStore<TRowData = unknown> {
 		cellSnapshotRebuilds: number;
 		rowMenuSnapshotRebuilds: number;
 		/** Microtask flushSync batches committing recycled cells' new rows before paint. */
-		cellRowChangeSyncFlushes: number;
+		cellSyncCommits: number;
 	};
 	resetDebugStats?(): void;
 	subscribeToCell?(cellKey: string, listener: () => void): () => void;

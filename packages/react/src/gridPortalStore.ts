@@ -31,7 +31,7 @@ export function createPortalStore<TRowData = unknown>() {
 		rowMenuStructuralPublishes: 0,
 		cellSnapshotRebuilds: 0,
 		rowMenuSnapshotRebuilds: 0,
-		cellRowChangeSyncFlushes: 0,
+		cellSyncCommits: 0,
 	};
 	// Mutable maps — source of truth
 	const portals = new Map<string, PortalData<TRowData>>();
@@ -111,21 +111,22 @@ export function createPortalStore<TRowData = unknown>() {
 		if (list) for (const l of list) l();
 	}
 
-	// A recycled slot's cell now shows another row. Rendered asynchronously, the previous row's
-	// component would stay visible at the new row's position for a frame, so these commit in one
-	// flushSync from a microtask: after the grid's frame work, before the browser paints.
-	const pendingRowChanges = new Set<string>();
-	let rowChangeFlushScheduled = false;
-	function notifyCellRowChange(cellKey: string) {
-		pendingRowChanges.add(cellKey);
-		if (rowChangeFlushScheduled) return;
-		rowChangeFlushScheduled = true;
+	// Cell data changes (a new value, or a recycled slot now showing another row) commit together in
+	// one flushSync from a microtask: after the grid's frame work, before the browser paints. Left to
+	// React's scheduler they render in a later task, so the cell shows its previous value — or the
+	// previous row's component at the new row's position — for a frame.
+	const pendingCellCommits = new Set<string>();
+	let cellCommitScheduled = false;
+	function scheduleCellCommit(cellKey: string) {
+		pendingCellCommits.add(cellKey);
+		if (cellCommitScheduled) return;
+		cellCommitScheduled = true;
 		queueMicrotask(() => {
-			rowChangeFlushScheduled = false;
-			if (pendingRowChanges.size === 0) return;
-			const keys = [...pendingRowChanges];
-			pendingRowChanges.clear();
-			debugStats.cellRowChangeSyncFlushes++;
+			cellCommitScheduled = false;
+			if (pendingCellCommits.size === 0) return;
+			const keys = [...pendingCellCommits];
+			pendingCellCommits.clear();
+			debugStats.cellSyncCommits++;
 			flushSync(() => {
 				for (const key of keys) notifyCellData(key);
 			});
@@ -157,7 +158,7 @@ export function createPortalStore<TRowData = unknown>() {
 			debugStats.rowMenuStructuralPublishes = 0;
 			debugStats.cellSnapshotRebuilds = 0;
 			debugStats.rowMenuSnapshotRebuilds = 0;
-			debugStats.cellRowChangeSyncFlushes = 0;
+			debugStats.cellSyncCommits = 0;
 		},
 		// Per-cell data subscription — PortalCellWrapper subscribes here for value/props updates
 		subscribeToCell(cellKey: string, listener: () => void) {
@@ -328,12 +329,9 @@ export function createPortalStore<TRowData = unknown>() {
 				// Rebuild snapshots — PortalPool components must re-render to add/remove portals
 				rebuildCellSnapshot();
 				notifyCellStructural();
-			} else if (existing && existing.node?.id !== node?.id) {
-				// Same slot, another row: commit before paint (see notifyCellRowChange).
-				notifyCellRowChange(cellKey);
 			} else {
-				// Data update only — notify the specific PortalCellWrapper, skip snapshot rebuild.
-				notifyCellData(cellKey);
+				// Data update only — the cell's own wrapper re-renders, before paint (see scheduleCellCommit).
+				scheduleCellCommit(cellKey);
 			}
 		},
 

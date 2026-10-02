@@ -31,18 +31,23 @@ describe('portal store: a recycled cell showing another row', () => {
 		expect(listener).not.toHaveBeenCalled();
 		await Promise.resolve();
 		expect(listener).toHaveBeenCalledTimes(2);
-		expect(store.getDebugStats!().cellRowChangeSyncFlushes).toBe(1);
+		expect(store.getDebugStats!().cellSyncCommits).toBe(1);
 		expect(store.getCellData!('k1')?.node).toBe(rowB);
 	});
 
-	it('keeps same-row data updates on the existing synchronous notification', () => {
+	it('commits same-row data updates in the same batched flush before paint', async () => {
 		const store = createPortalStore<{ name: string }>();
 		const container = document.createElement('div');
 		store.mountCell('k1', container, 'A', rowA, col, false, false, 'scroll-live', true, false, false, IDENTITY);
 		const listener = vi.fn();
 		store.subscribeToCell!('k1', listener);
 		store.mountCell('k1', container, 'A2', rowA, col, false, false, 'scroll-live', true, false, false, IDENTITY);
+		store.mountCell('k1', container, 'A3', rowA, col, false, false, 'scroll-live', true, false, false, IDENTITY);
+		expect(listener).not.toHaveBeenCalled();
+		await Promise.resolve();
+		// Two updates in one frame: one notification, one flush, the latest data.
 		expect(listener).toHaveBeenCalledTimes(1);
-		expect(store.getDebugStats!().cellRowChangeSyncFlushes).toBe(0);
+		expect(store.getDebugStats!().cellSyncCommits).toBe(1);
+		expect(store.getCellData!('k1')?.value).toBe('A3');
 	});
 });

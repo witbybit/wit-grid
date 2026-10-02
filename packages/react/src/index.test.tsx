@@ -688,6 +688,10 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			}
 		);
 
+		// Data updates commit in the store's pre-paint microtask flush.
+		await act(async () => {
+			await Promise.resolve();
+		});
 		// The structural listener should NOT have fired again (remains 1)
 		expect(structuralListener).toHaveBeenCalledTimes(1);
 		// But the cell-specific listener SHOULD have been called
