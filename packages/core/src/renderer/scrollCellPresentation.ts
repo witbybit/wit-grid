@@ -37,8 +37,8 @@ export interface ScrollCellPresentationDeps {
 	): { html: string } | undefined;
 	/** Read-only: grid-level defaults for the html-snapshot mode's missing-capture behavior — see
 	 *  GridRendererOptions.htmlSnapshot. Column-level `htmlSnapshot` capabilities take priority.
-	 *  Omitted defaults to `{ allowShellWhenMissing: true, allowTextFallbackWhenMissing: false }`. */
-	getHtmlSnapshotDefaults?(): { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean };
+	 *  Omitted defaults to `{ allowShellWhenMissing: true, allowTextFallbackWhenMissing: true, defaultStrict: false }`. */
+	getHtmlSnapshotDefaults?(): { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean; defaultStrict?: boolean };
 	/** Read-only: whether (rowId, colField) is a formula cell. Lets a plain primitive column (no
 	 *  valueGetter/formatter/renderer) show its raw field value during scroll instead of the "..."
 	 *  placeholder. Omitted means unknown — the placeholder is kept. */
@@ -565,8 +565,12 @@ export function resolveScrollCellPresentation<TRowData>(
 	// own mount/update lifecycle without React portal overhead).
 	const isHtmlSnapshotMode = presentation === 'html-snapshot';
 	const htmlSnapshotCaps = isHtmlSnapshotMode ? (col as InternalColumnDef<TRowData>).cellRendererCapabilities?.htmlSnapshot : undefined;
-	const htmlSnapshotDefaults = deps.getHtmlSnapshotDefaults?.() ?? { allowShellWhenMissing: true, allowTextFallbackWhenMissing: false };
-	const allowTextFallbackWhenMissing = htmlSnapshotCaps?.allowTextFallbackWhenMissing ?? htmlSnapshotDefaults.allowTextFallbackWhenMissing;
+	const htmlSnapshotDefaults = deps.getHtmlSnapshotDefaults?.() ?? { allowShellWhenMissing: true, allowTextFallbackWhenMissing: true };
+	// A cell with no captured snapshot yet shows its text rather than a blank shell, unless the column
+	// (or the grid's defaultStrict) is strict: strict never falls back to raw text.
+	const isStrictSnapshot = htmlSnapshotCaps?.strict ?? htmlSnapshotDefaults.defaultStrict ?? false;
+	const allowTextFallbackWhenMissing =
+		htmlSnapshotCaps?.allowTextFallbackWhenMissing ?? (!isStrictSnapshot && htmlSnapshotDefaults.allowTextFallbackWhenMissing);
 
 	// Compute live-content guard BEFORE any impostor path. If the cell is already showing rendered
 	// portal content for this exact row+key, freeze it in place during scroll rather than replacing

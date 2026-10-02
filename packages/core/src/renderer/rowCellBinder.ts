@@ -150,7 +150,7 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	incrementHtmlSnapshotMissesDuringScroll?: () => void;
 	incrementTextImpostorUsesDuringScroll?: () => void;
 	/** Grid-level defaults for scrollPresentation:'html-snapshot' columns that don't override them. */
-	getHtmlSnapshotDefaults?: () => { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean };
+	getHtmlSnapshotDefaults?: () => { allowShellWhenMissing: boolean; allowTextFallbackWhenMissing: boolean; defaultStrict?: boolean };
 	getSnapshotVisualVersions: () => SnapshotVisualVersions;
 	/** Live column-reorder preview offset (px) for a displayed column index.
 	 *  0 outside an active header drag. Only consulted on the full-bind path. */

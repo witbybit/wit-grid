@@ -293,7 +293,8 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 				const opts = this.deps.engine.rendererOptions?.htmlSnapshot;
 				return {
 					allowShellWhenMissing: opts?.allowShellWhenMissing ?? true,
-					allowTextFallbackWhenMissing: opts?.allowTextFallbackWhenMissing ?? false,
+					allowTextFallbackWhenMissing: opts?.allowTextFallbackWhenMissing ?? true,
+					defaultStrict: opts?.defaultStrict ?? false,
 				};
 			},
 			getSnapshotVisualVersions: () => ({

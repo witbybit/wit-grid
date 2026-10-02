@@ -142,10 +142,10 @@ it during scroll instead of re-mounting.
 
 | `htmlSnapshot` option          | Default      | Effect                                                                                                   |
 | ------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------- |
-| `strict`                       | grid default | When true, a missing snapshot never falls back to raw text or a stale clone.                             |
+| `strict`                       | grid default | When true, a missing snapshot never falls back to raw text or a stale clone: it shows the shell instead. |
 | `freshness`                    | —            | `'row-version-only'` invalidates only when row data changes; `'visual'` also tracks visual-only changes. |
 | `allowShellWhenMissing`        | `true`       | Show a loading shell instead of nothing when no snapshot exists yet.                                     |
-| `allowTextFallbackWhenMissing` | `false`      | Fall back to plain text instead of a shell when no snapshot exists.                                      |
+| `allowTextFallbackWhenMissing` | `true`       | Show the cell's text instead of a shell when no snapshot exists yet (ignored when `strict`).             |
 | `invalidateOnWidthChange`      | —            | Re-capture when the column is resized.                                                                   |
 | `invalidateOnHeightChange`     | —            | Re-capture when the row height changes.                                                                  |
 

@@ -2530,7 +2530,7 @@ describe('bindCellDuringScroll', () => {
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
 	});
 
-	it('shows a pending shell (not raw text) when scrollPresentation:"html-snapshot" has no fresh capture yet', () => {
+	it('a strict html-snapshot column shows a pending shell (not raw text) when it has no fresh capture yet', () => {
 		const dirty = vi.fn();
 		const showPortalContent = vi.fn();
 		const mountCellImmediately = vi.fn();
@@ -2594,7 +2594,7 @@ describe('bindCellDuringScroll', () => {
 			col: {
 				field: 'name',
 				cellRenderer: () => null,
-				cellRendererCapabilities: { scrollPresentation: 'html-snapshot' },
+				cellRendererCapabilities: { scrollPresentation: 'html-snapshot', htmlSnapshot: { strict: true } },
 			} as any,
 			lane: 'center',
 			ctx: {
@@ -2621,8 +2621,8 @@ describe('bindCellDuringScroll', () => {
 			isInVisibleContent: true,
 		});
 
-		// Shows a stable pending shell, not the snapshot's raw fallback text — html-snapshot mode
-		// never shows raw text unless the column/grid explicitly opts into allowTextFallbackWhenMissing.
+		// Shows a stable pending shell, not the snapshot's raw fallback text — a strict html-snapshot
+		// column never shows raw text (non-strict columns show the cell text by default).
 		expect(cellSlot.element.dataset.contentMode).toBe('pending');
 		expect(cellSlot.lastFormattedValue).toBe('');
 		expect(mountCellImmediately).not.toHaveBeenCalled();
