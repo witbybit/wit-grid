@@ -6,6 +6,7 @@ import {
 	formatNumbers,
 	rendererCalls,
 	installMeasurement,
+	installTicker,
 	makeRows,
 	markReady,
 	paintBar,
@@ -61,7 +62,9 @@ if (cssVariant && CSS_VARIANTS[cssVariant]) {
 	document.head.appendChild(style);
 }
 
-const api = createClientGrid<BenchRow>({ columns, rows: makeRows(scenario), getRowId: (row) => row.id });
+const initialRows = makeRows(scenario);
+const api = createClientGrid<BenchRow>({ columns, rows: initialRows, getRowId: (row) => row.id });
+installTicker(initialRows, (rows) => api.setRows(rows));
 const host = mountGridHost(api, container);
 // Diagnostics only (bench --trace): the grid's own write counters for the measured window.
 (window as unknown as { witHost: typeof host }).witHost = host;

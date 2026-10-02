@@ -75,6 +75,14 @@ const SCENARIOS = [
 		wheel: { dy: 2400, events: 90 },
 	},
 	{
+		name: 'setrows-one-change',
+		title: 'setRows, one changed row of 100,000',
+		description: 'Every 16 ms the app passes a new rows array with one visible row replaced by an edited copy (immutable-state updates).',
+		query: { rows: 100_000, cols: 50, domCols: 0 },
+		ticks: 120,
+		noFidelity: true,
+	},
+	{
 		name: 'vertical-formatted',
 		title: 'Vertical scroll, formatted numbers',
 		description: 'The plain-text grid with a valueFormatter on every numeric column ($<value>).',
@@ -103,7 +111,8 @@ const SCENARIOS = [
 ]
 	.filter((s) => !args.only || s.name === args.only)
 	// Fidelity-only scenarios have no AG counterpart; they still time on request (--only=<name>), Wit alone.
-	.filter((s) => fidelity || !s.fidelityOnly || args.only === s.name);
+	.filter((s) => fidelity || !s.fidelityOnly || args.only === s.name)
+	.filter((s) => !fidelity || !s.noFidelity);
 
 async function bundle() {
 	mkdirSync(out, { recursive: true });
@@ -183,16 +192,24 @@ async function runOnce(browser, grid, scenario) {
 	const before = await readMetrics();
 	if (traceLayouts) await page.evaluate(() => window.witHost?.resetRenderStats());
 	await page.evaluate(() => window.bench.start());
-	const { dx = 0, dy = 0, events } = scenario.wheel;
+	const { dx = 0, dy = 0, events } = scenario.wheel ?? { events: scenario.ticks };
 	const inputStart = performance.now();
-	// Forward then back, like a user flinging through data and returning.
-	for (let i = 0; i < events; i++) {
-		const sign = i < events / 2 ? 1 : -1;
-		await page.mouse.wheel(dx * sign, dy * sign);
-		await page.waitForTimeout(16);
+	if (scenario.ticks) {
+		// Data updates instead of input: one setRows-style replace per tick.
+		for (let i = 0; i < events; i++) {
+			await page.evaluate((i) => window.benchTick(i), i);
+			await page.waitForTimeout(16);
+		}
+	} else {
+		// Forward then back, like a user flinging through data and returning.
+		for (let i = 0; i < events; i++) {
+			const sign = i < events / 2 ? 1 : -1;
+			await page.mouse.wheel(dx * sign, dy * sign);
+			await page.waitForTimeout(16);
+		}
 	}
-	// page.mouse.wheel resolves once the page has handled the event, so time beyond the fixed
-	// 16ms pacing is main-thread work spent handling that input.
+	// The input call resolves once the page has handled it, so time beyond the fixed 16ms pacing
+	// is main-thread work spent handling that input (or that tick).
 	const inputOverheadMs = (performance.now() - inputStart) / events - 16;
 	if (fidelity) await page.evaluate(() => window.bench.markInputEnd());
 	await page.waitForTimeout(fidelity ? 1500 : 400);
@@ -474,7 +491,7 @@ const report = {
 			'Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame.',
 	},
 	environment,
-	scenarios: SCENARIOS.map(({ name, title, description, query, wheel }) => ({ name, title, description, query, wheel })),
+	scenarios: SCENARIOS.map(({ name, title, description, query, wheel, ticks }) => ({ name, title, description, query, wheel, ticks })),
 	results,
 };
 const resultsDir = join(here, 'results');
