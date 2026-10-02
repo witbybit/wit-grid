@@ -224,10 +224,10 @@ export type ScrollCellPresentation =
 	  }
 	| {
 			/**
-			 * The real renderer is mounted/updated on every scroll frame — the entire point of
-			 * `scroll: 'live'`. Counted under `liveReactMountsDuringScroll`, distinct from
-			 * `force-live-interactive-exception` (which fires rarely, only for 'text' cells that
-			 * are actively focused/editing).
+			 * The real renderer mounts/updates this scroll frame: a React `scroll: 'live'` cell
+			 * (`forceLiveInteractive: false`, counted under `liveReactMountsDuringScroll`), or a 'text'
+			 * cell the user is editing or focused on (`forceLiveInteractive: true`, counted separately
+			 * so a regression that makes it fire for ordinary cells is visible).
 			 */
 			kind: 'live-renderer';
 			className: string;
@@ -262,25 +262,6 @@ export type ScrollCellPresentation =
 			recordVersions: VisualFreshness;
 			title: string | null;
 			validationError: string | undefined;
-	  }
-	| {
-			/**
-			 * The ONLY case allowed to mount a live renderer during active scroll: the cell is actively
-			 * being edited or holds keyboard focus, so an impostor would be visibly wrong (the user is
-			 * interacting with it right now). Must stay rare — every other portal-capable cell with no
-			 * live content and no usable snapshot degrades to `impostor-synthetic` instead. Callers must
-			 * count this separately (`forceLiveMountsDuringScroll`), never fold it into generic
-			 * mount/portal counters, so a regression that makes this fire for normal cells is visible.
-			 */
-			kind: 'live-renderer';
-			className: string;
-			portalCellKey: string;
-			isEditing: boolean;
-			isFocused: boolean;
-			forceLiveInteractive: true;
-			recordVersionsFrom: CellDisplaySnapshot | undefined;
-			title: string | null;
-			validationError: string | undefined;
 	  };
 
 export interface ScrollCellPresentationInput<TRowData> {
@@ -307,6 +288,23 @@ function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {
 }
 
 /**
+ * What a cell shows during scroll, decided in this one place, in this order (first match wins):
+ *
+ * | # | Cell                                                        | Result                                   |
+ * | - | ----------------------------------------------------------- | ---------------------------------------- |
+ * | 1 | row-selection checkbox                                      | `checkbox-selector`                      |
+ * | 2 | outside the visible area, not `live`                        | `buffered` (kept content or direct text) |
+ * | 3 | plain column (no renderer, not editing, row loaded)         | `primitive` (snapshot, warm or direct text) |
+ * | 4 | React renderer, `live`                                      | `live-renderer`                          |
+ * | 5 | DOM renderer, `live`, not editing                           | `frozen-portal` if unchanged, else `dom-update` |
+ * | 6 | `text` holding its own mounted renderer (see below)         | `frozen-portal`                          |
+ * | 7 | React `text` whose prewarm snapshot holds stand-in text     | `primitive` (replays it)                 |
+ * | 8 | editing or focused                                          | `live-renderer` (interactive exception)  |
+ * | 9 | anything else (`text` entering view)                        | `shell` (stand-in text)                  |
+ *
+ * Results that are not final (`markDirty`, stand-in text, over-budget live cells) are completed
+ * by the settle repair once scrolling stops; the binders only execute the result.
+ *
  * Pure decision function for the scroll hot path. Given the current mounted slot state, a fresh
  * (possibly absent) display snapshot, and renderer capability metadata, decides what the cell
  * should show — never performs a DOM write, portal mount/release, or a semantic read (no
@@ -500,43 +498,38 @@ export function resolveScrollCellPresentation<TRowData>(
 	// manages its own mount/update lifecycle without React portal overhead, so it never takes the
 	// freeze path.
 
-	// If the cell is already showing rendered portal content for this exact row+key, freeze it in
-	// place during scroll rather than replacing it with stand-in text. This prevents the
-	// portal→text→portal flash on cells that were visible and rendered when the scroll began.
-	// A row rebind (different row reusing this slot) is excluded — existing content belongs to the
-	// old row identity and must never bleed into the incoming row.
-	const hasExistingLivePortalContent = canFreezeExistingPortalForIdentity(deps, cellSlot, portalCellKey, isRowRebind);
-
-	// A prewarm snapshot that explicitly says 'fallback' (stand-in text) takes authority over the
-	// freeze path.
-	const snapshotDemandsImpostor = snapshot?.contentMode === 'fallback';
-
-	if (!isDomRenderer && hasExistingLivePortalContent && !isEditing && !isFocused && !snapshotDemandsImpostor) {
+	// Keep the mounted renderer in place when the slot already shows this exact row+key's portal,
+	// rather than replacing it with stand-in text (no portal -> text -> portal flash). A row rebind
+	// never keeps it: the slot's content belongs to the previous row. A prewarm snapshot holding
+	// stand-in text ('fallback') takes precedence. A React 'text' cell keeps its renderer only while
+	// not focused or edited; a DOM renderer, or a focused/edited cell, keeps it only when its
+	// snapshot confirms live portal content, and is then repaired once scrolling settles.
+	const snapshotHoldsStandIn = snapshot?.contentMode === 'fallback';
+	const holdsOwnPortal = !snapshotHoldsStandIn && canFreezeExistingPortalForIdentity(deps, cellSlot, portalCellKey, isRowRebind);
+	const isPlainTextReactCell = !isDomRenderer && !isEditing && !isFocused;
+	if (holdsOwnPortal && (isPlainTextReactCell || (isPortalSnapshotContent(snapshot) && snapshot.contentKind === 'portal-live'))) {
 		const { globalChanged, rowChanged } = hasMountedDataVersionDrifted(cellSlot, {
 			rowVersion: input.rowVersion,
 			globalVersion: ctx.globalVersion,
 		});
-		const hasSnapshotCoverageForDecorations = !ctx.hasInsightDecorations || !!snapshot;
-		const shouldDirtyFrozen =
-			globalChanged ||
-			rowChanged ||
-			!hasSnapshotCoverageForDecorations ||
-			(ctx.hasDeferredCellStyleRules &&
-				(!snapshot || ctx.styleChangedDuringScroll || ctx.selectionChangedDuringScroll || ctx.loadingChangedDuringScroll));
+		const decorationsUncovered = ctx.hasInsightDecorations && !snapshot;
+		const deferredStylesStale =
+			ctx.hasDeferredCellStyleRules &&
+			(!snapshot || ctx.styleChangedDuringScroll || ctx.selectionChangedDuringScroll || ctx.loadingChangedDuringScroll);
 		return {
 			kind: 'frozen-portal',
 			className: cellClassName,
 			portalCellKey,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
-			markDirty: shouldDirtyFrozen,
+			markDirty: globalChanged || rowChanged || decorationsUncovered || deferredStylesStale || isFocused || isEditing,
 			keepVersionFresh: false,
 			recordVersionsFrom: snapshot,
 		};
 	}
 
 	// The prewarm snapshot already holds this cell's stand-in text: replay it as plain text.
-	if (!isDomRenderer && !isEditing && !isFocused && snapshotDemandsImpostor) {
+	if (!isDomRenderer && !isEditing && !isFocused && snapshotHoldsStandIn) {
 		return {
 			kind: 'primitive',
 			className: cellClassName,
@@ -546,39 +539,6 @@ export function resolveScrollCellPresentation<TRowData>(
 			title: snapshot.title || null,
 			validationError: snapshot.validationError,
 			recordVersionsFrom: snapshot,
-		};
-	}
-
-	// A row rebind never freezes: the slot's mounted portal content belongs to the previous row
-	// (portal keys are per cell instance, not per row), so it must not stay visible for the new one.
-	const canFreezePortal =
-		!isRowRebind &&
-		isPortalSnapshotContent(snapshot) &&
-		cellSlot.lastPortalKey === portalCellKey &&
-		snapshot.contentKind === 'portal-live' &&
-		hasAuthoritativePortalHostContent(deps, cellSlot, portalCellKey);
-
-	if (canFreezePortal) {
-		const { globalChanged, rowChanged } = hasMountedDataVersionDrifted(cellSlot, {
-			rowVersion: input.rowVersion,
-			globalVersion: ctx.globalVersion,
-		});
-		const hasSnapshotCoverageForDecorations = !ctx.hasInsightDecorations || !!snapshot;
-		const shouldDirtyFrozenPortal =
-			isFocused ||
-			isEditing ||
-			!hasSnapshotCoverageForDecorations ||
-			(ctx.hasDeferredCellStyleRules &&
-				(!snapshot || ctx.styleChangedDuringScroll || ctx.selectionChangedDuringScroll || ctx.loadingChangedDuringScroll));
-		return {
-			kind: 'frozen-portal',
-			className: cellClassName,
-			portalCellKey,
-			markDirty: globalChanged || rowChanged || shouldDirtyFrozenPortal,
-			keepVersionFresh: false,
-			recordVersionsFrom: snapshot,
-			title: snapshot?.title || null,
-			validationError: snapshot?.validationError,
 		};
 	}
 
