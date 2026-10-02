@@ -256,6 +256,17 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			endDomUpdate: () => {
 				this.deps.stateHost.liveFrameBudget?.endDomUpdate();
 			},
+			primeDisplayValueInFrame: (rowId: string, colField: string) => {
+				const budget = this.deps.stateHost.liveFrameBudget;
+				if (budget && !budget.beginGetterPrime()) return undefined;
+				try {
+					return this.deps.engine.data.primeDisplayValue(rowId, colField);
+				} catch {
+					return undefined;
+				} finally {
+					budget?.endGetterPrime();
+				}
+			},
 			incrementDomUpdatesDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) {
 					this.deps.stateHost.renderStats.domUpdatesDuringScroll = (this.deps.stateHost.renderStats.domUpdatesDuringScroll || 0) + 1;

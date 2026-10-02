@@ -137,6 +137,8 @@ export interface RowCellBinderDeps<TRowData = unknown> {
 	tryConsumeLiveBudget?: (kind: 'mount' | 'update') => boolean;
 	/** Admits one in-frame DOM renderer update ('update' presentation) against the frame's DOM-work budget. */
 	tryConsumeDomUpdateBudget?: () => boolean;
+	/** Computes (and caches) a getter/formula cell's display text within the frame's budget; undefined when over it. */
+	primeDisplayValueInFrame?: (rowId: string, colField: string) => string | undefined;
 	/** Ends the admitted update, charging its duration to the frame's DOM-work budget. */
 	endDomUpdate?: () => void;
 	/** A DOM renderer cell updated in place during scroll. */
@@ -416,6 +418,8 @@ function createScrollPresentationDeps<TRowData>(deps: RowCellBinderDeps<TRowData
 		getRowHeight: (idx) => deps.engine.geometry?.rowHeights?.[idx],
 		getColWidth: (idx) => adapter.ctx?.plan?.colWidths?.[idx],
 		getCheapDisplayValue: (rowId, colField) => deps.engine.getCheapDisplayValue?.(rowId, colField),
+		primeDisplayValue: (rowId, colField) => deps.primeDisplayValueInFrame?.(rowId, colField),
+		getCachedCellValue: (rowId, colField) => deps.engine.data?.getCachedCellValue?.(rowId, colField),
 		hasFormula: (rowId, colField) => deps.engine.hasFormula?.(rowId, colField) ?? true,
 		getFrozenHtmlSnapshot: (rowId, columnInstanceId, expected, rowHeight, colWidth) => {
 			const store = deps.engine.htmlScrollSnapshots as

@@ -261,6 +261,41 @@ describe('scroll presentation fixes', () => {
 		expect(getter.formattedValue).toBe('...');
 	});
 
+	it('a visible getter cell shows its computed text during scroll, within the budget, never for buffered cells', () => {
+		const prime = vi.fn(() => '0.5123');
+		const reactGetterCol = { field: 'delta', valueGetter: () => 0.5123, cellRenderer: () => null } as any;
+		const ctx = { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: true, mode: 'custom' }] } } as any;
+		const deps = makeScrollDeps({ hasFormula: () => false, getCheapDisplayValue: () => '', primeDisplayValue: prime });
+		const visible = resolveScrollCellPresentation(deps, scrollInput({ col: reactGetterCol, ctx }));
+		if (visible.kind !== 'shell') throw new Error(`expected shell, got ${visible.kind}`);
+		expect(visible.formattedValue).toBe('0.5123');
+		expect(visible.contentMode).toBe('fallback');
+
+		prime.mockClear();
+		resolveScrollCellPresentation(deps, scrollInput({ col: reactGetterCol, ctx, isInVisibleContent: false }));
+		expect(prime).not.toHaveBeenCalled();
+
+		// Over budget (prime declines): the old empty stand-in, not a stale value.
+		const over = resolveScrollCellPresentation(
+			makeScrollDeps({ hasFormula: () => false, getCheapDisplayValue: () => '', primeDisplayValue: () => undefined }),
+			scrollInput({ col: reactGetterCol, ctx })
+		);
+		if (over.kind !== 'shell') throw new Error(`expected shell, got ${over.kind}`);
+		expect(over.formattedValue).toBe('');
+
+		// A plain getter text column formats the computed value like the full bind.
+		const textCol = { field: 'delta', valueGetter: () => 0.5, valueFormatter: ({ value }: { value: unknown }) => `Δ${value}` } as any;
+		const text = resolveScrollCellPresentation(
+			makeScrollDeps({ hasFormula: () => false, primeDisplayValue: () => '0.5', getCachedCellValue: () => 0.5 }),
+			scrollInput({
+				col: textCol,
+				ctx: { ...scrollInput().ctx, plan: { columnPlans: [{ isCustom: false, mode: 'primitive-formatted' }] } } as any,
+			})
+		);
+		if (text.kind !== 'primitive') throw new Error(`expected primitive, got ${text.kind}`);
+		expect(text.formattedValue).toBe('Δ0.5');
+	});
+
 	it('a plain primitive column shows its field value (not "...") during scroll with no snapshot', () => {
 		const presentation = resolveScrollCellPresentation(makeScrollDeps({ hasFormula: () => false }), scrollInput());
 		if (presentation.kind !== 'primitive') throw new Error('unreachable');

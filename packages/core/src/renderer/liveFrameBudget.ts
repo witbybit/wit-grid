@@ -18,6 +18,10 @@ export class LiveFrameBudget {
 	private domUpdateMsPerFrame = 4;
 	private domUpdateSpentMs = 0;
 	private domUpdateStartedAt = -1;
+	/** Time spent this frame computing valueGetters for stand-in text (see beginGetterPrime). */
+	private getterPrimeSpentMs = 0;
+	private getterPrimeStartedAt = -1;
+	private readonly getterPrimeMsPerFrame = 2;
 	private readonly now: () => number;
 
 	constructor(now: () => number = () => (typeof performance !== 'undefined' ? performance.now() : Date.now())) {
@@ -37,6 +41,25 @@ export class LiveFrameBudget {
 		this.updatesThisFrame = 0;
 		this.domUpdateSpentMs = 0;
 		this.domUpdateStartedAt = -1;
+		this.getterPrimeSpentMs = 0;
+		this.getterPrimeStartedAt = -1;
+	}
+
+	/**
+	 * Admits computing one cell's valueGetter during a scroll frame, so a visible stand-in shows the
+	 * cell's text instead of a blank; pair with endGetterPrime(). Bounded per frame like DOM updates:
+	 * user getters can be arbitrarily expensive, and the rest wait for the full bind as before.
+	 */
+	public beginGetterPrime(): boolean {
+		if (this.getterPrimeSpentMs >= this.getterPrimeMsPerFrame) return false;
+		this.getterPrimeStartedAt = this.now();
+		return true;
+	}
+
+	public endGetterPrime(): void {
+		if (this.getterPrimeStartedAt < 0) return;
+		this.getterPrimeSpentMs += this.now() - this.getterPrimeStartedAt;
+		this.getterPrimeStartedAt = -1;
 	}
 
 	/**

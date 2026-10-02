@@ -4403,12 +4403,13 @@ describe('RenderEngine', () => {
 		expect(callbacks.length).toBeGreaterThanOrEqual(1);
 		callbacks[0](0);
 
-		// Inspect the cells rendered at the scrolled position - during scroll it shows loading placeholder
+		// Inspect the cells rendered at the scrolled position - a visible getter cell is computed within
+		// the frame's budget during scroll, so it already shows its value instead of a '...' placeholder.
 		const row10 = container.querySelector('[data-row-id="row:row-10"]') as HTMLDivElement;
 		expect(row10).not.toBeNull();
 		const computedCell = row10.querySelector('[data-col-field="computed"]') as HTMLDivElement;
 		expect(computedCell).not.toBeNull();
-		expect(computedCell.textContent).toBe('...');
+		expect(computedCell.textContent).toBe('Row 10!');
 
 		// Flush scroll-end chain (4 RAF ticks → finishScrolling) and post-scroll decoration
 		let i = 1;
