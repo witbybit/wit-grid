@@ -1,6 +1,8 @@
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { PortalRendererHandle } from '../cellRendererHandle.js';
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
+import type { ControllerWorkToken } from '../controllers/CellCtrl.js';
+import type { CellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
 import {
 	applyCellAccessibilityState,
 	applyCellTitlesAndValidation,
@@ -55,6 +57,16 @@ function applyLiveMountEmergencyShell<TRowData>(input: DispatchCellPresentationI
 	cellSlot.lastMountedGlobalVersion = runtime.globalVersion;
 	recordDispatchWrite(input, didWrite);
 }
+type DomUpdateMount<TRowData> = Parameters<CellRendererLifecycle<TRowData>['updateLive']>[0]['mount'];
+const domUpdateTokenScratch: ControllerWorkToken = {
+	epoch: 0,
+	cellControllerKey: '' as ControllerWorkToken['cellControllerKey'],
+	rowId: '',
+	columnInstanceId: '' as ControllerWorkToken['columnInstanceId'],
+	freshness: undefined as unknown as ControllerWorkToken['freshness'],
+};
+const domUpdateMountScratch = {} as DomUpdateMount<unknown>;
+
 /**
  * `dom-update`: a DOM renderer cell updated in place during scroll. The frame's DOM-update budget
  * admits it; the renderer's update() (or, for a slot's first use, mount()) runs now, and the cell is
@@ -94,30 +106,30 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 	deps.incrementDomUpdatesDuringScroll?.();
 	const lifecycle = getCellRendererLifecycle(deps);
 	const host = deps.ensureCellPortalHost(cellSlot.element);
-	const token = {
-		epoch: runtime.globalVersion,
-		cellControllerKey: cellCtrl.key,
-		rowId: cellCtrl.rowId,
-		columnInstanceId: cellCtrl.columnInstanceId,
-		freshness: cellCtrl.freshness!,
-	};
-	const mount = {
-		cellKey: presentation.portalKey!,
-		value: mountRuntime.value,
-		node: mountRuntime.node,
-		col: mountRuntime.col,
-		rowIndex: geometry.rowIndex,
-		colIndex: geometry.colIndex,
-		rowSlotId: runtime.rowSlotId,
-		slotGeneration: runtime.slotGeneration,
-		cellRowBindingGeneration: cellSlot.rowBindingGeneration,
-		cellInstanceId: cellSlot.cellInstanceId,
-		portalHostId: cellSlot.portalHostId,
-		isEditing: false,
-		isLoading: mountRuntime.isLoading,
-		isFocused: cellCtrl.visualState.focused,
-		isSelected: mountRuntime.isSelected,
-	};
+	// Scratch, refilled per cell: the lifecycle checks the token and copies the mount fields before
+	// any renderer code runs, and keeps neither, so one pair serves every DOM update.
+	const token = domUpdateTokenScratch;
+	token.epoch = runtime.globalVersion;
+	token.cellControllerKey = cellCtrl.key;
+	token.rowId = cellCtrl.rowId;
+	token.columnInstanceId = cellCtrl.columnInstanceId;
+	token.freshness = cellCtrl.freshness!;
+	const mount = domUpdateMountScratch as DomUpdateMount<TRowData>;
+	mount.cellKey = presentation.portalKey!;
+	mount.value = mountRuntime.value;
+	mount.node = mountRuntime.node;
+	mount.col = mountRuntime.col;
+	mount.rowIndex = geometry.rowIndex;
+	mount.colIndex = geometry.colIndex;
+	mount.rowSlotId = runtime.rowSlotId;
+	mount.slotGeneration = runtime.slotGeneration;
+	mount.cellRowBindingGeneration = cellSlot.rowBindingGeneration;
+	mount.cellInstanceId = cellSlot.cellInstanceId;
+	mount.portalHostId = cellSlot.portalHostId;
+	mount.isEditing = false;
+	mount.isLoading = mountRuntime.isLoading;
+	mount.isFocused = cellCtrl.visualState.focused;
+	mount.isSelected = mountRuntime.isSelected;
 	try {
 		if (deps.portalMountManager.isCellMounted(mount.cellKey)) lifecycle.updateLive({ cellCtrl, host, reason: 'scroll-live', token, mount });
 		else lifecycle.mountLive({ cellCtrl, host, reason: 'scroll-live', token, mount });
