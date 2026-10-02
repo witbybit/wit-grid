@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import type { ColumnDef, VisualRow, CellRendererPhase, RowRendererSpec } from '@eregister/wit-grid-core';
+import type { ColumnDef, VisualRow, RowRendererSpec } from '@eregister/wit-grid-core';
 import type {
 	PortalData,
 	RowPortalData,
@@ -7,8 +7,8 @@ import type {
 	CellPortalSnapshot,
 	RowMenuPortalSnapshot,
 	ImperativeUpdaterFn,
+	CellPortalProps,
 	CellPortalPhysicalIdentity,
-	PortalRowNodeLike,
 } from './gridPortalTypes.js';
 
 export type ConcretePortalStore<TRowData> = ReturnType<typeof createPortalStore<TRowData>>;
@@ -222,56 +222,32 @@ export function createPortalStore<TRowData = unknown>() {
 		unregisterImperativeUpdater(cellKey: string) {
 			imperativeUpdaters.delete(cellKey);
 		},
-		tryImperativeUpdate(
-			cellKey: string,
-			value: unknown,
-			node: PortalRowNodeLike<TRowData>,
-			col: ColumnDef<TRowData>,
-			isEditing: boolean,
-			isLoading: boolean,
-			phase: CellRendererPhase | undefined,
-			isScrolling: boolean | undefined,
-			isFocused: boolean | undefined,
-			isSelected: boolean | undefined,
-			physicalIdentity: CellPortalPhysicalIdentity
-		): boolean {
+		tryImperativeUpdate(cellKey: string, props: CellPortalProps<TRowData>): boolean {
 			const fn = imperativeUpdaters.get(cellKey);
 			if (!fn) return false;
 			const existing = portals.get(cellKey);
-			if (!isSamePhysicalIdentity(existing?.physicalIdentity, physicalIdentity) || !existing) {
+			if (!isSamePhysicalIdentity(existing?.physicalIdentity, props.physicalIdentity) || !existing) {
 				return false;
 			}
-			if (!fn(value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected)) return false;
+			if (!fn(props)) return false;
 			// Write the payload back in place (no notification, so no React render). The wrapper holds
 			// this same object in state, so any later React render of it — and the mountCell no-op
 			// check — sees the props the renderer is actually showing instead of the mount-time ones.
-			existing.value = value;
-			existing.node = node;
-			existing.col = col;
-			existing.isEditing = isEditing;
-			existing.isLoading = isLoading;
-			existing.phase = phase;
-			existing.isScrolling = isScrolling;
-			existing.isFocused = isFocused;
-			existing.isSelected = isSelected;
+			existing.value = props.value;
+			existing.node = props.node;
+			existing.col = props.col;
+			existing.isEditing = props.isEditing;
+			existing.isLoading = props.isLoading;
+			existing.phase = props.phase;
+			existing.isScrolling = props.isScrolling;
+			existing.isFocused = props.isFocused;
+			existing.isSelected = props.isSelected;
 			return true;
 		},
 
 		// ── Cell mounts ──────────────────────────────────────────────────────────
-		mountCell(
-			cellKey: string,
-			container: HTMLElement,
-			value: unknown,
-			node: PortalRowNodeLike<TRowData>,
-			col: ColumnDef<TRowData>,
-			isEditing: boolean,
-			isLoading: boolean,
-			phase: CellRendererPhase | undefined,
-			isScrolling: boolean | undefined,
-			isFocused: boolean | undefined,
-			isSelected: boolean | undefined,
-			physicalIdentity: CellPortalPhysicalIdentity
-		) {
+		mountCell(cellKey: string, container: HTMLElement, props: CellPortalProps<TRowData>) {
+			const { value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected, physicalIdentity } = props;
 			const existing = portals.get(cellKey);
 
 			// Full equality check — skip everything when nothing changed.

@@ -130,50 +130,27 @@ export function GridView<TRowData = unknown>({
 			},
 			cellContent: {
 				mountCellContent: (mount) => {
-					if (hasImperativeRendererCapability(mount.col) && !mount.isEditing) {
-						if (
-							portalStore.tryImperativeUpdate(
-								mount.cellKey,
-								mount.value,
-								mount.node,
-								mount.col,
-								mount.isEditing,
-								mount.isLoading,
-								mount.phase,
-								mount.isScrolling,
-								mount.isFocused,
-								mount.isSelected,
-								{
-									cellInstanceId: mount.cellInstanceId ?? '',
-									rowSlotId: mount.rowSlotId,
-									slotGeneration: mount.slotGeneration,
-									rowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
-									portalHostId: mount.portalHostId ?? '',
-								}
-							)
-						)
-							return;
-					}
-					portalStore.mountCell(
-						mount.cellKey,
-						mount.container,
-						mount.value,
-						mount.node,
-						mount.col,
-						mount.isEditing,
-						mount.isLoading,
-						mount.phase,
-						mount.isScrolling,
-						mount.isFocused,
-						mount.isSelected,
-						{
+					const props = {
+						value: mount.value,
+						node: mount.node,
+						col: mount.col,
+						isEditing: mount.isEditing,
+						isLoading: mount.isLoading,
+						phase: mount.phase,
+						isScrolling: mount.isScrolling,
+						isFocused: mount.isFocused,
+						isSelected: mount.isSelected,
+						physicalIdentity: {
 							cellInstanceId: mount.cellInstanceId ?? '',
 							rowSlotId: mount.rowSlotId,
 							slotGeneration: mount.slotGeneration,
 							rowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
 							portalHostId: mount.portalHostId ?? '',
-						}
-					);
+						},
+					};
+					if (hasImperativeRendererCapability(mount.col) && !mount.isEditing && portalStore.tryImperativeUpdate(mount.cellKey, props))
+						return;
+					portalStore.mountCell(mount.cellKey, mount.container, props);
 				},
 				unmountCellContent: (unmount) => {
 					portalStore.unmountCell(unmount.cellKey, unmount.container, unmount.flushSync ?? false, {

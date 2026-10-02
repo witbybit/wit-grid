@@ -27,20 +27,24 @@ export interface PortalCellProps<TRowData = unknown> {
 	isSelected?: boolean;
 }
 
-export interface PortalData<TRowData = unknown> {
-	cellKey: string;
-	container: HTMLElement;
+/** Everything a cell renderer is shown; passed whole to the store's mount/update entry points. */
+export interface CellPortalProps<TRowData = unknown> {
 	value: unknown;
 	node: PortalRowNodeLike<TRowData>;
 	col: ColumnDef<TRowData>;
 	isEditing: boolean;
 	isLoading: boolean;
-	phase?: CellRendererPhase;
-	isScrolling?: boolean;
-	isFocused?: boolean;
-	isSelected?: boolean;
+	phase: CellRendererPhase | undefined;
+	isScrolling: boolean | undefined;
+	isFocused: boolean | undefined;
+	isSelected: boolean | undefined;
 	/** Physical ownership identity for pooled cell portals. */
 	physicalIdentity: CellPortalPhysicalIdentity;
+}
+
+export interface PortalData<TRowData = unknown> extends CellPortalProps<TRowData> {
+	cellKey: string;
+	container: HTMLElement;
 }
 
 /** Snapshot used by the optimised CellPortalPool — rebuilt only on structural changes (add/remove). */
@@ -70,17 +74,7 @@ export interface MenuPortalData<TRowData = unknown> {
 }
 
 // Imperative updater fn — registered by ImperativePortalCellWrapper, called from the grid view layer
-export type ImperativeUpdaterFn<TRowData> = (
-	value: unknown,
-	node: PortalRowNodeLike<TRowData>,
-	col: ColumnDef<TRowData>,
-	isEditing: boolean,
-	isLoading: boolean,
-	phase: CellRendererPhase | undefined,
-	isScrolling: boolean | undefined,
-	isFocused: boolean | undefined,
-	isSelected: boolean | undefined
-) => boolean;
+export type ImperativeUpdaterFn<TRowData> = (props: CellPortalProps<TRowData>) => boolean;
 
 export interface PortalStore<TRowData = unknown> {
 	getDebugStats?(): {
@@ -102,33 +96,8 @@ export interface PortalStore<TRowData = unknown> {
 	// Imperative update protocol
 	registerImperativeUpdater?(cellKey: string, fn: ImperativeUpdaterFn<TRowData>): void;
 	unregisterImperativeUpdater?(cellKey: string): void;
-	tryImperativeUpdate?(
-		cellKey: string,
-		value: unknown,
-		node: PortalRowNodeLike<TRowData>,
-		col: ColumnDef<TRowData>,
-		isEditing: boolean,
-		isLoading: boolean,
-		phase: CellRendererPhase | undefined,
-		isScrolling: boolean | undefined,
-		isFocused: boolean | undefined,
-		isSelected: boolean | undefined,
-		physicalIdentity: CellPortalPhysicalIdentity
-	): boolean;
-	mountCell(
-		cellKey: string,
-		container: HTMLElement,
-		value: unknown,
-		node: PortalRowNodeLike<TRowData>,
-		col: ColumnDef<TRowData>,
-		isEditing: boolean,
-		isLoading: boolean,
-		phase: CellRendererPhase | undefined,
-		isScrolling: boolean | undefined,
-		isFocused: boolean | undefined,
-		isSelected: boolean | undefined,
-		physicalIdentity: CellPortalPhysicalIdentity
-	): void;
+	tryImperativeUpdate?(cellKey: string, props: CellPortalProps<TRowData>): boolean;
+	mountCell(cellKey: string, container: HTMLElement, props: CellPortalProps<TRowData>): void;
 	unmountCell(cellKey: string, container?: HTMLElement, sync?: boolean, physicalIdentity?: CellPortalPhysicalIdentity): void;
 }
 
