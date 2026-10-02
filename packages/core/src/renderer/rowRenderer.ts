@@ -9,7 +9,7 @@ import { SelectionPaintManager } from './selectionPaintManager.js';
 import { type ColumnDef, type GridCellClassParams } from '../columnDef.js';
 import type { ViewportRenderer } from './viewportRenderer.js';
 import type { ScrollRenderContext } from './scrollRenderContext.js';
-import { RowSlot } from './rowSlot.js';
+import type { RowSlot } from './rowSlot.js';
 import { RowSlotPool } from './rowSlotPool.js';
 import { RowRendererRuntimeBridge } from './rowRendererRuntime.js';
 import { compileStyleRules } from '../styling/styleRules.js';

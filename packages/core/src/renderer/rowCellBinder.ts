@@ -5,7 +5,7 @@ import { createEditRendererKey, createCellInstanceRendererKey } from './identity
 import { reportRendererFault } from './rendererFaults.js';
 import type { CellRendererPhase, ColumnDef, ColumnInstanceId, GridCellClassParams, InternalColumnDef } from '../columnDef.js';
 import { getColumnInstanceIdentity, getValueByPath } from '../columnDef.js';
-import type { CanonicalGridCellPointer, GridCellPointer } from '../api/GridApi.js';
+
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
@@ -29,7 +29,7 @@ import {
 	mergeCellSnapshotTitle,
 	type CellDisplaySnapshot,
 } from './cellDisplaySnapshot.js';
-import type { VisualFreshness } from './visualFreshness.js';
+
 import type { ScrollCellPresentationDeps, ScrollCellPresentationInput } from './scrollCellPresentation.js';
 import {
 	dispatchCellPresentation,
@@ -37,7 +37,7 @@ import {
 	type CellBindRuntime,
 	type DispatchCellPresentationInput,
 } from './binders/cellPresentationDispatcher.js';
-import { buildCellPinClass, applyCellTitlesAndValidation, getScrollMountValue } from './binders/binderShared.js';
+import { buildCellPinClass, getScrollMountValue } from './binders/binderShared.js';
 import { getOrCreateCellCtrl, createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
 import type { CellCtrl } from './controllers/CellCtrl.js';
 import { CellCtrlStore } from './controllers/CellCtrlStore.js';

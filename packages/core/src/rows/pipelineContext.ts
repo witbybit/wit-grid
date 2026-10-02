@@ -1,6 +1,6 @@
 import { compilePathGetter, type ColumnDef } from '../columnDef.js';
 import { createGridRowDataRef } from '../publicRowRef.js';
-import { RowNode } from '../rowNode.js';
+import type { RowNode } from '../rowNode.js';
 import type { GroupDef } from './hierarchyConfig.js';
 import type { RowPipelineContext } from './stages/types.js';
 

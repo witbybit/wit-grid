@@ -1,6 +1,6 @@
 import type { InternalGridState, GridStateUpdater } from '../state/GridState.js';
 import type { GridEventPayloadMap } from '../api/GridEvents.js';
-import { GridEventName } from '../api/GridEvents.js';
+import type { GridEventName } from '../api/GridEvents.js';
 import type { StateManager } from '../state/StateManager.js';
 import { normalizeInvalidationPlan, type InvalidationManager, type GridInvalidation } from '../renderer/invalidationManager.js';
 import type { EventBus } from '../events/EventBus.js';

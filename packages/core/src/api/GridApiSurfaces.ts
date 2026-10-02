@@ -31,10 +31,8 @@ import type { BuiltInThemeName, ThemeTokens } from '../renderer/themes.js';
 import type { GridCapabilityAction, GridCapabilityParams, GridCapabilityResult } from '../capabilities/capabilityTypes.js';
 import type { GridIntegrityApi } from '../features/dataIntegrity/integrityTypes.js';
 import type {
-	ActiveEditState,
 	AutoSizeAllColumnsOptions,
 	AutoSizeColumnOptions,
-	GridCellWrite,
 	CellState,
 	CellSubscription,
 	GridCellAccess,
@@ -52,13 +50,12 @@ import type {
 	GridTransaction,
 	GridTransactionOptions,
 	GridTransactionResult,
-	RowDataTransaction,
 	RowSelectionChangeResult,
 	RowSelectionGesture,
 	SelectAllRowsOptions,
 	SelectRowsOptions,
 } from './GridApi.js';
-import type { RowNodeTransaction } from '../rowTransactions.js';
+
 import type { RowModel } from '../rowModel.js';
 
 export interface GridDataApi<TRowData = unknown> {

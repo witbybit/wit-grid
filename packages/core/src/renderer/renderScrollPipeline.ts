@@ -19,19 +19,14 @@ import type { ScrollRenderContext } from './scrollRenderContext.js';
 import type { HeaderRenderer } from './headerRenderer.js';
 import type { FloatingFilterRenderer } from './floatingFilterRenderer.js';
 import type { StickyGroupRenderer } from './stickyGroupRenderer.js';
-import { isVisualFresh } from './visualFreshness.js';
+
 import type { ViewportRenderer } from './viewportRenderer.js';
 import type { LayoutTransitionController } from './layoutTransitionController.js';
-import { compileStyleRules, evaluateCellStyleRules } from '../styling/styleRules.js';
+import { compileStyleRules } from '../styling/styleRules.js';
 import type { RenderRuntimeState } from './renderRuntimeState.js';
-import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
-import { collectCellDecorationSnapshotMetadata, createCellDisplaySnapshot, mergeCellSnapshotTitle } from './cellDisplaySnapshot.js';
-import type { CanonicalGridCellPointer, GridCellRangeBounds } from '../api/GridApi.js';
-import { getColumnInstanceIdentity, type ColumnDef, type ColumnInstanceId } from '../columnDef.js';
-import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
+
 import { readInteractionState } from '../interaction/interactionState.js';
 import { asCapableRowModel } from '../rowModel.js';
-import type { RowNode } from '../rowNode.js';
 
 import { ApproachBandPrewarmer, type ApproachBandPrewarmerOptions } from './approachBandPrewarm.js';
 import type { PaintViewportLayout } from './renderPaintPipeline.js';

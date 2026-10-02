@@ -13,7 +13,7 @@ import {
 } from '../rowModel.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
-import type { GridIntegrityState, InternalGridState, GridStateUpdater } from '../state/GridState.js';
+import type { InternalGridState, GridStateUpdater } from '../state/GridState.js';
 import type {
 	GridCellConflict,
 	GridCellDiff,
@@ -21,7 +21,6 @@ import type {
 	GridDiffResult,
 	GridIntegrityIssue,
 	GridIntegrityIssueSource,
-	GridIntegritySummary,
 	GridTransactionStreamState,
 	ServerIntegrityReport,
 } from '../state/integrityStateTypes.js';

@@ -1,5 +1,6 @@
 import type { GridWriteResult } from '../api/GridApi.js';
-import { GridEventName, type GridEventPayloadMap } from '../api/GridEvents.js';
+import type { GridEventName } from '../api/GridEvents.js';
+import { type GridEventPayloadMap } from '../api/GridEvents.js';
 import { createGridRowNodeFacade, type GridRowNode } from '../publicRowNode.js';
 import type { RowNode } from '../rowNode.js';
 import type { InternalRowNodeTransaction, RowNodeTransaction } from '../rowTransactions.js';

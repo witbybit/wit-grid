@@ -1,10 +1,10 @@
 import { HeaderMenuController } from './headerMenuController.js';
 import { ScrollEngine } from './scrollEngine.js';
 import { ColumnInteractionController } from './columnInteractionController.js';
-import { FillDragController, type OverlayBox } from './fillDragController.js';
-import { createCellKey } from '../ids.js';
+import { FillDragController } from './fillDragController.js';
+
 import { GeometryController } from './geometryController.js';
-import type { InvalidationFrame } from './invalidationManager.js';
+
 import type {
 	GridCellContentMount,
 	GridCellContentUnmount,

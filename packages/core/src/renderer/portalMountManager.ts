@@ -17,7 +17,6 @@ import { reportRendererFault } from './rendererFaults.js';
 import {
 	createEditRendererKey,
 	createSlotRendererKey,
-	createIndexRendererKey,
 	createDomSlotRendererKey,
 	createDomIndexRendererKey,
 	createCellInstanceRendererKey,
