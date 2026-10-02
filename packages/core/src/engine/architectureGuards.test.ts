@@ -1966,7 +1966,8 @@ describe('Architecture guardrails', () => {
 
 	it('store floating-filter toggle no longer mutates state directly (Plan 103)', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'store.ts'), 'utf-8');
-		expect(content).toContain('this.engine.setShowFloatingFilters(enabled);');
+		const forwards = readFileSync(resolve(CORE_ROOT, 'src', 'internal', 'engineForwards.ts'), 'utf-8');
+		expect(forwards).toContain('setShowFloatingFilters');
 		expect(content).not.toContain('this.engine.stateManager.setState({ showFloatingFilters: enabled })');
 	});
 
@@ -1996,8 +1997,9 @@ describe('Architecture guardrails', () => {
 	it('store UI compatibility helpers route through GridEngine intent methods (Plan 103)', () => {
 		const storeContent = readFileSync(resolve(CORE_ROOT, 'src', 'store.ts'), 'utf-8');
 		const hostFacadeContent = readFileSync(resolve(CORE_ROOT, 'src', 'store', 'GridStoreHostFacade.ts'), 'utf-8');
-		expect(storeContent).toContain('this.engine.setRowOverscanPx(px);');
-		expect(storeContent).toContain('this.engine.setSidebarOpenPanel(panelId);');
+		const forwardsContent = readFileSync(resolve(CORE_ROOT, 'src', 'internal', 'engineForwards.ts'), 'utf-8');
+		expect(forwardsContent).toContain('setRowOverscanPx');
+		expect(forwardsContent).toContain("openPanel: 'setSidebarOpenPanel'");
 		expect(storeContent).toContain('this.engine.setSidebarOpenPanel(null);');
 		expect(storeContent).toContain('this.engine.setChartOpen(true);');
 		expect(storeContent).toContain('this.engine.setChartOpen(false);');
