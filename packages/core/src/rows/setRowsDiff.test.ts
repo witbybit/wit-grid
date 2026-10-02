@@ -78,4 +78,32 @@ describe('setRows diffs against the current rows', () => {
 		expect(grid.store.engine.getRowModel()?.getVisualRow(0)).toMatchObject({ kind: 'data', node: { id: 'r10' } });
 		grid.destroy();
 	});
+
+	it('updates the aggregates of a grouped grid from an edited copy', () => {
+		const rows: Row[] = [
+			{ id: 'a', name: 'X', amount: 1 },
+			{ id: 'b', name: 'X', amount: 2 },
+			{ id: 'c', name: 'Y', amount: 3 },
+		];
+		const store = new GridStore<Row>({
+			columns: [{ field: 'name' }, { field: 'amount' }],
+			getRowId: (row) => row.id,
+			grouping: { by: ['name'] },
+			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+		});
+		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
+		const groupX = () => {
+			const model = store.engine.getRowModel()!;
+			for (let i = 0; i < model.getVisualRowCount(); i++) {
+				const row = model.getVisualRow(i);
+				if (row?.kind === 'group' && row.id === 'group:name=X') return row.aggregates?.amount;
+			}
+			return undefined;
+		};
+		expect(groupX()).toBe(3);
+		store.setRows(rows.map((r) => (r.id === 'b' ? { ...r, amount: 10 } : r)));
+		expect(groupX()).toBe(11);
+		controller.dispose();
+		store.destroy();
+	});
 });
