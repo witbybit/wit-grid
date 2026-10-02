@@ -3718,7 +3718,9 @@ describe('RenderEngine', () => {
 			expect(decoratedCell.getAttribute('aria-invalid')).toBe('true');
 			expect(decoratedCell.getAttribute('aria-readonly')).toBe('true');
 			expect(decoratedCell.title).toContain('Tip:row-10');
-			expect(decoratedCell.title).toContain('Needs review');
+			// The validation message is shown by the grid's validation tooltip (data-validation-error),
+			// not repeated in the native title.
+			expect(decoratedCell.title).not.toContain('Needs review');
 			const stats = renderer.getRenderStats();
 			expect(stats.prewarmedCellSnapshots).toBeGreaterThan(0);
 			expect(stats.prewarmedDisplayValues).toBe(0);

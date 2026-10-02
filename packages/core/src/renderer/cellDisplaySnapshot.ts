@@ -48,8 +48,13 @@ export function collectCellDecorationSnapshotMetadata(decorations: readonly Grid
 	let validationError: string | undefined;
 	for (const decoration of decorations) {
 		if (decoration.className) classNameSuffix += ` ${decoration.className}`;
+		if (decoration.kind === 'validationError') {
+			// Shown by the grid's validation tooltip (data-validation-error); a native title as well
+			// would pop a second, unstyled tooltip over it.
+			if (decoration.title) validationError = decoration.title;
+			continue;
+		}
 		if (decoration.title) insightTitle = insightTitle ? `${insightTitle}\n${decoration.title}` : decoration.title;
-		if (decoration.kind === 'validationError' && decoration.title) validationError = decoration.title;
 	}
 	return { classNameSuffix, insightTitle, validationError };
 }
