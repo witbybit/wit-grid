@@ -96,6 +96,10 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 				!cell.lastPortalKey &&
 				(cell.portalHostElement === null || cell.portalHostElement.childElementCount === 0);
 			releaseFn(cell);
+			// Content a renderer mounted into the cell (a custom hierarchy cell, an aggregate renderer)
+			// is released too: a recycled or dropped cell must not keep a renderer — and, for React,
+			// its whole tree in a detached host — alive.
+			cell.releaseContentMount();
 			if (cell.element.parentNode) cell.element.remove();
 			cells.delete(instanceId);
 			if (recyclable) slot.recycledCells.push(cell);
