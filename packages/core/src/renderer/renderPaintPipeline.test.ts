@@ -53,7 +53,7 @@ function makeDeps(
 		geometryController: { recomputeIfNeeded: vi.fn(), invalidateAll: vi.fn() } as any,
 		portalMountManager: { beginCellReleaseTransaction: vi.fn(), endCellReleaseTransaction: vi.fn() } as any,
 		layoutTransition: { beginAnimation: vi.fn(), captureSnapshot: vi.fn() } as any,
-		viewportRenderer: { syncViewportScrollFromDom: vi.fn(), scrollViewport: null } as any,
+		viewportRenderer: { syncViewportScrollFromDom: vi.fn(), scrollViewport: null, getLayoutPlan: vi.fn(() => ({ renderWindow: {} })) } as any,
 		rowRenderer: {
 			styleVersion: 0,
 			loadingVersion: 0,
@@ -64,7 +64,7 @@ function makeDeps(
 		headerRenderer: { repaintHeaders: vi.fn(), sync: vi.fn() } as any,
 		floatingFilterRenderer: { repaint: vi.fn() } as any,
 		overlayRenderer: { repaintOverlay: vi.fn(), sync: vi.fn() } as any,
-		stickyGroupRenderer: { sync: vi.fn() } as any,
+		stickyGroupRenderer: { sync: vi.fn(), refresh: vi.fn() } as any,
 		viewportLayout: {
 			syncLayoutPlan: vi.fn(() => ({ renderWindow: {} }) as any),
 			recycleViewport: vi.fn(),
@@ -216,6 +216,8 @@ describe('RenderPaintPipeline – dispatch', () => {
 		expect((deps.rowRenderer as any).repaintInvalidatedRows).toHaveBeenCalledTimes(1);
 		expect((deps.rowRenderer as any).repaintInvalidatedCells).toHaveBeenCalledTimes(1);
 		expect((deps.headerRenderer as any).sync).toHaveBeenCalledTimes(1);
+		// Sticky header copies repeat group rows, so row and cell repaints refresh them once.
+		expect((deps.stickyGroupRenderer as any).refresh).toHaveBeenCalledTimes(1);
 		expect(deps.renderStats.cellPaints).toBe(2);
 		expect(deps.renderStats.rowPaints).toBe(1);
 	});

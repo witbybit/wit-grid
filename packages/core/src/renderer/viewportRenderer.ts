@@ -43,8 +43,6 @@ export class ViewportRenderer<TRowData = unknown> {
 	public floatingFilterLeftLayer: HTMLDivElement | null = null;
 	public floatingFilterRightLayer: HTMLDivElement | null = null;
 
-	public stickyGroupLayer: HTMLDivElement | null = null;
-
 	// Overlay sits outside the scroll viewport so it covers the full grid without scrolling
 	public overlayLayer: HTMLDivElement | null = null;
 
@@ -148,7 +146,6 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.floatingFilterLayer = this.layers.get('floating-filter') ?? null;
 		this.floatingFilterLeftLayer = this.layers.get('floating-filter-left') ?? null;
 		this.floatingFilterRightLayer = this.layers.get('floating-filter-right') ?? null;
-		this.stickyGroupLayer = this.layers.get('sticky-groups') ?? null;
 		this.rowsContainer = this.layers.get('rows') ?? null;
 		this.pinnedTopLayer = this.layers.get('pinned-top') ?? null;
 		this.pinnedBottomLayer = this.layers.get('pinned-bottom') ?? null;
@@ -194,7 +191,6 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.floatingFilterLayer = null;
 		this.floatingFilterLeftLayer = null;
 		this.floatingFilterRightLayer = null;
-		this.stickyGroupLayer = null;
 		this.overlayLayer = null;
 		this.styleTag = null;
 		this.layers.clear();

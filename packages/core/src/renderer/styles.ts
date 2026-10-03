@@ -742,19 +742,39 @@ export const CORE_STYLES = `
     width: var(--og-content-width, 100%);
   }
 
-  .og-layer-sticky-groups {
-    position: sticky;
-    top: 0;
+  /*
+   * One section per expanded group, spanning the group's rows in content coordinates. Its first
+   * child is the group header copy, position: sticky: the browser sticks it below the top chrome,
+   * pushes it up where the section ends and releases it, with no JS positioning. Sections never
+   * take pointer events; only the header does.
+   */
+  .og-sticky-section {
+    position: absolute;
     left: 0;
-    height: 0;
-    z-index: 29;
+    pointer-events: none;
+  }
+
+  .og-row.og-sticky-group-row-host {
+    position: sticky;
+    left: auto;
+    right: auto;
+    pointer-events: auto;
+  }
+
+  /*
+   * The copy is only shown while stuck: otherwise the body's own group row is right beneath it
+   * (and animates with the body on expand/collapse; the copy would not). The stuck class flips a
+   * frame after the compositor, at the instant copy and body row coincide, so the swap is invisible.
+   */
+  .og-row.og-sticky-group-row-host:not(.og-row-group-stuck) {
+    visibility: hidden;
     pointer-events: none;
   }
 
   /*
    * Viewport-pinned rows: zero-height sticky bands, so the compositor keeps pinned rows stuck with
    * no per-frame JS. Painted above body rows (25, matching the pinned-row z-index) and below the
-   * sticky group layer (29) and header (30).
+   * header (30).
    */
   .og-layer-pinned-top,
   .og-layer-pinned-bottom {
@@ -771,7 +791,7 @@ export const CORE_STYLES = `
     bottom: 0;
   }
 
-  .og-sticky-group-row-host {
+  .og-row.og-sticky-group-row-host {
     pointer-events: auto;
   }
 
@@ -881,8 +901,8 @@ export const CORE_STYLES = `
   /*
    * The sticky copy looks exactly like the group row it stands for, so attaching, detaching and
    * being pushed change nothing visible: the same tint over an opaque grid background (the copy
-   * covers rows scrolling underneath). Only a soft shadow marks it as stuck; it fades in once
-   * when the copy appears and never changes while pushed.
+   * covers rows scrolling underneath). Only a soft shadow marks it as stuck (unless the grid turns
+   * it off); it fades in once when the header sticks and never changes while pushed.
    */
   .og-row-group-sticky {
     background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
@@ -890,7 +910,7 @@ export const CORE_STYLES = `
     font-weight: var(--og-group-row-font-weight);
   }
 
-  .og-row-group-sticky::after {
+  .og-row-group-stuck.og-row-group-sticky-shadow::after {
     content: '';
     position: absolute;
     left: 0;
@@ -902,7 +922,7 @@ export const CORE_STYLES = `
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .og-row-group-sticky::after {
+    .og-row-group-stuck.og-row-group-sticky-shadow::after {
       animation: og-sticky-shadow-in 140ms ease-out;
     }
   }

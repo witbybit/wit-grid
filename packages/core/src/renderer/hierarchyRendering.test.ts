@@ -198,51 +198,7 @@ describe('group and total rows as cell rows', () => {
 	});
 });
 
-describe('sticky group headers as cell rows', () => {
-	it('draws the nested sticky stack with the same cells as body group rows, no row portals', () => {
-		const rows: Sale[] = [];
-		for (const region of ['EMEA', 'APAC']) {
-			for (const product of ['Cloud', 'Hardware']) {
-				for (let i = 0; i < 20; i++) rows.push({ id: `${region}-${product}-${i}`, region, product, amount: 1 });
-			}
-		}
-		const grid = mountGrid(
-			{
-				grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true },
-				aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
-			},
-			rows,
-			300
-		);
-		const viewport = grid.container.querySelector<HTMLDivElement>('.og-scroll-viewport')!;
-		// Rows: 0 EMEA, 1 EMEA/Cloud, 2..21 its rows — scroll into the middle of EMEA/Cloud.
-		viewport.scrollTop = 400;
-		grid.store.engine.viewport.setScrollPosition(400, 0);
-		grid.renderer.fullPaint();
-
-		const layer = grid.container.querySelector<HTMLElement>('.og-layer-sticky-groups')!;
-		// Offset by top, not translated: the layer already follows the chrome in flow, so a translate
-		// would draw every header a chrome height too low until the layer sticks.
-		expect(layer.style.transform).toBe('');
-		expect(layer.style.top).toMatch(/^\d+(\.\d+)?px$/);
-		const labels = [...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent);
-		expect(labels).toEqual(['EMEA', 'Cloud']);
-		// A child pushed up by its next sibling must slide under its parent, not over it.
-		const [outer, inner] = [...layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')];
-		expect(Number(outer.style.zIndex)).toBeGreaterThan(Number(inner.style.zIndex));
-		const emea = layer.querySelector('[data-row-id="group:region=EMEA"]')!;
-		expect(emea.querySelector('.og-row-pin-left .og-cell-hierarchy')).not.toBeNull();
-		expect(emea.querySelector('[data-col-field="amount"]')?.textContent).toBe('$40');
-		expect(grid.mountRowContent.mock.calls.some(([mount]) => mount.rowKey.startsWith('sticky-group:'))).toBe(false);
-
-		// Scrolling on into EMEA/Hardware replaces the inner header, keeps the outer one.
-		viewport.scrollTop = 1300;
-		grid.store.engine.viewport.setScrollPosition(1300, 0);
-		grid.renderer.fullPaint();
-		expect([...layer.querySelectorAll('.og-hierarchy-label')].map((label) => label.textContent)).toEqual(['EMEA', 'Hardware']);
-		grid.destroy();
-	});
-
+describe('sticky group headers as native sticky sections', () => {
 	function stickyRows(): Sale[] {
 		const rows: Sale[] = [];
 		for (const region of ['EMEA', 'APAC']) {
@@ -253,7 +209,9 @@ describe('sticky group headers as cell rows', () => {
 		return rows;
 	}
 
-	function scrollTo(grid: ReturnType<typeof mountGrid>, top: number, left = 0) {
+	type Grid = ReturnType<typeof mountGrid>;
+
+	function scrollTo(grid: Grid, top: number, left = 0) {
 		const viewport = grid.container.querySelector<HTMLDivElement>('.og-scroll-viewport')!;
 		viewport.scrollTop = top;
 		viewport.scrollLeft = left;
@@ -261,50 +219,123 @@ describe('sticky group headers as cell rows', () => {
 		grid.renderer.fullPaint();
 	}
 
-	const visibleHosts = (layer: Element) =>
-		[...layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')].filter((host) => host.style.display !== 'none');
+	const sectionsOf = (grid: Grid) => [...grid.container.querySelectorAll<HTMLElement>('.og-rows-container > .og-sticky-section')];
+	const headerOf = (section: HTMLElement) => section.firstElementChild as HTMLElement;
+	const headersOf = (grid: Grid) => sectionsOf(grid).map(headerOf);
+	const headerFor = (grid: Grid, rowId: string) => headersOf(grid).find((header) => header.dataset.rowId === rowId)!;
+	const stuckLabels = (grid: Grid) =>
+		headersOf(grid)
+			.filter((header) => header.classList.contains('og-row-group-stuck'))
+			.map((header) => header.querySelector('.og-hierarchy-label')?.textContent);
 
-	it('reuses the host element per stack depth when another group becomes stuck', () => {
-		const grid = mountGrid({ grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
+	const stickyGrouping = (stickyHeaders: boolean | { levels?: number; shadow?: boolean } = true) => ({
+		grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders },
+		aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' as const }] },
+	});
+
+	it('draws a section per group with a native sticky header, no per-frame positioning', () => {
+		const grid = mountGrid(stickyGrouping(), stickyRows(), 300);
+		// Rows: 0 EMEA, 1 EMEA/Cloud, 2..21 its rows — scroll into the middle of EMEA/Cloud.
 		scrollTo(grid, 400);
-		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
-		const [outer, inner] = visibleHosts(layer);
-		expect(inner.dataset.rowId).toBe('group:region=EMEA/product=Cloud');
-		const innerIndex = inner.dataset.rowIndex;
 
-		scrollTo(grid, 1300);
-		const [outer2, inner2] = visibleHosts(layer);
-		expect(outer2).toBe(outer);
-		expect(inner2).toBe(inner);
-		expect(inner2.dataset.rowId).toBe('group:region=EMEA/product=Hardware');
-		expect(inner2.dataset.rowIndex).not.toBe(innerIndex);
-		expect(inner2.dataset.rowKey).toBe('sticky-group:group:region=EMEA/product=Hardware');
-		expect(inner2.textContent).toContain('Hardware');
-		expect(inner2.textContent).not.toContain('Cloud');
+		const emea = headerFor(grid, 'group:region=EMEA');
+		const cloud = headerFor(grid, 'group:region=EMEA/product=Cloud');
+		expect(stuckLabels(grid)).toEqual(['EMEA', 'Cloud']);
+		// The section spans the group's rows in content coordinates; the header is its first child.
+		const emeaSection = emea.parentElement!;
+		expect(emeaSection.parentElement).toBe(grid.container.querySelector('.og-rows-container'));
+		expect(emeaSection.style.top).toBe('0px');
+		expect(emeaSection.style.height).toBe('1720px');
+		expect(emeaSection.style.transform).toBe('');
+		expect(emea.style.transform).toBe('');
+		expect(cloud.style.transform).toBe('');
+		// Cloud sticks right below EMEA's header.
+		expect(parseFloat(cloud.style.top)).toBe(parseFloat(emea.style.top) + 40);
+		// A child pushed up by its next sibling must slide under its parent, not over it.
+		expect(Number(emea.style.zIndex)).toBeGreaterThan(Number(cloud.style.zIndex));
+		expect(emea.querySelector('.og-row-pin-left .og-cell-hierarchy')).not.toBeNull();
+		expect(emea.querySelector('[data-col-field="amount"]')?.textContent).toBe('$40');
+		expect(grid.mountRowContent.mock.calls.some(([mount]) => mount.rowKey.startsWith('sticky-group:'))).toBe(false);
+
+		// The sticky layer is gone: nothing is moved by script.
+		expect(grid.container.querySelector('.og-layer-sticky-groups')).toBeNull();
 		grid.destroy();
 	});
 
-	it('hides hosts beyond the current stack depth', () => {
-		const grid = mountGrid({ grouping: { by: ['region', 'product'], defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
-		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
+	it('toggles the stuck class as a header sticks and releases, and keeps the same header element', () => {
+		const grid = mountGrid(stickyGrouping(), stickyRows(), 300);
+		const emeaAtRest = headerFor(grid, 'group:region=EMEA');
+		expect(emeaAtRest.classList.contains('og-row-group-stuck')).toBe(false);
 		scrollTo(grid, 400);
-		expect(visibleHosts(layer)).toHaveLength(2);
+		expect(headerFor(grid, 'group:region=EMEA')).toBe(emeaAtRest);
+		expect(emeaAtRest.classList.contains('og-row-group-stuck')).toBe(true);
+		// Scrolling on into EMEA/Hardware: the outer header stays stuck, the inner one is replaced.
+		scrollTo(grid, 1300);
+		expect(stuckLabels(grid)).toEqual(['EMEA', 'Hardware']);
 		scrollTo(grid, 0);
-		const visible = visibleHosts(layer);
-		expect(visible.length).toBeLessThan(2);
-		for (const host of layer.querySelectorAll<HTMLElement>('.og-sticky-group-row-host')) {
-			if (visible.includes(host)) continue;
-			expect(host.isConnected && host.style.display !== 'none').toBe(false);
-			expect(host.textContent).toBe('');
+		expect(headerFor(grid, 'group:region=EMEA').classList.contains('og-row-group-stuck')).toBe(false);
+		grid.destroy();
+	});
+
+	it('includes upcoming groups, and drops sections once their group leaves the rendered rows', () => {
+		const grid = mountGrid(stickyGrouping(), stickyRows(), 300);
+		scrollTo(grid, 0);
+		// The first rows are rendered: EMEA and EMEA/Cloud have sections already, neither is stuck yet.
+		const ids = headersOf(grid).map((header) => header.dataset.rowId);
+		expect(ids).toEqual(expect.arrayContaining(['group:region=EMEA', 'group:region=EMEA/product=Cloud']));
+		expect(stuckLabels(grid)).toEqual([]);
+		// Far down in APAC, EMEA's sections are gone and APAC's exist.
+		scrollTo(grid, 3000);
+		const later = headersOf(grid).map((header) => header.dataset.rowId);
+		expect(later).not.toContain('group:region=EMEA');
+		expect(later).toContain('group:region=APAC');
+		grid.destroy();
+	});
+
+	it('does no DOM work in a scroll frame whose sections are unchanged', () => {
+		const grid = mountGrid(stickyGrouping(), stickyRows(), 300);
+		scrollTo(grid, 400);
+		const observer = new MutationObserver(() => {});
+		for (const section of sectionsOf(grid)) {
+			observer.observe(section, { subtree: true, attributes: true, childList: true, characterData: true });
 		}
+		scrollTo(grid, 410);
+		scrollTo(grid, 420);
+		expect(observer.takeRecords()).toHaveLength(0);
+		// The observer sees real changes: releasing the stuck headers is a class write.
+		scrollTo(grid, 0);
+		expect(observer.takeRecords().length).toBeGreaterThan(0);
+		observer.disconnect();
+		grid.destroy();
+	});
+
+	it('levels: 1 gives sections to top-level groups only', () => {
+		const grid = mountGrid(stickyGrouping({ levels: 1 }), stickyRows(), 300);
+		scrollTo(grid, 400);
+		expect(stuckLabels(grid)).toEqual(['EMEA']);
+		const ids = headersOf(grid).map((header) => header.dataset.rowId);
+		expect(ids.length).toBeGreaterThan(0);
+		expect(ids.every((id) => id === 'group:region=EMEA' || id === 'group:region=APAC')).toBe(true);
+		grid.destroy();
+	});
+
+	it('shadow: false drops the shadow class', () => {
+		const withShadow = mountGrid(stickyGrouping(), stickyRows(), 300);
+		scrollTo(withShadow, 400);
+		expect(headersOf(withShadow).every((header) => header.classList.contains('og-row-group-sticky-shadow'))).toBe(true);
+		withShadow.destroy();
+
+		const grid = mountGrid(stickyGrouping({ shadow: false }), stickyRows(), 300);
+		scrollTo(grid, 400);
+		expect(stuckLabels(grid)).toEqual(['EMEA', 'Cloud']);
+		expect(headersOf(grid).some((header) => header.classList.contains('og-row-group-sticky-shadow'))).toBe(false);
 		grid.destroy();
 	});
 
 	it("pins full-width sticky content like body rows with display: 'row'", () => {
 		const grid = mountGrid({ grouping: { by: ['region'], display: 'row', defaultExpanded: true, stickyHeaders: true } }, stickyRows(), 300);
 		scrollTo(grid, 400, 120);
-		const layer = grid.container.querySelector('.og-layer-sticky-groups')!;
-		const [host] = visibleHosts(layer);
+		const host = headersOf(grid)[0];
 		expect(host).toBeDefined();
 		const wrapper = host.querySelector<HTMLElement>(':scope > .og-row-portal-host');
 		expect(wrapper).not.toBeNull();

@@ -1,5 +1,5 @@
 import type { GridEngine } from '../engine/GridEngine.js';
-import { computeRenderWindow, type RenderWindow, type StickyGroupStackItem } from './renderWindow.js';
+import { computeRenderWindow, type RenderWindow, type StickySection } from './renderWindow.js';
 import type { InternalColumnDef } from '../columnDef.js';
 import { getMemoizedColumnTopology, type CompiledColumnTopology } from './columnTopology.js';
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
@@ -123,7 +123,7 @@ export interface GridLayoutPlan {
 		paginationTop: number;
 	};
 	headerBands: HeaderBandLayout[];
-	stickyGroups: StickyGroupStackItem[];
+	stickySections: StickySection[];
 	renderWindow: RenderWindow;
 	/** Authoritative column topology: lane membership, lane-relative offsets, group segments. */
 	columnTopology: CompiledColumnTopology;
@@ -413,7 +413,7 @@ export function computeGridLayoutPlan<TRowData>(
 			paginationTop,
 		},
 		headerBands,
-		stickyGroups: rw.stickyGroupStack ?? [],
+		stickySections: rw.stickySections ?? [],
 		renderWindow: rw,
 		columnTopology,
 	};

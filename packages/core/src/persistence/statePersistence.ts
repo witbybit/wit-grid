@@ -1,4 +1,4 @@
-import { freezeGroupingConfig, groupByColIds, type GroupingConfig } from '../rows/hierarchyConfig.js';
+import { freezeGroupingConfig, groupByColIds, type GroupingConfig, type StickyHeadersOptions } from '../rows/hierarchyConfig.js';
 import type { TotalPlacement } from '../visualRow.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
@@ -34,7 +34,7 @@ export interface SerializedGridState {
 export interface PersistedGrouping {
 	by: string[];
 	totals?: { groups?: TotalPlacement | false; grand?: TotalPlacement | false };
-	stickyHeaders?: boolean;
+	stickyHeaders?: boolean | StickyHeadersOptions;
 }
 
 export interface PersistedGridState {
@@ -89,10 +89,18 @@ function isPlacement(value: unknown): boolean {
 	return value === undefined || value === false || value === 'top' || value === 'bottom';
 }
 
+function isStickyHeadersValue(value: unknown): value is boolean | StickyHeadersOptions {
+	if (typeof value === 'boolean') return true;
+	if (!isRecord(value)) return false;
+	if (value.levels !== undefined && (typeof value.levels !== 'number' || Number.isNaN(value.levels))) return false;
+	if (value.shadow !== undefined && typeof value.shadow !== 'boolean') return false;
+	return Object.keys(value).every((key) => key === 'levels' || key === 'shadow');
+}
+
 function isPersistedGrouping(value: unknown): value is PersistedGrouping {
 	if (!isRecord(value)) return false;
 	if (!Array.isArray(value.by) || !value.by.every((entry) => typeof entry === 'string')) return false;
-	if (value.stickyHeaders !== undefined && typeof value.stickyHeaders !== 'boolean') return false;
+	if (value.stickyHeaders !== undefined && !isStickyHeadersValue(value.stickyHeaders)) return false;
 	if (value.totals !== undefined && (!isRecord(value.totals) || !isPlacement(value.totals.groups) || !isPlacement(value.totals.grand)))
 		return false;
 	return Object.keys(value).every((key) => key === 'by' || key === 'totals' || key === 'stickyHeaders');
@@ -194,7 +202,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 	if (raw.grouping !== undefined && !isPersistedGrouping(raw.grouping)) {
 		return {
 			ok: false,
-			error: '[wit-grid] persisted grid state field `state.grouping` must be `{ by: string[], totals?: { groups?, grand? }, stickyHeaders?: boolean }` with placements `top`, `bottom` or false.',
+			error: '[wit-grid] persisted grid state field `state.grouping` must be `{ by: string[], totals?: { groups?, grand? }, stickyHeaders?: boolean | { levels?, shadow? } }` with placements `top`, `bottom` or false.',
 		};
 	}
 	if (

@@ -150,6 +150,7 @@ export type {
 } from './visualRow.js';
 export type {
 	GroupingConfig,
+	StickyHeadersOptions,
 	GroupInfo,
 	TreeDataConfig,
 	TreeRowInfo,
