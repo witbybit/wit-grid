@@ -13,7 +13,8 @@ const isNumber = (value: unknown): value is number => typeof value === 'number' 
 /**
  * A flat grid's grand total kept by deltas: a value change moves sum and counts by the difference,
  * min/max rescan only when the extreme leaves, first/last are read from the first and last data
- * row, and an exact recount every {@link DRIFT_RECOMPUTE_EVERY} deltas bounds float drift. Built-in
+ * row, and an exact recount after as many deltas as there are rows (at least
+ * {@link DRIFT_RECOMPUTE_EVERY}) bounds float drift at O(1) amortized per change. Built-in
  * functions on plain fields only (`create` returns null otherwise).
  */
 export class FlatTotals<TData> {
@@ -21,6 +22,9 @@ export class FlatTotals<TData> {
 	private readonly fields: string[];
 	private readonly readers: Array<(node: RowNode<TData>) => unknown>;
 	private deltas = 0;
+	private rowCount = 0;
+	/** Fields with a min or max aggregate: only their extremes need a rescan when the extreme leaves. */
+	private readonly extremeFields: Set<string>;
 
 	private constructor(
 		private readonly aggDefs: AggregationDef<TData>[],
@@ -28,6 +32,7 @@ export class FlatTotals<TData> {
 		private readonly rows: () => readonly VisualRow<TData>[]
 	) {
 		this.fields = [...new Set(aggDefs.map((def) => def.colId))];
+		this.extremeFields = new Set(aggDefs.filter((def) => def.aggFunc === 'min' || def.aggFunc === 'max').map((def) => def.colId));
 		const context = createRowPipelineContext(columns);
 		this.readers = this.fields.map((colId) => context.readerFor(colId));
 		this.recount();
@@ -53,7 +58,7 @@ export class FlatTotals<TData> {
 				if (isNumber(oldValue)) {
 					stats.numericCount--;
 					stats.sum -= oldValue;
-					if (oldValue === stats.min || oldValue === stats.max) rescan = true;
+					if ((oldValue === stats.min || oldValue === stats.max) && this.extremeFields.has(colId)) rescan = true;
 				}
 				if (isNumber(newValue)) {
 					stats.numericCount++;
@@ -64,7 +69,7 @@ export class FlatTotals<TData> {
 				this.deltas++;
 			}
 		}
-		if (rescan || this.deltas >= DRIFT_RECOMPUTE_EVERY) this.recount();
+		if (rescan || this.deltas >= Math.max(DRIFT_RECOMPUTE_EVERY, this.rowCount)) this.recount();
 	}
 
 	/** The grand total's aggregates, as the full run's aggregate stage would produce them. */
@@ -92,9 +97,11 @@ export class FlatTotals<TData> {
 
 	private recount(): void {
 		this.deltas = 0;
+		this.rowCount = 0;
 		const stats = this.fields.map(() => createStats());
 		for (const row of this.rows()) {
 			if (row.kind !== 'data') continue;
+			this.rowCount++;
 			for (let f = 0; f < this.fields.length; f++) addStatsValue(stats[f], this.readers[f](row.node));
 		}
 		this.fields.forEach((colId, f) => this.stats.set(colId, stats[f]));

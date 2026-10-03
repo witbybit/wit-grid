@@ -1172,12 +1172,13 @@ export class ClientRowModelController<TData = unknown>
 	}
 
 	/**
-	 * Records each data row's index on its node from `start` on (the first occurrence wins), and group,
-	 * total and detail rows' indices by visual id. O(rows - start), plain field writes for data rows.
+	 * Records each data row's index on its node from `start` through `end` (default: the last row; the
+	 * first occurrence wins), and group, total and detail rows' indices by visual id. O(end - start),
+	 * plain field writes for data rows.
 	 */
-	private stampRowPositions(start: number): void {
+	private stampRowPositions(start: number, end = this.visualRows.length - 1): void {
 		const rows = this.visualRows;
-		for (let i = start; i < rows.length; i++) {
+		for (let i = start; i <= end; i++) {
 			const row = rows[i];
 			if (row.kind !== 'data') {
 				this.visualRowIdToIndex.set(row.id, i);
@@ -1478,10 +1479,12 @@ export class ClientRowModelController<TData = unknown>
 		compareToNode: (a: RowNode<TData>) => (b: RowNode<TData>) => number
 	): number {
 		const rows = this.visualRows;
-		const moving = new Set<VisualRow<TData>>();
-		for (const item of toRelocate) moving.add(item.vr);
-		const rest: VisualRow<TData>[] = [];
-		for (const row of rows) if (!moving.has(row)) rest.push(row);
+		const n = rows.length;
+		// Movers are marked by old index (unique: a batch's repeated rows were merged).
+		const moved = new Uint8Array(n);
+		for (const item of toRelocate) moved[item.oldIdx] = 1;
+		const rest: VisualRow<TData>[] = new Array(n - toRelocate.length);
+		for (let i = 0, k = 0; i < n; i++) if (moved[i] === 0) rest[k++] = rows[i];
 		const movers = toRelocate.map((item) => ({ item, compare: compareToNode(item.node) }));
 		movers.sort((a, b) => a.compare(b.item.node));
 		// Same search as the splice path: before the first data row the mover sorts at or before.
@@ -1497,23 +1500,31 @@ export class ClientRowModelController<TData = unknown>
 			}
 			return lo;
 		});
-		let start = rows.length;
+		let start = n;
+		let end = -1;
 		let out = 0;
 		let r = 0;
-		const write = (row: VisualRow<TData>) => {
+		for (let m = 0; m <= movers.length; m++) {
+			const stop = m < movers.length ? places[m] : rest.length;
+			for (; r < stop; r++, out++) {
+				const row = rest[r];
+				if (rows[out] === row) continue;
+				if (out < start) start = out;
+				end = out;
+				rows[out] = row;
+			}
+			if (m === movers.length) break;
+			const row = movers[m].item.vr;
 			if (rows[out] !== row) {
 				if (out < start) start = out;
+				end = out;
 				rows[out] = row;
 			}
 			out++;
-		};
-		for (let m = 0; m < movers.length; m++) {
-			while (r < places[m]) write(rest[r++]);
-			write(movers[m].item.vr);
 		}
-		while (r < rest.length) write(rest[r++]);
-		if (start < rows.length) this.stampRowPositions(start);
-		return start === rows.length ? 0 : start;
+		if (end < 0) return 0;
+		this.stampRowPositions(start, end);
+		return start;
 	}
 
 	public replaceRowsStructurally(rows: readonly TData[]): RowModelWriteResult<TData> {
