@@ -2,7 +2,7 @@
  * Low-frequency React cells (ticker avatar, rating stars, status badge) and the custom group
  * renderer. Everything that updates at feed speed is a DOM renderer instead (domRenderers.ts).
  */
-import React, { memo } from 'react';
+import React, { memo, useRef } from 'react';
 import { GroupCount, GroupToggle, type CellRendererProps, type GroupRenderContext } from '@eregister/wit-grid-react';
 import type { MarketRow } from './data';
 import { fmtPct, fmtSignedUsd } from './format';
@@ -76,6 +76,13 @@ function GroupBody({ ctx, actions }: { ctx: GroupRenderContext<MarketRow>; actio
 	const pct = Number(ctx.aggregates?.changePct);
 	const share = useShare(Math.min(ctx.level, 3), pnl);
 	const dir = pnl > 0 ? 'up' : pnl < 0 ? 'down' : '';
+	// The bar tweens while this cell keeps showing the same group; one reused for another group snaps.
+	const shownId = useRef(ctx.id);
+	const tween = shownId.current === ctx.id;
+	shownId.current = ctx.id;
+
+	// The hierarchy column also holds the instrument rows: nothing to show there.
+	if (ctx.kind === 'data') return null;
 
 	if (ctx.isTotal) {
 		return (
@@ -100,14 +107,14 @@ function GroupBody({ ctx, actions }: { ctx: GroupRenderContext<MarketRow>; actio
 			)}
 			{!stuck && (
 				<span className='md-grp-bar' title='Share of the largest group P&L at this level'>
-					<i data-dir={dir || 'up'} style={{ width: `${share * 50}%` }} />
+					<i data-dir={dir || 'up'} className={tween ? 'md-tween' : undefined} style={{ transform: `scaleX(${dir === 'down' ? -share : share})` }} />
 				</span>
 			)}
 			<span className='md-grp-pnl' data-dir={dir}>
 				{fmtSignedUsd(pnl)}
 			</span>
 			{!stuck && Number.isFinite(pct) && (
-				<span className='md-grp-count' style={{ minWidth: 48 }}>
+				<span className='md-grp-count md-grp-pct'>
 					{fmtPct(pct)}
 				</span>
 			)}

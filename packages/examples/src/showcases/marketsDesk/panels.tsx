@@ -61,7 +61,10 @@ export function KpiStrip({ engine, isLight, compact }: { engine: FeedEngine; isL
 				isLight={isLight}
 				sub={
 					<span className={`mt-1 block h-1 w-full overflow-hidden rounded-full ${isLight ? 'bg-rose-200' : 'bg-rose-500/40'}`}>
-						<span className={`block h-full ${isLight ? 'bg-emerald-600' : 'bg-emerald-400'}`} style={{ width: `${advPct}%` }} />
+						<span
+							className={`block h-full w-full origin-left transition-transform duration-500 ease-out ${isLight ? 'bg-emerald-600' : 'bg-emerald-400'}`}
+							style={{ transform: `scaleX(${advPct / 100})` }}
+						/>
 					</span>
 				}
 			>

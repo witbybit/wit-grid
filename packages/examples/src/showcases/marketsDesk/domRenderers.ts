@@ -20,6 +20,25 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, pa
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
 
+/**
+ * Sets a bar's transform, tweening only when the cell still shows the same row (a live value change);
+ * a cell rebound to another row (scroll, sort, regroup) snaps instead of morphing from the old row.
+ */
+function setBar(bar: HTMLElement, transform: string, tween: boolean): void {
+	bar.classList.toggle('md-tween', tween);
+	bar.style.transform = transform;
+}
+
+/** True while `p` is an update of the row the cell already showed; records the row for the next call. */
+function sameRow(): (p: Params) => boolean {
+	let rowId: string | null = null;
+	return (p) => {
+		const same = p.node.id === rowId;
+		rowId = p.node.id;
+		return same;
+	};
+}
+
 // ─── Price with an up/down flash ──────────────────────────────────────────────
 
 /** Price cell. A tick toggles one of two identical keyframe classes, which restarts the CSS animation without a reflow. */
@@ -122,20 +141,17 @@ export const changeHeatRenderer: DomCellRenderer<MarketRow> = {
 		const wrap = el('div', 'md-heat', container);
 		const bar = el('i', 'md-heat-bar', wrap);
 		const text = el('span', 'md-heat-text', wrap);
-		const paint = (pct: number) => {
-			const w = clamp(Math.abs(pct) / HEAT_FULL_PCT, 0, 1) * 50;
-			bar.style.width = `${w}%`;
-			bar.style.left = pct >= 0 ? '50%' : `${50 - w}%`;
+		const same = sameRow();
+		const paint = (p: Params) => {
+			const pct = Number(p.value);
+			// From the centre line: right for gains, mirrored left for losses.
+			setBar(bar, `scaleX(${clamp(pct / HEAT_FULL_PCT, -1, 1)})`, same(p));
 			bar.dataset.dir = pct >= 0 ? 'up' : 'down';
 			text.dataset.dir = pct > 0 ? 'up' : pct < 0 ? 'down' : '';
 			text.textContent = fmtPct(pct);
 		};
-		paint(Number(params.value));
-		return {
-			update(p: Params) {
-				paint(Number(p.value));
-			},
-		};
+		paint(params);
+		return { update: paint };
 	},
 };
 
@@ -170,12 +186,14 @@ export const dayRangeRenderer: DomCellRenderer<MarketRow> = {
 		const vwap = el('i', 'md-range-vwap', track);
 		const marker = el('i', 'md-range-marker', track);
 		const hi = el('span', 'md-range-hi', wrap);
+		const same = sameRow();
 		const paint = (p: Params) => {
 			const r = p.node.data;
 			const span = r.dayHigh - r.dayLow || 1;
 			lo.textContent = fmtPrice(r.dayLow, r.dp);
 			hi.textContent = fmtPrice(r.dayHigh, r.dp);
-			marker.style.left = `${clamp((r.price - r.dayLow) / span, 0, 1) * 100}%`;
+			// The marker spans the track; translating it by a share of its own width moves its tick along the track.
+			setBar(marker, `translateX(${clamp((r.price - r.dayLow) / span, 0, 1) * 100}%)`, same(p));
 			marker.dataset.dir = r.price >= r.prevClose ? 'up' : 'down';
 			vwap.style.left = `${clamp((r.vwap - r.dayLow) / span, 0, 1) * 100}%`;
 		};
@@ -193,9 +211,10 @@ export const volumeRenderer: DomCellRenderer<MarketRow> = {
 		const track = el('div', 'md-bar-track', wrap);
 		const fill = el('i', 'md-bar-fill md-bar-accent', track);
 		const text = el('span', 'md-bar-text', wrap);
+		const same = sameRow();
 		const paint = (p: Params) => {
 			const r = p.node.data;
-			fill.style.width = `${clamp(r.volume / r.avgVolume, 0.02, 1) * 100}%`;
+			setBar(fill, `scaleX(${clamp(r.volume / r.avgVolume, 0.02, 1)})`, same(p));
 			text.textContent = fmtCompact(r.volume);
 		};
 		paint(params);
@@ -212,13 +231,14 @@ export const pnlRenderer: DomCellRenderer<MarketRow> = {
 		const text = el('span', 'md-pnl-text', wrap);
 		const track = el('div', 'md-pnl-track', wrap);
 		const fill = el('i', 'md-pnl-fill', track);
+		const same = sameRow();
 		const paint = (p: Params) => {
 			const r = p.node.data;
 			const v = Number(p.value);
 			text.textContent = fmtSignedUsd(v);
 			text.dataset.dir = v > 0 ? 'up' : v < 0 ? 'down' : '';
 			fill.dataset.dir = v >= 0 ? 'up' : 'down';
-			fill.style.width = `${clamp(Math.abs(v) / (r.notional * 0.04 || 1), 0.03, 1) * 100}%`;
+			setBar(fill, `scaleX(${clamp(Math.abs(v) / (r.notional * 0.04 || 1), 0.03, 1)})`, same(p));
 		};
 		paint(params);
 		return { update: paint };
@@ -234,9 +254,10 @@ export const volatilityRenderer: DomCellRenderer<MarketRow> = {
 		const track = el('div', 'md-bar-track', wrap);
 		const fill = el('i', 'md-bar-fill', track);
 		const text = el('span', 'md-bar-text', wrap);
+		const same = sameRow();
 		const paint = (p: Params) => {
 			const v = Number(p.value);
-			fill.style.width = `${clamp(v / 100, 0.03, 1) * 100}%`;
+			setBar(fill, `scaleX(${clamp(v / 100, 0.03, 1)})`, same(p));
 			fill.dataset.level = v >= 60 ? 'hi' : v >= 30 ? 'mid' : 'lo';
 			text.textContent = `${v.toFixed(0)}%`;
 		};
