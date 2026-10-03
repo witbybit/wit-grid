@@ -108,6 +108,25 @@ const SCENARIOS = [
 		fidelityOnly: true,
 	},
 	{
+		name: 'grouped-feed-10',
+		title: 'Grouped live feed, 10 rows per tick',
+		description:
+			'100,000 rows grouped by region (8) and sector (96), sum/avg/count aggregates, sorted by an updated column; every 16 ms a transaction updates 10 random rows. Wit only. Reports the ms each transaction call takes.',
+		query: { rows: 100_000, cols: 50, domCols: 0, feed: 10 },
+		ticks: 150,
+		grids: ['wit'],
+		noFidelity: true,
+	},
+	{
+		name: 'grouped-feed-1000',
+		title: 'Grouped live feed, 1,000 rows per tick',
+		description: 'The same grouped grid; every 16 ms a transaction updates 1,000 random rows. Wit only.',
+		query: { rows: 100_000, cols: 50, domCols: 0, feed: 1000 },
+		ticks: 150,
+		grids: ['wit'],
+		noFidelity: true,
+	},
+	{
 		name: 'vertical-styled',
 		title: 'Vertical scroll, decorated cells',
 		description:
@@ -299,6 +318,9 @@ async function runOnce(browser, grid, scenario) {
 	const calls = await page.evaluate(() => window.rendererCalls);
 	// Elements JS re-positioned because the content scrolled (each lags the compositor by a frame).
 	const scrollLinkedWrites = grid === 'wit' ? await page.evaluate(() => window.witHost?.getRenderStats().scrollLinkedPositionWrites ?? 0) : 0;
+	// Grouped feed scenarios: ms per transaction call (p50 / p95 / max).
+	const feedTimes = await page.evaluate(() => window.__feedTimes ?? null);
+	const pct = (list, q) => (list.length ? [...list].sort((a, b) => a - b)[Math.min(list.length - 1, Math.floor(q * list.length))] : 0);
 	const writeStats = traceLayouts
 		? await page.evaluate(() => {
 				const stats = window.witHost?.getRenderStats();
@@ -360,6 +382,7 @@ async function runOnce(browser, grid, scenario) {
 		taskMs: deltaMs('TaskDuration'),
 		mounts: calls.mounts,
 		scrollLinkedWrites,
+		...(feedTimes ? { txP50: pct(feedTimes, 0.5), txP95: pct(feedTimes, 0.95), txMax: Math.max(...feedTimes) } : {}),
 		updates: calls.updates,
 		...(traceLayouts ? summarizeLayoutTrace(traceEvents) : {}),
 		...census,
@@ -553,6 +576,7 @@ const table = fidelity
 				'blank %': fmt(r.blankSamplesPct),
 				'renderer mounts/updates': `${r.mounts}/${r.updates}`,
 				'scroll-linked writes': fmt(r.scrollLinkedWrites, 0),
+				...(r.txP50 !== undefined ? { 'tx ms p50/p95/max': `${fmt(r.txP50, 2)}/${fmt(r.txP95, 2)}/${fmt(r.txMax, 1)}` } : {}),
 			}));
 console.log();
 console.table(table);

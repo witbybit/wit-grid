@@ -77,7 +77,48 @@ if (grouped) {
 	api.transaction({ pins: { top: 2, bottom: 1 } });
 }
 if (styledCells) api.setStyleRules([{ kind: 'cell', when: (row, col) => isHotValue(row[col.field]), cellClass: HOT_CLASS }]);
-installTicker(initialRows, (rows) => api.setRows(rows));
+// ?feed=<rows per tick>: a grouped live feed. Rows are grouped by region (8) › sector (96) with
+// sum/avg/count aggregates and sorted by c5; each tick updates that many random rows (c5, c6) in
+// one transaction. Every commit is timed: window.__feedTimes (ms per transaction call).
+const feedRowsPerTick = Number(new URLSearchParams(location.search).get('feed') ?? 0);
+if (feedRowsPerTick > 0) {
+	for (const row of initialRows) {
+		const r = Number(row.id.slice(1));
+		row.region = `Region ${r % 8}`;
+		row.sector = `Sector ${r % 96}`;
+	}
+	api.setRows(initialRows);
+	api.setColumns([{ field: 'region', header: 'Region', width: 100 }, { field: 'sector', header: 'Sector', width: 100 }, ...columns]);
+	api.setGrouping({ by: ['region', 'sector'], defaultExpanded: true });
+	api.setAggregation({
+		defs: [
+			{ colId: 'c5', aggFunc: 'sum' },
+			{ colId: 'c6', aggFunc: 'avg' },
+			{ colId: 'c7', aggFunc: 'count' },
+		],
+	});
+	api.setSortModel([{ colId: 'c5', sort: 'desc' }]);
+	const times: number[] = [];
+	(window as unknown as { __feedTimes: number[] }).__feedTimes = times;
+	let rows = initialRows;
+	let seed = 12345;
+	const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+	(window as unknown as { benchTick: (i: number) => void }).benchTick = () => {
+		const update: BenchRow[] = [];
+		for (let k = 0; k < feedRowsPerTick; k++) {
+			const index = Math.floor(random() * rows.length);
+			const row = rows[index];
+			const next = { ...row, c5: Math.floor(random() * 1000), c6: Math.floor(random() * 1000) };
+			rows[index] = next;
+			update.push(next);
+		}
+		const start = performance.now();
+		api.transaction({ rows: { update } });
+		times.push(performance.now() - start);
+	};
+} else {
+	installTicker(initialRows, (rows) => api.setRows(rows));
+}
 const host = mountGridHost(api, container);
 // Diagnostics only (bench --trace): the grid's own write counters for the measured window.
 (window as unknown as { witHost: typeof host }).witHost = host;
