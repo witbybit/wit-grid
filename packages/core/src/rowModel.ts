@@ -511,7 +511,6 @@ export interface GroupRowMeta {
 	firstLeafIndex: number;
 	lastLeafIndex: number;
 	/** rowIds of all visible (non-collapsed) data rows beneath this group. */
-	visibleDescendantRowIds: string[];
 	/** groupIds of immediate child group rows that are visible. */
 	childGroupIds: string[];
 	leafCount: number;
