@@ -11,6 +11,13 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Added — row animation styles
+
+`rowAnimation` (React prop; `rendererOptions.rowAnimation` and `api.setRowAnimation` in core) chooses how rows
+move on sorts, live reorders, expansion and detail rows: `style` (`'slide'`, `'fade'`, `'none'`), `easing`
+(`'smooth'`, `'snappy'`, `'spring'` or any CSS easing), `duration`, a capped `stagger` cascade, and `on` to switch
+kinds of change off. See [Styling](/docs/next/styling#row-animations).
+
 ### Added — sticky group headers, native, with options
 
 Expanded group headers stick under the column header while their rows scroll, stack one per level, and are pushed up when their group ends. They use the browser's native sticky positioning, so a stuck header moves with the scroll on the GPU, with no JavaScript per frame. `grouping.stickyHeaders` takes `true` or `{ levels, shadow }` to cap how many levels stick or drop the shadow. A stuck header carries the class `og-row-group-stuck`. See [Sticky group headers](/docs/next/grouping#sticky-group-headers).

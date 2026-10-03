@@ -1,3 +1,4 @@
+import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import type {
 	FilterModel,
 	QuickFilterModel,
@@ -201,6 +202,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	/** Selects or deselects every data row beneath a group or tree row. */
 	setDescendantsSelected(id: string, selected: boolean): void;
 	setShowGroupPanel(enabled: boolean): void;
+	/** How rows animate when a sort, live value change, expansion or detail moves them; applies from the next change. */
+	setRowAnimation(options: RowAnimationOptions | undefined): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;
 	getVisibleColumnRange(): { colStart: number; colEnd: number; total: number };

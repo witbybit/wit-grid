@@ -1,3 +1,4 @@
+import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import { canEditCell, isCellSelectable } from '../visualRow.js';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
 import { GridEventName } from '../api/GridEvents.js';
@@ -268,6 +269,8 @@ export class GridEngine<TRowData = unknown> {
 	public readonly rowCtrls = new RowCtrlStore<TRowData>();
 	/** Grid-wide scroll presentation policy — see columnDef.ts's GridRendererOptions. */
 	public readonly rendererOptions: GridRendererOptions | undefined;
+	/** Current row animation options; read when an animation starts, so a change applies to the next one. */
+	public rowAnimation: RowAnimationOptions | undefined;
 
 	private _scrollStateProvider: { isScrolling(): boolean; phase: string } | null = null;
 
@@ -300,6 +303,7 @@ export class GridEngine<TRowData = unknown> {
 	constructor(config: GridEngineConfig<TRowData>) {
 		this.getContainerElement = config.getContainerElement ?? (() => null);
 		this.rendererOptions = config.rendererOptions;
+		this.rowAnimation = config.rendererOptions?.rowAnimation;
 		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
@@ -1132,6 +1136,10 @@ export class GridEngine<TRowData = unknown> {
 	public setStyleRules(styleRules: InternalGridState<TRowData>['styleRules']): void {
 		this.stateFeature.setStyleRules(styleRules);
 	}
+	public setRowAnimation(options: RowAnimationOptions | undefined): void {
+		this.rowAnimation = options;
+	}
+
 	public setShowFloatingFilters(enabled: boolean): void {
 		this.stateFeature.setShowFloatingFilters(enabled);
 	}

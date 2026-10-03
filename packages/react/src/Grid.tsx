@@ -1,4 +1,5 @@
 import { createClientGrid, createInfiniteGrid, createServerSideGrid, createLocalStorageAdapter } from '@eregister/wit-grid-core';
+import type { RowAnimationOptions } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
 import { GridProvider } from './gridContext.js';
 import { GridView, type GridViewProps } from './GridView.js';
@@ -56,6 +57,12 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	showFilterChipBar?: boolean;
 	/** Show the floating filter row — always-visible inline filter inputs below column headers. */
 	showFloatingFilters?: boolean;
+	/**
+	 * How rows animate when a sort, live value change, expansion or detail moves them: style
+	 * ('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and
+	 * which changes animate. Live: a change applies from the next animation.
+	 */
+	rowAnimation?: RowAnimationOptions;
 	/** Row drag mode: 'managed' (grid auto-reorders) or 'unmanaged' (host applies order). */
 	rowDragMode?: 'managed' | 'unmanaged';
 	onGridReady?: (event: GridReadyEvent<TRowData>) => void;
@@ -148,6 +155,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		showStatusBar,
 		showFilterChipBar,
 		showFloatingFilters,
+		rowAnimation,
 		rows,
 		getRowHeight,
 		datasource,
@@ -265,6 +273,12 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	useEffect(() => {
 		api.setShowFloatingFilters(!!showFloatingFilters);
 	}, [api, showFloatingFilters]);
+
+	useEffect(() => {
+		api.setRowAnimation(rowAnimation ?? rendererOptions?.rowAnimation);
+		// rendererOptions is creation-time; only the rowAnimation prop is live.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [api, rowAnimation]);
 
 	useEffect(() => {
 		api.setShowFilterChipBar(!!showFilterChipBar);

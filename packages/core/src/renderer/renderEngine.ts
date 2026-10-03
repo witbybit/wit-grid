@@ -219,6 +219,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				const model = this.engine.getRowModel();
 				return model ? model.getVisualIndexById(visualRowId) >= 0 : false;
 			},
+			getRowAnimation: () => this.engine.rowAnimation,
 			// Grid root for semantic column-pin effects.
 			getGridRoot: () => this.viewportRenderer.container,
 		});
