@@ -46,7 +46,11 @@ describe('a live reorder of many rows', () => {
 			],
 			getRowId: (r) => r.id,
 		});
-		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns, getRowId: (r) => r.id });
+		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), {
+			rows,
+			columns: store.getState().columns,
+			getRowId: (r) => r.id,
+		});
 		store.setSortModel([{ colId: 'price', sort: 'desc' } as never]);
 		let seed = 7;
 		const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
@@ -54,7 +58,8 @@ describe('a live reorder of many rows', () => {
 			const current = store.rows().getAll() as Row[];
 			const update: Row[] = [];
 			// Odd rounds take the per-row splice path; each batch updates one row twice (the last write wins).
-			for (let k = 0; k < (round % 2 ? 10 : 120); k++) update.push({ ...current[Math.floor(random() * current.length)], price: Math.floor(random() * 50) });
+			for (let k = 0; k < (round % 2 ? 10 : 120); k++)
+				update.push({ ...current[Math.floor(random() * current.length)], price: Math.floor(random() * 50) });
 			update.push({ ...update[0], price: (update[0].price + 7) % 50 });
 			store.transaction({ rows: { update } });
 			const all = store.rows().getAll() as Row[];
@@ -64,7 +69,9 @@ describe('a live reorder of many rows', () => {
 				.map((row) => row.id);
 			const actual = Array.from({ length: model.getVisualRowCount() }, (_, i) => (model.getVisualRow(i) as { rowId: string }).rowId);
 			expect(actual).toEqual(expected);
-			const bad = expected.flatMap((id, i) => (model.getVisualIndexByRowId(id) === i ? [] : [`${round}:${id}@${i}->${model.getVisualIndexByRowId(id)}`]));
+			const bad = expected.flatMap((id, i) =>
+				model.getVisualIndexByRowId(id) === i ? [] : [`${round}:${id}@${i}->${model.getVisualIndexByRowId(id)}`]
+			);
 			expect(bad).toEqual([]);
 		}
 		store.destroy();

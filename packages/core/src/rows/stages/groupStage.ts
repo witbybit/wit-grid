@@ -31,7 +31,11 @@ function groupRecursively<TData>(
 	const groupsMap = new Map<string, { key: unknown; nodes: RowNode<TData>[] }>();
 	for (const node of nodes) {
 		const value = read(node);
-		const keyString = keyCreator ? keyCreator({ value, row: node.data, rowId: node.id }) : typeof value === 'string' ? value : String(value ?? 'None');
+		const keyString = keyCreator
+			? keyCreator({ value, row: node.data, rowId: node.id })
+			: typeof value === 'string'
+				? value
+				: String(value ?? 'None');
 		let group = groupsMap.get(keyString);
 		if (!group) groupsMap.set(keyString, (group = { key: value, nodes: [] }));
 		group.nodes.push(node);

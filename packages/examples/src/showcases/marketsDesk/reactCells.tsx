@@ -107,17 +107,17 @@ function GroupBody({ ctx, actions }: { ctx: GroupRenderContext<MarketRow>; actio
 			)}
 			{!stuck && (
 				<span className='md-grp-bar' title='Share of the largest group P&L at this level'>
-					<i data-dir={dir || 'up'} className={tween ? 'md-tween' : undefined} style={{ transform: `scaleX(${dir === 'down' ? -share : share})` }} />
+					<i
+						data-dir={dir || 'up'}
+						className={tween ? 'md-tween' : undefined}
+						style={{ transform: `scaleX(${dir === 'down' ? -share : share})` }}
+					/>
 				</span>
 			)}
 			<span className='md-grp-pnl' data-dir={dir}>
 				{fmtSignedUsd(pnl)}
 			</span>
-			{!stuck && Number.isFinite(pct) && (
-				<span className='md-grp-count md-grp-pct'>
-					{fmtPct(pct)}
-				</span>
-			)}
+			{!stuck && Number.isFinite(pct) && <span className='md-grp-count md-grp-pct'>{fmtPct(pct)}</span>}
 			{actions && !stuck && (
 				<span className='md-grp-actions'>
 					<button type='button' className='md-grp-btn' onClick={stop(ctx.expandAll)}>

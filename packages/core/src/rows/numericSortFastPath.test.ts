@@ -35,7 +35,12 @@ describe('numeric sort fast paths match the general comparison', () => {
 			});
 
 			it(`tree leaves: ${label}`, () => {
-				const leaves: RowTreeNode<Row>[] = rows.map((row) => ({ kind: 'data', rowId: row.id, node: new RowNode<Row>(row.id, row), depth: 0 }));
+				const leaves: RowTreeNode<Row>[] = rows.map((row) => ({
+					kind: 'data',
+					rowId: row.id,
+					node: new RowNode<Row>(row.id, row),
+					depth: 0,
+				}));
 				sortTreeStage(leaves, sortModel, columns);
 				expect(leaves.map((leaf) => (leaf as { rowId: string }).rowId)).toEqual(reference(rows, desc));
 			});

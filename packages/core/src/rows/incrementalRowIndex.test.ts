@@ -202,7 +202,8 @@ function expectEqualOutputs(
 	expect(approx(project(actual.visualRows))).toEqual(approx(project(expected.visualRows)));
 	expect(actual.visualRowIdToIndex).toEqual(expected.visualRowIdToIndex);
 	// The index does not keep the row id map: every row, visible or not, must resolve through it.
-	const located = (id: string) => (index ? index.visualIndexOfRow(id, actual.visualRows, actual.visualRowIdToIndex) : actual.rowIdToVisualIndex.get(id));
+	const located = (id: string) =>
+		index ? index.visualIndexOfRow(id, actual.visualRows, actual.visualRowIdToIndex) : actual.rowIdToVisualIndex.get(id);
 	expect(rowIds.map(located)).toEqual(rowIds.map((id) => expected.rowIdToVisualIndex.get(id)));
 	expect(approx(actual.groupMeta)).toEqual(approx(expected.groupMeta));
 	expect(approx(actual.groupMetaByVisualIndex)).toEqual(approx(expected.groupMetaByVisualIndex));
@@ -329,7 +330,12 @@ describe('IncrementalRowIndex', { timeout: 30_000 }, () => {
 					ctx.rebuild();
 				}
 				const fresh = new RowPipeline<Row>().run(pipelineInput(ctx.nodes, sc, ctx.expansion));
-				expectEqualOutputs(ctx.output, fresh, ctx.index, ctx.rows.map((r) => r.id));
+				expectEqualOutputs(
+					ctx.output,
+					fresh,
+					ctx.index,
+					ctx.rows.map((r) => r.id)
+				);
 			}
 			expect(absorbed).toBeGreaterThanOrEqual(structural ? 120 : 200);
 			// The structural scenarios really exercise moves / flips, on screen and off.
@@ -440,7 +446,12 @@ describe('IncrementalRowIndex', { timeout: 30_000 }, () => {
 		const result = ctx.index!.apply([node], new Map([[node.id, new Map([['sector', { oldValue: 's0', newValue: 's1' }]])]]), ctx.target)!;
 		expect(result.membershipChanged).toBe(true);
 		const fresh = new RowPipeline<Row>().run(pipelineInput(ctx.nodes, sc, ctx.expansion));
-		expectEqualOutputs(ctx.output, fresh, ctx.index, ctx.rows.map((r) => r.id));
+		expectEqualOutputs(
+			ctx.output,
+			fresh,
+			ctx.index,
+			ctx.rows.map((r) => r.id)
+		);
 		expect(ctx.output.groupMeta.get('group:region=N/sector=s0')!.leafCount).toBe(fresh.groupMeta.get('group:region=N/sector=s0')!.leafCount);
 	});
 

@@ -433,7 +433,11 @@ export class IncrementalRowIndex<TData> {
 	}
 
 	/** A data row's flat index, or undefined when it is filtered out or under a collapsed group. */
-	public visualIndexOfRow(rowId: string, visualRows: readonly VisualRow<TData>[], visualRowIdToIndex: ReadonlyMap<string, number>): number | undefined {
+	public visualIndexOfRow(
+		rowId: string,
+		visualRows: readonly VisualRow<TData>[],
+		visualRowIdToIndex: ReadonlyMap<string, number>
+	): number | undefined {
 		const entry = this.leafOf.get(rowId);
 		const row = entry?.leaf.row;
 		if (!entry || !row) return undefined;
