@@ -218,6 +218,11 @@ export class ViewportModel<TRowData = unknown> {
 		this.scrollTop = scrollTop;
 	}
 
+	/** Whether a correction is waiting: lets the renderer skip reading scrollTop (a forced layout after DOM writes). */
+	public hasPendingScrollAnchor(): boolean {
+		return this.scrollAnchorDelta !== 0;
+	}
+
 	public consumeScrollAnchor(currentScrollTop: number): number {
 		const delta = this.scrollAnchorAtTop === currentScrollTop ? this.scrollAnchorDelta : 0;
 		this.scrollAnchorDelta = 0;
