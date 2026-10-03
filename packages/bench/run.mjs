@@ -118,6 +118,16 @@ const SCENARIOS = [
 		noFidelity: true,
 	},
 	{
+		name: 'grouped-feed-moves',
+		title: 'Grouped live feed with group moves',
+		description:
+			'The grouped grid; every 16 ms a transaction updates 100 random rows, 10 of which also move to another existing sector of their region (group-key changes). Wit only.',
+		query: { rows: 100_000, cols: 50, domCols: 0, feed: 100, moves: 10 },
+		ticks: 150,
+		grids: ['wit'],
+		noFidelity: true,
+	},
+	{
 		name: 'grouped-feed-1000',
 		title: 'Grouped live feed, 1,000 rows per tick',
 		description: 'The same grouped grid; every 16 ms a transaction updates 1,000 random rows. Wit only.',
