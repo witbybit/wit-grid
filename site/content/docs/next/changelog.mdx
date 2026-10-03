@@ -76,7 +76,7 @@ and added rows after they commit, and removed rows drop their issues (`validatio
 | `batchCellValues(updates, source)`       | `transaction({ cells: updates, source })`                                      |
 | `batchCellValuesAsync(updates, source)`  | `transaction({ cells: updates, source }, { async: true })`                     |
 | `setCellValueAsync(rowId, field, value)` | `transaction({ cells: [{ rowId, colField: field, value }] }, { async: true })` |
-| `updateRows(fn)`                         | `setRows(fn(api.rows().getAll()))`                                             |
+| `updateRows(fn)`                         | `transaction({ rows: { update: changedRows } })`                               |
 | `transaction({ rowTransaction })`        | `transaction({ rows })`                                                        |
 | `transaction({ rows: allRows })`         | `setRows(allRows)`                                                             |
 | type `BatchCellValueUpdate`              | `GridCellWrite`                                                                |
