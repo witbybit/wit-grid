@@ -518,6 +518,7 @@ export class RenderScrollPipeline<TRowData = unknown> {
 			for (let r = 0; r < pinTopRows && r < window.rowCount; r++) {
 				const slot = this.deps.rowRenderer.activeRows.get(r);
 				if (slot) {
+					this.deps.renderStats.scrollLinkedPositionWrites++;
 					slot.updatePosition(snapToDevicePixel(rowTops[r] + scrollTop));
 				}
 			}
@@ -526,6 +527,7 @@ export class RenderScrollPipeline<TRowData = unknown> {
 				if (r >= pinTopRows) {
 					const slot = this.deps.rowRenderer.activeRows.get(r);
 					if (slot) {
+						this.deps.renderStats.scrollLinkedPositionWrites++;
 						slot.updatePosition(snapToDevicePixel(scrollTop + viewportHeight - (totalHeight - rowTops[r])));
 					}
 				}

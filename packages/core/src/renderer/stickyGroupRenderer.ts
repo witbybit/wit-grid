@@ -44,6 +44,8 @@ export class StickyGroupRenderer<TRowData = unknown> {
 	private readonly hosts: StickyGroupHost<TRowData>[] = [];
 	/** Set by the render engine once the row renderer exists. */
 	public cellRowBinder: StickyCellRowBinder<TRowData> | null = null;
+	/** Set by the render engine: counts scroll-linked position writes. */
+	public renderStats: { scrollLinkedPositionWrites: number } | null = null;
 	private lastLayerWidth = -1;
 	private lastLayerTop = Number.NaN;
 
@@ -140,6 +142,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 		}
 		if (host.top !== top) {
 			host.top = top;
+			if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
 			el.style.transform = `translate3d(0, ${top}px, 0)`;
 		}
 		// Outer levels stack above inner ones: a header pushed up by the next sibling slides under its

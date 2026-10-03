@@ -78,6 +78,7 @@ export class OverlayRenderer<TRowData = unknown> {
 			if (selectionBorder.style.display !== 'none') selectionBorder.style.display = 'none';
 			return;
 		}
+		if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
 		this.writeSelectionBox(selectionBorder, box);
 	}
 

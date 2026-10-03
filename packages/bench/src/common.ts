@@ -194,7 +194,8 @@ export function installMeasurement(options: {
 				const c = cell.getBoundingClientRect();
 				if (c.width === 0 || c.left < box.left || c.right > box.right) continue;
 				const { rowId, colId } = options.cellIds(cell, row);
-				if (!rowId || !colId) continue;
+				// Data cells only: group, total and other synthetic rows have no bench value to judge.
+				if (!rowId || !colId || !/^r\d+$/.test(rowId)) continue;
 				const key = `${rowId}/${colId}`;
 				const signature = readSignature(cell);
 				seen.set(key, signature);

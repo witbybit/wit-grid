@@ -321,9 +321,11 @@ export class RowRenderer<TRowData = unknown> {
 	): number {
 		// Pinned rows track scrollTop every frame: snap to device pixels.
 		if (rowIndex < pinTopRows) {
+			if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
 			return snapToDevicePixel(rowTops[rowIndex] + scrollTop);
 		}
 		if (rowIndex >= rowCount - pinBottomRows) {
+			if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
 			return snapToDevicePixel(scrollTop + viewportHeight - (totalHeight - rowTops[rowIndex]));
 		}
 		return rowTops[rowIndex];

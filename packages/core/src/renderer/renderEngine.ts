@@ -267,6 +267,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.statusBarRenderer = new StatusBarRenderer<TRowData>(engine);
 		this.paginationBarRenderer = new PaginationBarRenderer<TRowData>(engine);
 		this.stickyGroupRenderer = new StickyGroupRenderer<TRowData>(engine, this.portalMountManager);
+		this.stickyGroupRenderer.renderStats = this.renderStats;
 		this.stickyGroupRenderer.cellRowBinder = {
 			bind: (request) => this.rowRenderer.detachedRowBinder.bind(request),
 			release: (slot) => this.rowRenderer.detachedRowBinder.release(slot),
