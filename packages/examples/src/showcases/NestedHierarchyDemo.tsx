@@ -26,6 +26,7 @@ import {
 	TrendingUp,
 } from 'lucide-react';
 import type { WitGridExampleRuntimeProps } from '../types';
+import { ROW_ANIMATION_PRESETS } from './RealtimeDashboard';
 
 type TabId = 'groups' | 'tree' | 'detail';
 
@@ -789,6 +790,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 									setGroupApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 
@@ -819,6 +821,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 									setTreeApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 
@@ -846,6 +849,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 									setDetailApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 					</div>
