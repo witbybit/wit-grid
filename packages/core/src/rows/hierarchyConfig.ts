@@ -93,8 +93,11 @@ export interface GroupingConfig<TData = unknown> {
 	 * per grouping level, each showing its own level. `'row'`: one full-width row per group.
 	 */
 	display?: 'column' | 'columns' | 'row';
-	/** `display: 'row'`: draws each group row. Without one, the adapter's group row renderer is used. */
-	rowRenderer?: RowRendererSpec<TData>;
+	/**
+	 * `display: 'row'`: draws each group and total row, with a `GroupRenderContext` (a DOM renderer's
+	 * `mount` / `update`, or a React component's props). Without one, the adapter's group row renderer is used.
+	 */
+	rowRenderer?: GroupRendererSpec<TData>;
 }
 
 export interface TreeDataConfig<TData = unknown> {
@@ -152,7 +155,59 @@ export interface HierarchyColumnConfig<TData = unknown> {
 	count?: (ctx: HierarchyCellContext<TData>) => string | null;
 	/** Extra class names for the cell. */
 	cellClass?: string | ((ctx: HierarchyCellContext<TData>) => string | undefined);
+	/**
+	 * Draws the whole cell content (replacing indent, toggle, checkbox, label and count) with a
+	 * `GroupRenderContext`. `label`, `count` and `cellClass` still apply: they feed `ctx.label` / `ctx.count`
+	 * and the cell's classes. DOM renderers draw synchronously; React components follow the adapter's scroll deferral.
+	 */
+	renderer?: GroupRendererSpec<TData>;
 }
+
+/**
+ * What a group, total or tree-row renderer receives (`grouping.rowRenderer`, `hierarchyColumn.renderer`,
+ * the sticky copy of a group header): the hierarchy cell's fields, resolved text, and actions bound to this row.
+ * A new context is handed over whenever the row's content, expansion or stuck state changes.
+ */
+export interface GroupRenderContext<TData = unknown> extends HierarchyCellContext<TData> {
+	/** The row being drawn. */
+	row: VisualRow<TData>;
+	/** `kind === 'total'`. */
+	isTotal: boolean;
+	/** True while this is the stuck copy of a sticky group header (`grouping.stickyHeaders`). */
+	isStuck: boolean;
+	/** Group rows: the grouping path down to this group; otherwise empty. */
+	path: readonly GroupPathItem[];
+	/** Indent for this level in px (0 in `display: 'columns'`, where each level has its own column). */
+	indentPx: number;
+	/** What the built-in cell would show: `hierarchyColumn.label`, else `formattedValue` (totals: "Total"). */
+	label: string;
+	/** `hierarchyColumn.count`, else the leaf count of a group; null when there is none. */
+	count: string | null;
+	api: GridApi<TData>;
+	/** Opens a closed group, closes an open one. */
+	toggle(): void;
+	setExpanded(open: boolean): void;
+	/** Opens this group and every group beneath it. */
+	expandAll(): void;
+	/** Closes this group and every group beneath it. */
+	collapseAll(): void;
+	/** Selects or deselects every data row beneath this group (or tree parent). Read the state with `api.getDescendantSelection(ctx.id)`. */
+	selectChildren(selected: boolean): void;
+}
+
+export interface GroupRendererHandle<TData = unknown> {
+	/** Called when the same row is drawn again with a new context (aggregates, expansion, stuck state, a recycled host). */
+	update?(ctx: GroupRenderContext<TData>): void;
+	destroy?(): void;
+}
+
+/** A framework-free group renderer: `mount` runs synchronously in core, even mid-scroll. */
+export interface DomGroupRenderer<TData = unknown> {
+	mount(container: HTMLElement, ctx: GroupRenderContext<TData>): GroupRendererHandle<TData> | void;
+}
+
+/** How group rows and the hierarchy cell are drawn: a DOM renderer, or (React) a component rendered with the `GroupRenderContext` as props. */
+export type GroupRendererSpec<TData = unknown> = { kind: 'dom'; renderer: DomGroupRenderer<TData> } | { kind: 'react'; component: unknown };
 
 export type BuiltInAggFunc = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'distinctCount' | 'first' | 'last';
 
@@ -178,9 +233,9 @@ export interface AggregationConfig<TData = unknown> {
 	defs: AggregationDef<TData>[];
 }
 
-/** What a full-width row renderer receives. */
+/** What a detail row renderer (and core's own full-width row renderers) receives. */
 export interface RowRendererParams<TData = unknown> {
-	/** The detail, group or total row being drawn. */
+	/** The row being drawn. */
 	row: VisualRow<TData>;
 	/** Detail rows: the master row's data. */
 	masterData?: TData;
@@ -193,14 +248,14 @@ export interface DomRowRendererHandle<TData = unknown> {
 	destroy?(): void;
 }
 
-/** A framework-free full-width row renderer: mounted by core, synchronously, even mid-scroll. */
+/** A framework-free full-width row renderer for detail rows: mounted by core, synchronously, even mid-scroll. */
 export interface DomRowRenderer<TData = unknown> {
 	mount(container: HTMLElement, params: RowRendererParams<TData>): DomRowRendererHandle<TData> | void;
 }
 
 /**
- * How a full-width row is drawn: a DOM renderer core mounts itself, or a component the adapter
- * mounts (React: `{ kind: 'react', component }`, rendered with `{ visualRow, api }`).
+ * How a detail row is drawn: a DOM renderer core mounts itself, or a component the adapter
+ * mounts (React: `{ kind: 'react', component }`, rendered with `{ visualRow, api }`). Group rows use `GroupRendererSpec`.
  */
 export type RowRendererSpec<TData = unknown> = { kind: 'dom'; renderer: DomRowRenderer<TData> } | { kind: 'react'; component: unknown };
 

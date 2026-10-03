@@ -5,6 +5,7 @@ import {
 	asRowExpansionCapableModel,
 	asRowExpansionStateReadableModel,
 	type ExpandAllOptions,
+	type SetExpandedOptions,
 	type RowModel,
 	type RowExpansionCapableModel,
 	type RowModelRefreshResult,
@@ -304,8 +305,8 @@ export class GroupingFeatureController<TRowData = unknown> {
 		return asRowExpansionStateReadableModel(this.getRowModel())?.isExpanded(id) ?? false;
 	}
 
-	public setExpanded(id: string, expanded: boolean): void {
-		const result = this.getExpansionCapableRowModel()?.setExpanded(id, expanded);
+	public setExpanded(id: string, expanded: boolean, options?: SetExpandedOptions): void {
+		const result = this.getExpansionCapableRowModel()?.setExpanded(id, expanded, options);
 		this.applyRowModelRefreshInvalidation(result, 'group expansion', id);
 		if (result?.changed) this.dispatchExpansionChanged({ target: 'row', id, expanded });
 	}

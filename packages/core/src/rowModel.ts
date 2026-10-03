@@ -265,9 +265,14 @@ export interface ExpandAllOptions {
 	maxLevel?: number;
 }
 
+export interface SetExpandedOptions {
+	/** Also open or close every group and tree row beneath the row. Default: false. */
+	deep?: boolean;
+}
+
 /** Expansion for groups and tree rows (by visual row id) and detail rows (by row id). */
 export interface RowExpansionCapableModel<TRowData = unknown> {
-	setExpanded(id: string, expanded: boolean): RowModelRefreshResult | void;
+	setExpanded(id: string, expanded: boolean, options?: SetExpandedOptions): RowModelRefreshResult | void;
 	expandAll(options?: ExpandAllOptions): RowModelRefreshResult | void;
 	collapseAll(): RowModelRefreshResult | void;
 	setDetailOpen(rowId: string, open: boolean): RowModelRefreshResult | void;
@@ -1088,7 +1093,17 @@ export class ClientRowModelController<TData = unknown>
 		});
 	};
 
-	public setExpanded = (id: string, expanded: boolean): RowModelRefreshResult => {
+	public setExpanded = (id: string, expanded: boolean, options?: SetExpandedOptions): RowModelRefreshResult => {
+		const below = options?.deep ? (this.getHierarchyIndex()?.getDescendantContainerIds(id) ?? []) : [];
+		if (below.length > 0) {
+			// One write for the whole subtree, so one refresh.
+			this.runtime.updateExpansion((expansion) => {
+				const rows = { ...expansion.rows, [id]: expanded };
+				for (const childId of below) rows[childId] = expanded;
+				return { ...expansion, rows };
+			});
+			return this.refresh('expansion', id);
+		}
 		if (this.isExpanded(id) === expanded) return { changed: false };
 		this.runtime.updateExpansion((expansion) => ({ ...expansion, rows: { ...expansion.rows, [id]: expanded } }));
 		return this.refresh('expansion', id);

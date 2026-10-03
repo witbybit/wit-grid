@@ -182,8 +182,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	setHierarchyColumn(config: HierarchyColumnConfig<TRowData> | false | undefined): void;
 	getDetail(): DetailConfig<TRowData> | undefined;
 	setDetail(detail: DetailConfig<TRowData> | undefined): void;
-	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). */
-	setExpanded(id: string, expanded: boolean): void;
+	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). `deep` also opens or closes every group and tree row beneath it. */
+	setExpanded(id: string, expanded: boolean, options?: { deep?: boolean }): void;
 	toggleExpanded(id: string): void;
 	isExpanded(id: string): boolean;
 	/** Opens every group and tree row, or only levels up to `maxLevel` (closing deeper ones). Replaces individual choices. */

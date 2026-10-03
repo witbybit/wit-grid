@@ -1,8 +1,9 @@
 import { GridEventName } from '../api/GridEvents.js';
 import type { GridApi } from '../api/GridApiSurfaces.js';
-import { isGroupingActive, type DomRowRenderer, type RowRendererParams } from '../rows/hierarchyConfig.js';
+import { type DomGroupRenderer, type DomRowRenderer, type GroupRenderContext } from '../rows/hierarchyConfig.js';
 import type { VisualRow } from '../visualRow.js';
-import { resolveHierarchyCellModel, writeHierarchyCell, type HierarchyCellParts } from './hierarchyCell.js';
+import { writeHierarchyCell, type HierarchyCellParts } from './hierarchyCell.js';
+import { resolveFullWidthGroupModel } from './groupRenderContext.js';
 
 /**
  * Core's own full-width row renderers, used when neither a `RowRendererSpec` nor the adapter draws
@@ -63,28 +64,16 @@ function writeAggregates<TData>(
 	}
 }
 
-function hierarchyModel<TData>(api: GridApi<TData>, row: VisualRow<TData>) {
-	const treeData = api.getTreeData();
-	return resolveHierarchyCellModel(
-		row,
-		{ config: api.getHierarchyColumn() || undefined, treeColumn: treeData?.column, isTree: !isGroupingActive(api.getGrouping()) && !!treeData },
-		{
-			getColumn: (field) => api.getColumnDef(field),
-			getCellValue: (rowId, field) => api.getCellValue(rowId, field),
-			isRowSelected: (rowId) => api.isRowNodeSelected(rowId),
-			getDescendantSelection: (id) => api.getDescendantSelection(id).state,
-		}
-	);
-}
+const hierarchyModel = resolveFullWidthGroupModel;
 
 /**
  * A full-width group (or total) row: the hierarchy parts (toggle, checkbox, label, count — the
  * same parts and click handling as the hierarchy cell) followed by its aggregates.
  */
-function createHierarchyRowRenderer<TData>(kind: 'group' | 'total'): DomRowRenderer<TData> {
+function createHierarchyRowRenderer<TData>(kind: 'group' | 'total'): DomGroupRenderer<TData> {
 	return {
 		mount(container, initial) {
-			let params: RowRendererParams<TData> = initial;
+			let params: GroupRenderContext<TData> = initial;
 			const root = document.createElement('div');
 			root.className = `og-full-width-row og-full-width-${kind}`;
 			const parts = document.createElement('div');
@@ -154,6 +143,9 @@ const DEFAULTS = {
 	),
 } as const;
 
-export function getDefaultRowRenderer<TData>(row: VisualRow<TData>): DomRowRenderer<TData> | undefined {
-	return (DEFAULTS as Record<string, DomRowRenderer<unknown> | undefined>)[row.kind] as DomRowRenderer<TData> | undefined;
+export function getDefaultRowRenderer<TData>(row: VisualRow<TData>): DomRowRenderer<TData> | DomGroupRenderer<TData> | undefined {
+	return (DEFAULTS as Record<string, DomRowRenderer<unknown> | DomGroupRenderer<unknown> | undefined>)[row.kind] as
+		| DomRowRenderer<TData>
+		| DomGroupRenderer<TData>
+		| undefined;
 }
