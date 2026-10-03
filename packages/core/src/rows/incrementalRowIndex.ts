@@ -17,7 +17,7 @@ type LeafNode<TData> = Extract<RowTreeNode<TData>, { kind: 'data' }>;
 export const INCREMENTAL_MIN_ROW_LIMIT = 2000;
 export const INCREMENTAL_ROW_SHARE_LIMIT = 0.05;
 /** A group's column is recomputed exactly after this many deltas, bounding float drift. */
-export const DRIFT_RECOMPUTE_EVERY = 256;
+export const DRIFT_RECOMPUTE_EVERY = 2048;
 
 const BUILT_IN_FUNCS = new Set<string>([...STAT_FUNCS, 'distinctCount']);
 /** Key for the grand total in the distinct-value caches. */
@@ -195,30 +195,36 @@ export class IncrementalRowIndex<TData> {
 		let end = -1;
 		const changedRanges: Array<{ startIndex: number; endIndex: number }> = [];
 
-		// 1. In-group order.
-		const moves: Array<{ group: GroupNode<TData>; oldOrder: RowTreeNode<TData>[]; moving: LeafNode<TData>[]; lo: number; hi: number }> = [];
+		// 1. In-group order. The moved span (lo..hi in the group's children) comes from the moved
+		// leaves' old and new positions; a group that is not on screen only reorders its children.
+		const moves: Array<{ group: GroupNode<TData>; base: number; moving: LeafNode<TData>[]; lo: number; hi: number }> = [];
 		const reordered = new Set<GroupNode<TData>>();
 		if (this.sortModel.length > 0) {
 			for (const [group, leaves] of touched) {
-				const sorted = [...leaves.values()].filter((l) => l.sortChanged);
-				if (sorted.length === 0) continue;
-				const oldOrder = group.children.slice();
-				this.reinsert(
-					group.children,
-					sorted.map((l) => l.leaf)
-				);
-				let lo = -1;
+				const moving: LeafNode<TData>[] = [];
+				for (const item of leaves.values()) if (item.sortChanged) moving.push(item.leaf);
+				if (moving.length === 0) continue;
+				const gi = visualRowIdToIndex.get(group.id);
+				const groupRow = gi === undefined ? undefined : visualRows[gi];
+				const onScreen = groupRow?.kind === 'group' && groupRow.hierarchy.expanded;
+				const base = onScreen ? gi! + 1 + (visualRows[gi! + 1]?.kind === 'total' ? 1 : 0) : -1;
+				let lo = Infinity;
 				let hi = -1;
-				for (let i = 0; i < oldOrder.length; i++) {
-					if (oldOrder[i] !== group.children[i]) {
-						if (lo < 0) lo = i;
-						hi = i;
+				if (onScreen) {
+					for (const leaf of moving) {
+						const at = rowIdToVisualIndex.get(leaf.rowId);
+						if (at === undefined) throw new Error('incremental index out of step');
+						lo = Math.min(lo, at - base);
+						hi = Math.max(hi, at - base);
 					}
 				}
-				if (lo >= 0) {
-					moves.push({ group, oldOrder, moving: sorted.map((l) => l.leaf), lo, hi });
-					reordered.add(group);
+				const inserted = this.reinsert(group.children, moving);
+				for (const at of inserted) {
+					lo = Math.min(lo, at);
+					hi = Math.max(hi, at);
 				}
+				reordered.add(group);
+				if (onScreen && hi >= lo) moves.push({ group, base, moving, lo, hi });
 			}
 		}
 
@@ -321,16 +327,7 @@ export class IncrementalRowIndex<TData> {
 		}
 
 		// 6. The flat list: rewrite only the moved spans.
-		for (const { group, oldOrder, moving, lo, hi } of moves) {
-			moved = true;
-			const gi = visualRowIdToIndex.get(group.id);
-			if (gi === undefined) continue; // under a collapsed ancestor
-			const groupRow = visualRows[gi];
-			if (groupRow.kind !== 'group' || !groupRow.hierarchy.expanded) continue;
-			const base = gi + 1 + (visualRows[gi + 1]?.kind === 'total' ? 1 : 0);
-			const first = visualRows[base + lo];
-			if (first?.kind !== 'data' || first.rowId !== (oldOrder[lo] as LeafNode<TData>).rowId) throw new Error('incremental index out of step');
-			// Rows that did not move keep their relative order; the moved ones drop in at their new slots.
+		for (const { group, base, moving, lo, hi } of moves) {
 			const slice = visualRows.slice(base + lo, base + hi + 1);
 			const movedRows = new Map<RowTreeNode<TData>, VisualRow<TData>>();
 			const movedSlots = new Set<number>();
@@ -344,6 +341,7 @@ export class IncrementalRowIndex<TData> {
 				movedSlots.add(at - base - lo);
 			}
 			let cursor = 0;
+			let changed = false;
 			for (let i = lo; i <= hi; i++) {
 				const child = group.children[i];
 				let row = movedRows.get(child);
@@ -355,23 +353,13 @@ export class IncrementalRowIndex<TData> {
 				// Rows are this model's own objects: posInSet follows the row's new place in the group.
 				(row.hierarchy as { posInSet: number }).posInSet = i + 1;
 				if (visualRows[index] === row) continue;
+				changed = true;
 				visualRows[index] = row;
 				visualRowIdToIndex.set(row.id, index);
 				if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, index);
 			}
-			// Every expanded ancestor lists its visible descendants in row order.
-			const oldFirstId = (oldOrder[lo] as LeafNode<TData>).rowId;
-			let up: GroupNode<TData> | null = group;
-			while (up) {
-				const meta = groupMeta.get(up.id);
-				if (meta?.expanded) {
-					const ids = meta.visibleDescendantRowIds;
-					const at = ids.indexOf(oldFirstId);
-					if (at < 0) throw new Error('incremental index out of step');
-					for (let i = lo; i <= hi; i++) ids[at + i - lo] = (group.children[i] as LeafNode<TData>).rowId;
-				}
-				up = this.parentOf.get(up) ?? null;
-			}
+			if (!changed) continue;
+			moved = true;
 			changedRanges.push({ startIndex: base + lo, endIndex: base + hi });
 			start = Math.min(start, base + lo);
 			end = Math.max(end, base + hi);
@@ -412,12 +400,16 @@ export class IncrementalRowIndex<TData> {
 
 	// ── ordering ────────────────────────────────────────────────────────────────
 
-	/** Removes `leaves` from the sorted `children` and inserts each at its sorted place. */
-	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[]): void {
+	/**
+	 * Removes `leaves` from the sorted `children` and inserts each at its sorted place. Returns their
+	 * final positions (an insert at or before an earlier one shifts it down).
+	 */
+	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[]): number[] {
 		const moving = new Set<RowTreeNode<TData>>(leaves);
 		let kept = 0;
 		for (const child of children) if (!moving.has(child)) children[kept++] = child;
 		children.length = kept;
+		const positions: number[] = [];
 		for (const leaf of leaves) {
 			const keys = this.sortModel.map((s) => toSortKey(this.context.getValue(leaf.node, s.colId)));
 			const source = this.getSourceIndex(leaf.rowId) ?? 0;
@@ -429,7 +421,10 @@ export class IncrementalRowIndex<TData> {
 				else lo = mid + 1;
 			}
 			children.splice(lo, 0, leaf);
+			for (let i = 0; i < positions.length; i++) if (positions[i] >= lo) positions[i]++;
+			positions.push(lo);
 		}
+		return positions;
 	}
 
 	/** The tree sort's comparison: sort model in order, ties by source order. */

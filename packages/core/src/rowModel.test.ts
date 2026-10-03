@@ -54,6 +54,20 @@ function doApplyTransaction<T>(
 	);
 }
 
+/** Data row ids between a group's first and last visible leaf. */
+function visibleLeafIds(
+	ctrl: { getVisualRow(index: number): { kind: string; rowId?: string } | null },
+	meta: { firstLeafIndex: number; lastLeafIndex: number }
+): string[] {
+	const ids: string[] = [];
+	if (meta.firstLeafIndex < 0) return ids;
+	for (let i = meta.firstLeafIndex; i <= meta.lastLeafIndex; i++) {
+		const row = ctrl.getVisualRow(i);
+		if (row?.kind === 'data' && row.rowId) ids.push(row.rowId);
+	}
+	return ids;
+}
+
 describe('ClientRowModelController', () => {
 	it('should initialize and populate visualRows correctly', () => {
 		const store = new GridStore<TestRow>({
@@ -668,7 +682,7 @@ describe('GroupRowMeta', () => {
 		expect(ctrl.getGroupMeta('no-such-id')).toBeNull();
 	});
 
-	it('collapsed group: firstChildIndex and lastChildIndex are -1, visibleDescendantRowIds is empty', () => {
+	it('collapsed group: firstChildIndex and lastChildIndex are -1, no visible leaves', () => {
 		const store = new GridStore<GRow>({
 			getRowId: (r) => r.id,
 			columns: [{ field: 'category', header: 'Category' }],
@@ -687,10 +701,10 @@ describe('GroupRowMeta', () => {
 		expect(meta!.expanded).toBe(false);
 		expect(meta!.firstChildIndex).toBe(-1);
 		expect(meta!.lastChildIndex).toBe(-1);
-		expect(meta!.visibleDescendantRowIds).toEqual([]);
+		expect(visibleLeafIds(ctrl, meta!)).toEqual([]);
 	});
 
-	it('expanded group: firstChildIndex, lastChildIndex, and visibleDescendantRowIds are correct', () => {
+	it('expanded group: firstChildIndex, lastChildIndex, and the visible leaf range are correct', () => {
 		const store = new GridStore<GRow>({
 			getRowId: (r) => r.id,
 			columns: [{ field: 'category', header: 'Category' }],
@@ -711,7 +725,7 @@ describe('GroupRowMeta', () => {
 		expect(meta!.expanded).toBe(true);
 		expect(meta!.firstChildIndex).toBe(1);
 		expect(meta!.lastChildIndex).toBe(2);
-		expect(meta!.visibleDescendantRowIds).toEqual(['1', '2']);
+		expect(visibleLeafIds(ctrl, meta!)).toEqual(['1', '2']);
 		expect(meta!.firstLeafIndex).toBe(1);
 		expect(meta!.lastLeafIndex).toBe(2);
 	});
@@ -754,8 +768,8 @@ describe('GroupRowMeta', () => {
 		store.engine.stateManager.setState({ expansion: { rows: { [idA]: true, [idB]: true }, details: {} } });
 		ctrl.refresh();
 
-		expect(ctrl.getGroupMeta(idA)!.visibleDescendantRowIds).toEqual(['1']);
-		expect(ctrl.getGroupMeta(idB)!.visibleDescendantRowIds).toEqual(['2', '3']);
+		expect(visibleLeafIds(ctrl, ctrl.getGroupMeta(idA)!)).toEqual(['1']);
+		expect(visibleLeafIds(ctrl, ctrl.getGroupMeta(idB)!)).toEqual(['2', '3']);
 		// A's range ends just before B's group row (index 2)
 		expect(ctrl.getGroupMeta(idA)!.lastChildIndex).toBe(1);
 		// B's range starts at index 3
@@ -788,13 +802,13 @@ describe('GroupRowMeta', () => {
 
 		const outerMeta = ctrl.getGroupMeta(outer);
 		const innerMeta = ctrl.getGroupMeta(inner);
-		expect(outerMeta!.visibleDescendantRowIds).toEqual(['1', '2']);
-		expect(innerMeta!.visibleDescendantRowIds).toEqual(['1', '2']);
+		expect(visibleLeafIds(ctrl, outerMeta!)).toEqual(['1', '2']);
+		expect(visibleLeafIds(ctrl, innerMeta!)).toEqual(['1', '2']);
 		expect(outerMeta!.childGroupIds).toContain(inner);
 		expect(innerMeta!.parentGroupId).toBe(outer);
 	});
 
-	it('group with footer: footer row does not appear in visibleDescendantRowIds but is in child range', () => {
+	it('group with footer: footer row is not a visible leaf but is in child range', () => {
 		const store = new GridStore<GRow>({
 			getRowId: (r) => r.id,
 			columns: [{ field: 'category', header: 'Category' }],
@@ -812,7 +826,7 @@ describe('GroupRowMeta', () => {
 		ctrl.refresh();
 
 		const meta = ctrl.getGroupMeta(groupId);
-		expect(meta!.visibleDescendantRowIds).toEqual(['1', '2']);
+		expect(visibleLeafIds(ctrl, meta!)).toEqual(['1', '2']);
 		const footerRow = ctrl.getVisualRow(meta!.lastChildIndex);
 		expect(footerRow?.kind).toBe('total');
 	});

@@ -356,7 +356,6 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 				lastChildIndex: row.hierarchy.expanded ? visualRows.length - 1 : -1,
 				firstLeafIndex: -1,
 				lastLeafIndex: -1,
-				visibleDescendantRowIds: [],
 				childGroupIds: [],
 				leafCount: row.hierarchy.leafCount,
 				childCount: row.hierarchy.childCount,
@@ -369,7 +368,6 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 			if (row.hierarchy.expanded) stack.push(meta);
 		} else if (row.kind === 'data') {
 			for (const group of stack) {
-				group.visibleDescendantRowIds.push(row.rowId);
 				if (group.firstLeafIndex === -1) group.firstLeafIndex = i;
 				group.lastLeafIndex = i;
 			}
