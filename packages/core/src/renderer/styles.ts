@@ -1752,10 +1752,43 @@ export const CORE_STYLES = `
 
   .og-selection-border {
     position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 19;
     border: 2px dashed var(--og-selection-border);
     background-color: var(--og-selection-bg);
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  /*
+   * The selection box is part of the scrolled content (rows container / pinned bands), positioned
+   * in content coordinates, so it scrolls on the compositor with the cells. Pieces over pinned
+   * columns sit in zero-height sticky lanes (left:0 / right:0) like the pinned cells they cover.
+   * 19 keeps it above body cells and below sticky group headers (21-24), the pinned bands (25) and
+   * the column header (30).
+   */
+  .og-selection-lane {
+    position: sticky;
+    height: 0;
+    z-index: 19;
+    pointer-events: none;
+  }
+
+  .og-selection-lane-left {
+    left: 0;
+  }
+
+  .og-selection-lane-right {
+    right: 0;
+    margin-left: auto;
+  }
+
+  .og-layer-pinned-top > .og-selection-border,
+  .og-layer-pinned-top > .og-selection-lane,
+  .og-layer-pinned-bottom > .og-selection-border,
+  .og-layer-pinned-bottom > .og-selection-lane {
+    z-index: 26;
   }
 
   /* Selection Fill Handle Style */

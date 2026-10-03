@@ -312,7 +312,7 @@ describe('scroll-end detection', () => {
 });
 
 describe('selection overlay during scroll', () => {
-	it('moves the selection border with the content on every scroll frame', () => {
+	it('keeps the selection box in scrolled content coordinates with zero scroll-linked writes', () => {
 		const rafs: FrameRequestCallback[] = [];
 		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
 			rafs.push(cb);
@@ -327,16 +327,77 @@ describe('selection overlay during scroll', () => {
 		renderer.overlayRenderer.repaintOverlay();
 		const border = container.querySelector('.og-selection-border') as HTMLDivElement;
 		expect(border).not.toBeNull();
+		// Lives in the scrolled rows container, not the fixed overlay layer.
+		expect(border.parentNode).toBe(container.querySelector('.og-rows-container'));
+		expect(container.querySelector('.og-layer-overlay')!.contains(border)).toBe(false);
 		const before = border.style.transform;
+		expect(before).toContain(`${2 * 40}px`);
 
+		renderer.resetRenderStats();
 		const scrollViewport = container.querySelector('.og-scroll-viewport') as HTMLDivElement;
-		scrollViewport.scrollTop = 40;
+		for (const top of [40, 120, 300]) {
+			scrollViewport.scrollTop = top;
+			scrollViewport.dispatchEvent(new Event('scroll'));
+			rafs[rafs.length - 1]!(0);
+		}
+		scrollViewport.scrollLeft = 30;
 		scrollViewport.dispatchEvent(new Event('scroll'));
 		rafs[rafs.length - 1]!(0);
 
 		expect(renderer.getRenderStats().scrollFrames).toBeGreaterThan(0);
-		expect(border.style.transform).not.toBe(before);
-		expect(border.style.transform).toContain(`${2 * 40 - 40}px`);
+		expect(renderer.getRenderStats().scrollLinkedPositionWrites).toBe(0);
+		expect(border.style.transform).toBe(before);
+
+		renderer.unmount();
+		controller.dispose();
+		store.destroy();
+	});
+});
+
+describe('selection over pinned columns', () => {
+	it('clips the center piece to the center area on horizontal scroll only', () => {
+		const rafs: FrameRequestCallback[] = [];
+		vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
+			rafs.push(cb);
+			return rafs.length;
+		});
+		vi.stubGlobal('cancelAnimationFrame', () => {});
+		const columns = Array.from({ length: 8 }, (_, i) => ({ field: `c${i}`, header: `C${i}`, width: 120 }));
+		const store = new GridStore<Record<string, string>>({ columns, defaultRowHeight: 40, defaultColWidth: 120, getRowId: (row) => row.id! });
+		const controller = new ClientRowModelController(store.getClientRowModelRuntime(), {
+			rows: Array.from({ length: 50 }, (_, i) => ({ id: `row-${i}`, c0: 'x' })),
+			columns: store.getState().columns,
+		});
+		store.setViewportPins({ left: 1 });
+		const container = makeContainer();
+		const renderer = new RenderEngine(store.engine, store);
+		renderer.mount(container);
+		store.selectRange({ rowId: 'row-2', colField: 'c0' }, { rowId: 'row-3', colField: 'c5' });
+		renderer.overlayRenderer.repaintOverlay();
+		const rows = container.querySelector('.og-rows-container')!;
+		const center = Array.from(container.querySelectorAll('.og-selection-border')).find((el) => el.parentNode === rows) as HTMLElement;
+		expect(center).toBeTruthy();
+		const leftClip = (el: HTMLElement) => Number(/inset\([^ ]+ [^ ]+ [^ ]+ (-?[\d.]+)px\)/.exec(el.style.clipPath)![1]);
+		expect(leftClip(center)).toBeLessThanOrEqual(0);
+
+		const scrollViewport = container.querySelector('.og-scroll-viewport') as HTMLDivElement;
+		// Selecting scrolls the range into view; settle that scroll before measuring.
+		scrollViewport.scrollLeft = 0;
+		scrollViewport.dispatchEvent(new Event('scroll'));
+		rafs[rafs.length - 1]!(0);
+		renderer.resetRenderStats();
+		scrollViewport.scrollTop = 120;
+		scrollViewport.dispatchEvent(new Event('scroll'));
+		rafs[rafs.length - 1]!(0);
+		expect(renderer.getRenderStats().scrollLinkedPositionWrites).toBe(0);
+
+		scrollViewport.scrollLeft = 60;
+		scrollViewport.dispatchEvent(new Event('scroll'));
+		rafs[rafs.length - 1]!(0);
+		// Piece starts at x=120 (right after the 120px lane); at scrollLeft 60 its first 60px sit under the lane.
+		expect(store.engine.viewport.scrollLeft).toBe(60);
+		expect(leftClip(center)).toBe(60);
+		expect(renderer.getRenderStats().scrollLinkedPositionWrites).toBeGreaterThan(0);
 
 		renderer.unmount();
 		controller.dispose();
