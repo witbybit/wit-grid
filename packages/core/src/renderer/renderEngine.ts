@@ -196,6 +196,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		});
 
 		this.viewportRenderer = new ViewportRenderer<TRowData>(engine, this.geometryController);
+		this.scrollEngine.onProgrammaticScroll = () => this.viewportRenderer.invalidatePositionReads();
 		this.cellRenderer = new CellRenderer((frame) => this.rowRenderer.repaintInvalidatedRowsAndCells(frame));
 		this.rowRenderer = new RowRenderer<TRowData>(
 			engine,

@@ -164,8 +164,12 @@ export class ScrollEngine<TRowData = unknown> {
 	/**
 	 * Programmatically update scroll offsets.
 	 */
+	/** Called after a programmatic scroll (reads cached by the renderer are stale). */
+	public onProgrammaticScroll: (() => void) | null = null;
+
 	public scrollTo(scrollTop: number, scrollLeft: number): void {
 		if (this.scrollContainer) {
+			this.onProgrammaticScroll?.();
 			this.scrollContainer.scrollTop = scrollTop;
 			this.scrollContainer.scrollLeft = scrollLeft;
 

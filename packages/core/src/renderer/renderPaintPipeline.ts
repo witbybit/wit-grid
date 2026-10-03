@@ -244,6 +244,7 @@ export class RenderPaintPipeline<TRowData = unknown> {
 		if (!notScrolling || delta === 0 || currentTop <= 0) return;
 		this.deps.viewportLayout.syncLayoutPlan();
 		scrollViewport.scrollTop = Math.max(0, currentTop + delta);
+		this.deps.viewportRenderer.invalidatePositionReads();
 		// Read back: the browser may clamp. Keep the engine in step without faking scroll velocity.
 		this.deps.engine.viewport.applyAnchoredScrollTop(scrollViewport.scrollTop);
 	}
@@ -310,8 +311,9 @@ export class RenderPaintPipeline<TRowData = unknown> {
 	private syncViewport(): void {
 		// Sync DOM-measured scroll viewport width before computing layout — ensures
 		// scrollViewportClientWidth is fresh after container resizes (e.g. sidebar open/close)
-		// without needing a full paint cycle.
-		this.deps.viewportRenderer.syncViewportScrollFromDom();
+		// without needing a full paint cycle. A scroll frame in this flush already read it: reuse that
+		// instead of reading after its DOM writes (a forced layout).
+		this.deps.viewportRenderer.syncViewportScrollFromDom('frame');
 		const layoutPlan = this.deps.viewportLayout.syncLayoutPlan();
 		this.deps.viewportLayout.recycleViewport(false, undefined, layoutPlan.renderWindow);
 		this.deps.stickyGroupRenderer.sync(layoutPlan);

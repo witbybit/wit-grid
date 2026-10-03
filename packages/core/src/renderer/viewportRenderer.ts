@@ -200,13 +200,50 @@ export class ViewportRenderer<TRowData = unknown> {
 	private lastScrolledLeft = false;
 	private lastScrolledRight = false;
 
-	public syncViewportScrollFromDom(): void {
+	/** A scroll event read the position since the last DOM sync (the engine holds it); a programmatic scroll clears it. */
+	private eventReadFresh = false;
+	/** A DOM sync ran in the current task (one frame flush); cleared on a microtask after it. */
+	private frameReadFresh = false;
+
+	/** The scroll event handler read scrollTop/scrollLeft and handed them to the engine. */
+	public notePositionFromScrollEvent(): void {
+		this.eventReadFresh = true;
+	}
+
+	/** The grid moved the scroll position itself: the next sync must read the DOM. */
+	public invalidatePositionReads(): void {
+		this.eventReadFresh = false;
+		this.frameReadFresh = false;
+	}
+
+	/**
+	 * Reads the scroll position and viewport width into the engine. Reading after DOM writes forces a
+	 * synchronous layout, so a caller may reuse a read the engine already holds: `'event'` one made by
+	 * the scroll event since the last sync (it ran before this frame's writes), `'frame'` one made
+	 * earlier in this frame flush. Width changes come from resizes and full paints, which read.
+	 */
+	public syncViewportScrollFromDom(reuse: 'none' | 'event' | 'frame' = 'none'): void {
 		if (!this.scrollViewport) return;
+		if ((reuse === 'event' && this.eventReadFresh) || (reuse === 'frame' && this.frameReadFresh)) {
+			this.eventReadFresh = false;
+			this.markFrameRead();
+			const viewport = this.engine.viewport;
+			this.syncHorizontalScrollEdges(viewport.scrollLeft, viewport.scrollViewportClientWidth || viewport.viewportWidth);
+			return;
+		}
 		const clientWidth = this.scrollViewport.clientWidth || this.engine.viewport.viewportWidth;
 		const scrollLeft = this.scrollViewport.scrollLeft;
 		this.engine.viewport.setScrollViewportClientWidth(clientWidth);
 		this.engine.viewport.setScrollPosition(this.scrollViewport.scrollTop, scrollLeft);
 		this.syncHorizontalScrollEdges(scrollLeft, clientWidth);
+		this.eventReadFresh = false;
+		this.markFrameRead();
+	}
+
+	private markFrameRead(): void {
+		if (this.frameReadFresh) return;
+		this.frameReadFresh = true;
+		queueMicrotask(() => (this.frameReadFresh = false));
 	}
 
 	/**
