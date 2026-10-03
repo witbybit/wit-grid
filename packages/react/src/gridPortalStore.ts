@@ -95,13 +95,18 @@ export function createPortalStore<TRowData = unknown>() {
 		});
 	}
 
+	// Row and menu content commits in one flushSync from a microtask, like cell data: a recycled
+	// row container (a group row, a custom hierarchy cell) must not show the previous row's
+	// content for a frame while React's scheduler gets to it.
 	function notifyRowMenuStructural() {
 		debugStats.rowMenuStructuralPublishes++;
 		if (rowMenuScheduled) return;
 		rowMenuScheduled = true;
 		queueMicrotask(() => {
 			rowMenuScheduled = false;
-			for (const l of rowMenuStructuralListeners) l();
+			flushSync(() => {
+				for (const l of rowMenuStructuralListeners) l();
+			});
 		});
 	}
 

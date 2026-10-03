@@ -574,6 +574,7 @@ export class PortalMountManager<TRowData = unknown> {
 		}
 		for (const [rowKey, mount] of this.deferredRowMounts) {
 			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
+			clearRowContentPending(mount.container);
 			this.onMountRowContent?.(mount);
 			this.deferredRowMounts.delete(rowKey);
 			processed++;
@@ -649,6 +650,10 @@ export class PortalMountManager<TRowData = unknown> {
 			this.stats.deferredDuringScroll++;
 			this.deferredRowReleases.delete(mount.rowKey);
 			this.deferredRowMounts.set(mount.rowKey, mount);
+			// The container still shows the previous row's content until this mount is applied: hide
+			// it and show the new row's label instead (CSS only, so the adapter's DOM is untouched).
+			if (existingContainer === mount.container && existingVisualRow && existingVisualRow.id !== mount.visualRow.id)
+				markRowContentPending(mount.container, mount.context?.label ?? '');
 			return;
 		}
 		this.onMountRowContent?.(mount);
@@ -691,6 +696,7 @@ export class PortalMountManager<TRowData = unknown> {
 		const mount = this.deferredRowMounts.get(rowKey);
 		if (mount) {
 			this.deferredRowMounts.delete(rowKey);
+			clearRowContentPending(mount.container);
 			this.onMountRowContent?.(mount);
 		}
 	}
@@ -802,4 +808,17 @@ export class PortalMountManager<TRowData = unknown> {
 		this.stats.flushChunks = 0;
 		this.stats.maxOpsFlushedInOneChunk = 0;
 	}
+}
+
+const ROW_CONTENT_PENDING_CLASS = 'og-row-content-pending';
+
+function markRowContentPending(container: HTMLElement, standIn: string): void {
+	container.classList.add(ROW_CONTENT_PENDING_CLASS);
+	container.setAttribute('data-stand-in', standIn);
+}
+
+function clearRowContentPending(container: HTMLElement): void {
+	if (!container.classList.contains(ROW_CONTENT_PENDING_CLASS)) return;
+	container.classList.remove(ROW_CONTENT_PENDING_CLASS);
+	container.removeAttribute('data-stand-in');
 }

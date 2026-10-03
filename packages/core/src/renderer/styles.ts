@@ -754,6 +754,21 @@ export const CORE_STYLES = `
     pointer-events: none;
   }
 
+  /*
+   * A recycled row/cell container whose adapter-rendered content is still the previous row's while
+   * its own mount waits out the scroll: the old content is hidden and the new row's label shown.
+   */
+  .og-row-content-pending > * {
+    visibility: hidden;
+  }
+  .og-row-content-pending::before {
+    content: attr(data-stand-in);
+    position: absolute;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .og-row.og-sticky-group-row-host {
     position: sticky;
     left: auto;
