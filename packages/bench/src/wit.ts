@@ -64,7 +64,18 @@ if (cssVariant && CSS_VARIANTS[cssVariant]) {
 }
 
 const initialRows = makeRows(scenario);
-const api = createClientGrid<BenchRow>({ columns, rows: initialRows, getRowId: (row) => row.id });
+// ?grouped=1: grouped by c1 (1,000 groups of ~100 rows), every group open, sticky group headers, and
+// two rows pinned to the top and one to the bottom: every element that stays put while rows scroll.
+const grouped = new URLSearchParams(location.search).get('grouped') === '1';
+const api = createClientGrid<BenchRow>({
+	columns,
+	rows: initialRows,
+	getRowId: (row) => row.id,
+});
+if (grouped) {
+	api.setGrouping({ by: ['c1'], defaultExpanded: true, stickyHeaders: true });
+	api.transaction({ pins: { top: 2, bottom: 1 } });
+}
 if (styledCells) api.setStyleRules([{ kind: 'cell', when: (row, col) => isHotValue(row[col.field]), cellClass: HOT_CLASS }]);
 installTicker(initialRows, (rows) => api.setRows(rows));
 const host = mountGridHost(api, container);
