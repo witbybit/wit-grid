@@ -40,7 +40,9 @@ export const DESK_CSS = `
 
 .md-heat { position: relative; width: 100%; height: 18px; border-radius: 4px; background: var(--md-track); overflow: hidden; }
 .md-heat::after { content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--md-muted); opacity: .35; }
-.md-heat-bar { position: absolute; top: 0; bottom: 0; transition: width .25s ease, left .25s ease; }
+/* Bars move by transform (the compositor animates it), and only tween while a row's own value changes (.md-tween); a cell rebound to another row snaps. */
+.md-heat-bar { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: left center; transform: scaleX(0); }
+.md-tween { transition: transform .25s ease; }
 .md-heat-bar[data-dir='up'] { background: var(--md-up-soft); box-shadow: inset 0 0 0 1px var(--md-up-soft); }
 .md-heat-bar[data-dir='down'] { background: var(--md-down-soft); box-shadow: inset 0 0 0 1px var(--md-down-soft); }
 .md-heat-text { position: relative; z-index: 1; display: block; text-align: center; font: 700 11px/18px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--md-text); }
@@ -56,14 +58,15 @@ export const DESK_CSS = `
 .md-range-lo { min-width: 38px; text-align: right; }
 .md-range-hi { min-width: 38px; }
 .md-range-track { position: relative; flex: 1; height: 4px; border-radius: 2px; background: var(--md-track); }
-.md-range-marker { position: absolute; top: -3px; width: 4px; height: 10px; margin-left: -2px; border-radius: 2px; background: var(--md-text); transition: left .25s ease; }
-.md-range-marker[data-dir='up'] { background: var(--md-up); }
-.md-range-marker[data-dir='down'] { background: var(--md-down); }
+.md-range-marker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.md-range-marker::before { content: ''; position: absolute; top: -3px; left: -2px; width: 4px; height: 10px; border-radius: 2px; background: var(--md-text); }
+.md-range-marker[data-dir='up']::before { background: var(--md-up); }
+.md-range-marker[data-dir='down']::before { background: var(--md-down); }
 .md-range-vwap { position: absolute; top: -2px; width: 1px; height: 8px; background: var(--md-accent); opacity: .9; }
 
 .md-bar-cell { display: flex; align-items: center; gap: 6px; width: 100%; }
 .md-bar-track { flex: 1; height: 5px; border-radius: 3px; background: var(--md-track); overflow: hidden; }
-.md-bar-fill { display: block; height: 100%; border-radius: 3px; background: var(--md-muted); transition: width .25s ease; }
+.md-bar-fill { display: block; width: 100%; height: 100%; background: var(--md-muted); transform-origin: left center; }
 .md-bar-fill.md-bar-accent { background: var(--md-accent); }
 .md-bar-fill[data-level='lo'] { background: var(--md-up); }
 .md-bar-fill[data-level='mid'] { background: var(--md-warn); }
@@ -73,7 +76,7 @@ export const DESK_CSS = `
 .md-pnl { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; width: 100%; }
 .md-pnl-text { font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .md-pnl-track { width: 100%; height: 3px; border-radius: 2px; background: var(--md-track); overflow: hidden; display: flex; justify-content: flex-end; }
-.md-pnl-fill { display: block; height: 100%; transition: width .25s ease; }
+.md-pnl-fill { display: block; width: 100%; height: 100%; transform-origin: right center; }
 .md-pnl-fill[data-dir='up'] { background: var(--md-up); }
 .md-pnl-fill[data-dir='down'] { background: var(--md-down); }
 .md-agg { font: 700 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -97,18 +100,21 @@ export const DESK_CSS = `
 .md-badge i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: block; }
 
 /* Group rows */
-.md-grp { display: flex; align-items: center; gap: 8px; height: 100%; width: 100%; padding-right: 8px; box-sizing: border-box; font-size: 12px; color: var(--md-text); background: var(--md-group-bg); }
+.md-grp { display: flex; align-items: center; gap: 8px; height: 100%; width: 100%; padding-right: 8px; box-sizing: border-box; font-size: 12px; color: var(--md-text); background: var(--md-group-bg); container-type: inline-size; }
 .md-grp.md-grp-stuck { background: var(--md-group-stuck); font-size: 11px; }
-.md-grp-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The label keeps room for a short name; the bar gives way first, then the % column drops out. */
+.md-grp-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 64px; flex: 0 1 auto; }
+.md-grp-pct { min-width: 44px; text-align: right; }
+@container (max-width: 320px) { .md-grp-pct { display: none; } }
 .md-grp-count { font-size: 10px; color: var(--md-muted); white-space: nowrap; }
 .md-grp-pnl { font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .md-grp-pnl[data-dir='up'] { color: var(--md-up); }
 .md-grp-pnl[data-dir='down'] { color: var(--md-down); }
-.md-grp-bar { position: relative; width: 56px; height: 5px; border-radius: 3px; background: var(--md-track); flex-shrink: 0; }
+.md-grp-bar { position: relative; width: 48px; min-width: 20px; height: 5px; border-radius: 3px; background: var(--md-track); flex-shrink: 1; }
 .md-grp-bar::after { content: ''; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--md-muted); opacity: .5; }
-.md-grp-bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
-.md-grp-bar i[data-dir='up'] { left: 50%; background: var(--md-up); }
-.md-grp-bar i[data-dir='down'] { right: 50%; background: var(--md-down); }
+.md-grp-bar i { position: absolute; top: 0; bottom: 0; left: 50%; width: 50%; transform-origin: left center; }
+.md-grp-bar i[data-dir='up'] { background: var(--md-up); }
+.md-grp-bar i[data-dir='down'] { background: var(--md-down); }
 .md-grp-actions { margin-left: auto; display: flex; gap: 4px; flex-shrink: 0; }
 .md-grp-btn { font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--md-track); background: transparent; color: var(--md-muted); cursor: pointer; }
 .md-grp-btn:hover { color: var(--md-text); border-color: var(--md-muted); }

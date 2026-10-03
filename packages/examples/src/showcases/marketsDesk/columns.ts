@@ -125,9 +125,8 @@ export function createColumns(compact: boolean): ColumnDef<MarketRow>[] {
 	];
 }
 
-/** Per group: count, sum notional, sum unrealised P&L, sum volume, avg change %, max volatility. */
+/** Per group: sum notional, sum unrealised P&L, sum volume, avg change %, max volatility (the row count is the group's count chip). */
 export const AGGREGATES: AggregationDef<MarketRow>[] = [
-	{ colId: 'symbol', aggFunc: 'count' },
 	{ colId: 'notional', aggFunc: 'sum' },
 	{ colId: 'unrealizedPnl', aggFunc: 'sum' },
 	{ colId: 'volume', aggFunc: 'sum' },
