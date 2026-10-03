@@ -7,6 +7,7 @@ import AdvancedFiltersDemo from '../showcases/AdvancedFiltersDemo.js';
 import ClipboardDemo from '../showcases/ClipboardDemo.js';
 import DataIntegrityLab from '../showcases/DataIntegrityLab.js';
 import InfiniteServerScroll from '../showcases/InfiniteServerScroll.js';
+import GroupingStickyDemo from '../showcases/GroupingStickyDemo.js';
 import KanbanBoardDemo from '../showcases/KanbanBoardDemo.js';
 import NativeCellTypesDemo from '../showcases/NativeCellTypesDemo.js';
 import RealtimeDashboard from '../showcases/RealtimeDashboard.js';
@@ -22,6 +23,7 @@ const SHOWCASES: Record<string, ComponentType<Record<string, unknown>>> = {
 	'advanced-filters': AdvancedFiltersDemo as ComponentType<Record<string, unknown>>,
 	'kanban-board': KanbanBoardDemo as ComponentType<Record<string, unknown>>,
 	'row-drag': RowDragDemo as ComponentType<Record<string, unknown>>,
+	'grouping-sticky': GroupingStickyDemo as ComponentType<Record<string, unknown>>,
 	clipboard: ClipboardDemo as ComponentType<Record<string, unknown>>,
 };
 
