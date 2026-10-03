@@ -25,22 +25,22 @@ function groupRecursively<TData>(
 ): RowTreeNode<TData>[] {
 	const groupDef = groupDefs[depth];
 	const field = groupDef.colId;
-	const groupsMap = new Map<string, RowNode<TData>[]>();
-	const groupKeys = new Map<string, { key: unknown; keyString: string }>();
-
+	// Same keys as context.getGroupKey, inlined: one reader, one Map lookup and no allocation per row.
+	const read = context.readerFor(field);
+	const keyCreator = groupDef.keyCreator;
+	const groupsMap = new Map<string, { key: unknown; nodes: RowNode<TData>[] }>();
 	for (const node of nodes) {
-		const key = context.getGroupKey(node, groupDef);
-		if (!groupsMap.has(key.keyString)) {
-			groupsMap.set(key.keyString, []);
-			groupKeys.set(key.keyString, key);
-		}
-		groupsMap.get(key.keyString)!.push(node);
+		const value = read(node);
+		const keyString = keyCreator ? keyCreator({ value, row: node.data, rowId: node.id }) : typeof value === 'string' ? value : String(value ?? 'None');
+		let group = groupsMap.get(keyString);
+		if (!group) groupsMap.set(keyString, (group = { key: value, nodes: [] }));
+		group.nodes.push(node);
 	}
 
 	const results: RowTreeNode<TData>[] = [];
 
-	for (const [keyString, groupNodes] of groupsMap.entries()) {
-		const key = groupKeys.get(keyString)?.key ?? keyString;
+	for (const [keyString, { key: rawKey, nodes: groupNodes }] of groupsMap) {
+		const key = rawKey ?? keyString;
 		const path = [...parentPath, { field, key, keyString }];
 		const groupId = toGroupVisualRowId(path);
 		const isLastLevel = depth === groupDefs.length - 1;
@@ -57,9 +57,8 @@ function groupRecursively<TData>(
 			childNodes = groupRecursively(groupNodes, groupDefs, context, depth + 1, path);
 		}
 
-		const leafCount = childNodes.reduce((acc, child) => {
-			return acc + (child.kind === 'data' ? 1 : child.leafCount);
-		}, 0);
+		let leafCount = 0;
+		for (const child of childNodes) leafCount += child.kind === 'data' ? 1 : child.leafCount;
 
 		results.push({
 			kind: 'group',

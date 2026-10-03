@@ -35,6 +35,8 @@ export type RowTreeNode<TData = unknown> =
 export interface RowPipelineContext<TData = unknown> {
 	columnsById: Map<string, ColumnDef<TData>>;
 	getValue: (node: RowNode<TData>, colId: string) => unknown;
+	/** The value reader for a column id, resolved once per run (hoist it out of per-row loops). */
+	readerFor: (colId: string) => (node: RowNode<TData>) => unknown;
 	getGroupKey: (node: RowNode<TData>, groupDef: GroupDef<TData>) => { key: unknown; keyString: string };
 	reportFault?: (operation: string, error: unknown, context?: Record<string, unknown>) => void;
 }

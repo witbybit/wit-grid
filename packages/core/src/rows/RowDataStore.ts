@@ -269,7 +269,28 @@ export class RowDataStore<T> {
 		return this.rowsById.get(rowId) ?? null;
 	}
 
+	/** Nodes in source order, cached until the order or membership changes. Callers must not mutate it. */
+	private nodesInOrder: RowNode<T>[] | null = null;
+	private orderSeen: readonly string[] | null = null;
+	private nodesSeen: Map<string, RowNode<T>> | null = null;
+
 	public getAllNodes(): RowNode<T>[] {
+		// Every order change assigns a new array or pushes onto it (length), membership edits replace
+		// or edit rowsById (size): cheap identity checks instead of hooks in every mutation path.
+		if (
+			this.nodesInOrder &&
+			this.orderSeen === this.sourceOrder &&
+			this.nodesInOrder.length === this.sourceOrder.length &&
+			this.nodesSeen === this.rowsById &&
+			this.rowsById.size === this.nodesInOrder.length
+		)
+			return this.nodesInOrder;
+		this.orderSeen = this.sourceOrder;
+		this.nodesSeen = this.rowsById;
+		return (this.nodesInOrder = this.computeAllNodes());
+	}
+
+	private computeAllNodes(): RowNode<T>[] {
 		return this.sourceOrder.map((id) => this.rowsById.get(id)!);
 	}
 

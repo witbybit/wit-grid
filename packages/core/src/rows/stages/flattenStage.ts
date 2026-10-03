@@ -8,7 +8,7 @@ import {
 	type TotalsConfig,
 	type TreeRowInfo,
 } from '../hierarchyConfig.js';
-import { toDataVisualRowId, toDetailVisualRowId, toTotalVisualRowId } from '../visualRowIds.js';
+import { dataVisualRowIdOf, toDataVisualRowId, toDetailVisualRowId, toTotalVisualRowId } from '../visualRowIds.js';
 import type { RowTreeNode } from './types.js';
 
 export interface FlattenConfig<TData = unknown> {
@@ -32,6 +32,8 @@ interface FlattenState<TData> {
 	readonly result: VisualRow<TData>[];
 	readonly stickyGroupMeta?: Map<number, number>;
 	readonly totalsHeight: number;
+	/** `config.rowHeightsRecord`, or null when it is empty (most grids): no per-row lookup then. */
+	readonly recordedHeights: Record<string, number> | null;
 }
 
 /**
@@ -51,6 +53,7 @@ export function flattenStage<TData>(
 		result,
 		stickyGroupMeta,
 		totalsHeight: config.groupRowHeight || config.defaultRowHeight,
+		recordedHeights: hasKeys(config.rowHeightsRecord) ? config.rowHeightsRecord : null,
 	};
 	const grand = config.totals?.grand;
 	if (grand === 'top') pushGrandTotal(state);
@@ -133,6 +136,11 @@ function pushGrandTotal<TData>(state: FlattenState<TData>): void {
 	});
 }
 
+function hasKeys(record: Record<string, unknown>): boolean {
+	for (const _ in record) return true;
+	return false;
+}
+
 function countLeaves<TData>(node: RowTreeNode<TData>): number {
 	if (node.kind === 'group') return node.leafCount;
 	let count = 0;
@@ -157,9 +165,9 @@ function flattenNode<TData>(
 	const { config, result } = state;
 
 	if (node.kind === 'data') {
-		const rowId = node.node.id;
-		const id = toDataVisualRowId(rowId);
-		const explicitHeight = config.rowHeightsRecord[rowId] ?? config.getRowHeight?.(node.node.data, rowId);
+		const rowId = node.rowId;
+		const id = dataVisualRowIdOf(node.node);
+		const explicitHeight = state.recordedHeights?.[rowId] ?? config.getRowHeight?.(node.node.data, rowId);
 		const children = node.children;
 		const hasChildren = !!children && children.length > 0;
 		const expanded = hasChildren && resolveNodeExpanded(node, level, config);
@@ -178,11 +186,11 @@ function flattenNode<TData>(
 				posInSet,
 				setSize,
 			},
-			...(node.aggregates ? { aggregates: node.aggregates } : {}),
 			height: explicitHeight !== undefined ? explicitHeight : config.defaultRowHeight,
 			selectable: true,
 			editable: true,
 		};
+		if (node.aggregates) (row as { aggregates?: Record<string, unknown> }).aggregates = node.aggregates;
 		node.row = row;
 		result.push(row);
 
