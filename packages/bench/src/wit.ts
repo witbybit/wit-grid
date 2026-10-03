@@ -83,6 +83,8 @@ if (styledCells) api.setStyleRules([{ kind: 'cell', when: (row, col) => isHotVal
 const feedRowsPerTick = Number(new URLSearchParams(location.search).get('feed') ?? 0);
 // ?moves=<n>: that many of each tick's rows also move to another existing sector of their region.
 const feedMovesPerTick = Number(new URLSearchParams(location.search).get('moves') ?? 0);
+// ?flat=1: the same feed on a flat sorted grid (no grouping, no aggregates).
+const feedFlat = new URLSearchParams(location.search).get('flat') === '1';
 if (feedRowsPerTick > 0) {
 	for (const row of initialRows) {
 		const r = Number(row.id.slice(1));
@@ -91,14 +93,16 @@ if (feedRowsPerTick > 0) {
 	}
 	api.setRows(initialRows);
 	api.setColumns([{ field: 'region', header: 'Region', width: 100 }, { field: 'sector', header: 'Sector', width: 100 }, ...columns]);
-	api.setGrouping({ by: ['region', 'sector'], defaultExpanded: true });
-	api.setAggregation({
-		defs: [
-			{ colId: 'c5', aggFunc: 'sum' },
-			{ colId: 'c6', aggFunc: 'avg' },
-			{ colId: 'c7', aggFunc: 'count' },
-		],
-	});
+	if (!feedFlat) {
+		api.setGrouping({ by: ['region', 'sector'], defaultExpanded: true });
+		api.setAggregation({
+			defs: [
+				{ colId: 'c5', aggFunc: 'sum' },
+				{ colId: 'c6', aggFunc: 'avg' },
+				{ colId: 'c7', aggFunc: 'count' },
+			],
+		});
+	}
 	api.setSortModel([{ colId: 'c5', sort: 'desc' }]);
 	const times: number[] = [];
 	(window as unknown as { __feedTimes: number[] }).__feedTimes = times;

@@ -5,6 +5,11 @@
 export class RowNode<TRowData = unknown> {
 	public id!: string;
 	public data!: TRowData;
+	/**
+	 * Internal: the client row model's index of this row's data row. Only meaningful while that visual
+	 * row holds this node (the model checks); kept as a field so reorders write numbers, not Map entries.
+	 */
+	public visualIndex = -1;
 
 	private cellValueCache = new Map<string, unknown>();
 

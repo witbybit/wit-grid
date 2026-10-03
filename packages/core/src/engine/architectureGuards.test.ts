@@ -1005,15 +1005,16 @@ describe('Architecture guardrails', () => {
 		expect(treeDataConfig).toMatch(/getParentIdDependencies\?:\s*string\[\]/);
 	});
 
-	it('incremental index maintenance uses reindexFrom and preserves Map identity (Plan 083)', () => {
+	it('incremental index maintenance stamps row positions in place (Plan 083 → 140)', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'rowModel.ts'), 'utf-8');
-		// reindexFrom must exist and update maps in-place (no new Map() calls in incremental paths).
-		expect(content).toContain('private reindexFrom(');
-		expect(content).toContain('this.reindexFrom(');
-		// Cost model must exist (the transaction-size threshold; the unused isIncrementalCheaper was removed).
+		// Data rows are located by RowNode.visualIndex, re-stamped from the first changed index only.
+		expect(content).toContain('private stampRowPositions(');
+		expect(content).toContain('this.stampRowPositions(changedStartIndex)');
+		expect(content).toContain('this.stampRowPositions(earliestChangedIndex)');
+		// Cost model must exist (the transaction-size threshold).
 		expect(content).toContain('INCREMENTAL_TX_LIMIT');
-		// Stale entries for removed rows must be deleted before splice.
-		expect(content).toContain('this.rowIdToVisualIndex.delete(node.id)');
+		// No per-row index Map in the client row model.
+		expect(content).not.toContain('this.rowIdToVisualIndex');
 	});
 
 	it('GridDomainVersions includes filtering and sorting domains (Plan 084)', () => {
