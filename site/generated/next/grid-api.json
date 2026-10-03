@@ -581,6 +581,12 @@
 					"signature": "(enabled: boolean): void"
 				},
 				{
+					"name": "setRowAnimation",
+					"optional": false,
+					"signature": "(options: RowAnimationOptions | undefined): void",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them; applies from the next change."
+				},
+				{
 					"name": "setShowFloatingFilters",
 					"optional": false,
 					"signature": "(enabled: boolean): void"
