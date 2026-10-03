@@ -56,7 +56,6 @@ export interface RowPipelineOutput<TData = unknown> {
 	visualRows: VisualRow<TData>[];
 	visualRowIdToIndex: Map<string, number>;
 	rowIdToVisualIndex: Map<string, number>;
-	rowIdToVisualRowId: Map<string, string>;
 	rowIdToVisualRowIds?: Map<string, string[]>;
 	/** Maps each expanded group row's visual index → its last descendant's visual index. */
 	stickyGroupMeta: Map<number, number>;
@@ -193,7 +192,6 @@ export class RowPipeline<TData = unknown> {
 
 		const visualRowIdToIndex = new Map<string, number>();
 		const rowIdToVisualIndex = new Map<string, number>();
-		const rowIdToVisualRowId = new Map<string, string>();
 		let rowIdToVisualRowIds: Map<string, string[]> | undefined;
 		let groupCount = 0;
 		let detailRowCount = 0;
@@ -203,13 +201,13 @@ export class RowPipeline<TData = unknown> {
 			if (row.kind === 'data') {
 				if (!rowIdToVisualIndex.has(row.rowId)) {
 					rowIdToVisualIndex.set(row.rowId, idx);
-					rowIdToVisualRowId.set(row.rowId, row.id);
 				}
 			} else if (row.kind === 'detail') {
 				rowIdToVisualRowIds ??= new Map<string, string[]>();
 				const parentRowId = row.parentRowId ?? row.parentId;
 				const ids = rowIdToVisualRowIds.get(parentRowId) ?? [];
-				const dataVisualRowId = rowIdToVisualRowId.get(parentRowId);
+				// A data row's visual id is derived from its row id.
+				const dataVisualRowId = rowIdToVisualIndex.has(parentRowId) ? toDataVisualRowId(parentRowId) : undefined;
 				if (ids.length === 0 && dataVisualRowId) {
 					ids.push(dataVisualRowId);
 				}
@@ -229,7 +227,6 @@ export class RowPipeline<TData = unknown> {
 			visualRows,
 			visualRowIdToIndex,
 			rowIdToVisualIndex,
-			rowIdToVisualRowId,
 			rowIdToVisualRowIds,
 			stickyGroupMeta,
 			groupMeta,

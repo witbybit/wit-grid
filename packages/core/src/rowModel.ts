@@ -1051,7 +1051,6 @@ export class ClientRowModelController<TData = unknown>
 	private visualRows: Array<VisualRow<TData>> = [];
 	private visualRowIdToIndex = new Map<string, number>();
 	private rowIdToVisualIndex = new Map<string, number>();
-	private rowIdToVisualRowId = new Map<string, string>();
 	private rowIdToVisualRowIds: Map<string, string[]> | undefined;
 	private dataRowCount = 0;
 	private unsubscribers: Array<() => void> = [];
@@ -1595,7 +1594,6 @@ export class ClientRowModelController<TData = unknown>
 			this.visualRowIdToIndex.set(vr.id, i);
 			if (vr.kind === 'data') {
 				this.rowIdToVisualIndex.set(vr.rowId, i);
-				this.rowIdToVisualRowId.set(vr.rowId, vr.id);
 			}
 		}
 	}
@@ -1623,7 +1621,6 @@ export class ClientRowModelController<TData = unknown>
 				if (idx !== undefined) {
 					removalIndices.push(idx);
 					this.rowIdToVisualIndex.delete(node.id);
-					this.rowIdToVisualRowId.delete(node.id);
 					this.visualRowIdToIndex.delete(toDataVisualRowId(node.id));
 					this.dataRowCount--;
 				}
@@ -1889,7 +1886,6 @@ export class ClientRowModelController<TData = unknown>
 		this._pageWindow = result.pageWindow ?? null;
 		this.visualRowIdToIndex = result.visualRowIdToIndex;
 		this.rowIdToVisualIndex = result.rowIdToVisualIndex;
-		this.rowIdToVisualRowId = result.rowIdToVisualRowId;
 		this.rowIdToVisualRowIds = result.rowIdToVisualRowIds;
 		this._stickyGroupMeta = result.stickyGroupMeta;
 		this._groupMeta = result.groupMeta;
