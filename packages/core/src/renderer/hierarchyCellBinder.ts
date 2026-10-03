@@ -135,7 +135,12 @@ function bindCustomHierarchyCell<TRowData>(
 		handle = spec.renderer.mount(cellSlot.contentElement, ctx) ?? {};
 	} else {
 		const rowKey = `hierarchy-cell:${cellSlot.cellInstanceId}`;
-		const container = cellSlot.contentElement;
+		// React owns everything inside its own host element. Core may clear the content element (a
+		// rebind to the built-in cell, a remount): that detaches the host whole, so React's later
+		// unmount still finds its nodes where it left them.
+		const container = document.createElement('div');
+		container.className = 'og-hierarchy-cell-host';
+		cellSlot.contentElement.appendChild(container);
 		const draw = (next: typeof ctx) => portals!.mountRow({ rowKey, container, visualRow: next.row, renderer: spec, context: next });
 		draw(ctx);
 		handle = { update: draw, destroy: () => portals!.releaseRow({ rowKey, container }) };
