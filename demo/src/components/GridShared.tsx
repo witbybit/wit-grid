@@ -24,6 +24,7 @@ export type GridPageType =
 	| 'clipboard'
 	| 'floatingfilters'
 	| 'rowdrag'
+	| 'grouping-sticky'
 	| 'advancedfilters'
 	| 'integrity'
 	| 'projects'

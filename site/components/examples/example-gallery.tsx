@@ -12,6 +12,7 @@ import {
 	Database,
 	ListFilter,
 	Pencil,
+	Layers,
 	ShieldCheck,
 	Zap,
 	Maximize2,
@@ -32,6 +33,7 @@ const CATEGORY_ORDER: WitGridExampleMeta['category'][] = [
 	'Row models',
 	'Filtering',
 	'Editing',
+	'Grouping',
 	'Validation',
 	'Rendering',
 ];
@@ -43,6 +45,7 @@ const CATEGORY_ICONS: Record<WitGridExampleMeta['category'], LucideIcon> = {
 	'Row models': Database,
 	Filtering: ListFilter,
 	Editing: Pencil,
+	Grouping: Layers,
 	Validation: ShieldCheck,
 	Rendering: Zap,
 };
@@ -60,6 +63,7 @@ const previewModules = {
 	'kanban-board': dynamic(() => import('@eregister/wit-grid-examples/kanban-board'), { ssr: false }),
 	clipboard: dynamic(() => import('@eregister/wit-grid-examples/clipboard'), { ssr: false }),
 	'realtime-grouping': dynamic(() => import('@eregister/wit-grid-examples/realtime-grouping'), { ssr: false }),
+	'grouping-sticky': dynamic(() => import('@eregister/wit-grid-examples/grouping-sticky'), { ssr: false }),
 	'nested-hierarchy': dynamic(() => import('@eregister/wit-grid-examples/nested-hierarchy'), { ssr: false }),
 };
 

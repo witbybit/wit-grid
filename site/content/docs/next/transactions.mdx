@@ -43,15 +43,15 @@ export function applyFills(api: GridApi<Trade>) {
 }
 ```
 
-| Field                                         | Effect                                                                                                  |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `rows.add`                                    | Rows to insert. They are appended in source order unless `rows.addIndex` is set.                        |
-| `rows.addIndex`                               | Source position to insert the added rows at.                                                            |
-| `rows.update`                                 | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored.    |
-| `rows.remove`                                 | Rows to remove, matched by id. Only the id needs to be right.                                           |
-| `cells`                                       | Cell writes, `{ rowId, colField, value }`, through each column's value setter, formulas and validation. |
-| `source`                                      | Where the cell writes come from: `'api'` (default), `'paste'` or `'fill'`. Picks the validation policy. |
-| `columns`, `sortModel`, `filterModel`, `pins` | Grid state applied in the same commit.                                                                  |
+| Field                                         | Effect                                                                                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rows.add`                                    | Rows to insert. They are appended in source order unless `rows.addIndex` is set.                                                                                           |
+| `rows.addIndex`                               | Source position to insert the added rows at.                                                                                                                               |
+| `rows.update`                                 | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored.                                                                       |
+| `rows.remove`                                 | Rows to remove, matched by id. Only the id needs to be right.                                                                                                              |
+| `cells`                                       | Cell writes, `{ rowId, colField, value }`, through each column's value setter, formulas and validation.                                                                    |
+| `source`                                      | Where the cell writes come from: `'api'` (default), `'paste'` or `'fill'`. Picks the validation policy.                                                                    |
+| `columns`, `sortModel`, `filterModel`, `pins` | Grid state applied in the same commit. `pins: { top, bottom }` pins that many rows to the top or bottom of the viewport; they stay put natively, even as the rest scrolls. |
 
 The result is the write status plus what was touched:
 

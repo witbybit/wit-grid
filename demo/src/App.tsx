@@ -29,6 +29,7 @@ const WideGridDemo = lazy(() => import('./pages/WideGridDemo'));
 const ColumnGroupHeaderDemo = lazy(() => import('./pages/ColumnGroupHeaderDemo'));
 const ClipboardDemo = lazy(() => import('@eregister/wit-grid-examples/clipboard'));
 const FloatingFiltersDemo = lazy(() => import('./pages/FloatingFiltersDemo'));
+const GroupingStickyDemo = lazy(() => import('@eregister/wit-grid-examples/grouping-sticky'));
 const RowDragDemo = lazy(() => import('@eregister/wit-grid-examples/row-drag'));
 const AdvancedFiltersDemo = lazy(() => import('@eregister/wit-grid-examples/advanced-filters'));
 const DataIntegrityLab = lazy(() => import('@eregister/wit-grid-examples/data-integrity'));
@@ -58,6 +59,7 @@ const PAGES: readonly GridPageType[] = [
 	'colgroups',
 	'floatingfilters',
 	'rowdrag',
+	'grouping-sticky',
 	'advancedfilters',
 	'integrity',
 	'projects',
@@ -257,6 +259,7 @@ export default function App() {
 		if (activePage === 'clipboard') return <ClipboardDemo />;
 		if (activePage === 'floatingfilters') return <FloatingFiltersDemo {...commonGridProps} />;
 		if (activePage === 'rowdrag') return <RowDragDemo />;
+		if (activePage === 'grouping-sticky') return <GroupingStickyDemo />;
 		if (activePage === 'advancedfilters') return <AdvancedFiltersDemo />;
 		if (activePage === 'integrity') return <DataIntegrityLab />;
 		if (activePage === 'projects') return <ProjectsComplianceDemo onGridReady={handleGridReady} />;
