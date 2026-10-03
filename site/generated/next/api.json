@@ -769,6 +769,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "RowAnimationOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "RowModelType",
 			"kind": "type",
 			"source": "./types.js"
@@ -847,6 +852,11 @@
 			"name": "SortModel",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "StickyHeadersOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "StyleRule",
@@ -1006,6 +1016,12 @@
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
 				},
 				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+				},
+				{
 					"name": "rowDragMode",
 					"optional": true,
 					"type": "'managed' | 'unmanaged'",
@@ -1140,6 +1156,12 @@
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
 				},
 				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+				},
+				{
 					"name": "rowDragMode",
 					"optional": true,
 					"type": "'managed' | 'unmanaged'",
@@ -1271,6 +1293,12 @@
 					"optional": true,
 					"type": "boolean",
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
