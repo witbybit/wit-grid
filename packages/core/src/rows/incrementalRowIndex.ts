@@ -220,9 +220,9 @@ export class IncrementalRowIndex<TData> {
 		let end = -1;
 		const changedRanges: Array<{ startIndex: number; endIndex: number }> = [];
 
-		// 1. In-group order. The moved span (lo..hi in the group's children) comes from the moved
-		// leaves' old and new positions; a group that is not on screen only reorders its children.
-		const moves: Array<{ group: GroupNode<TData>; base: number; moving: LeafNode<TData>[]; lo: number; hi: number }> = [];
+		// 1. In-group order. Each moved leaf shifts only the rows between its old and new position, so
+		// the flat list is rewritten span by span (overlapping spans merged), not across the group.
+		const moves: Array<{ group: GroupNode<TData>; base: number; spans: Array<[number, number]> }> = [];
 		const reordered = new Set<GroupNode<TData>>();
 		if (this.sortModel.length > 0) {
 			for (const [group, leaves] of touched) {
@@ -233,8 +233,6 @@ export class IncrementalRowIndex<TData> {
 				const groupRow = gi === undefined ? undefined : visualRows[gi];
 				const onScreen = groupRow?.kind === 'group' && groupRow.hierarchy.expanded;
 				const base = onScreen ? gi! + 1 + (visualRows[gi! + 1]?.kind === 'total' ? 1 : 0) : -1;
-				let lo = Infinity;
-				let hi = -1;
 				let oldPositions: number[] | null = null;
 				if (onScreen) {
 					oldPositions = [];
@@ -242,17 +240,26 @@ export class IncrementalRowIndex<TData> {
 						const at = rowIdToVisualIndex.get(leaf.rowId);
 						if (at === undefined) throw new Error('incremental index out of step');
 						oldPositions.push(at - base);
-						lo = Math.min(lo, at - base);
-						hi = Math.max(hi, at - base);
 					}
 				}
-				const inserted = this.reinsert(group.children, moving, oldPositions);
-				for (const at of inserted) {
-					lo = Math.min(lo, at);
-					hi = Math.max(hi, at);
-				}
+				const newPositions = this.reinsert(group.children, moving, oldPositions);
 				reordered.add(group);
-				if (onScreen && hi >= lo) moves.push({ group, base, moving, lo, hi });
+				if (!onScreen || !oldPositions) continue;
+				const spans: Array<[number, number]> = [];
+				for (let i = 0; i < moving.length; i++) {
+					const from = oldPositions[i];
+					const to = newPositions.get(moving[i])!;
+					if (from !== to) spans.push(from < to ? [from, to] : [to, from]);
+				}
+				if (spans.length === 0) continue;
+				spans.sort((x, y) => x[0] - y[0]);
+				const merged: Array<[number, number]> = [spans[0]];
+				for (let i = 1; i < spans.length; i++) {
+					const last = merged[merged.length - 1];
+					if (spans[i][0] <= last[1]) last[1] = Math.max(last[1], spans[i][1]);
+					else merged.push(spans[i]);
+				}
+				moves.push({ group, base, spans: merged });
 			}
 		}
 
@@ -354,43 +361,35 @@ export class IncrementalRowIndex<TData> {
 			grandAggregates = this.aggregatesOf(stats, (colId) => this.distinctOf(GRAND, colId));
 		}
 
-		// 6. The flat list: rewrite only the moved spans.
-		for (const { group, base, moving, lo, hi } of moves) {
-			const slice = visualRows.slice(base + lo, base + hi + 1);
-			const movedRows = new Map<RowTreeNode<TData>, VisualRow<TData>>();
-			const movedSlots = new Set<number>();
-			for (const leaf of moving) {
-				const at = rowIdToVisualIndex.get(leaf.rowId);
-				if (at === undefined) throw new Error('incremental index out of step');
-				if (at < base + lo || at > base + hi) continue; // landed where it was
-				const row = visualRows[at];
-				if (row.kind !== 'data') throw new Error('incremental index out of step');
-				movedRows.set(leaf, row);
-				movedSlots.add(at - base - lo);
-			}
-			let cursor = 0;
-			let changed = false;
-			for (let i = lo; i <= hi; i++) {
-				const child = group.children[i];
-				let row = movedRows.get(child);
-				if (!row) {
-					while (movedSlots.has(cursor)) cursor++;
-					row = slice[cursor++];
+		// 6. The flat list: rewrite each moved span. A span holds the same rows before and after (only
+		// their order changed), so its rows are found among the span's old rows.
+		for (const { group, base, spans } of moves) {
+			for (const [lo, hi] of spans) {
+				const rowsById = new Map<string, VisualRow<TData>>();
+				for (let index = base + lo; index <= base + hi; index++) {
+					const row = visualRows[index];
+					if (row.kind !== 'data') throw new Error('incremental index out of step');
+					rowsById.set(row.rowId, row);
 				}
-				const index = base + i;
-				// Rows are this model's own objects: posInSet follows the row's new place in the group.
-				(row.hierarchy as { posInSet: number }).posInSet = i + 1;
-				if (visualRows[index] === row) continue;
-				changed = true;
-				visualRows[index] = row;
-				visualRowIdToIndex.set(row.id, index);
-				if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, index);
+				let changed = false;
+				for (let i = lo; i <= hi; i++) {
+					const row = rowsById.get((group.children[i] as LeafNode<TData>).rowId);
+					if (!row) throw new Error('incremental index out of step');
+					const index = base + i;
+					// Rows are this model's own objects: posInSet follows the row's new place in the group.
+					(row.hierarchy as { posInSet: number }).posInSet = i + 1;
+					if (visualRows[index] === row) continue;
+					changed = true;
+					visualRows[index] = row;
+					visualRowIdToIndex.set(row.id, index);
+					if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, index);
+				}
+				if (!changed) continue;
+				moved = true;
+				changedRanges.push({ startIndex: base + lo, endIndex: base + hi });
+				start = Math.min(start, base + lo);
+				end = Math.max(end, base + hi);
 			}
-			if (!changed) continue;
-			moved = true;
-			changedRanges.push({ startIndex: base + lo, endIndex: base + hi });
-			start = Math.min(start, base + lo);
-			end = Math.max(end, base + hi);
 		}
 
 		// 7. Group and total rows with new aggregates.
@@ -433,7 +432,7 @@ export class IncrementalRowIndex<TData> {
 	 * final positions. A few moved leaves are spliced in by binary search; many are sorted among
 	 * themselves and merged with the rest in one pass (O(n + m log m) rather than a splice per leaf).
 	 */
-	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[], oldPositions: number[] | null): number[] {
+	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[], oldPositions: number[] | null): Map<LeafNode<TData>, number> {
 		// Fresh keys for the moved leaves (their sort values changed).
 		const entries = leaves.map((leaf) => ({ leaf, ...this.sortEntryOf(leaf.node, true) }));
 		// Splices are native memmoves (cheap for a few leaves); a merge reads every row's cached key.
@@ -447,7 +446,7 @@ export class IncrementalRowIndex<TData> {
 			for (const child of children) if (!moving.has(child)) children[kept++] = child;
 			children.length = kept;
 		}
-		const positions: number[] = [];
+		const positions = new Map<LeafNode<TData>, number>();
 		for (const { leaf, keys, source } of entries) {
 			let lo = 0;
 			let hi = children.length;
@@ -457,8 +456,8 @@ export class IncrementalRowIndex<TData> {
 				else lo = mid + 1;
 			}
 			children.splice(lo, 0, leaf);
-			for (let i = 0; i < positions.length; i++) if (positions[i] >= lo) positions[i]++;
-			positions.push(lo);
+			for (const [placed, at] of positions) if (at >= lo) positions.set(placed, at + 1);
+			positions.set(leaf, lo);
 		}
 		return positions;
 	}
@@ -466,20 +465,21 @@ export class IncrementalRowIndex<TData> {
 	private mergeReinsert(
 		children: RowTreeNode<TData>[],
 		moving: Array<{ leaf: LeafNode<TData>; keys: ReturnType<typeof toSortKey>[]; source: number }>
-	): number[] {
+	): Map<LeafNode<TData>, number> {
 		const movingSet = new Set<RowTreeNode<TData>>(moving.map((m) => m.leaf));
 		const rest: RowTreeNode<TData>[] = [];
 		for (const child of children) if (!movingSet.has(child)) rest.push(child);
 		moving.sort((a, b) => this.compareEntries(a.keys, a.source, b.keys, b.source));
-		const positions: number[] = [];
+		const positions = new Map<LeafNode<TData>, number>();
 		let r = 0;
 		let m = 0;
 		let out = 0;
 		while (r < rest.length || m < moving.length) {
 			// Same rule as a binary insert: a moved leaf goes after every rest leaf it does not sort before.
 			if (m < moving.length && (r >= rest.length || this.compare(moving[m].keys, moving[m].source, (rest[r] as LeafNode<TData>).node) < 0)) {
-				children[out] = moving[m++].leaf;
-				positions.push(out++);
+				const leaf = moving[m++].leaf;
+				children[out] = leaf;
+				positions.set(leaf, out++);
 			} else {
 				children[out++] = rest[r++];
 			}
