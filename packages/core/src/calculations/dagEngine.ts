@@ -5,6 +5,8 @@ export interface FormulaCellCoordinate {
 
 const NO_CACHED_FORMULA_VALUE: { hasCached: boolean; value: unknown } = Object.freeze({ hasCached: false, value: undefined });
 
+const NO_CELLS: FormulaCellCoordinate[] = [];
+
 export class DagEngine {
 	private dependents = new Map<string, Set<string>>(); // dependencyKey -> Set of dependentKeys
 	private dependencies = new Map<string, Set<string>>(); // dependentKey -> Set of dependencyKeys
@@ -151,7 +153,12 @@ export class DagEngine {
 	 * Returns the list of cell keys that were invalidated.
 	 */
 	public invalidateCell(rowId: string, colField: string, invalidated: Map<string, FormulaCellCoordinate> = new Map()): FormulaCellCoordinate[] {
+		// A grid without formulas (the common case, and every live-feed write): nothing depends on any
+		// cell, so there is nothing to invalidate.
+		if (this.formulas.size === 0 && this.dependents.size === 0) return invalidated.size === 0 ? NO_CELLS : Array.from(invalidated.values());
 		const key = this.getCellKey(rowId, colField);
+		// A plain cell that no formula reads: no cached result, no dependents.
+		if (invalidated.size === 0 && !this.formulas.has(key) && !this.dependents.has(key)) return NO_CELLS;
 		if (invalidated.has(key)) return [];
 
 		invalidated.set(key, { rowId, colField });

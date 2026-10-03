@@ -41,19 +41,16 @@ export class DataMutationController<TRowData = unknown> {
 	applyStructuralWriteEffects(writeResult: RowModelWriteResult<TRowData>): StructuralWriteEffectResult {
 		const invalidatedCells: GridCellPointer[] = [];
 		const cellChanges = new Map<string, Set<string>>();
-		const seen = new Set<string>();
 
+		// cellChanges doubles as the de-duplication set (no per-cell key strings on the write path).
 		const addCell = (rowId: string, colField: string): void => {
-			const key = `${rowId}:${colField}`;
-			if (seen.has(key)) return;
-			seen.add(key);
-			invalidatedCells.push({ rowId, colField });
 			let rowFields = cellChanges.get(rowId);
 			if (!rowFields) {
 				rowFields = new Set<string>();
 				cellChanges.set(rowId, rowFields);
-			}
+			} else if (rowFields.has(colField)) return;
 			rowFields.add(colField);
+			invalidatedCells.push({ rowId, colField });
 		};
 
 		const changedFieldsByRow = writeResult.changedFieldsByRow;
