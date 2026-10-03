@@ -553,7 +553,7 @@ interface RealtimeDashboardProps {
 }
 
 /** Row animation styles to try on the live sort: each is a plain `rowAnimation` object. */
-const ROW_ANIMATION_PRESETS = {
+export const ROW_ANIMATION_PRESETS = {
 	cascade: { label: 'Cascade', options: { style: 'slide', easing: 'snappy', duration: 360, stagger: 18 } },
 	spring: { label: 'Spring', options: { style: 'slide', easing: 'spring', duration: 520 } },
 	smooth: { label: 'Smooth', options: { style: 'slide', easing: 'smooth', duration: 280 } },
