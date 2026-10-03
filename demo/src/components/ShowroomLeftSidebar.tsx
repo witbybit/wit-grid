@@ -173,6 +173,12 @@ export default function ShowroomLeftSidebar({ activePage, leftSidebarCollapsed, 
 			icon: GripVertical,
 		},
 		{
+			id: 'grouping-sticky',
+			label: 'Sticky Groups',
+			subtitle: 'Sticky Headers · Pinned Rows · Renderer',
+			icon: Layers,
+		},
+		{
 			id: 'advancedfilters',
 			label: 'Advanced Filters',
 			subtitle: 'Multi-Select · Async · Infinite',

@@ -83,26 +83,30 @@ export default function CustomEditorRenderer({
 	const handleBatchActivate = () => {
 		if (!api || !selectedRange) return alert('Please select a range of cells or rows first.');
 		const rowIdSet = new Set(api.rows().inRange(selectedRange).getIds());
-		api.setRows(
-			api
-				.rows()
-				.getAll()
-				.map((row) => (rowIdSet.has(row.id) ? { ...row, status: 'Active' } : row))
-		);
+		api.transaction({
+			rows: {
+				update: api
+					.rows()
+					.getAll()
+					.map((row) => (rowIdSet.has(row.id) ? { ...row, status: 'Active' } : row)),
+			},
+		});
 	};
 
 	const handleBatchBoostProgress = () => {
 		if (!api || !selectedRange) return alert('Please select a range of cells or rows first.');
 		const rowIdSet = new Set(api.rows().inRange(selectedRange).getIds());
-		api.setRows(
-			api
-				.rows()
-				.getAll()
-				.map((row) => {
-					if (!rowIdSet.has(row.id)) return row;
-					return { ...row, progress: Math.min(100, (parseFloat(String(row.progress)) || 0) + 10).toString() };
-				})
-		);
+		api.transaction({
+			rows: {
+				update: api
+					.rows()
+					.getAll()
+					.map((row) => {
+						if (!rowIdSet.has(row.id)) return row;
+						return { ...row, progress: Math.min(100, (parseFloat(String(row.progress)) || 0) + 10).toString() };
+					}),
+			},
+		});
 	};
 
 	return (

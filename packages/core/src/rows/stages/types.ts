@@ -1,4 +1,5 @@
-import { RowNode, type ColumnDef } from '../../store.js';
+import type { RowNode } from '../../store.js';
+import { type ColumnDef } from '../../store.js';
 import type { GroupDef } from '../hierarchyConfig.js';
 import type { GroupPathItem } from '../visualRowIds.js';
 

@@ -3,13 +3,34 @@ import type { RowSlot } from './rowSlot.js';
 import { isVisualRowEqual, type PortalMountManager } from './portalMountManager.js';
 import { getDefaultRowRenderer } from './defaultRowRenderers.js';
 import type { GridEngine } from '../engine/GridEngine.js';
-import type { DomRowRenderer, DomRowRendererHandle, RowRendererParams, RowRendererSpec } from '../rows/hierarchyConfig.js';
+import type { GridApi } from '../api/GridApiSurfaces.js';
+import type {
+	DomGroupRenderer,
+	DomRowRenderer,
+	GroupRenderContext,
+	GroupRendererSpec,
+	RowRendererParams,
+	RowRendererSpec,
+} from '../rows/hierarchyConfig.js';
+import { createGroupRenderContext, resolveFullWidthGroupModel } from './groupRenderContext.js';
+
+type AnyDomRenderer<TRowData> = DomRowRenderer<TRowData> | DomGroupRenderer<TRowData>;
+interface AnyDomHandle {
+	update?(arg: never): void;
+	destroy?(): void;
+}
+
+function isGroupRow(row: VisualRow<unknown>): boolean {
+	return row.kind === 'group' || row.kind === 'total';
+}
 
 interface DomRowMount<TRowData> {
 	rowKey: string;
-	renderer: DomRowRenderer<TRowData>;
-	handle: DomRowRendererHandle<TRowData>;
+	renderer: AnyDomRenderer<TRowData>;
+	handle: AnyDomHandle;
 	row: VisualRow<TRowData>;
+	/** Group rows: drawn as the stuck copy of a sticky header. */
+	isStuck: boolean;
 }
 
 /**
@@ -39,7 +60,7 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 	}
 
 	/** The configured renderer for a full-width row: `detail.renderer`, or `grouping.rowRenderer` for group / total rows. */
-	private resolveSpec(row: VisualRow<TRowData>): RowRendererSpec<TRowData> | undefined {
+	private resolveSpec(row: VisualRow<TRowData>): RowRendererSpec<TRowData> | GroupRendererSpec<TRowData> | undefined {
 		const state = this.engine?.stateManager.getState();
 		if (row.kind === 'detail') return state?.detail?.renderer;
 		if (row.kind === 'group' || row.kind === 'total') return state?.grouping?.rowRenderer;
@@ -77,21 +98,31 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 	}
 
 	/** Draws a full-width row into `host`: a DOM row renderer in place, else through the adapter. */
-	public mountContent(host: HTMLElement, rowKey: string, visualRow: VisualRow<TRowData>): void {
+	public mountContent(host: HTMLElement, rowKey: string, visualRow: VisualRow<TRowData>, isStuck = false): void {
 		this.syncAutoHeight(host, visualRow);
 		const spec = this.resolveSpec(visualRow);
 		const domRenderer = this.resolveDomRenderer(spec, visualRow);
 		if (domRenderer) {
-			this.bindDomRow(host, rowKey, visualRow, domRenderer);
+			this.bindDomRow(host, rowKey, visualRow, domRenderer, isStuck);
 			return;
 		}
 		this.destroyDomRow(host);
-		this.portalMountManager.mountRow({ rowKey, container: host, visualRow, ...(spec ? { renderer: spec } : {}) });
+		const context = isGroupRow(visualRow) ? this.createGroupContext(visualRow, isStuck) : null;
+		this.portalMountManager.mountRow({
+			rowKey,
+			container: host,
+			visualRow,
+			...(spec ? { renderer: spec } : {}),
+			...(context ? { context } : {}),
+		});
 	}
 
 	// A DOM spec, else the adapter when it draws this row (a React spec, or its own renderer for
 	// the kind), else core's built-in renderer: adapters carry no hierarchy logic of their own.
-	private resolveDomRenderer(spec: RowRendererSpec<TRowData> | undefined, visualRow: VisualRow<TRowData>): DomRowRenderer<TRowData> | undefined {
+	private resolveDomRenderer(
+		spec: RowRendererSpec<TRowData> | GroupRendererSpec<TRowData> | undefined,
+		visualRow: VisualRow<TRowData>
+	): AnyDomRenderer<TRowData> | undefined {
 		if (spec?.kind === 'dom') return spec.renderer;
 		return spec?.kind === 'react' || this.portalMountManager.adapterRendersRow(visualRow) ? undefined : getDefaultRowRenderer(visualRow);
 	}
@@ -115,20 +146,24 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 	 * drawn again with changed content, or a recycled host handed another row, gets `update` when the
 	 * renderer has one; otherwise (or for a different renderer) it remounts.
 	 */
-	private bindDomRow(host: HTMLElement, rowKey: string, row: VisualRow<TRowData>, renderer: DomRowRenderer<TRowData>): void {
+	private bindDomRow(host: HTMLElement, rowKey: string, row: VisualRow<TRowData>, renderer: AnyDomRenderer<TRowData>, isStuck: boolean): void {
 		const existing = this.domRows.get(host);
 		if (existing && existing.renderer === renderer && (existing.rowKey === rowKey || existing.handle.update)) {
-			if (existing.rowKey !== rowKey || !isVisualRowEqual(existing.row, row)) {
+			if (existing.rowKey !== rowKey || existing.isStuck !== isStuck || !isVisualRowEqual(existing.row, row)) {
 				existing.rowKey = rowKey;
 				existing.row = row;
-				existing.handle.update?.(this.createParams(row));
+				existing.isStuck = isStuck;
+				const arg = this.createRendererArg(row, isStuck);
+				if (arg) existing.handle.update?.(arg as never);
 			}
 			return;
 		}
 		this.destroyDomRow(host);
 		host.textContent = '';
-		const handle = renderer.mount(host, this.createParams(row)) ?? {};
-		this.domRows.set(host, { rowKey, renderer, handle, row });
+		const arg = this.createRendererArg(row, isStuck);
+		if (!arg) return;
+		const handle = (renderer as { mount(container: HTMLElement, arg: unknown): AnyDomHandle | void }).mount(host, arg) ?? {};
+		this.domRows.set(host, { rowKey, renderer, handle, row, isStuck });
 	}
 
 	private destroyDomRow(host: HTMLElement): void {
@@ -184,6 +219,19 @@ export class FullWidthRowRenderer<TRowData = unknown> {
 		}
 		const estimate = engine.stateManager.getState().detail?.estimatedHeight ?? 200;
 		engine.applyAutoRowHeightBatch(heights, () => estimate);
+	}
+
+	/** Group and total rows get a `GroupRenderContext`; every other full-width row `RowRendererParams`. */
+	private createRendererArg(row: VisualRow<TRowData>, isStuck: boolean): RowRendererParams<TRowData> | GroupRenderContext<TRowData> | null {
+		return isGroupRow(row) ? this.createGroupContext(row, isStuck) : this.createParams(row);
+	}
+
+	private createGroupContext(row: VisualRow<TRowData>, isStuck: boolean): GroupRenderContext<TRowData> | null {
+		const engine = this.engine;
+		if (!engine) return null;
+		const api = engine.getApiRef() as GridApi<TRowData>;
+		const model = resolveFullWidthGroupModel(api, row);
+		return model ? createGroupRenderContext(api, row, model, isStuck) : null;
 	}
 
 	private createParams(row: VisualRow<TRowData>): RowRendererParams<TRowData> {

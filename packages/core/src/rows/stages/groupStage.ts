@@ -1,4 +1,4 @@
-import { RowNode } from '../../store.js';
+import type { RowNode } from '../../store.js';
 import type { GroupDef } from '../RowPipeline.js';
 import { toGroupVisualRowId, type GroupPathItem } from '../visualRowIds.js';
 import type { RowPipelineContext, RowTreeNode } from './types.js';

@@ -1,3 +1,4 @@
+import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import type {
 	FilterModel,
 	QuickFilterModel,
@@ -31,10 +32,8 @@ import type { BuiltInThemeName, ThemeTokens } from '../renderer/themes.js';
 import type { GridCapabilityAction, GridCapabilityParams, GridCapabilityResult } from '../capabilities/capabilityTypes.js';
 import type { GridIntegrityApi } from '../features/dataIntegrity/integrityTypes.js';
 import type {
-	ActiveEditState,
 	AutoSizeAllColumnsOptions,
 	AutoSizeColumnOptions,
-	GridCellWrite,
 	CellState,
 	CellSubscription,
 	GridCellAccess,
@@ -52,13 +51,13 @@ import type {
 	GridTransaction,
 	GridTransactionOptions,
 	GridTransactionResult,
-	RowDataTransaction,
 	RowSelectionChangeResult,
 	RowSelectionGesture,
 	SelectAllRowsOptions,
 	SelectRowsOptions,
 } from './GridApi.js';
-import type { RowNodeTransaction } from '../rowTransactions.js';
+
+import type { RowModel } from '../rowModel.js';
 
 export interface GridDataApi<TRowData = unknown> {
 	getStateSnapshot(): GridStateSnapshot<TRowData>;
@@ -184,8 +183,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	setHierarchyColumn(config: HierarchyColumnConfig<TRowData> | false | undefined): void;
 	getDetail(): DetailConfig<TRowData> | undefined;
 	setDetail(detail: DetailConfig<TRowData> | undefined): void;
-	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). */
-	setExpanded(id: string, expanded: boolean): void;
+	/** Opens or closes a group or tree row, by visual row id (`visualRow.id`). `deep` also opens or closes every group and tree row beneath it. */
+	setExpanded(id: string, expanded: boolean, options?: { deep?: boolean }): void;
 	toggleExpanded(id: string): void;
 	isExpanded(id: string): boolean;
 	/** Opens every group and tree row, or only levels up to `maxLevel` (closing deeper ones). Replaces individual choices. */
@@ -203,6 +202,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	/** Selects or deselects every data row beneath a group or tree row. */
 	setDescendantsSelected(id: string, selected: boolean): void;
 	setShowGroupPanel(enabled: boolean): void;
+	/** How rows animate when a sort, live value change, expansion or detail moves them; applies from the next change. */
+	setRowAnimation(options: RowAnimationOptions | undefined): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;
 	getVisibleColumnRange(): { colStart: number; colEnd: number; total: number };
@@ -329,7 +330,7 @@ export interface GridPluginRuntime<TRowData = unknown> extends GridApi<TRowData>
 	getVisibleRowRange(): { startIdx: number; endIdx: number };
 	getColumnIndex(colField: string): number;
 	getColumnField(colIndex: number): string | null;
-	getRowModel(): import('../rowModel.js').RowModel<TRowData> | null;
+	getRowModel(): RowModel<TRowData> | null;
 	reportRuntimeFault(fault: RuntimeFaultInput): RuntimeFault;
 }
 
@@ -375,8 +376,8 @@ export interface GridHostRuntime<TRowData = unknown> {
 }
 
 export interface GridCompositionRuntime<TRowData = unknown> {
-	registerRowModel(rowModel: import('../rowModel.js').RowModel<TRowData>): void;
-	getRowModel(): import('../rowModel.js').RowModel<TRowData> | null;
+	registerRowModel(rowModel: RowModel<TRowData>): void;
+	getRowModel(): RowModel<TRowData> | null;
 	triggerCellNotifications(rowId: string): void;
 	batchedUpdates: boolean;
 	registerCellSubscription(sub: CellSubscription): void;

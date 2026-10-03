@@ -139,20 +139,23 @@ export default function SpreadsheetWorkspace({
 				.rows()
 				.inRange(range as any)
 				.getIds();
-			api.setRows(
-				api
-					.rows()
-					.getAll()
-					.map((row) => {
-						if (!rowIds.includes(row.id)) return row;
-						const nextRow = { ...row };
-						for (const field of fields) {
-							if (field === 'id') continue;
-							(nextRow as any)[field] = emptyValue !== undefined ? emptyValue : mapValue(parseFloat(String((row as any)[field])) || 0);
-						}
-						return nextRow;
-					})
-			);
+			api.transaction({
+				rows: {
+					update: api
+						.rows()
+						.getAll()
+						.map((row) => {
+							if (!rowIds.includes(row.id)) return row;
+							const nextRow = { ...row };
+							for (const field of fields) {
+								if (field === 'id') continue;
+								(nextRow as any)[field] =
+									emptyValue !== undefined ? emptyValue : mapValue(parseFloat(String((row as any)[field])) || 0);
+							}
+							return nextRow;
+						}),
+				},
+			});
 		},
 		[api]
 	);
@@ -169,21 +172,23 @@ export default function SpreadsheetWorkspace({
 			.rows()
 			.inRange(range as any)
 			.getIds();
-		api.setRows(
-			api
-				.rows()
-				.getAll()
-				.map((row) => {
-					if (!rowIds.includes(row.id)) return row;
-					const nextRow = { ...row };
-					for (const field of fields) {
-						if (field === 'id') continue;
-						const idx = rowIds.indexOf(row.id);
-						(nextRow as any)[field] = (compoundInputs.principal * Math.pow(1 + compoundInputs.rate / 100, idx + 1)).toFixed(1);
-					}
-					return nextRow;
-				})
-		);
+		api.transaction({
+			rows: {
+				update: api
+					.rows()
+					.getAll()
+					.map((row) => {
+						if (!rowIds.includes(row.id)) return row;
+						const nextRow = { ...row };
+						for (const field of fields) {
+							if (field === 'id') continue;
+							const idx = rowIds.indexOf(row.id);
+							(nextRow as any)[field] = (compoundInputs.principal * Math.pow(1 + compoundInputs.rate / 100, idx + 1)).toFixed(1);
+						}
+						return nextRow;
+					}),
+			},
+		});
 	}, [api, compoundInputs.principal, compoundInputs.rate]);
 
 	const focusedValue =

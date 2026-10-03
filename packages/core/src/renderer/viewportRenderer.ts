@@ -20,6 +20,10 @@ export class ViewportRenderer<TRowData = unknown> {
 	// Single rows container — all row elements live here (no separate left/right layers)
 	public rowsContainer: HTMLDivElement | null = null;
 
+	// Zero-height sticky bands holding viewport-pinned top / bottom rows.
+	public pinnedTopLayer: HTMLDivElement | null = null;
+	public pinnedBottomLayer: HTMLDivElement | null = null;
+
 	// Group panel — optional sticky strip above the header for groupBy chips.
 	// Only present in the DOM; shown/hidden by syncLayoutPlan().
 	public groupPanel: HTMLDivElement | null = null;
@@ -38,8 +42,6 @@ export class ViewportRenderer<TRowData = unknown> {
 	public floatingFilterLayer: HTMLDivElement | null = null;
 	public floatingFilterLeftLayer: HTMLDivElement | null = null;
 	public floatingFilterRightLayer: HTMLDivElement | null = null;
-
-	public stickyGroupLayer: HTMLDivElement | null = null;
 
 	// Overlay sits outside the scroll viewport so it covers the full grid without scrolling
 	public overlayLayer: HTMLDivElement | null = null;
@@ -144,8 +146,9 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.floatingFilterLayer = this.layers.get('floating-filter') ?? null;
 		this.floatingFilterLeftLayer = this.layers.get('floating-filter-left') ?? null;
 		this.floatingFilterRightLayer = this.layers.get('floating-filter-right') ?? null;
-		this.stickyGroupLayer = this.layers.get('sticky-groups') ?? null;
 		this.rowsContainer = this.layers.get('rows') ?? null;
+		this.pinnedTopLayer = this.layers.get('pinned-top') ?? null;
+		this.pinnedBottomLayer = this.layers.get('pinned-bottom') ?? null;
 		this.overlayLayer = this.layers.get('overlay') ?? null;
 	}
 
@@ -176,6 +179,8 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.container = null;
 		this.scrollViewport = null;
 		this.rowsContainer = null;
+		this.pinnedTopLayer = null;
+		this.pinnedBottomLayer = null;
 		this.groupPanel = null;
 		this.filterChipBar = null;
 		this.headerWrapper = null;
@@ -186,7 +191,6 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.floatingFilterLayer = null;
 		this.floatingFilterLeftLayer = null;
 		this.floatingFilterRightLayer = null;
-		this.stickyGroupLayer = null;
 		this.overlayLayer = null;
 		this.styleTag = null;
 		this.layers.clear();

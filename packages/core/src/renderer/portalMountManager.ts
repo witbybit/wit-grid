@@ -17,7 +17,6 @@ import { reportRendererFault } from './rendererFaults.js';
 import {
 	createEditRendererKey,
 	createSlotRendererKey,
-	createIndexRendererKey,
 	createDomSlotRendererKey,
 	createDomIndexRendererKey,
 	createCellInstanceRendererKey,
@@ -155,6 +154,8 @@ export class PortalMountManager<TRowData = unknown> {
 		[],
 	];
 	private mountedRowVisualRows = new Map<string, GridRowContentMount<TRowData>['visualRow']>();
+	/** Whether each mounted group row was drawn stuck: the row alone does not change when its header sticks. */
+	private mountedRowStuck = new Map<string, boolean>();
 	private mountedMenus = new Map<string, HTMLElement | undefined>();
 	private cellReleaseTransactionDepth = 0;
 	private deferredRowMounts = new Map<string, GridRowContentMount<TRowData>>();
@@ -573,6 +574,7 @@ export class PortalMountManager<TRowData = unknown> {
 		}
 		for (const [rowKey, mount] of this.deferredRowMounts) {
 			if (isFlushOutOfBudget(budgetUsed, maxItems, deadline, processed)) break;
+			clearRowContentPending(mount.container);
 			this.onMountRowContent?.(mount);
 			this.deferredRowMounts.delete(rowKey);
 			processed++;
@@ -624,8 +626,15 @@ export class PortalMountManager<TRowData = unknown> {
 	public mountRow(mount: GridRowContentMount<TRowData>): void {
 		const existingContainer = this.mountedRows.get(mount.rowKey);
 		const existingVisualRow = this.mountedRowVisualRows.get(mount.rowKey);
-		if (existingContainer === mount.container && isVisualRowEqual(existingVisualRow, mount.visualRow)) return;
+		const stuck = mount.context?.isStuck === true;
+		if (
+			existingContainer === mount.container &&
+			isVisualRowEqual(existingVisualRow, mount.visualRow) &&
+			(this.mountedRowStuck.get(mount.rowKey) ?? false) === stuck
+		)
+			return;
 		this.mountedRows.set(mount.rowKey, mount.container);
+		this.mountedRowStuck.set(mount.rowKey, stuck);
 		this.mountedRowVisualRows.set(mount.rowKey, mount.visualRow);
 		// Full-width rows are few per frame, so they mount during scroll too (bounded per frame)
 		// rather than sitting blank until scroll settles.
@@ -641,6 +650,10 @@ export class PortalMountManager<TRowData = unknown> {
 			this.stats.deferredDuringScroll++;
 			this.deferredRowReleases.delete(mount.rowKey);
 			this.deferredRowMounts.set(mount.rowKey, mount);
+			// The container still shows the previous row's content until this mount is applied: hide
+			// it and show the new row's label instead (CSS only, so the adapter's DOM is untouched).
+			if (existingContainer === mount.container && existingVisualRow && existingVisualRow.id !== mount.visualRow.id)
+				markRowContentPending(mount.container, mount.context?.label ?? '');
 			return;
 		}
 		this.onMountRowContent?.(mount);
@@ -651,6 +664,7 @@ export class PortalMountManager<TRowData = unknown> {
 		if (unmount.container && existingContainer && existingContainer !== unmount.container) return;
 		this.mountedRows.delete(unmount.rowKey);
 		this.mountedRowVisualRows.delete(unmount.rowKey);
+		this.mountedRowStuck.delete(unmount.rowKey);
 		if (this.scrolling) {
 			this.stats.releasesDuringScroll++;
 			this.stats.deferredDuringScroll++;
@@ -682,6 +696,7 @@ export class PortalMountManager<TRowData = unknown> {
 		const mount = this.deferredRowMounts.get(rowKey);
 		if (mount) {
 			this.deferredRowMounts.delete(rowKey);
+			clearRowContentPending(mount.container);
 			this.onMountRowContent?.(mount);
 		}
 	}
@@ -718,6 +733,7 @@ export class PortalMountManager<TRowData = unknown> {
 		this.cells.clear();
 		this.mountedRows.clear();
 		this.mountedRowVisualRows.clear();
+		this.mountedRowStuck.clear();
 		this.mountedMenus.clear();
 	}
 
@@ -792,4 +808,17 @@ export class PortalMountManager<TRowData = unknown> {
 		this.stats.flushChunks = 0;
 		this.stats.maxOpsFlushedInOneChunk = 0;
 	}
+}
+
+const ROW_CONTENT_PENDING_CLASS = 'og-row-content-pending';
+
+function markRowContentPending(container: HTMLElement, standIn: string): void {
+	container.classList.add(ROW_CONTENT_PENDING_CLASS);
+	container.setAttribute('data-stand-in', standIn);
+}
+
+function clearRowContentPending(container: HTMLElement): void {
+	if (!container.classList.contains(ROW_CONTENT_PENDING_CLASS)) return;
+	container.classList.remove(ROW_CONTENT_PENDING_CLASS);
+	container.removeAttribute('data-stand-in');
 }

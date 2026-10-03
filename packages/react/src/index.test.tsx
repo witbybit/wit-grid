@@ -1474,24 +1474,31 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		document.body.appendChild(containerDetail);
 
 		const store = createPortalStore<TestRow>();
-		store.mountRow('group-1', containerGroup, {
-			kind: 'group',
-			id: 'group-1',
-			field: 'category',
-			key: 'Electronics',
-			expanded: true,
-			depth: 1,
-			childCount: 5,
-		} as any);
+		store.mountRow(
+			'group-1',
+			containerGroup,
+			{
+				kind: 'group',
+				id: 'group-1',
+				field: 'category',
+				key: 'Electronics',
+				expanded: true,
+				depth: 1,
+				childCount: 5,
+			} as any,
+			undefined,
+			{ field: 'category', value: 'Electronics', leafCount: 5 } as any
+		);
 		store.mountRow('detail-1', containerDetail, {
 			kind: 'detail',
 			id: 'detail-1',
 			parentId: 'parent-1',
 		} as any);
 
-		const groupRenderer = ({ visualRow }: any) => (
+		// Group rows are drawn with the render context as props.
+		const groupRenderer = ({ field, value, leafCount }: any) => (
 			<span data-testid='custom-group'>
-				{visualRow.field}:{visualRow.key} ({visualRow.childCount} items)
+				{field}:{value} ({leafCount} items)
 			</span>
 		);
 
@@ -1584,17 +1591,18 @@ describe('React Adapter (v2 API and Architecture)', () => {
 			childCount: expanded ? 5 : 2,
 		});
 
-		const groupRenderer = ({ visualRow }: any) => (
-			<span data-testid='custom-group'>{visualRow.expanded ? `expanded:${visualRow.childCount}` : `collapsed:${visualRow.childCount}`}</span>
+		const groupRenderer = ({ expanded, leafCount }: any) => (
+			<span data-testid='custom-group'>{expanded ? `expanded:${leafCount}` : `collapsed:${leafCount}`}</span>
 		);
+		const makeContext = (row: ReturnType<typeof makeVisualRow>) => ({ expanded: row.expanded, leafCount: row.childCount }) as any;
 
-		store.mountRow('group-1', container, makeVisualRow(false) as any);
+		store.mountRow('group-1', container, makeVisualRow(false) as any, undefined, makeContext(makeVisualRow(false)));
 
 		render(<PortalManager store={store} api={grid.api} groupRowRenderer={groupRenderer} />);
 
 		expect(screen.getByTestId('custom-group').textContent).toBe('collapsed:2');
 
-		store.mountRow('group-1', container, makeVisualRow(true) as any);
+		store.mountRow('group-1', container, makeVisualRow(true) as any, undefined, makeContext(makeVisualRow(true)));
 		await act(async () => {
 			await Promise.resolve();
 		});

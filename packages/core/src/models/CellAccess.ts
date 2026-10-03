@@ -7,6 +7,7 @@ import { readInteractionState } from '../interaction/interactionState.js';
 import type { RowNode } from '../rowNode.js';
 import type { RowLoadState } from '../rowModel.js';
 import { createGridRowNodeFacade, type GridRowNode } from '../publicRowNode.js';
+import type { GridWriteResult } from '../api/GridApi.js';
 
 export class CellAccessModel<TRowData = unknown> {
 	constructor(private readonly runtime: CellAccessRuntime<TRowData>) {}
@@ -29,7 +30,7 @@ export class CellAccessModel<TRowData = unknown> {
 				scrollToRow: this.runtime.scrollToRow,
 				setCellValue: this.runtime.setCellValue,
 				writeCells: (updates) =>
-					updates.reduce<import('../api/GridApi.js').GridWriteResult>(
+					updates.reduce<GridWriteResult>(
 						(result, update) =>
 							result.status === 'applied' || result.status === 'noop'
 								? this.runtime.setCellValue(update.rowId, update.colField, update.value)

@@ -234,6 +234,11 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "DomGroupRenderer",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "dropdownColumnType",
 			"kind": "value",
 			"source": "./renderers/CellTypes.js"
@@ -584,14 +589,39 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "GroupCount",
+			"kind": "value",
+			"source": "./GroupParts.js"
+		},
+		{
 			"name": "GroupDef",
 			"kind": "type",
 			"source": "./types.js"
 		},
 		{
+			"name": "GroupRenderContext",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GroupRendererHandle",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GroupRendererSpec",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "GroupRowStyleRule",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "GroupToggle",
+			"kind": "value",
+			"source": "./GroupParts.js"
 		},
 		{
 			"name": "GroupVisualRow",
@@ -739,6 +769,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "RowAnimationOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "RowModelType",
 			"kind": "type",
 			"source": "./types.js"
@@ -817,6 +852,11 @@
 			"name": "SortModel",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "StickyHeadersOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "StyleRule",
@@ -922,7 +962,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
@@ -974,6 +1014,12 @@
 					"optional": true,
 					"type": "boolean",
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1056,7 +1102,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
@@ -1108,6 +1154,12 @@
 					"optional": true,
 					"type": "boolean",
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1189,7 +1241,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
@@ -1241,6 +1293,12 @@
 					"optional": true,
 					"type": "boolean",
 					"description": "Show the floating filter row — always-visible inline filter inputs below column headers."
+				},
+				{
+					"name": "rowAnimation",
+					"optional": true,
+					"type": "RowAnimationOptions",
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1341,8 +1399,8 @@
 				{
 					"name": "groupRowRenderer",
 					"optional": true,
-					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode",
-					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence."
+					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
 				},
 				{
 					"name": "detailRowRenderer",
@@ -1353,7 +1411,7 @@
 				{
 					"name": "totalRowRenderer",
 					"optional": true,
-					"type": "(props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode",
+					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
 					"description": "Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid."
 				},
 				{

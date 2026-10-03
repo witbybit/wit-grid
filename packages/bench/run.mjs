@@ -98,6 +98,16 @@ const SCENARIOS = [
 		fidelityOnly: true,
 	},
 	{
+		name: 'grouped-sticky',
+		title: 'Vertical scroll, grouped with sticky headers and pinned rows',
+		description:
+			'100,000 rows grouped into 1,000 open groups with sticky group headers, 2 rows pinned to the top and 1 to the bottom. Wit only (AG Grid row grouping is Enterprise). Scroll-linked writes counts elements JS moved because the content scrolled.',
+		query: { rows: 100_000, cols: 50, domCols: 0, grouped: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit'],
+		fidelityOnly: true,
+	},
+	{
 		name: 'vertical-styled',
 		title: 'Vertical scroll, decorated cells',
 		description:
@@ -246,7 +256,8 @@ async function runOnce(browser, grid, scenario) {
 		});
 	}
 	const before = await readMetrics();
-	if (traceLayouts) await page.evaluate(() => window.witHost?.resetRenderStats());
+	// Render stats cover the measured window only (scroll-linked writes, and the --trace write counters).
+	await page.evaluate(() => window.witHost?.resetRenderStats());
 	await page.evaluate(() => window.bench.start());
 	const { dx = 0, dy = 0, events } = scenario.wheel ?? { events: scenario.ticks };
 	const inputStart = performance.now();
@@ -286,6 +297,8 @@ async function runOnce(browser, grid, scenario) {
 		await done;
 	}
 	const calls = await page.evaluate(() => window.rendererCalls);
+	// Elements JS re-positioned because the content scrolled (each lags the compositor by a frame).
+	const scrollLinkedWrites = grid === 'wit' ? await page.evaluate(() => window.witHost?.getRenderStats().scrollLinkedPositionWrites ?? 0) : 0;
 	const writeStats = traceLayouts
 		? await page.evaluate(() => {
 				const stats = window.witHost?.getRenderStats();
@@ -346,6 +359,7 @@ async function runOnce(browser, grid, scenario) {
 		styleCount: delta('RecalcStyleCount'),
 		taskMs: deltaMs('TaskDuration'),
 		mounts: calls.mounts,
+		scrollLinkedWrites,
 		updates: calls.updates,
 		...(traceLayouts ? summarizeLayoutTrace(traceEvents) : {}),
 		...census,
@@ -538,6 +552,7 @@ const table = fidelity
 				'dropped %': fmt(r.droppedPct),
 				'blank %': fmt(r.blankSamplesPct),
 				'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+				'scroll-linked writes': fmt(r.scrollLinkedWrites, 0),
 			}));
 console.log();
 console.table(table);

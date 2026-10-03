@@ -510,6 +510,7 @@ export class InfiniteRowModelController<TData = unknown>
 		VisibleBlockLoadCapableRowModel,
 		CapableRowModel
 {
+	public readonly kind = 'infinite' as const;
 	private readonly runtime: InfiniteRowModelRuntime<TData>;
 	private datasource: InfiniteDatasource<TData>;
 	private blockSize: number;

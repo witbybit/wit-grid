@@ -1,4 +1,5 @@
-import { GridEventName, type GridEventPayloadMap } from '../api/GridEvents.js';
+import type { GridEventName } from '../api/GridEvents.js';
+import { type GridEventPayloadMap } from '../api/GridEvents.js';
 
 export type RuntimeFaultSource =
 	| 'event-bus'

@@ -38,6 +38,17 @@ const promotedShowcases = [
 		sourcePath: 'packages/examples/src/showcases/RowDragDemo.tsx',
 	},
 	{
+		id: 'grouping-sticky',
+		title: 'Sticky groups',
+		description: 'Group headers that stick natively and stack per level, pinned rows, and one custom renderer for every group display.',
+		category: 'Grouping',
+		level: 'advanced',
+		tags: ['grouping', 'sticky headers', 'pinned rows', 'aggregation', 'renderer'],
+		docs: '/docs/next/grouping',
+		showcase: true,
+		sourcePath: 'packages/examples/src/showcases/GroupingStickyDemo.tsx',
+	},
+	{
 		id: 'native-cell-types',
 		title: 'Native cell types',
 		description: 'Built-in checkbox, multi-select, date, dropdown, number, and tag-style cells with editors.',

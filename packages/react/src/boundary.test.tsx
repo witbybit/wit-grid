@@ -24,6 +24,8 @@ describe('React public boundary', () => {
 			'DateDomCellRenderer',
 			'Grid',
 			'GridEventName',
+			'GroupCount',
+			'GroupToggle',
 			'MultiSelectCellRenderer',
 			'TagsCellRenderer',
 			'createDropdownCellEditor',

@@ -1,10 +1,10 @@
 import { HeaderMenuController } from './headerMenuController.js';
 import { ScrollEngine } from './scrollEngine.js';
 import { ColumnInteractionController } from './columnInteractionController.js';
-import { FillDragController, type OverlayBox } from './fillDragController.js';
-import { createCellKey } from '../ids.js';
+import { FillDragController } from './fillDragController.js';
+
 import { GeometryController } from './geometryController.js';
-import type { InvalidationFrame } from './invalidationManager.js';
+
 import type {
 	GridCellContentMount,
 	GridCellContentUnmount,
@@ -219,6 +219,7 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				const model = this.engine.getRowModel();
 				return model ? model.getVisualIndexById(visualRowId) >= 0 : false;
 			},
+			getRowAnimation: () => this.engine.rowAnimation,
 			// Grid root for semantic column-pin effects.
 			getGridRoot: () => this.viewportRenderer.container,
 		});
@@ -361,8 +362,8 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				this.viewportRenderer.headerRightLayer
 			);
 		}
-		if (this.viewportRenderer.stickyGroupLayer) {
-			this.stickyGroupRenderer.mount(this.viewportRenderer.stickyGroupLayer);
+		if (this.viewportRenderer.rowsContainer) {
+			this.stickyGroupRenderer.mount(this.viewportRenderer.rowsContainer);
 		}
 
 		// Group panel: mount if showGroupPanel is already true at mount time

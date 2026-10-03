@@ -43,15 +43,15 @@ export function applyFills(api: GridApi<Trade>) {
 }
 ```
 
-| Field                                         | Effect                                                                                                  |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `rows.add`                                    | Rows to insert. They are appended in source order unless `rows.addIndex` is set.                        |
-| `rows.addIndex`                               | Source position to insert the added rows at.                                                            |
-| `rows.update`                                 | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored.    |
-| `rows.remove`                                 | Rows to remove, matched by id. Only the id needs to be right.                                           |
-| `cells`                                       | Cell writes, `{ rowId, colField, value }`, through each column's value setter, formulas and validation. |
-| `source`                                      | Where the cell writes come from: `'api'` (default), `'paste'` or `'fill'`. Picks the validation policy. |
-| `columns`, `sortModel`, `filterModel`, `pins` | Grid state applied in the same commit.                                                                  |
+| Field                                         | Effect                                                                                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rows.add`                                    | Rows to insert. They are appended in source order unless `rows.addIndex` is set.                                                                                           |
+| `rows.addIndex`                               | Source position to insert the added rows at.                                                                                                                               |
+| `rows.update`                                 | Replacement row objects. Each replaces the row with the same id; rows that do not exist are ignored.                                                                       |
+| `rows.remove`                                 | Rows to remove, matched by id. Only the id needs to be right.                                                                                                              |
+| `cells`                                       | Cell writes, `{ rowId, colField, value }`, through each column's value setter, formulas and validation.                                                                    |
+| `source`                                      | Where the cell writes come from: `'api'` (default), `'paste'` or `'fill'`. Picks the validation policy.                                                                    |
+| `columns`, `sortModel`, `filterModel`, `pins` | Grid state applied in the same commit. `pins: { top, bottom }` pins that many rows to the top or bottom of the viewport; they stay put natively, even as the rest scrolls. |
 
 The result is the write status plus what was touched:
 
@@ -98,8 +98,13 @@ export function toggle(api: GridApi<Task>, tasks: Task[], id: string) {
 }
 ```
 
-Only the edited row repaints, and selection, scroll position and the rest of the grid are left alone. To read
-the current rows for a change like this, use `api.rows().getAll()`.
+Only the edited row repaints, and selection, scroll position and the rest of the grid are left alone.
+
+Pass `setRows` your own rows array, in your own order. To change rows the grid already holds without keeping your
+own copy, update them instead: `api.transaction({ rows: { update: changed } })` matches rows by id, keeps their
+order, and animates rows that move under the current sort. (`api.rows().getAll()` returns only the rows currently displayed, in display order — sorted, without filtered-out
+rows or rows in collapsed groups — so handing that array back to `setRows` would reorder your rows and drop the
+hidden ones.)
 
 ## `setCellValue`
 

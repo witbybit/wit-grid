@@ -9,7 +9,7 @@ import {
 } from './renderWindow.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import { GridMetric } from '../diagnostics/GridInstrumentation.js';
-import { snapToDevicePixel, type GridLayoutPlan } from './layoutPlan.js';
+import { type GridLayoutPlan } from './layoutPlan.js';
 import type { OverlayRenderer } from './overlayRenderer.js';
 import type { PortalMountManager } from './portalMountManager.js';
 import type { FrameCoordinator } from './frameCoordinator.js';
@@ -19,19 +19,14 @@ import type { ScrollRenderContext } from './scrollRenderContext.js';
 import type { HeaderRenderer } from './headerRenderer.js';
 import type { FloatingFilterRenderer } from './floatingFilterRenderer.js';
 import type { StickyGroupRenderer } from './stickyGroupRenderer.js';
-import { isVisualFresh } from './visualFreshness.js';
+
 import type { ViewportRenderer } from './viewportRenderer.js';
 import type { LayoutTransitionController } from './layoutTransitionController.js';
-import { compileStyleRules, evaluateCellStyleRules } from '../styling/styleRules.js';
+import { compileStyleRules } from '../styling/styleRules.js';
 import type { RenderRuntimeState } from './renderRuntimeState.js';
-import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
-import { collectCellDecorationSnapshotMetadata, createCellDisplaySnapshot, mergeCellSnapshotTitle } from './cellDisplaySnapshot.js';
-import type { CanonicalGridCellPointer, GridCellRangeBounds } from '../api/GridApi.js';
-import { getColumnInstanceIdentity, type ColumnDef, type ColumnInstanceId } from '../columnDef.js';
-import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
+
 import { readInteractionState } from '../interaction/interactionState.js';
 import { asCapableRowModel } from '../rowModel.js';
-import type { RowNode } from '../rowNode.js';
 
 import { ApproachBandPrewarmer, type ApproachBandPrewarmerOptions } from './approachBandPrewarm.js';
 import type { PaintViewportLayout } from './renderPaintPipeline.js';
@@ -96,7 +91,6 @@ export class RenderScrollPipeline<TRowData = unknown> {
 	// same-window fast path never need to call getState() or geometry.
 	private cachedMaxScrollLeft = 0;
 	private cachedTotalWidth = 0;
-	private cachedTotalHeight = 0;
 	private cachedDefaultRowHeight = 40;
 	private cachedHasSelectionOverlay = false;
 
@@ -185,7 +179,6 @@ export class RenderScrollPipeline<TRowData = unknown> {
 
 	public updateGeometryBounds(defaultColWidth: number, defaultRowHeight: number): void {
 		this.cachedTotalWidth = this.deps.engine.geometry.getTotalWidth(defaultColWidth);
-		this.cachedTotalHeight = this.deps.engine.geometry.getTotalHeight(defaultRowHeight);
 		this.cachedDefaultRowHeight = defaultRowHeight ?? 40;
 		const viewportWidth = this.deps.engine.viewport.scrollViewportClientWidth || this.deps.engine.viewport.viewportWidth;
 		this.cachedMaxScrollLeft = Math.max(0, this.cachedTotalWidth - viewportWidth);
@@ -253,7 +246,8 @@ export class RenderScrollPipeline<TRowData = unknown> {
 			scrollCtx.selectionChangedDuringScroll = this.deps.engine.selectionVersion !== this.deps.rowRenderer.scrollStartSelectionVersion;
 			scrollCtx.globalChangedDuringScroll = state.globalVersion !== this.deps.rowRenderer.scrollStartGlobalVersion;
 			scrollCtx.activeEdit = interaction.activeEdit.active;
-			scrollCtx.hasDeferredCellStyleRules = compileStyleRules(state.styleRules).hasCellRules;
+			scrollCtx.compiledStyleRules = compileStyleRules(state.styleRules);
+			scrollCtx.hasDeferredCellStyleRules = scrollCtx.compiledStyleRules.hasCellRules;
 			scrollCtx.hasCustomRenderers = plan.hasCustomRenderers;
 			scrollCtx.hasInsightDecorations = this.deps.engine.insights.size > 0;
 			scrollCtx.plan = plan;
@@ -504,7 +498,6 @@ export class RenderScrollPipeline<TRowData = unknown> {
 	}
 
 	public syncCheapScrollOnly(layoutPlan: GridLayoutPlan): void {
-		const window = layoutPlan.renderWindow;
 		const scrollTop = layoutPlan.viewport.scrollTop;
 		const scrollLeft = layoutPlan.viewport.scrollLeft;
 
@@ -512,30 +505,7 @@ export class RenderScrollPipeline<TRowData = unknown> {
 		this.deps.renderStats.overlayCheapSyncsDuringScroll++;
 		this.deps.overlayRenderer.syncScrollPosition(this.cachedHasSelectionOverlay);
 
-		const pinTopRows = window.pinTopRows;
-		const pinBottomRows = window.pinBottomRows;
-		if (pinTopRows > 0 || pinBottomRows > 0) {
-			const viewportHeight = this.deps.engine.viewport.viewportHeight;
-			const totalHeight = this.cachedTotalHeight;
-			const rowTops = this.deps.engine.geometry.rowTops;
-
-			for (let r = 0; r < pinTopRows && r < window.rowCount; r++) {
-				const slot = this.deps.rowRenderer.activeRows.get(r);
-				if (slot) {
-					slot.updatePosition(snapToDevicePixel(rowTops[r] + scrollTop));
-				}
-			}
-
-			for (let r = window.rowCount - pinBottomRows; r < window.rowCount; r++) {
-				if (r >= pinTopRows) {
-					const slot = this.deps.rowRenderer.activeRows.get(r);
-					if (slot) {
-						slot.updatePosition(snapToDevicePixel(scrollTop + viewportHeight - (totalHeight - rowTops[r])));
-					}
-				}
-			}
-		}
-
+		// Viewport-pinned rows sit in sticky bands (compositor-pinned): nothing to write per frame.
 		this.deps.stickyGroupRenderer.sync(layoutPlan);
 		if (this.deps.rowRenderer.currentWindow) {
 			this.deps.rowRenderer.currentWindow.scrollTop = scrollTop;

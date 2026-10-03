@@ -7,7 +7,11 @@ import type { CellSlot } from './cellSlot.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { RowCellBinderDeps } from './rowCellBinder.js';
 import { buildCellPinClass } from './binders/binderShared.js';
-import { resolveHierarchyCellModel, writeHierarchyCell, type HierarchyCellDeps } from './hierarchyCell.js';
+import { resolveHierarchyCellModel, writeHierarchyCell, type HierarchyCellDeps, type HierarchyCellModel } from './hierarchyCell.js';
+import { reportRendererFault } from './rendererFaults.js';
+import type { GridApi } from '../api/GridApiSurfaces.js';
+import type { GroupRendererSpec } from '../rows/hierarchyConfig.js';
+import { createGroupRenderContext, isSameGroupRenderContext } from './groupRenderContext.js';
 
 export interface BindHierarchyCellRequest<TRowData> {
 	cellSlot: CellSlot<TRowData>;
@@ -20,6 +24,8 @@ export interface BindHierarchyCellRequest<TRowData> {
 	width: number;
 	state: InternalGridState<TRowData>;
 	isScrollFrameActive: boolean;
+	/** The row is the stuck copy of a sticky group header. */
+	isStuck?: boolean;
 }
 
 /** Per-call selection set, rebuilt only when the selection array changes. */
@@ -71,8 +77,8 @@ export function applyHierarchyCellFocus<TRowData>(
 	return ' og-cell-focused';
 }
 
-function createDeps<TRowData>(deps: HierarchyCellBinderDeps<TRowData>, state: InternalGridState<TRowData>): HierarchyCellDeps<TRowData> {
-	const engine = deps.engine;
+/** The reads the hierarchy model needs, bound to the engine and one state snapshot. */
+export function createHierarchyDeps<TRowData>(engine: GridEngine<TRowData>, state: InternalGridState<TRowData>): HierarchyCellDeps<TRowData> {
 	return {
 		getColumn: (field) => engine.columns.getColumnByFieldOrInstanceId(field),
 		getCellValue: (rowId, field) => engine.data.getCellValue(rowId, field),
@@ -93,15 +99,66 @@ function createDeps<TRowData>(deps: HierarchyCellBinderDeps<TRowData>, state: In
  * the parts are written directly (and diffed), so the cell is current on every scroll frame —
  * a recycled row never shows another row's label, and nothing waits for scroll to settle.
  */
+/**
+ * Draws a cell through `hierarchyColumn.renderer`: a DOM renderer is mounted here and updated in
+ * place; a React component is mounted by the adapter into the cell's content element, keyed by the
+ * cell (so a recycled cell updates its component instead of remounting). Returns false when the
+ * adapter is missing for a React spec, so the built-in cell is drawn instead.
+ */
+function bindCustomHierarchyCell<TRowData>(
+	deps: HierarchyCellBinderDeps<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	spec: GroupRendererSpec<TRowData>,
+	row: VisualRow<TRowData>,
+	model: HierarchyCellModel<TRowData>,
+	isStuck: boolean
+): boolean {
+	const portals = deps.cellBinderDeps?.portalMountManager;
+	if (spec.kind === 'react' && !portals) return false;
+	const ctx = createGroupRenderContext(deps.engine.getApiRef() as GridApi<TRowData>, row, model, isStuck);
+	const key = spec.kind === 'dom' ? spec.renderer : spec.component;
+	const mounted = cellSlot.contentMount;
+	if (mounted && mounted.renderer === key) {
+		const previous = mounted.context as typeof ctx | undefined;
+		if (previous && isSameGroupRenderContext(previous, ctx)) return true;
+		if (mounted.handle.update) {
+			mounted.context = ctx;
+			mounted.handle.update(ctx as never);
+			return true;
+		}
+	}
+	cellSlot.releaseContentMount();
+	cellSlot.hierarchyParts = null;
+	cellSlot.contentElement.textContent = '';
+	let handle: { update?(ctx: never): void; destroy?(): void };
+	if (spec.kind === 'dom') {
+		handle = spec.renderer.mount(cellSlot.contentElement, ctx) ?? {};
+	} else {
+		const rowKey = `hierarchy-cell:${cellSlot.cellInstanceId}`;
+		// React owns everything inside its own host element. Core may clear the content element (a
+		// rebind to the built-in cell, a remount): that detaches the host whole, so React's later
+		// unmount still finds its nodes where it left them.
+		const container = document.createElement('div');
+		container.className = 'og-hierarchy-cell-host';
+		cellSlot.contentElement.appendChild(container);
+		const draw = (next: typeof ctx) => portals!.mountRow({ rowKey, container, visualRow: next.row, renderer: spec, context: next });
+		draw(ctx);
+		handle = { update: draw, destroy: () => portals!.releaseRow({ rowKey, container }) };
+	}
+	cellSlot.contentMount = { renderer: key, handle, rowId: row.id, value: undefined, context: ctx };
+	return true;
+}
+
 export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowData>, request: BindHierarchyCellRequest<TRowData>): void {
 	const { cellSlot, row, rowIndex, colIndex, col, lane, left, width, state, isScrollFrameActive } = request;
 	const baseClass = buildCellPinClass(lane);
 	if (isScrollFrameActive) deps.onScrollCellVisited?.();
 	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
 
-	const model = resolveHierarchyCellModel(row, hierarchyCellInputsFor(state, col), createDeps(deps, state));
+	const model = resolveHierarchyCellModel(row, hierarchyCellInputsFor(state, col), createHierarchyDeps(deps.engine, state));
 	const rowId = row.kind === 'data' ? row.rowId : row.id;
 	if (!model) {
+		cellSlot.releaseContentMount();
 		if (cellSlot.hierarchyParts) {
 			cellSlot.contentElement.textContent = '';
 			cellSlot.hierarchyParts = null;
@@ -109,7 +166,20 @@ export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowDa
 		cellSlot.update(colIndex, col.field, rowIndex, rowId, left, -1, width, `${baseClass} og-cell-hierarchy`, 'empty', undefined, '', undefined);
 		return;
 	}
-	cellSlot.hierarchyParts = writeHierarchyCell(cellSlot.contentElement, cellSlot.hierarchyParts, model);
+	const spec = state.hierarchyColumn ? state.hierarchyColumn.renderer : undefined;
+	let custom = false;
+	if (spec) {
+		try {
+			custom = bindCustomHierarchyCell(deps, cellSlot, spec, row, model, request.isStuck === true);
+		} catch (error) {
+			reportRendererFault(deps.engine, 'hierarchy-cell-renderer', error, { rowId, rowIndex, colField: col.field, colIndex });
+			cellSlot.releaseContentMount();
+		}
+	}
+	if (!custom) {
+		cellSlot.releaseContentMount();
+		cellSlot.hierarchyParts = writeHierarchyCell(cellSlot.contentElement, cellSlot.hierarchyParts, model);
+	}
 	const focusClass = applyHierarchyCellFocus(deps, cellSlot, rowId, rowIndex, colIndex, col, state);
 	const didWrite = cellSlot.update(
 		colIndex,

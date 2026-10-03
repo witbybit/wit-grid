@@ -1,5 +1,6 @@
 import type { RowHierarchy } from '../visualRow.js';
-import { CellSlot, toPx } from './cellSlot.js';
+import type { CellSlot } from './cellSlot.js';
+import { toPx } from './cellSlot.js';
 import type { ColumnInstanceId } from '../columnDef.js';
 import type { VisualRow } from '../visualRow.js';
 

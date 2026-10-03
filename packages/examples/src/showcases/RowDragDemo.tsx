@@ -10,7 +10,7 @@
  *   - api.getRowOrder() / api.setRowOrder() for programmatic control
  *   - Live event log for all rowDrag* events
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { Grid, GridEventName } from '@eregister/wit-grid-react';
 import type { ColumnDef, GridApi, GridReadyEvent } from '@eregister/wit-grid-react';
 import { GripVertical, Shuffle, RotateCcw, List, ArrowUpDown } from 'lucide-react';
@@ -201,7 +201,7 @@ export default function RowDragDemo({ compact = false }: Props = {}) {
 		addLog('rowOrderChanged', `[reset via api.setRowOrder]`);
 	};
 
-	const cols = buildColumns(mode);
+	const cols = useMemo(() => buildColumns(mode), [mode]);
 	const displayRows = mode === 'unmanaged' ? unmanagedOrder : rows;
 
 	return (

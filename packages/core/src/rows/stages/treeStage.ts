@@ -1,4 +1,4 @@
-import { RowNode } from '../../store.js';
+import type { RowNode } from '../../store.js';
 import type { RowTreeNode } from './types.js';
 
 export function treeStage<TData>(nodes: RowNode<TData>[], getParentId: (data: TData) => string | null | undefined): RowTreeNode<TData>[] {

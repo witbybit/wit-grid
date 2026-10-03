@@ -1,6 +1,6 @@
 import type { GridEventListener, GridEventPayloadMap } from '../api/GridEvents.js';
-import { GridEventName } from '../api/GridEvents.js';
-import type { ColumnDef, CompiledGridPlan } from '../columnDef.js';
+import type { GridEventName } from '../api/GridEvents.js';
+import type { ColumnDef } from '../columnDef.js';
 import type { FormulaCellCoordinate } from '../calculations/dagEngine.js';
 import type { GeometryModel } from '../models/GeometryModel.js';
 import type { RowModel, RowModelRefreshResult } from '../rowModel.js';
@@ -10,6 +10,8 @@ import type { RuntimeFault, RuntimeFaultInput } from '../diagnostics/RuntimeFaul
 import type { GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import type { GridInvalidationReason } from '../renderer/invalidationManager.js';
 import type { LayoutTransitionReason } from '../renderer/layoutTransitionController.js';
+import type { GridWriteResult } from '../api/GridApi.js';
+import type { GridUIState } from '../state/GridState.js';
 
 export interface DataModelRuntime<TRowData = unknown> {
 	getState: () => InternalGridState<TRowData>;
@@ -51,7 +53,7 @@ export interface CellAccessRuntime<TRowData = unknown> {
 	selectRows: (rowIds: string[], options?: { mode?: 'add' | 'replace' }) => void;
 	deselectRows: (rowIds: string[]) => void;
 	scrollToRow: (rowId: string, options?: { select?: boolean }) => void;
-	setCellValue: (rowId: string, field: string, value: unknown) => import('../api/GridApi.js').GridWriteResult;
+	setCellValue: (rowId: string, field: string, value: unknown) => GridWriteResult;
 	refreshRows: () => void;
 	getRowModelType: () => 'client' | 'infinite' | 'server';
 }
@@ -130,8 +132,8 @@ export interface InfiniteRowModelRuntime<TRowData = unknown> extends RowModelRun
 export interface ServerSideRowModelRuntime<TRowData = unknown> extends RowModelRuntimeBase<TRowData> {
 	clearFormulas: () => void;
 	setLoadingState: (loading: boolean) => void;
-	setServerSideState: (state: NonNullable<import('../state/GridState.js').GridUIState['serverSide']>) => void;
-	publishServerSideState: (state: NonNullable<import('../state/GridState.js').GridUIState['serverSide']>) => void;
+	setServerSideState: (state: NonNullable<GridUIState['serverSide']>) => void;
+	publishServerSideState: (state: NonNullable<GridUIState['serverSide']>) => void;
 }
 
 export interface RowModelRuntimeEngineBridge<TRowData = unknown> {
@@ -160,8 +162,8 @@ export interface RowModelRuntimeEngineBridge<TRowData = unknown> {
 	getScrollVelocity: () => { vx: number; vy: number };
 	setRowModelLoadingState: (loading: boolean) => void;
 	setServerPaginationState: (payload: GridEventPayloadMap<TRowData>[GridEventName.paginationChanged]) => void;
-	setServerSideState: (state: NonNullable<import('../state/GridState.js').GridUIState['serverSide']>) => void;
-	publishServerSideState: (state: NonNullable<import('../state/GridState.js').GridUIState['serverSide']>) => void;
+	setServerSideState: (state: NonNullable<GridUIState['serverSide']>) => void;
+	publishServerSideState: (state: NonNullable<GridUIState['serverSide']>) => void;
 }
 
 export interface RowModelRuntimeStoreBridge<TRowData = unknown> {

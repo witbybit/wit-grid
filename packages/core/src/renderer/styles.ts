@@ -742,16 +742,75 @@ export const CORE_STYLES = `
     width: var(--og-content-width, 100%);
   }
 
-  .og-layer-sticky-groups {
-    position: sticky;
-    top: 0;
+  /*
+   * One section per expanded group, spanning the group's rows in content coordinates. Its first
+   * child is the group header copy, position: sticky: the browser sticks it below the top chrome,
+   * pushes it up where the section ends and releases it, with no JS positioning. Sections never
+   * take pointer events; only the header does.
+   */
+  .og-sticky-section {
+    position: absolute;
     left: 0;
-    height: 0;
-    z-index: 29;
     pointer-events: none;
   }
 
-  .og-sticky-group-row-host {
+  /*
+   * A recycled row/cell container whose adapter-rendered content is still the previous row's while
+   * its own mount waits out the scroll: the old content is hidden and the new row's label shown.
+   */
+  .og-hierarchy-cell-host {
+    display: contents;
+  }
+
+  .og-row-content-pending > * {
+    visibility: hidden;
+  }
+  .og-row-content-pending::before {
+    content: attr(data-stand-in);
+    position: absolute;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .og-row.og-sticky-group-row-host {
+    position: sticky;
+    left: auto;
+    right: auto;
+    pointer-events: auto;
+  }
+
+  /*
+   * The copy is only shown while stuck: otherwise the body's own group row is right beneath it
+   * (and animates with the body on expand/collapse; the copy would not). The stuck class flips a
+   * frame after the compositor, at the instant copy and body row coincide, so the swap is invisible.
+   */
+  .og-row.og-sticky-group-row-host:not(.og-row-group-stuck) {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /*
+   * Viewport-pinned rows: zero-height sticky bands, so the compositor keeps pinned rows stuck with
+   * no per-frame JS. Painted above body rows (25, matching the pinned-row z-index) and below the
+   * header (30).
+   */
+  .og-layer-pinned-top,
+  .og-layer-pinned-bottom {
+    position: sticky;
+    height: 0;
+    z-index: 25;
+  }
+
+  .og-layer-pinned-top {
+    top: 0;
+  }
+
+  .og-layer-pinned-bottom {
+    bottom: 0;
+  }
+
+  .og-row.og-sticky-group-row-host {
     pointer-events: auto;
   }
 
@@ -861,8 +920,8 @@ export const CORE_STYLES = `
   /*
    * The sticky copy looks exactly like the group row it stands for, so attaching, detaching and
    * being pushed change nothing visible: the same tint over an opaque grid background (the copy
-   * covers rows scrolling underneath). Only a soft shadow marks it as stuck; it fades in once
-   * when the copy appears and never changes while pushed.
+   * covers rows scrolling underneath). Only a soft shadow marks it as stuck (unless the grid turns
+   * it off); it fades in once when the header sticks and never changes while pushed.
    */
   .og-row-group-sticky {
     background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
@@ -870,7 +929,7 @@ export const CORE_STYLES = `
     font-weight: var(--og-group-row-font-weight);
   }
 
-  .og-row-group-sticky::after {
+  .og-row-group-stuck.og-row-group-sticky-shadow::after {
     content: '';
     position: absolute;
     left: 0;
@@ -882,7 +941,7 @@ export const CORE_STYLES = `
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .og-row-group-sticky::after {
+    .og-row-group-stuck.og-row-group-sticky-shadow::after {
       animation: og-sticky-shadow-in 140ms ease-out;
     }
   }
@@ -1712,10 +1771,43 @@ export const CORE_STYLES = `
 
   .og-selection-border {
     position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 19;
     border: 2px dashed var(--og-selection-border);
     background-color: var(--og-selection-bg);
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  /*
+   * The selection box is part of the scrolled content (rows container / pinned bands), positioned
+   * in content coordinates, so it scrolls on the compositor with the cells. Pieces over pinned
+   * columns sit in zero-height sticky lanes (left:0 / right:0) like the pinned cells they cover.
+   * 19 keeps it above body cells and below sticky group headers (21-24), the pinned bands (25) and
+   * the column header (30).
+   */
+  .og-selection-lane {
+    position: sticky;
+    height: 0;
+    z-index: 19;
+    pointer-events: none;
+  }
+
+  .og-selection-lane-left {
+    left: 0;
+  }
+
+  .og-selection-lane-right {
+    right: 0;
+    margin-left: auto;
+  }
+
+  .og-layer-pinned-top > .og-selection-border,
+  .og-layer-pinned-top > .og-selection-lane,
+  .og-layer-pinned-bottom > .og-selection-border,
+  .og-layer-pinned-bottom > .og-selection-lane {
+    z-index: 26;
   }
 
   /* Selection Fill Handle Style */

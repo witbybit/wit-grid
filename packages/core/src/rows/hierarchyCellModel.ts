@@ -12,7 +12,7 @@ import type { DescendantSelectionState } from './hierarchyIndex.js';
 import type { VisualRow } from '../visualRow.js';
 
 /** Everything the hierarchy cell shows, resolved once per bind; the writer only diffs it onto the DOM. */
-export interface HierarchyCellModel {
+export interface HierarchyCellModel<TData = unknown> {
 	/** Visual row id the toggle and checkbox act on. */
 	targetId: string;
 	indentPx: number;
@@ -23,6 +23,8 @@ export interface HierarchyCellModel {
 	label: string;
 	count: string | null;
 	cellClass: string;
+	/** The context the label, count and class callbacks saw (a custom renderer's context is built from it). */
+	ctx: HierarchyCellContext<TData>;
 }
 
 export interface HierarchyCellDeps<TData> {
@@ -71,7 +73,7 @@ export function resolveHierarchyCellModel<TData>(
 	row: VisualRow<TData>,
 	inputs: HierarchyCellInputs<TData>,
 	deps: HierarchyCellDeps<TData>
-): HierarchyCellModel | null {
+): HierarchyCellModel<TData> | null {
 	if (row.kind !== 'group' && row.kind !== 'total' && row.kind !== 'data') return null;
 	const { config, levelIndex } = inputs;
 	const { hierarchy } = row;
@@ -145,6 +147,7 @@ export function resolveHierarchyCellModel<TData>(
 		label,
 		count,
 		cellClass: `og-cell-hierarchy og-cell-hierarchy-${ctx.kind}${extraClass ? ' ' + extraClass : ''}`,
+		ctx,
 	};
 }
 

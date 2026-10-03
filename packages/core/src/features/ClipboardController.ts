@@ -1,6 +1,6 @@
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { ColumnDef } from '../columnDef.js';
-import { getColumnInstanceIdentity } from '../columnDef.js';
+
 import type { CanonicalGridCellPointer, GridWriteResult } from '../api/GridApi.js';
 import type { VisualRow } from '../visualRow.js';
 import type { InternalGridState } from '../state/GridState.js';

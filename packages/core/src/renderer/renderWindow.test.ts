@@ -8,9 +8,16 @@ import {
 	computeRenderWindow,
 	sameRenderedWindow,
 	type RenderWindow,
+	type StickySection,
 } from './renderWindow.js';
 import { GridStore } from '../store.js';
 import { ClientRowModelController } from '../rowModel.js';
+
+/** The sections whose header is stuck at this scroll position (the browser decides; this mirrors it). */
+const stuckSections = (window: RenderWindow): StickySection[] =>
+	(window.stickySections ?? []).filter(
+		(s) => s.top < window.scrollTop + s.stickyOffset && s.top + s.sectionHeight > window.scrollTop + s.stickyOffset
+	);
 
 describe('RenderWindow & ViewportDelta calculations', () => {
 	const baseWindow: RenderWindow = {
@@ -88,12 +95,12 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		expect(delta.hasChanges).toBe(false);
 	});
 
-	it('treats pinned row scroll offset changes as geometry changes', () => {
+	it('does not treat a scroll offset change as a geometry change (pinned rows ride sticky bands)', () => {
 		const delta = diffRenderWindow(baseWindow, { ...baseWindow, scrollTop: baseWindow.scrollTop + 20 });
 
 		expect(delta.rowsEntered).toEqual([]);
 		expect(delta.rowsExited).toEqual([]);
-		expect(delta.hasChanges).toBe(true);
+		expect(delta.hasChanges).toBe(false);
 	});
 
 	it('preserves pinned rows when max rendered rows clamps the center range', () => {
@@ -245,27 +252,23 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		store.setScrollPosition(80, 0);
 
 		const window = computeRenderWindow(store.engine);
-		expect(window.stickyGroupStack?.map((s) => s.visualIndex)).toContain(1);
-		const stickyItem = window.stickyGroupStack?.find((s) => s.visualIndex === 1);
-		expect(stickyItem?.top).toBe(120);
-		expect(window.stickyGroupStack).toEqual([
-			{
-				groupId: 'group:category=Hardware/product=Workstation',
-				visualIndex: 1,
-				depth: 1,
-				top: 120,
-				height: 40,
-				lastDescendantIndex: 3,
-				boundaryBottom: 160,
-				pushed: false,
-			},
-		]);
+		expect(stuckSections(window).map((s) => s.visualIndex)).toEqual([1]);
+		// Sticks below the pinned row; its section runs to the last row of the group.
+		expect(window.stickySections?.find((s) => s.visualIndex === 1)).toEqual({
+			groupId: 'group:category=Hardware/product=Workstation',
+			visualIndex: 1,
+			depth: 1,
+			top: 40,
+			height: 40,
+			sectionHeight: 120,
+			stickyOffset: 40,
+		});
 
 		controller.dispose();
 		store.destroy();
 	});
 
-	it('does not invalidate the row window for sticky group pixel movement only', () => {
+	it('does not invalidate the row window for scrolling alone', () => {
 		const base = {
 			rowStart: 10,
 			rowEnd: 20,
@@ -281,31 +284,31 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 			scrollLeft: 0,
 			viewportWidth: 500,
 			viewportHeight: 300,
-			stickyGroupStack: [
+			stickySections: [
 				{
 					groupId: 'category:Hardware',
 					visualIndex: 4,
 					depth: 0,
-					top: 120,
+					top: 160,
 					height: 40,
-					lastDescendantIndex: 30,
-					boundaryBottom: 1240,
-					pushed: false,
+					sectionHeight: 1080,
+					stickyOffset: 0,
 				},
 			],
 		};
 
+		// Scrolling never changes the sections: the browser sticks the headers.
+		expect(sameRenderedWindow(base, { ...base, scrollTop: 160 })).toBe(true);
 		expect(
 			sameRenderedWindow(base, {
 				...base,
-				scrollTop: 160,
-				stickyGroupStack: [{ ...base.stickyGroupStack[0], top: 160 }],
+				stickySections: [{ ...base.stickySections[0], sectionHeight: 1120 }],
 			})
-		).toBe(true);
+		).toBe(false);
 		expect(
 			sameRenderedWindow(base, {
 				...base,
-				stickyGroupStack: [{ ...base.stickyGroupStack[0], pushed: true }],
+				stickySections: [{ ...base.stickySections[0], stickyOffset: 40 }],
 			})
 		).toBe(false);
 	});
@@ -333,19 +336,17 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		store.setScrollPosition(90, 0);
 
 		const window = computeRenderWindow(store.engine);
-		expect(window.stickyGroupStack).toEqual([
-			{
-				groupId: 'group:category=Hardware',
-				visualIndex: 0,
-				depth: 0,
-				top: 80,
-				height: 40,
-				lastDescendantIndex: 2,
-				boundaryBottom: 120,
-				pushed: true,
-			},
-		]);
-		expect(window.stickyGroupStack?.map((s) => s.top)).toEqual([80]);
+		// Hardware (rows 0-2) is stuck; Software's section starts below the window's stuck line.
+		expect(stuckSections(window).map((s) => s.groupId)).toEqual(['group:category=Hardware']);
+		expect(window.stickySections?.find((s) => s.groupId === 'group:category=Hardware')).toEqual({
+			groupId: 'group:category=Hardware',
+			visualIndex: 0,
+			depth: 0,
+			top: 0,
+			height: 40,
+			sectionHeight: 120,
+			stickyOffset: 0,
+		});
 
 		controller.dispose();
 		store.destroy();
@@ -503,7 +504,7 @@ describe('column virtualization', () => {
 });
 
 describe('sticky group headers with nested groups', () => {
-	function makeNestedGrid(pagination?: { pageSize: number }) {
+	function makeNestedGrid(pagination?: { pageSize: number }, stickyHeaders: boolean | { levels?: number; shadow?: boolean } = true) {
 		type Row = { id: string; region: string; category: string };
 		const rows: Row[] = [];
 		for (const region of ['Americas', 'EMEA']) {
@@ -518,7 +519,7 @@ describe('sticky group headers with nested groups', () => {
 				{ field: 'category', header: 'Category' },
 			],
 			defaultRowHeight: 40,
-			grouping: { by: ['region', 'category'], defaultExpanded: true, stickyHeaders: true, rowHeight: 40 },
+			grouping: { by: ['region', 'category'], defaultExpanded: true, stickyHeaders, rowHeight: 40 },
 			...(pagination ? { pagination: { pageSize: pagination.pageSize, page: 0 } } : {}),
 		});
 		new ClientRowModelController(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns });
@@ -529,7 +530,7 @@ describe('sticky group headers with nested groups', () => {
 	const stackAt = (store: ReturnType<typeof makeNestedGrid>, scrollTop: number) => {
 		store.setScrollPosition(scrollTop, 0);
 		const rowModel = store.engine.getRowModel()!;
-		return (computeRenderWindow(store.engine).stickyGroupStack ?? []).map((item) => {
+		return stuckSections(computeRenderWindow(store.engine)).map((item) => {
 			const row = rowModel.getVisualRow(item.visualIndex);
 			return row?.kind === 'group' ? row.keyString : '?';
 		});
@@ -547,5 +548,42 @@ describe('sticky group headers with nested groups', () => {
 		expect(stackAt(store, 26 * 40)).toEqual(['Americas', 'Software']);
 		// Into the next outer group.
 		expect(stackAt(store, 37 * 40)).toEqual(['EMEA', 'Cloud']);
+	});
+
+	const sectionLabels = (store: ReturnType<typeof makeNestedGrid>, scrollTop: number) => {
+		store.setScrollPosition(scrollTop, 0);
+		const rowModel = store.engine.getRowModel()!;
+		return (computeRenderWindow(store.engine).stickySections ?? []).map((item) => {
+			const row = rowModel.getVisualRow(item.visualIndex);
+			return row?.kind === 'group' ? row.keyString : '?';
+		});
+	};
+
+	it('has a section for the stuck stack and for every group whose rows are in the window', () => {
+		const store = makeNestedGrid();
+		// Viewport 200px = 5 rows, scrolled to row 15 (inside Americas/Hardware): the stuck pair plus the
+		// upcoming Software group, whose header is within the rendered rows but not yet stuck.
+		const labels = sectionLabels(store, 15 * 40);
+		expect(labels).toEqual(expect.arrayContaining(['Americas', 'Hardware', 'Software']));
+		const window = computeRenderWindow(store.engine);
+		expect(stuckSections(window).map((s) => s.groupId)).toEqual(['group:region=Americas', 'group:region=Americas/category=Hardware']);
+		// A group far below the rendered rows has no section yet.
+		expect(labels).not.toContain('EMEA');
+		// The inner header sticks below the outer one.
+		const outer = window.stickySections!.find((s) => s.groupId === 'group:region=Americas')!;
+		const inner = window.stickySections!.find((s) => s.groupId === 'group:region=Americas/category=Hardware')!;
+		expect(outer.stickyOffset).toBe(0);
+		expect(inner.stickyOffset).toBe(outer.height);
+	});
+
+	it('levels: 1 sticks only top-level headers', () => {
+		const store = makeNestedGrid(undefined, { levels: 1 });
+		expect(stackAt(store, 15 * 40)).toEqual(['Americas']);
+		expect(sectionLabels(store, 15 * 40).every((label) => label === 'Americas' || label === 'EMEA')).toBe(true);
+	});
+
+	it('stickyHeaders: false, or levels: 0, has no sections', () => {
+		expect(sectionLabels(makeNestedGrid(undefined, false), 15 * 40)).toEqual([]);
+		expect(sectionLabels(makeNestedGrid(undefined, { levels: 0 }), 15 * 40)).toEqual([]);
 	});
 });

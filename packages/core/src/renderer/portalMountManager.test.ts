@@ -119,6 +119,28 @@ describe('PortalMountManager', () => {
 		expect(releaseRow).not.toHaveBeenCalled();
 	});
 
+	it('a recycled row container whose mount is deferred hides the previous row and shows the new label', () => {
+		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 0;
+		const mountRow = vi.fn();
+		manager.onMountRowContent = mountRow;
+		const container = document.createElement('div');
+		const group = (id: string) => ({ kind: 'group', id, depth: 0, height: 40 }) as never;
+
+		// Mounted at rest, then recycled to another group mid-scroll with no budget left this frame.
+		manager.mountRow({ rowKey: 'hierarchy-cell:1', container, visualRow: group('group:a') });
+		manager.setRuntimeState(makeScrollingRuntimeState());
+		manager.mountRow({ rowKey: 'hierarchy-cell:1', container, visualRow: group('group:b'), context: { label: 'B' } as never });
+		expect(container.classList.contains('og-row-content-pending')).toBe(true);
+		expect(container.getAttribute('data-stand-in')).toBe('B');
+
+		manager.setRuntimeState(makeIdleRuntimeState());
+		manager.flushDeferred();
+		expect(container.classList.contains('og-row-content-pending')).toBe(false);
+		expect(container.hasAttribute('data-stand-in')).toBe(false);
+		expect(mountRow).toHaveBeenCalledTimes(2);
+	});
+
 	it('defers row portal mounts and releases while scrolling when the budget is spent', () => {
 		const manager = new PortalMountManager();
 		manager.maxRowMountsPerScrollFrame = 0;

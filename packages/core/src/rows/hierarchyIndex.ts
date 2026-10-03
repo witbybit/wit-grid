@@ -18,25 +18,31 @@ export interface DescendantSelection {
 export class HierarchyIndex {
 	private readonly rowIds: string[] = [];
 	private readonly ranges = new Map<string, { start: number; end: number }>();
+	/** Ids of every group / tree parent in pre-order; `containerRanges` slices it per container. */
+	private readonly containerIds: string[] = [];
+	private readonly containerRanges = new Map<string, { start: number; end: number }>();
 
 	constructor(roots: readonly RowTreeNode<unknown>[]) {
 		// Iterative pre-order walk; an exit marker closes a node's range after its subtree.
-		const stack: Array<{ node: RowTreeNode<unknown>; exit: boolean; start: number }> = [];
-		for (let i = roots.length - 1; i >= 0; i--) stack.push({ node: roots[i], exit: false, start: 0 });
+		const stack: Array<{ node: RowTreeNode<unknown>; exit: boolean; start: number; containerStart: number }> = [];
+		for (let i = roots.length - 1; i >= 0; i--) stack.push({ node: roots[i], exit: false, start: 0, containerStart: 0 });
 		while (stack.length > 0) {
 			const entry = stack.pop()!;
 			const { node } = entry;
 			const id = node.kind === 'group' ? node.id : toDataVisualRowId(node.rowId);
 			if (entry.exit) {
 				this.ranges.set(id, { start: entry.start, end: this.rowIds.length });
+				this.containerRanges.set(id, { start: entry.containerStart, end: this.containerIds.length });
 				continue;
 			}
 			if (node.kind === 'data') this.rowIds.push(node.rowId);
 			const children = node.children;
 			if (!children || children.length === 0) continue;
 			// A tree parent's descendants start after itself; a group's with its first row.
-			stack.push({ node, exit: true, start: this.rowIds.length });
-			for (let i = children.length - 1; i >= 0; i--) stack.push({ node: children[i], exit: false, start: 0 });
+			// Containers beneath it start after itself.
+			this.containerIds.push(id);
+			stack.push({ node, exit: true, start: this.rowIds.length, containerStart: this.containerIds.length });
+			for (let i = children.length - 1; i >= 0; i--) stack.push({ node: children[i], exit: false, start: 0, containerStart: 0 });
 		}
 	}
 
@@ -44,6 +50,12 @@ export class HierarchyIndex {
 	public getDescendantRowIds(id: string): readonly string[] {
 		const range = this.ranges.get(id);
 		return range ? this.rowIds.slice(range.start, range.end) : [];
+	}
+
+	/** Visual row ids of every group and tree parent beneath `id` (not `id` itself), collapsed subtrees included. */
+	public getDescendantContainerIds(id: string): readonly string[] {
+		const range = this.containerRanges.get(id);
+		return range ? this.containerIds.slice(range.start, range.end) : [];
 	}
 
 	public countSelected(id: string, selected: ReadonlySet<string>): DescendantSelection {

@@ -1,5 +1,7 @@
 import type { GridInstrumentation } from '../diagnostics/GridInstrumentation.js';
 import { registerGridRuntimeComposition } from './apiInternalBridge.js';
+import { PUBLIC_ENGINE_FORWARD_NAMES } from './engineForwards.js';
+import { pickMembers } from './memberNames.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
 import type { GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
@@ -17,17 +19,16 @@ import type {
 	GridSnapshotSelector,
 	GridSnapshotSelectorEquality,
 	GridStateSnapshot,
-	RowDataTransaction,
 	RowSelectionGesture,
 	SelectAllRowsOptions,
 	SelectRowsOptions,
 	ScrollToRowOptions,
 	ScrollToCellOptions,
 } from '../api/GridApi.js';
-import type { RowNodeTransaction } from '../rowTransactions.js';
+
 import type { ColumnDef } from '../columnDef.js';
-import type { FilterModel, SortModel, RowModelCapability } from '../rowModel.js';
-import type { ColumnState, GridInitialState } from '../state/GridState.js';
+import type { RowModelCapability } from '../rowModel.js';
+import type { ColumnState } from '../state/GridState.js';
 import type { GridPersistenceAdapter, PersistenceController, PersistenceStatus, PersistedGridState } from '../persistence/statePersistence.js';
 
 interface GridRuntimeCompositionOptions<TRowData> {
@@ -56,16 +57,15 @@ export function createGridRuntimeComposition<TRowData>({
 	persistenceController,
 	workspaceController,
 }: GridRuntimeCompositionOptions<TRowData>): GridApi<TRowData> {
+	// Members that are a plain call into the engine are bound once on the runtime; the api shares them.
+	const engineForwards: Pick<GridApi<TRowData>, (typeof PUBLIC_ENGINE_FORWARD_NAMES)[number]> = pickMembers(runtime, PUBLIC_ENGINE_FORWARD_NAMES);
 	const api = {
+		...engineForwards,
 		getStateSnapshot: () => runtime.getStateSnapshot(),
-		getRowId: (row: TRowData) => runtime.getRowId(row),
-		isRowLoading: (rowId: string) => runtime.isRowLoading(rowId),
 		getDataRowAtVisualIndex: (index: number) => runtime.getDataRowAtVisualIndex(index),
 		setRows: (rows: TRowData[]) => runtime.setRows(rows),
 		transaction: runtime.transaction,
-		flushTransactions: () => runtime.flushTransactions(),
 		getRowOrder: () => runtime.getRowOrder(),
-		setRowOrder: (rowIds: string[]) => runtime.setRowOrder(rowIds),
 		refreshRows: () => runtime.refreshRows(),
 		setRowHeights: (rowHeights: Record<string, number> | undefined) => runtime.setRowHeights(rowHeights),
 		setDefaultRowHeight: (defaultRowHeight?: number | undefined) => runtime.setDefaultRowHeight(defaultRowHeight),
@@ -78,74 +78,24 @@ export function createGridRuntimeComposition<TRowData>({
 		refreshServerSide: (options?: ServerSideRefreshOptions) => runtime.refreshServerSide(options),
 		purgeServerSide: (options?: Omit<ServerSideRefreshOptions, 'purge'>) => runtime.purgeServerSide(options),
 		getServerSideStoreState: () => runtime.getServerSideStoreState(),
-		getCellValue: (rowId: string, colField: string) => runtime.getCellValue(rowId, colField),
-		getFormula: (rowId: string, colField: string) => runtime.getFormula(rowId, colField),
-		hasFormula: (rowId: string, colField: string) => runtime.hasFormula(rowId, colField),
 		setFormula: (rowId: string, colField: string, formula: string) => runtime.setFormula(rowId, colField, formula),
 		clearFormula: (rowId: string, colField: string) => runtime.clearFormula(rowId, colField),
-		setCellValue: (rowId: string, colField: string, value: unknown) => runtime.setCellValue(rowId, colField, value),
 		selectCell: (pointer: GridCellPointer | null, source?: GridSelectionSource) => runtime.selectCell(pointer, source),
 		selectRange: (start: GridCellPointer | null, end: GridCellPointer | null, source?: GridSelectionSource) =>
 			runtime.selectRange(start, end, source),
 		extendSelection: (end: GridCellPointer, source?: GridSelectionSource) => runtime.extendSelection(end, source),
 		setColumns: (columns: ColumnDef<TRowData>[]) => runtime.setColumns(columns),
-		setColumnWidth: (colField: string, width: number) => runtime.setColumnWidth(colField, width),
-		autoSizeColumn: (colField: string, options?: Parameters<typeof runtime.autoSizeColumn>[1]) => runtime.autoSizeColumn(colField, options),
-		autoSizeAllColumns: (options?: Parameters<typeof runtime.autoSizeAllColumns>[0]) => runtime.autoSizeAllColumns(options),
-		getColumnDistinctValues: (colField: string) => runtime.getColumnDistinctValues(colField),
-		getColumnDistinctValueSummary: (colField: string) => runtime.getColumnDistinctValueSummary(colField),
 		copySelectedRange: () => runtime.copySelectedRange(),
 		pasteFromClipboard: () => runtime.pasteFromClipboard(),
-		copyRange: (minRow: number, maxRow: number, minCol: number, maxCol: number) => runtime.copyRange(minRow, maxRow, minCol, maxCol),
 		setColumnVisible: (colField: string, visible: boolean) => runtime.setColumnVisible(colField, visible),
 		setColumnsVisible: (colFields: string[], visible: boolean) => runtime.setColumnsVisible(colFields, visible),
 		getColumns: () => runtime.getColumns(),
-		getDisplayedColumns: () => runtime.getDisplayedColumns(),
 		setPinnedColumns: (pins: { left?: number; right?: number }) => runtime.setPinnedColumns(pins),
-		getPinnedColumns: () => runtime.getPinnedColumns(),
-		moveColumn: (colField: string, toIndex: number) => runtime.moveColumn(colField, toIndex),
-		setColumnOrder: (colFields: string[]) => runtime.setColumnOrder(colFields),
-		setColumnReorderEnabled: (enabled: boolean) => runtime.setColumnReorderEnabled(enabled),
-		setRowHeight: (rowId: string, height: number) => runtime.setRowHeight(rowId, height),
-		setSortModel: (sortModel: SortModel | null) => runtime.setSortModel(sortModel),
-		setFilterModel: (filterModel: FilterModel | null) => runtime.setFilterModel(filterModel),
 		getQuickFilter: () => runtime.getQuickFilter(),
 		setQuickFilter: (text: string, columnIds?: string[]) => runtime.setQuickFilter(text, columnIds),
-		getGrouping: () => runtime.getGrouping(),
-		setGrouping: (grouping: Parameters<typeof runtime.setGrouping>[0]) => runtime.setGrouping(grouping),
-		updateGrouping: (patch: Parameters<typeof runtime.updateGrouping>[0]) => runtime.updateGrouping(patch),
-		setGroupBy: (by: Parameters<typeof runtime.setGroupBy>[0]) => runtime.setGroupBy(by),
-		getGroupBy: () => runtime.getGroupBy(),
-		addGroupBy: (colId: string, atIndex?: number) => runtime.addGroupBy(colId, atIndex),
-		removeGroupBy: (colId: string) => runtime.removeGroupBy(colId),
-		moveGroupBy: (colId: string, toIndex: number) => runtime.moveGroupBy(colId, toIndex),
-		getTreeData: () => runtime.getTreeData(),
-		setTreeData: (treeData: Parameters<typeof runtime.setTreeData>[0]) => runtime.setTreeData(treeData),
-		getAggregation: () => runtime.getAggregation(),
-		setAggregation: (defs: Parameters<typeof runtime.setAggregation>[0]) => runtime.setAggregation(defs),
-		getHierarchyColumn: () => runtime.getHierarchyColumn(),
-		setHierarchyColumn: (config: Parameters<typeof runtime.setHierarchyColumn>[0]) => runtime.setHierarchyColumn(config),
-		getDetail: () => runtime.getDetail(),
-		setDetail: (detail: Parameters<typeof runtime.setDetail>[0]) => runtime.setDetail(detail),
-		setExpanded: (id: string, expanded: boolean) => runtime.setExpanded(id, expanded),
-		toggleExpanded: (id: string) => runtime.toggleExpanded(id),
-		isExpanded: (id: string) => runtime.isExpanded(id),
-		expandAll: (options?: Parameters<typeof runtime.expandAll>[0]) => runtime.expandAll(options),
-		collapseAll: () => runtime.collapseAll(),
-		setDetailOpen: (rowId: string, open: boolean) => runtime.setDetailOpen(rowId, open),
-		toggleDetailOpen: (rowId: string) => runtime.toggleDetailOpen(rowId),
-		isDetailOpen: (rowId: string) => runtime.isDetailOpen(rowId),
-		getDescendantRowIds: (id: string) => runtime.getDescendantRowIds(id),
-		getDescendantSelection: (id: string) => runtime.getDescendantSelection(id),
 		setDescendantsSelected: (id: string, selected: boolean) => runtime.setDescendantsSelected(id, selected),
-		setShowGroupPanel: (enabled: boolean) => runtime.setShowGroupPanel(enabled),
-		setShowFloatingFilters: (enabled: boolean) => runtime.setShowFloatingFilters(enabled),
-		setShowFilterChipBar: (enabled: boolean) => runtime.setShowFilterChipBar(enabled),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
 		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
-		setStyleRules: (styleRules: GridInitialState<TRowData>['styleRules']) => runtime.setStyleRules(styleRules),
-		addEventListener: runtime.addEventListener,
-		dispatchEvent: runtime.dispatchEvent,
 		startEditing: (rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api') =>
 			runtime.startEditing(rowId, colFieldOrInstanceId, source),
 		updateEditDraft: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.updateEditDraft(rowId, colFieldOrInstanceId, value),
@@ -153,7 +103,6 @@ export function createGridRuntimeComposition<TRowData>({
 		commitEdit: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.commitEdit(rowId, colFieldOrInstanceId, value),
 		integrity: runtime.integrity,
 		getVisibleColumnRange: () => runtime.getVisibleColumnRange(),
-		getColumnState: () => runtime.getColumnState(),
 		applyColumnState: (states: ColumnState[], opts?: { applyOrder?: boolean }) => runtime.applyColumnState(states, opts),
 		getGridState: () => runtime.getGridState(),
 		applyGridState: (state: PersistedGridState) =>
@@ -178,13 +127,6 @@ export function createGridRuntimeComposition<TRowData>({
 		) => runtime.subscribeToSnapshotSelector(keys, selector, listener, isEqual),
 		subscribeToIntegrity: (listener: Parameters<typeof runtime.subscribeToIntegrity>[0]) => runtime.subscribeToIntegrity(listener),
 		subscribeToCell: (rowId: string, colField: string, listener: () => void) => runtime.subscribeToCell(rowId, colField, listener),
-		subscribeToDomainVersions: (listener: Parameters<typeof runtime.subscribeToDomainVersions>[0]) => runtime.subscribeToDomainVersions(listener),
-		subscribeDomain: (domain: Parameters<typeof runtime.subscribeDomain>[0], listener: Parameters<typeof runtime.subscribeDomain>[1]) =>
-			runtime.subscribeDomain(domain, listener),
-		getColumnIndex: (colField: string) => runtime.getColumnIndex(colField),
-		getColumnField: (colIndex: number) => runtime.getColumnField(colIndex),
-		getColumnDef: (colField: string) => runtime.getColumnDef(colField),
-		openPanel: (panelId: string) => runtime.openPanel(panelId),
 		closePanel: () => runtime.closePanel(),
 		togglePanel: (panelId: string) => runtime.togglePanel(panelId),
 		getOpenPanel: () => runtime.getOpenPanel(),
@@ -192,10 +134,6 @@ export function createGridRuntimeComposition<TRowData>({
 		openChart: () => runtime.openChart(),
 		closeChart: () => runtime.closeChart(),
 		toggleChart: () => runtime.toggleChart(),
-		undo: () => runtime.undo(),
-		redo: () => runtime.redo(),
-		canUndo: () => runtime.canUndo(),
-		canRedo: () => runtime.canRedo(),
 		hasPersistence: (): boolean => persistenceAdapter !== undefined,
 		clearPersistedState: (): void | Promise<void> => persistenceAdapter?.clear?.(),
 		setAutoSave: (enabled: boolean): void => persistenceController?.setAutoSave(enabled),
@@ -264,7 +202,6 @@ export function createGridRuntimeComposition<TRowData>({
 		clearRuntimeFaults: () => runtime.clearRuntimeFaults(),
 		getInstrumentation: () => runtime.getInstrumentation(),
 		setInstrumentation: (inst: GridInstrumentation) => runtime.setInstrumentation(inst),
-		flushCellUpdatesSync: () => runtime.flushCellUpdatesSync(),
 		getTheme: () => runtime.getTheme(),
 		getThemeName: () => runtime.getThemeName(),
 		getAvailableThemes: () => runtime.getAvailableThemes(),

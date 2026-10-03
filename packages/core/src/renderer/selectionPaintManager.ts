@@ -1,5 +1,5 @@
 import type { GridEngine } from '../engine/GridEngine.js';
-import type { InternalGridState } from '../state/GridState.js';
+
 import type { GridRowClassParams } from '../columnDef.js';
 import type { RowNode } from '../rowNode.js';
 import type { RowSlot } from './rowSlot.js';

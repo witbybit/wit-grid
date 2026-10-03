@@ -1,3 +1,4 @@
+import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import { canEditCell, isCellSelectable } from '../visualRow.js';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
 import { GridEventName } from '../api/GridEvents.js';
@@ -75,7 +76,7 @@ import { computeDistinctValueSummary } from '../distinctValues.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
 import { type GridInstrumentation, NOOP_INSTRUMENTATION } from '../diagnostics/GridInstrumentation.js';
 import { GridCapabilityManager } from '../capabilities/GridCapabilityManager.js';
-import type { GridCapabilityAction, GridCapabilitiesConfig, GridCapabilityResult } from '../capabilities/capabilityTypes.js';
+
 import { GridInsightRegistry } from '../insights/GridInsightRegistry.js';
 import { GridDataIntegrityManager } from '../features/dataIntegrity/GridDataIntegrityManager.js';
 import { createGridIntegrityRowProvider, type GridIntegrityRowModelKind } from '../features/dataIntegrity/GridIntegrityRowProvider.js';
@@ -100,6 +101,12 @@ import {
 	isGroupingActive,
 } from '../rows/hierarchyConfig.js';
 import { RenderRequestCoordinator } from './RenderRequestCoordinator.js';
+import type { GridApi, GridCellWrite } from '../api/GridApi.js';
+import type { GridCommit } from './GridChangeApplier.js';
+import type { AppliedDomainMutation, GridDomainMutation } from './GridDomainMutation.js';
+import type { GroupDef } from '../rows/hierarchyConfig.js';
+import type { CellValueChangeResult } from '../features/DataMutationController.js';
+import type { GridIntegrityIssue } from '../features/dataIntegrity/integrityTypes.js';
 
 export type ManagedRowDragBlockReason =
 	| 'unsupported-row-model'
@@ -157,12 +164,12 @@ export class GridEngine<TRowData = unknown> {
 	public dataIntegrity: GridDataIntegrityManager<TRowData> | null = null;
 
 	// Lazy api ref — set by store after api object is created
-	private _apiRef: import('../api/GridApi.js').GridApi<TRowData> | null = null;
-	public setApiRef(api: import('../api/GridApi.js').GridApi<TRowData>): void {
+	private _apiRef: GridApi<TRowData> | null = null;
+	public setApiRef(api: GridApi<TRowData>): void {
 		this._apiRef = api;
 	}
 	/** The grid's public api, handed to DOM cell renderers. Throws before the api exists. */
-	public getApiRef(): import('../api/GridApi.js').GridApi<TRowData> {
+	public getApiRef(): GridApi<TRowData> {
 		if (!this._apiRef) throw new Error('Grid api is not available yet');
 		return this._apiRef;
 	}
@@ -262,6 +269,8 @@ export class GridEngine<TRowData = unknown> {
 	public readonly rowCtrls = new RowCtrlStore<TRowData>();
 	/** Grid-wide scroll presentation policy — see columnDef.ts's GridRendererOptions. */
 	public readonly rendererOptions: GridRendererOptions | undefined;
+	/** Current row animation options; read when an animation starts, so a change applies to the next one. */
+	public rowAnimation: RowAnimationOptions | undefined;
 
 	private _scrollStateProvider: { isScrolling(): boolean; phase: string } | null = null;
 
@@ -294,6 +303,7 @@ export class GridEngine<TRowData = unknown> {
 	constructor(config: GridEngineConfig<TRowData>) {
 		this.getContainerElement = config.getContainerElement ?? (() => null);
 		this.rendererOptions = config.rendererOptions;
+		this.rowAnimation = config.rendererOptions?.rowAnimation;
 		this.asyncTransactionWaitMs = config.asyncTransactionWaitMs;
 		this.eventBus = new EventBus<TRowData>();
 		this.renderRequests = new RenderRequestCoordinator(this.eventBus);
@@ -547,7 +557,7 @@ export class GridEngine<TRowData = unknown> {
 		const featureContext = {
 			columns: this.columns,
 			getState: () => this.stateManager.getState(),
-			applyChange: (change: import('./GridChangeApplier.js').GridCommit<TRowData>) => this.changeApplier.commit(change),
+			applyChange: (change: GridCommit<TRowData>) => this.changeApplier.commit(change),
 		};
 		this.columnFeature = new ColumnFeatureController<TRowData>(featureContext);
 		this.columnAutoSize = new ColumnAutoSizeController<TRowData>({
@@ -615,7 +625,7 @@ export class GridEngine<TRowData = unknown> {
 			const diFeatureCtx = {
 				columns: this.columns,
 				getState: () => this.stateManager.getState(),
-				applyChange: (change: import('./GridChangeApplier.js').GridCommit<TRowData>) => this.changeApplier.commit(change),
+				applyChange: (change: GridCommit<TRowData>) => this.changeApplier.commit(change),
 			};
 			// The provider refines this from the attached row model's capabilities.
 			const modelType: GridIntegrityRowModelKind = 'client';
@@ -633,7 +643,7 @@ export class GridEngine<TRowData = unknown> {
 				scheduler: defaultGridScheduler,
 				rowProvider,
 				capabilityManager: this.capabilityManager,
-				commitCells: (updates) => this.transaction({ cells: updates as import('../api/GridApi.js').GridCellWrite[] }),
+				commitCells: (updates) => this.transaction({ cells: updates as GridCellWrite[] }),
 				applyRowPatch: (rowId, patch) => {
 					const row = this.rowModel?.getRawRowById(rowId);
 					if (!row) {
@@ -867,7 +877,7 @@ export class GridEngine<TRowData = unknown> {
 			if (failure) return withNoTransactionChanges<TRowData>(failure, cells, failure.status === 'rejected' ? failure.reason : 'rejected');
 		}
 		if (!hasRows && cells.length === 0) return withNoTransactionChanges<TRowData>({ status: 'noop' }, [], '');
-		const domainMutations: import('./GridDomainMutation.js').GridDomainMutation<TRowData>[] = [];
+		const domainMutations: GridDomainMutation<TRowData>[] = [];
 		if (hasRows) domainMutations.push({ kind: 'row-transaction', transaction: rows! });
 		if (cells.length > 0) domainMutations.push({ kind: 'batch-cell', updates: [...cells], undoable: true, source });
 		const execution = this.changeApplier.commitDetailed({
@@ -955,7 +965,7 @@ export class GridEngine<TRowData = unknown> {
 	}
 	public subscribeToSelector<TValue>(
 		keys: readonly string[],
-		selector: (state: import('../state/GridState.js').InternalGridState<TRowData>) => TValue,
+		selector: (state: InternalGridState<TRowData>) => TValue,
 		listener: (value: TValue) => void,
 		isEqual?: (left: TValue, right: TValue) => boolean
 	): () => void {
@@ -987,7 +997,7 @@ export class GridEngine<TRowData = unknown> {
 			deselectRows: (rowIds) => this.deselectRowIds(rowIds, 'api'),
 			scrollToRow: () => {},
 			setCellValue: (targetRowId, field, value) => this.setCellValue(targetRowId, field, value),
-			writeCells: (updates) => this.transaction({ cells: updates as import('../api/GridApi.js').GridCellWrite[] }),
+			writeCells: (updates) => this.transaction({ cells: updates as GridCellWrite[] }),
 			setExpanded: (id, expanded) => this.groupingFeature.setExpanded(id, expanded),
 			setDetailOpen: (rowId, open) => this.groupingFeature.setDetailOpen(rowId, open),
 			refreshRows: () => this.rowModel?.refresh(),
@@ -1126,6 +1136,10 @@ export class GridEngine<TRowData = unknown> {
 	public setStyleRules(styleRules: InternalGridState<TRowData>['styleRules']): void {
 		this.stateFeature.setStyleRules(styleRules);
 	}
+	public setRowAnimation(options: RowAnimationOptions | undefined): void {
+		this.rowAnimation = options;
+	}
+
 	public setShowFloatingFilters(enabled: boolean): void {
 		this.stateFeature.setShowFloatingFilters(enabled);
 	}
@@ -1183,7 +1197,7 @@ export class GridEngine<TRowData = unknown> {
 		});
 	}
 
-	public setGroupBy(by: ReadonlyArray<string | import('../rows/hierarchyConfig.js').GroupDef<TRowData>>): void {
+	public setGroupBy(by: ReadonlyArray<string | GroupDef<TRowData>>): void {
 		this.groupingFeature.setGroupBy(by);
 	}
 	public addGroupBy(colId: string, atIndex?: number): void {
@@ -1626,15 +1640,10 @@ export class GridEngine<TRowData = unknown> {
 		}));
 	}
 
-	private collectCommittedWriteCells(
-		appliedMutations: readonly import('./GridDomainMutation.js').AppliedDomainMutation<TRowData>[]
-	): GridCellPointer[] {
+	private collectCommittedWriteCells(appliedMutations: readonly AppliedDomainMutation<TRowData>[]): GridCellPointer[] {
 		const cells: GridCellPointer[] = [];
 		for (const mutation of appliedMutations) {
-			const result = mutation.result as
-				| import('../features/DataMutationController.js').CellValueChangeResult
-				| { committed?: readonly import('../features/DataMutationController.js').CellValueChangeResult[] }
-				| undefined;
+			const result = mutation.result as CellValueChangeResult | { committed?: readonly CellValueChangeResult[] } | undefined;
 			if (!result) continue;
 			if ('applied' in result) {
 				if (result.applied) cells.push({ rowId: result.rowId, colField: result.colField });
@@ -1680,9 +1689,7 @@ export class GridEngine<TRowData = unknown> {
 		return issues.length > 0 ? this.toValidationFailedWriteResult(issues) : null;
 	}
 
-	private toValidationFailedWriteResult(
-		issues: readonly import('../features/dataIntegrity/integrityTypes.js').GridIntegrityIssue[]
-	): GridWriteResult {
+	private toValidationFailedWriteResult(issues: readonly GridIntegrityIssue[]): GridWriteResult {
 		return {
 			status: 'validationFailed',
 			reason: issues[0]?.message ?? 'blocking validation failed',
@@ -1707,7 +1714,7 @@ function _createEmptyIntegrityState<TRowData>(): GridIntegrityState<TRowData> {
 /** What the engine commits for a transaction; `applyState` carries grid state set in the same call. */
 export interface GridEngineTransaction<TRowData> {
 	rows?: RowDataTransaction<TRowData>;
-	cells?: readonly import('../api/GridApi.js').GridCellWrite[];
+	cells?: readonly GridCellWrite[];
 	source?: 'api' | 'paste' | 'fill';
 	/** Grid state (columns, sort, filter, pins) applied in the same batch, before the data commit. */
 	applyState?: () => void;
@@ -1715,18 +1722,18 @@ export interface GridEngineTransaction<TRowData> {
 
 interface BatchCellCommitSummary {
 	committed: readonly { rowId: string; colField: string; newRawValue: unknown }[];
-	rejected: readonly { update: import('../api/GridApi.js').GridCellWrite; reason: string }[];
+	rejected: readonly { update: GridCellWrite; reason: string }[];
 }
 
 const EMPTY_ROW_NODE_TRANSACTION = Object.freeze({ add: [], update: [], remove: [] }) as unknown as RowNodeTransaction<never>;
 
-function toWriteProposals(cells: readonly import('../api/GridApi.js').GridCellWrite[]) {
+function toWriteProposals(cells: readonly GridCellWrite[]) {
 	return cells.map((cell) => ({ rowId: cell.rowId, colField: cell.colField, proposedValue: cell.value }));
 }
 
 function withNoTransactionChanges<TRowData>(
 	result: GridWriteResult,
-	cells: readonly import('../api/GridApi.js').GridCellWrite[],
+	cells: readonly GridCellWrite[],
 	reason: string
 ): GridTransactionResult<TRowData> {
 	return {

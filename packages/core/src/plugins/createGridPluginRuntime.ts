@@ -1,196 +1,46 @@
 import type { GridPluginRuntime } from '../api/GridApi.js';
+import { memberNames, pickMembers, type MemberNames } from '../internal/memberNames.js';
 
+/** Every member of the plugin surface. The compile-time check below keeps this list equal to `GridPluginRuntime`. */
+const PLUGIN_RUNTIME_MEMBERS = `
+	getStateSnapshot getRowId isRowLoading getDataRowAtVisualIndex setRows transaction flushTransactions
+	refreshRows setRowHeights setDefaultRowHeight getRowModelType getRowModelCapabilities
+	supportsRowModelCapability purgeCache setInfiniteDatasource setServerSideDatasource refreshServerSide
+	purgeServerSide getServerSideStoreState getCellValue getFormula hasFormula setFormula clearFormula
+	getCellAccessByPointer setCellValue getRowNode getDisplayedRowAtIndex getRowIndexById forEachNode
+	forEachDisplayedNode getRowLoadState selectCell selectRange extendSelection applyRowSelectionGesture
+	selectRows deselectRows toggleRowSelection selectAllRows clearRowSelection getSelectedRowIds
+	isRowNodeSelected getSelectedRowCount setColumns setColumnWidth autoSizeColumn autoSizeAllColumns
+	getColumnDistinctValues getColumnDistinctValueSummary copySelectedRange pasteFromClipboard copyRange
+	setColumnVisible setColumnsVisible getColumns getDisplayedColumns setPinnedColumns getPinnedColumns
+	moveColumn setColumnOrder setColumnReorderEnabled setRowHeight setSortModel setFilterModel getQuickFilter
+	setQuickFilter getQueryModel setQueryModel clearQueryModel evaluateQueryForRow setStyleRules setGroupBy
+	getGroupBy addGroupBy removeGroupBy moveGroupBy getGrouping setGrouping updateGrouping getTreeData
+	setTreeData getAggregation setAggregation getHierarchyColumn setHierarchyColumn getDetail setDetail
+	setExpanded toggleExpanded isExpanded expandAll collapseAll setDetailOpen toggleDetailOpen isDetailOpen
+	getDescendantRowIds getDescendantSelection setDescendantsSelected setShowGroupPanel setRowAnimation setShowFloatingFilters
+	setShowFilterChipBar getRawRowById rows addEventListener dispatchEvent startEditing updateEditDraft
+	stopEditing commitEdit getColumnState applyColumnState getGridState applyGridState subscribe subscribeToKey
+	subscribeToSnapshotSelector subscribeToIntegrity subscribeToCell subscribeToDomainVersions subscribeDomain
+	getColumnIndex getColumnField getColumnDef undo redo canUndo canRedo openPanel closePanel togglePanel
+	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv hasPersistence clearPersistedState
+	setAutoSave isAutoSaveEnabled getPersistenceStatus subscribeToPersistenceStatus saveNow hasWorkspace
+	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView deleteView duplicateView
+	renameView setDefaultView getRuntimeFaults clearRuntimeFaults flushCellUpdatesSync getInstrumentation
+	setInstrumentation reportRuntimeFault getTheme getThemeName getAvailableThemes switchTheme mergeTheme
+	setTheme onThemeChange getContainer destroy getCellState getCheapDisplayValue getVisualRow getVisualRowCount
+	getVisualIndexByRowId getVisibleRowRange getRowModel integrity getVisibleColumnRange getRowOrder setRowOrder
+	can canEdit canCopy canPaste canExport scrollToRow scrollToCell getInsightDiagnostics`;
+
+type PluginRuntimeMember = MemberNames<typeof PLUGIN_RUNTIME_MEMBERS>;
+type MissingFromList = Exclude<keyof GridPluginRuntime, PluginRuntimeMember>;
+type NotOnSurface = Exclude<PluginRuntimeMember, keyof GridPluginRuntime>;
+const _surfaceMatchesList: [MissingFromList, NotOnSurface] extends [never, never] ? true : never = true;
+void _surfaceMatchesList;
+
+const pluginRuntimeMembers = memberNames(PLUGIN_RUNTIME_MEMBERS);
+
+/** The plugin surface of `source`: exactly the members plugins may use, none of the host's other internals. */
 export function createGridPluginRuntime<TRowData>(source: GridPluginRuntime<TRowData>): GridPluginRuntime<TRowData> {
-	return {
-		getStateSnapshot: source.getStateSnapshot,
-		getRowId: source.getRowId,
-		isRowLoading: source.isRowLoading,
-		getDataRowAtVisualIndex: source.getDataRowAtVisualIndex,
-		setRows: source.setRows,
-		transaction: source.transaction,
-		flushTransactions: source.flushTransactions,
-		refreshRows: source.refreshRows,
-		setRowHeights: source.setRowHeights,
-		setDefaultRowHeight: source.setDefaultRowHeight,
-		getRowModelType: source.getRowModelType,
-		getRowModelCapabilities: source.getRowModelCapabilities,
-		supportsRowModelCapability: source.supportsRowModelCapability,
-		purgeCache: source.purgeCache,
-		setInfiniteDatasource: source.setInfiniteDatasource,
-		setServerSideDatasource: source.setServerSideDatasource,
-		refreshServerSide: source.refreshServerSide,
-		purgeServerSide: source.purgeServerSide,
-		getServerSideStoreState: source.getServerSideStoreState,
-		getCellValue: source.getCellValue,
-		getFormula: source.getFormula,
-		hasFormula: source.hasFormula,
-		setFormula: source.setFormula,
-		clearFormula: source.clearFormula,
-		getCellAccessByPointer: source.getCellAccessByPointer,
-		setCellValue: source.setCellValue,
-		getRowNode: source.getRowNode,
-		getDisplayedRowAtIndex: source.getDisplayedRowAtIndex,
-		getRowIndexById: source.getRowIndexById,
-		forEachNode: source.forEachNode,
-		forEachDisplayedNode: source.forEachDisplayedNode,
-		getRowLoadState: source.getRowLoadState,
-		selectCell: source.selectCell,
-		selectRange: source.selectRange,
-		extendSelection: source.extendSelection,
-		applyRowSelectionGesture: source.applyRowSelectionGesture,
-		selectRows: source.selectRows,
-		deselectRows: source.deselectRows,
-		toggleRowSelection: source.toggleRowSelection,
-		selectAllRows: source.selectAllRows,
-		clearRowSelection: source.clearRowSelection,
-		getSelectedRowIds: source.getSelectedRowIds,
-		isRowNodeSelected: source.isRowNodeSelected,
-		getSelectedRowCount: source.getSelectedRowCount,
-		setColumns: source.setColumns,
-		setColumnWidth: source.setColumnWidth,
-		autoSizeColumn: source.autoSizeColumn,
-		autoSizeAllColumns: source.autoSizeAllColumns,
-		getColumnDistinctValues: source.getColumnDistinctValues,
-		getColumnDistinctValueSummary: source.getColumnDistinctValueSummary,
-		copySelectedRange: source.copySelectedRange,
-		pasteFromClipboard: source.pasteFromClipboard,
-		copyRange: source.copyRange,
-		setColumnVisible: source.setColumnVisible,
-		setColumnsVisible: source.setColumnsVisible,
-		getColumns: source.getColumns,
-		getDisplayedColumns: source.getDisplayedColumns,
-		setPinnedColumns: source.setPinnedColumns,
-		getPinnedColumns: source.getPinnedColumns,
-		moveColumn: source.moveColumn,
-		setColumnOrder: source.setColumnOrder,
-		setColumnReorderEnabled: source.setColumnReorderEnabled,
-		setRowHeight: source.setRowHeight,
-		setSortModel: source.setSortModel,
-		setFilterModel: source.setFilterModel,
-		getQuickFilter: source.getQuickFilter,
-		setQuickFilter: source.setQuickFilter,
-		getQueryModel: source.getQueryModel,
-		setQueryModel: source.setQueryModel,
-		clearQueryModel: source.clearQueryModel,
-		evaluateQueryForRow: source.evaluateQueryForRow,
-		setStyleRules: source.setStyleRules,
-		setGroupBy: source.setGroupBy,
-		getGroupBy: source.getGroupBy,
-		addGroupBy: source.addGroupBy,
-		removeGroupBy: source.removeGroupBy,
-		moveGroupBy: source.moveGroupBy,
-		getGrouping: source.getGrouping,
-		setGrouping: source.setGrouping,
-		updateGrouping: source.updateGrouping,
-		getTreeData: source.getTreeData,
-		setTreeData: source.setTreeData,
-		getAggregation: source.getAggregation,
-		setAggregation: source.setAggregation,
-		getHierarchyColumn: source.getHierarchyColumn,
-		setHierarchyColumn: source.setHierarchyColumn,
-		getDetail: source.getDetail,
-		setDetail: source.setDetail,
-		setExpanded: source.setExpanded,
-		toggleExpanded: source.toggleExpanded,
-		isExpanded: source.isExpanded,
-		expandAll: source.expandAll,
-		collapseAll: source.collapseAll,
-		setDetailOpen: source.setDetailOpen,
-		toggleDetailOpen: source.toggleDetailOpen,
-		isDetailOpen: source.isDetailOpen,
-		getDescendantRowIds: source.getDescendantRowIds,
-		getDescendantSelection: source.getDescendantSelection,
-		setDescendantsSelected: source.setDescendantsSelected,
-		setShowGroupPanel: source.setShowGroupPanel,
-		setShowFloatingFilters: source.setShowFloatingFilters,
-		setShowFilterChipBar: source.setShowFilterChipBar,
-		getRawRowById: source.getRawRowById,
-		rows: source.rows,
-		addEventListener: source.addEventListener,
-		dispatchEvent: source.dispatchEvent,
-		startEditing: source.startEditing,
-		updateEditDraft: source.updateEditDraft,
-		stopEditing: source.stopEditing,
-		commitEdit: source.commitEdit,
-		getColumnState: source.getColumnState,
-		applyColumnState: source.applyColumnState,
-		getGridState: source.getGridState,
-		applyGridState: source.applyGridState,
-		subscribe: source.subscribe,
-		subscribeToKey: source.subscribeToKey,
-		subscribeToSnapshotSelector: source.subscribeToSnapshotSelector,
-		subscribeToIntegrity: source.subscribeToIntegrity,
-		subscribeToCell: source.subscribeToCell,
-		subscribeToDomainVersions: source.subscribeToDomainVersions,
-		subscribeDomain: source.subscribeDomain,
-		getColumnIndex: source.getColumnIndex,
-		getColumnField: source.getColumnField,
-		getColumnDef: source.getColumnDef,
-		undo: source.undo,
-		redo: source.redo,
-		canUndo: source.canUndo,
-		canRedo: source.canRedo,
-		openPanel: source.openPanel,
-		closePanel: source.closePanel,
-		togglePanel: source.togglePanel,
-		getOpenPanel: source.getOpenPanel,
-		openChart: source.openChart,
-		closeChart: source.closeChart,
-		toggleChart: source.toggleChart,
-		isChartOpen: source.isChartOpen,
-		exportCsv: source.exportCsv,
-		getCsv: source.getCsv,
-		hasPersistence: source.hasPersistence,
-		clearPersistedState: source.clearPersistedState,
-		setAutoSave: source.setAutoSave,
-		isAutoSaveEnabled: source.isAutoSaveEnabled,
-		getPersistenceStatus: source.getPersistenceStatus,
-		subscribeToPersistenceStatus: source.subscribeToPersistenceStatus,
-		saveNow: source.saveNow,
-		hasWorkspace: source.hasWorkspace,
-		getWorkspaceState: source.getWorkspaceState,
-		subscribeToWorkspaceState: source.subscribeToWorkspaceState,
-		listViews: source.listViews,
-		saveView: source.saveView,
-		updateView: source.updateView,
-		applyView: source.applyView,
-		deleteView: source.deleteView,
-		duplicateView: source.duplicateView,
-		renameView: source.renameView,
-		setDefaultView: source.setDefaultView,
-		getRuntimeFaults: source.getRuntimeFaults,
-		clearRuntimeFaults: source.clearRuntimeFaults,
-		flushCellUpdatesSync: source.flushCellUpdatesSync,
-		getInstrumentation: source.getInstrumentation,
-		setInstrumentation: source.setInstrumentation,
-		reportRuntimeFault: source.reportRuntimeFault,
-		getTheme: source.getTheme,
-		getThemeName: source.getThemeName,
-		getAvailableThemes: source.getAvailableThemes,
-		switchTheme: source.switchTheme,
-		mergeTheme: source.mergeTheme,
-		setTheme: source.setTheme,
-		onThemeChange: source.onThemeChange,
-		getContainer: source.getContainer,
-		destroy: source.destroy,
-		getCellState: source.getCellState,
-		getCheapDisplayValue: source.getCheapDisplayValue,
-		getVisualRow: source.getVisualRow,
-		getVisualRowCount: source.getVisualRowCount,
-		getVisualIndexByRowId: source.getVisualIndexByRowId,
-		getVisibleRowRange: source.getVisibleRowRange,
-		getRowModel: source.getRowModel,
-		integrity: source.integrity,
-		getVisibleColumnRange: source.getVisibleColumnRange,
-		getRowOrder: source.getRowOrder,
-		setRowOrder: source.setRowOrder,
-		can: source.can,
-		canEdit: source.canEdit,
-		canCopy: source.canCopy,
-		canPaste: source.canPaste,
-		canExport: source.canExport,
-		scrollToRow: source.scrollToRow,
-		scrollToCell: source.scrollToCell,
-		getInsightDiagnostics: source.getInsightDiagnostics,
-	};
+	return pickMembers(source, pluginRuntimeMembers);
 }

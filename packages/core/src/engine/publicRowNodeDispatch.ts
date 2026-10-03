@@ -1,9 +1,12 @@
 import type { GridWriteResult } from '../api/GridApi.js';
-import { GridEventName, type GridEventPayloadMap } from '../api/GridEvents.js';
+import type { GridEventName } from '../api/GridEvents.js';
+import { type GridEventPayloadMap } from '../api/GridEvents.js';
 import { createGridRowNodeFacade, type GridRowNode } from '../publicRowNode.js';
 import type { RowNode } from '../rowNode.js';
 import type { InternalRowNodeTransaction, RowNodeTransaction } from '../rowTransactions.js';
 import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
+import type { RowLoadState } from '../rowModel.js';
+import type { GridIntegrityIssue } from '../features/dataIntegrity/integrityTypes.js';
 
 export interface PublicRowNodeDispatchDeps<TRowData = unknown> {
 	getRowId(row: TRowData): string;
@@ -22,9 +25,9 @@ export interface PublicRowNodeDispatchDeps<TRowData = unknown> {
 	setExpanded(id: string, expanded: boolean): void;
 	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
-	retryRowLoad(rowIndex: number | null, loadState: import('../rowModel.js').RowLoadState): GridWriteResult;
-	getRowIssues(rowId: string): readonly import('../features/dataIntegrity/integrityTypes.js').GridIntegrityIssue[];
-	validateRow(rowId: string): Promise<readonly import('../features/dataIntegrity/integrityTypes.js').GridIntegrityIssue[]>;
+	retryRowLoad(rowIndex: number | null, loadState: RowLoadState): GridWriteResult;
+	getRowIssues(rowId: string): readonly GridIntegrityIssue[];
+	validateRow(rowId: string): Promise<readonly GridIntegrityIssue[]>;
 	getRowModelType(): 'client' | 'infinite' | 'server';
 }
 
