@@ -543,8 +543,8 @@ export class GridEngine<TRowData = unknown> {
 				applyStructuralWriteEffects: (writeResult) => this.dataMutation.applyStructuralWriteEffects(writeResult),
 				publishCommittedCellChanges: (changes) => this.publishCommittedCellChanges(changes),
 				requestLayoutTransitionCapture: (reason) => this.requestLayoutTransitionCapture(reason),
-				syncRowGeometryFrom: (startIndex) => {
-					this.syncRowGeometry(startIndex);
+				syncRowGeometryFrom: (startIndex, endIndex) => {
+					this.syncRowGeometry(startIndex, endIndex);
 				},
 			},
 			domainMutationExecutorRegistry: createDefaultGridDomainMutationExecutorRegistry<TRowData>(),
@@ -1321,18 +1321,19 @@ export class GridEngine<TRowData = unknown> {
 	 *
 	 * Returns the first changed row index, or -1 when geometry was already current.
 	 */
-	public syncRowGeometry(fromIndex = 0): number {
+	public syncRowGeometry(fromIndex = 0, toIndex?: number): number {
 		const rowModel = this.rowModel;
 		if (!rowModel) return -1;
 		const state = this.stateManager.getState();
-		return this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight, fromIndex);
+		return this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight, fromIndex, toIndex);
 	}
 
 	private syncRowGeometryFrom(
 		rowModel: RowModel<TRowData>,
 		rowHeightsRecord: Record<string, number>,
 		defaultRowHeight: number,
-		fromIndex = 0
+		fromIndex = 0,
+		toIndex?: number
 	): number {
 		const state = this.stateManager.getState();
 		let count = rowModel.getVisualRowCount();
@@ -1355,7 +1356,8 @@ export class GridEngine<TRowData = unknown> {
 				const explicitHeight = row.height ?? rowHeightsRecord[row.id];
 				return explicitHeight !== undefined ? explicitHeight : defaultRowHeight;
 			},
-			fromIndex
+			fromIndex,
+			toIndex
 		);
 	}
 
