@@ -61,7 +61,7 @@ function makePlan(topologyVersion: number, colCount = 5): GridLayoutPlan {
 			},
 		},
 		headerBands: [makeLeafBand(colCount)],
-		stickyGroups: [],
+		stickySections: [],
 		renderWindow: {
 			rowStart: 0,
 			rowEnd: 10,

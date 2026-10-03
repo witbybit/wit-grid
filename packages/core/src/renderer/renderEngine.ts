@@ -267,7 +267,6 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.statusBarRenderer = new StatusBarRenderer<TRowData>(engine);
 		this.paginationBarRenderer = new PaginationBarRenderer<TRowData>(engine);
 		this.stickyGroupRenderer = new StickyGroupRenderer<TRowData>(engine, this.portalMountManager);
-		this.stickyGroupRenderer.renderStats = this.renderStats;
 		this.stickyGroupRenderer.cellRowBinder = {
 			bind: (request) => this.rowRenderer.detachedRowBinder.bind(request),
 			release: (slot) => this.rowRenderer.detachedRowBinder.release(slot),
@@ -362,8 +361,8 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 				this.viewportRenderer.headerRightLayer
 			);
 		}
-		if (this.viewportRenderer.stickyGroupLayer) {
-			this.stickyGroupRenderer.mount(this.viewportRenderer.stickyGroupLayer);
+		if (this.viewportRenderer.rowsContainer) {
+			this.stickyGroupRenderer.mount(this.viewportRenderer.rowsContainer);
 		}
 
 		// Group panel: mount if showGroupPanel is already true at mount time

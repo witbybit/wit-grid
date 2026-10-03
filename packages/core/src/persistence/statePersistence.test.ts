@@ -443,6 +443,23 @@ describe('statePersistence', () => {
 			expect(applied.grouping?.stickyHeaders).toBe(true);
 		});
 
+		it('round-trips stickyHeaders options and rejects malformed ones', () => {
+			const before = makeCurrent({
+				columns: [{ field: 'region', header: 'Region', width: 150 }],
+				grouping: { by: ['region'], stickyHeaders: { levels: 1, shadow: false } },
+			});
+			const persisted = extractPersistedState(before);
+			expect(persisted.state.grouping?.stickyHeaders).toEqual({ levels: 1, shadow: false });
+			const after = makeCurrent({ columns: [{ field: 'region', header: 'Region', width: 150 }], grouping: { by: ['region'] } });
+			const result = preparePersistedGridStateRestore(JSON.parse(JSON.stringify(persisted)) as PersistedGridState, after);
+			expect(result.ok).toBe(true);
+			if (result.ok) expect(result.restore.stateMutation.grouping?.stickyHeaders).toEqual({ levels: 1, shadow: false });
+
+			const malformed = JSON.parse(JSON.stringify(persisted)) as PersistedGridState;
+			(malformed.state.grouping as { stickyHeaders: unknown }).stickyHeaders = { levels: 'two' };
+			expect(preparePersistedGridStateRestore(malformed, after).ok).toBe(false);
+		});
+
 		it('omits unknown column fields from stateMutation', () => {
 			const saved = wrapState({
 				columnWidths: { id: 120, unknown: 180 },

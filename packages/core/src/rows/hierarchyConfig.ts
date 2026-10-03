@@ -42,14 +42,49 @@ export interface TotalsConfig {
 	grand?: TotalPlacement | false;
 }
 
+export interface StickyHeadersOptions {
+	/** How many grouping levels stick, outermost first (1 = only top-level groups). Default: every level. */
+	levels?: number;
+	/** A shadow under the stuck stack. Default: true. */
+	shadow?: boolean;
+}
+
+/** `stickyHeaders` normalised once: null when headers do not stick. */
+export interface ResolvedStickyHeaders {
+	levels: number;
+	shadow: boolean;
+}
+
+const STICKY_ALL_LEVELS: ResolvedStickyHeaders = Object.freeze({ levels: Infinity, shadow: true });
+const resolvedStickyOptions = new WeakMap<StickyHeadersOptions, ResolvedStickyHeaders>();
+
+/** Cached per config object, so reading it every frame allocates nothing. */
+export function resolveStickyHeaders(stickyHeaders: boolean | StickyHeadersOptions | undefined): ResolvedStickyHeaders | null {
+	if (!stickyHeaders) return null;
+	if (stickyHeaders === true) return STICKY_ALL_LEVELS;
+	let resolved = resolvedStickyOptions.get(stickyHeaders);
+	if (!resolved) {
+		const levels = stickyHeaders.levels;
+		resolved = Object.freeze({
+			levels: levels === undefined ? Infinity : Math.max(0, Math.floor(levels)),
+			shadow: stickyHeaders.shadow !== false,
+		});
+		resolvedStickyOptions.set(stickyHeaders, resolved);
+	}
+	return resolved;
+}
+
 export interface GroupingConfig<TData = unknown> {
 	/** Grouping levels, outermost first. Empty keeps the configuration without grouping. */
 	by: ReadonlyArray<string | GroupDef<TData>>;
 	/** Which groups start open. Explicit expansion (`setExpanded`, `expandAll`) overrides it. Default: false. */
 	defaultExpanded?: DefaultExpanded<GroupInfo>;
 	totals?: TotalsConfig;
-	/** Expanded group headers stick to the top of the viewport while their rows scroll past. */
-	stickyHeaders?: boolean;
+	/**
+	 * Expanded group headers stick to the top of the viewport while their rows scroll past. `true` sticks
+	 * every level with a shadow; pass options to cap the levels or drop the shadow.
+	 */
+	stickyHeaders?: boolean | StickyHeadersOptions;
 	/** Height of group and total rows. Default: the grid's row height. */
 	rowHeight?: number;
 	/**

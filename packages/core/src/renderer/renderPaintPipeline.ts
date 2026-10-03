@@ -287,6 +287,9 @@ export class RenderPaintPipeline<TRowData = unknown> {
 			this.deps.rowRenderer.repaintInvalidatedCells(frame);
 		}
 
+		// The sticky header copies repeat group rows' cells, so a row or cell repaint rewrites them too.
+		if (frame.rows.size > 0 || cellCount > 0 || frame.columns.size > 0) this.refreshStickyGroups();
+
 		if (frame.headers) {
 			stats.headerPaints++;
 			this.deps.headerRenderer.sync(frame);
@@ -296,6 +299,11 @@ export class RenderPaintPipeline<TRowData = unknown> {
 			stats.overlayPaints++;
 			this.deps.overlayRenderer.sync(frame);
 		}
+	}
+
+	private refreshStickyGroups(): void {
+		const plan = this.deps.viewportRenderer.getLayoutPlan();
+		if (plan) this.deps.stickyGroupRenderer.refresh(plan);
 	}
 
 	private syncViewport(): void {

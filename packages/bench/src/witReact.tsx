@@ -72,7 +72,8 @@ installTicker(rows, render, (i) => middleVisibleRowIndex('.og-rows-container > .
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.og-scroll-viewport'),
 	header: () => container.querySelector<HTMLElement>('.og-layer-header-wrapper'),
-	rows: () => container.querySelectorAll<HTMLElement>('.og-rows-container > .og-row'),
+	rows: () =>
+		container.querySelectorAll<HTMLElement>('.og-rows-container > .og-row, .og-layer-pinned-top > .og-row, .og-layer-pinned-bottom > .og-row'),
 	cells: (row) => row.querySelectorAll<HTMLElement>('.og-cell'),
 	cellIds: (cell) => ({ rowId: cell.dataset.rowId ?? null, colId: cell.dataset.colField ?? null }),
 });

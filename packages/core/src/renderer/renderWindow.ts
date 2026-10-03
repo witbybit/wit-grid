@@ -2,17 +2,30 @@ import type { GridEngine } from '../engine/GridEngine.js';
 
 import { asStickyGroupMetaCapableVisualRowModel } from '../rowModel.js';
 import type { VisualRowModel } from '../rowModel.js';
+import { resolveStickyHeaders } from '../rows/hierarchyConfig.js';
 
-export interface StickyGroupStackItem {
+/**
+ * An expanded group whose rows overlap the rendered window: it gets a section (the group's whole
+ * extent, in content coordinates) holding a header that the browser sticks natively.
+ */
+export interface StickySection {
 	groupId: string;
 	visualIndex: number;
+	/** Grouping level, 0 = outermost. */
 	depth: number;
+	/** The group row's top, in content coordinates (also the section's top). */
 	top: number;
+	/** The group row's height. */
 	height: number;
-	lastDescendantIndex: number;
-	boundaryBottom: number;
-	pushed: boolean;
+	/** From the group row's top to the bottom of its last descendant. */
+	sectionHeight: number;
+	/** Where the header sticks, below the top chrome: pinned top rows plus the enclosing groups' headers. */
+	stickyOffset: number;
 }
+
+// Scratch for the enclosing-candidate stack of the sticky-section walk (nesting is shallow).
+const stickyStackDepths: number[] = [];
+const stickyStackOffsets: number[] = [];
 
 export interface RenderWindow {
 	rowStart: number;
@@ -49,10 +62,8 @@ export interface RenderWindow {
 	visibleColStart?: number;
 	/** Last non-pinned displayed column index whose pixels overlap the visible viewport band. */
 	visibleColEnd?: number;
-	// Sticky group rows — group rows that have scrolled above the viewport but whose
-	// descendants are still visible. Rendered at the top of the viewport, stacked by depth.
-	// Each entry contains the visual index, pixel position, and boundary metadata.
-	stickyGroupStack?: StickyGroupStackItem[];
+	// Sticky group sections — expanded groups overlapping the rendered rows, ascending by row index.
+	stickySections?: StickySection[];
 }
 
 export interface ViewportDelta {
@@ -69,16 +80,17 @@ function getStickyGroupMeta(rowModel: VisualRowModel<unknown> | null): Map<numbe
 	return asStickyGroupMetaCapableVisualRowModel(rowModel)?.getStickyGroupMeta() ?? null;
 }
 
-/** Element-wise equality for sticky stack membership/state; pixel movement is handled by the sticky layer. */
-function sameStickyStack(a: StickyGroupStackItem[] | undefined, b: StickyGroupStackItem[] | undefined): boolean {
+/** Element-wise equality of the sticky sections; scrolling never changes them (the browser sticks the headers). */
+function sameStickySections(a: StickySection[] | undefined, b: StickySection[] | undefined): boolean {
 	const an = a ? a.length : 0;
 	const bn = b ? b.length : 0;
 	if (an !== bn) return false;
 	for (let i = 0; i < an; i++) {
-		if (a![i].visualIndex !== b![i].visualIndex) return false;
-		if (a![i].height !== b![i].height) return false;
-		if (a![i].depth !== b![i].depth) return false;
-		if (a![i].pushed !== b![i].pushed) return false;
+		const x = a![i];
+		const y = b![i];
+		if (x.visualIndex !== y.visualIndex || x.groupId !== y.groupId) return false;
+		if (x.depth !== y.depth || x.top !== y.top || x.height !== y.height) return false;
+		if (x.sectionHeight !== y.sectionHeight || x.stickyOffset !== y.stickyOffset) return false;
 	}
 	return true;
 }
@@ -99,7 +111,7 @@ export function sameRenderedWindow(a: RenderWindow | null, b: RenderWindow | nul
 		(a.geometryVersion ?? 0) === (b.geometryVersion ?? 0) &&
 		(a.rowModelVersion ?? 0) === (b.rowModelVersion ?? 0) &&
 		(a.columnVersion ?? 0) === (b.columnVersion ?? 0) &&
-		sameStickyStack(a.stickyGroupStack, b.stickyGroupStack)
+		sameStickySections(a.stickySections, b.stickySections)
 	);
 }
 
@@ -254,9 +266,9 @@ export function applyRenderWindowRuntimeLimits(window: RenderWindow, limits?: Re
 	}
 
 	const next = { ...window };
-	// The stickyGroupStack on `window` is per-double-buffer scratch reused every frame —
+	// The stickySections on `window` are per-double-buffer scratch reused every frame —
 	// the clamped window outlives the frame, so it needs its own deep copy.
-	next.stickyGroupStack = window.stickyGroupStack ? window.stickyGroupStack.map((item) => ({ ...item })) : undefined;
+	next.stickySections = window.stickySections ? window.stickySections.map((item) => ({ ...item })) : undefined;
 	let clamped = false;
 
 	const pinTopRows = countPinnedLeading(next.pinTopRows, next.rowCount);
@@ -424,70 +436,87 @@ export function computeRenderWindowInto<TRowData>(engine: GridEngine<TRowData>, 
 			? Math.min(colCount - 1 - pinRightCols, engine.geometry.getColIndexAtOffset(Math.max(centerViewportLeft, centerViewportRight - 1)))
 			: -1;
 
-	// Sticky group rows: groups whose natural top is above visibleTop but whose last
-	// descendant is still at or below visibleTop — they "stick" to the viewport top.
-	// Reuse the target array across frames (zero per-frame allocation); it is
+	// Sticky sections: every expanded group whose rows overlap the rendered window. Each gets a
+	// section element holding a `position: sticky` header copy, so the browser does the sticking,
+	// pushing and releasing; this list only changes when the window, the row model or the geometry
+	// does. Item objects are reused across frames (zero per-frame allocation); the array is
 	// per-double-buffer so mutation never aliases the currently-rendered window.
-	const stickyGroupStack = target.stickyGroupStack ?? (target.stickyGroupStack = []);
-	stickyGroupStack.length = 0;
+	const stickySections = target.stickySections ?? (target.stickySections = []);
+	let sectionCount = 0;
+	const sticky = resolveStickyHeaders(state.grouping?.stickyHeaders);
 
-	if (state.grouping?.stickyHeaders && rowCount > 0) {
+	if (sticky && rowCount > 0 && newRowRange.startIdx >= 0) {
 		const stickyMeta = getStickyGroupMeta(rowModel);
 		if (stickyMeta && stickyMeta.size > 0) {
 			// The pipeline records groups in row order (a group before the groups it contains), so
-			// group indices — and therefore group tops — ascend in iteration order. That allows two
-			// cuts vs scanning every group per frame: break once groupTop >= visibleTop (no later
-			// group can be sticky), and when a subtree ends above the viewport, binary-search past
-			// all groups inside it instead of visiting them.
+			// group indices ascend in iteration order: stop past the window's last row, and when a
+			// subtree ends above the window (or is capped by `levels`) binary-search past every group
+			// inside it instead of visiting them.
 			const meta = getStickyMetaArrays(stickyMeta);
 			const groupIdxs = meta.idx;
 			const lastIdxs = meta.last;
-			let stickyOffset = 0;
+			const windowStart = newRowRange.startIdx;
+			const windowEnd = newRowRange.endIdx;
+			// Enclosing candidates by depth, with the cumulative stuck height through each one.
+			let stackSize = 0;
 			let i = 0;
 			const n = groupIdxs.length;
 			while (i < n) {
 				const groupIdx = groupIdxs[i];
-				if (groupIdx >= rowCount) break; // ascending — all later are out of range too
+				if (groupIdx >= rowCount || groupIdx > windowEnd) break; // ascending — all later are out too
 				if (groupIdx < pinTopRows) {
 					// A pinned top row is always in view already; sticking it would draw it twice.
 					i++;
 					continue;
 				}
-				const groupTop = engine.geometry.getRowTop(groupIdx, defaultRowHeight);
-				if (groupTop >= visibleTop) break; // ascending tops — nothing later can be sticky
 				const lastDescIdx = lastIdxs[i];
 				if (lastDescIdx >= rowCount) {
 					i++;
 					continue;
 				}
-				const boundaryBottom = engine.geometry.getRowBottom(lastDescIdx, defaultRowHeight);
-				if (boundaryBottom > visibleTop) {
-					// Sticky: descend into this subtree (its children follow in DFS order).
-					const desiredTop = visibleTop + stickyOffset;
-					const rowHeight = engine.geometry.getRowHeight(groupIdx, defaultRowHeight);
-					const stickyTop = Math.min(desiredTop, boundaryBottom - rowHeight);
-					const visualRow = rowModel?.getVisualRow(groupIdx);
-					if (visualRow?.kind === 'group') {
-						stickyGroupStack.push({
-							groupId: visualRow.groupId,
-							visualIndex: groupIdx,
-							depth: visualRow.hierarchy.level,
-							top: stickyTop,
-							height: rowHeight,
-							lastDescendantIndex: lastDescIdx,
-							boundaryBottom,
-							pushed: stickyTop < desiredTop,
-						});
-					}
-					stickyOffset += rowHeight;
-					i++;
-				} else {
-					// Whole subtree ends above the viewport — skip every group inside it.
+				if (lastDescIdx < windowStart) {
 					i = firstIndexAfter(groupIdxs, lastDescIdx, i + 1);
+					continue;
 				}
+				const visualRow = rowModel?.getVisualRow(groupIdx);
+				if (visualRow?.kind !== 'group') {
+					i++;
+					continue;
+				}
+				const depth = visualRow.hierarchy.level;
+				if (depth >= sticky.levels) {
+					i = firstIndexAfter(groupIdxs, lastDescIdx, i + 1);
+					continue;
+				}
+				while (stackSize > 0 && stickyStackDepths[stackSize - 1] >= depth) stackSize--;
+				const stickyOffset = stackSize > 0 ? stickyStackOffsets[stackSize - 1] : pinnedTopHeight;
+				const height = engine.geometry.getRowHeight(groupIdx, defaultRowHeight);
+				const top = engine.geometry.getRowTop(groupIdx, defaultRowHeight);
+				stickyStackDepths[stackSize] = depth;
+				stickyStackOffsets[stackSize] = stickyOffset + height;
+				stackSize++;
+				const section = (stickySections[sectionCount] ??= {
+					groupId: '',
+					visualIndex: 0,
+					depth: 0,
+					top: 0,
+					height: 0,
+					sectionHeight: 0,
+					stickyOffset: 0,
+				});
+				section.groupId = visualRow.groupId;
+				section.visualIndex = groupIdx;
+				section.depth = depth;
+				section.top = top;
+				section.height = height;
+				section.sectionHeight = engine.geometry.getRowBottom(lastDescIdx, defaultRowHeight) - top;
+				section.stickyOffset = stickyOffset;
+				sectionCount++;
+				i++;
 			}
 		}
 	}
+	stickySections.length = sectionCount;
 
 	target.rowStart = newRowRange.startIdx;
 	target.rowEnd = newRowRange.endIdx;
