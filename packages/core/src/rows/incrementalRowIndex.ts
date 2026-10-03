@@ -381,7 +381,6 @@ export class IncrementalRowIndex<TData> {
 					if (visualRows[index] === row) continue;
 					changed = true;
 					visualRows[index] = row;
-					visualRowIdToIndex.set(row.id, index);
 					if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, index);
 				}
 				if (!changed) continue;

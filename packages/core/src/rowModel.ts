@@ -19,7 +19,7 @@ import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
-import { toDataVisualRowId } from './rows/visualRowIds.js';
+import { rowIdFromDataVisualRowId, toDataVisualRowId } from './rows/visualRowIds.js';
 import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import {
 	type FilterModel,
@@ -1085,8 +1085,18 @@ export class ClientRowModelController<TData = unknown>
 		return CLIENT_CAPABILITIES;
 	}
 
+	/** A visual row's index: group/total/detail rows by visual id, data rows through their row id. */
+	private visualIndexOf(visualRowId: string): number | undefined {
+		const index = this.visualRowIdToIndex.get(visualRowId);
+		if (index !== undefined) return index;
+		const rowId = rowIdFromDataVisualRowId(visualRowId);
+		if (rowId === null) return undefined;
+		const at = this.rowIdToVisualIndex.get(rowId);
+		return at !== undefined && this.visualRows[at]?.id === visualRowId ? at : undefined;
+	}
+
 	public isExpanded = (id: string): boolean => {
-		const index = this.visualRowIdToIndex.get(id);
+		const index = this.visualIndexOf(id);
 		const row = index === undefined ? undefined : this.visualRows[index];
 		if (row) return row.hierarchy.expanded;
 		// Not displayed (under a collapsed ancestor, filtered out or on another page).
@@ -1591,7 +1601,7 @@ export class ClientRowModelController<TData = unknown>
 	private reindexFrom(start: number): void {
 		for (let i = start; i < this.visualRows.length; i++) {
 			const vr = this.visualRows[i];
-			this.visualRowIdToIndex.set(vr.id, i);
+			if (vr.kind !== 'data') this.visualRowIdToIndex.set(vr.id, i);
 			if (vr.kind === 'data') {
 				this.rowIdToVisualIndex.set(vr.rowId, i);
 			}
@@ -1621,7 +1631,6 @@ export class ClientRowModelController<TData = unknown>
 				if (idx !== undefined) {
 					removalIndices.push(idx);
 					this.rowIdToVisualIndex.delete(node.id);
-					this.visualRowIdToIndex.delete(toDataVisualRowId(node.id));
 					this.dataRowCount--;
 				}
 			}
@@ -1725,7 +1734,7 @@ export class ClientRowModelController<TData = unknown>
 	};
 
 	public getVisualIndexById = (visualRowId: string): number => {
-		const idx = this.visualRowIdToIndex.get(visualRowId);
+		const idx = this.visualIndexOf(visualRowId);
 		return idx !== undefined ? idx : -1;
 	};
 
