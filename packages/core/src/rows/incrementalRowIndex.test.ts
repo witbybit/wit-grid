@@ -39,6 +39,8 @@ interface Scenario {
 	sort: Array<{ colId: string; sort: 'asc' | 'desc' }> | null;
 	totals?: TotalsConfig;
 	collapse: number;
+	/** Largest update batch (default 50); large batches move many leaves per group (the merge path). */
+	maxBatch?: number;
 }
 
 const ALL_AGGS: AggregationDef<Row>[] = [
@@ -53,6 +55,15 @@ const ALL_AGGS: AggregationDef<Row>[] = [
 ];
 
 const SCENARIOS: Scenario[] = [
+	{
+		name: '1 level, large batches: many moved leaves per group are merged',
+		by: ['region'],
+		aggs: ALL_AGGS,
+		sort: [{ colId: 'a', sort: 'desc' }],
+		totals: { grand: 'bottom' },
+		collapse: 0,
+		maxBatch: 300,
+	},
 	{
 		name: '1 level, sort desc with ties, grand total',
 		by: ['region'],
@@ -216,7 +227,7 @@ describe('IncrementalRowIndex', { timeout: 30_000 }, () => {
 			const ctx = setup(sc, 1000 + n);
 			expect(ctx.index).not.toBeNull();
 			for (let batch = 0; batch < 200; batch++) {
-				const count = 1 + Math.floor(ctx.random() * 50);
+				const count = 1 + Math.floor(ctx.random() * (sc.maxBatch ?? 50));
 				const { updated, changedValuesByRow } = mutate(ctx.nodes, ctx.random, count);
 				const result = ctx.index!.apply(updated, changedValuesByRow, ctx.target);
 				expect(result).not.toBeNull();
