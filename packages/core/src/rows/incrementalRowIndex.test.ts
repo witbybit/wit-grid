@@ -127,12 +127,12 @@ function project(rows: VisualRow<Row>[]): unknown[] {
 
 function expectEqualOutputs(actual: RowPipelineOutput<Row>, expected: RowPipelineOutput<Row>): void {
 	expect(actual.visualRows.map((r) => r.id)).toEqual(expected.visualRows.map((r) => r.id));
-	expect(project(actual.visualRows)).toEqual(project(expected.visualRows));
+	expect(approx(project(actual.visualRows))).toEqual(approx(project(expected.visualRows)));
 	expect(actual.visualRowIdToIndex).toEqual(expected.visualRowIdToIndex);
 	expect(actual.rowIdToVisualIndex).toEqual(expected.rowIdToVisualIndex);
 	expect(actual.rowIdToVisualRowId).toEqual(expected.rowIdToVisualRowId);
-	expect(actual.groupMeta).toEqual(expected.groupMeta);
-	expect(actual.groupMetaByVisualIndex).toEqual(expected.groupMetaByVisualIndex);
+	expect(approx(actual.groupMeta)).toEqual(approx(expected.groupMeta));
+	expect(approx(actual.groupMetaByVisualIndex)).toEqual(approx(expected.groupMetaByVisualIndex));
 	expect(actual.stickyGroupMeta).toEqual(expected.stickyGroupMeta);
 }
 
@@ -166,6 +166,18 @@ function setup(sc: Scenario, seed: number, rowCount = 300) {
 		groupMeta: output.groupMeta,
 	};
 	return { random, rows, nodes, pipeline, expansion, output, index, target };
+}
+
+/**
+ * Aggregates move by delta, so float sums may differ from a fresh left-to-right sum in the last
+ * digits; compare numbers to 12 significant digits (everything else exactly).
+ */
+function approx<T>(value: T): T {
+	if (typeof value === 'number') return (Number.isFinite(value) ? Number(value.toPrecision(12)) : value) as T;
+	if (value instanceof Map) return new Map([...value].map(([k, v]) => [k, approx(v)])) as T;
+	if (Array.isArray(value)) return value.map((v) => approx(v)) as T;
+	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, approx(v)])) as T;
+	return value;
 }
 
 function mutate(nodes: RowNode<Row>[], random: () => number, count: number) {
