@@ -986,14 +986,21 @@ export function applyClientSortAndFilter<TData>(
 					getter = (node: RowNode<TData>) =>
 						colValGetter({ node: createGridRowDataRef(node.id, node.data), row: node.data, colField: column.field });
 				} else {
-					const pathGetter = compilePathGetter(column.field);
-					getter = (node: RowNode<TData>) => node.getCellValue(column.field, pathGetter);
+					// A direct read, as the pipeline's readers do: the per-node cache costs more than it saves.
+					const pathGetter = compilePathGetter(column.field) as (data: TData) => unknown;
+					getter = (node: RowNode<TData>) => pathGetter(node.data);
 				}
 			} else {
 				getter = () => undefined;
 			}
 			return getter;
 		});
+
+		// One all-numeric column: sort the numbers directly (ties in source order, as below).
+		if (sortModel.length === 1) {
+			const sorted = sortByNumber(result, precompiledSortGetters[0], sortModel[0].sort === 'desc');
+			if (sorted) return sorted;
+		}
 
 		// Schwartzian transform: extract sort keys in O(N) using pre-allocated arrays to minimize allocation overhead
 		// Keys carry their Number()/String() coercions so the comparator never re-coerces.
@@ -1020,6 +1027,28 @@ export function applyClientSortAndFilter<TData>(
 	}
 
 	return result;
+}
+
+/** Null unless every value is a number (not NaN); `items` are in source order. */
+function sortByNumber<TItem extends { node: RowNode<TData> }, TData>(
+	items: TItem[],
+	read: (node: RowNode<TData>) => unknown,
+	desc: boolean
+): TItem[] | null {
+	const n = items.length;
+	const values = new Float64Array(n);
+	for (let i = 0; i < n; i++) {
+		const value = read(items[i].node);
+		if (typeof value !== 'number' || value !== value) return null;
+		values[i] = value;
+	}
+	const order: number[] = new Array(n);
+	for (let i = 0; i < n; i++) order[i] = i;
+	if (desc) order.sort((a, b) => values[b] - values[a] || a - b);
+	else order.sort((a, b) => values[a] - values[b] || a - b);
+	const out: TItem[] = new Array(n);
+	for (let i = 0; i < n; i++) out[i] = items[order[i]];
+	return out;
 }
 
 const CLIENT_CAPABILITIES: RowModelCapabilities = {
