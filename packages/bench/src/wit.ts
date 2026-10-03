@@ -81,6 +81,8 @@ if (styledCells) api.setStyleRules([{ kind: 'cell', when: (row, col) => isHotVal
 // sum/avg/count aggregates and sorted by c5; each tick updates that many random rows (c5, c6) in
 // one transaction. Every commit is timed: window.__feedTimes (ms per transaction call).
 const feedRowsPerTick = Number(new URLSearchParams(location.search).get('feed') ?? 0);
+// ?moves=<n>: that many of each tick's rows also move to another existing sector of their region.
+const feedMovesPerTick = Number(new URLSearchParams(location.search).get('moves') ?? 0);
 if (feedRowsPerTick > 0) {
 	for (const row of initialRows) {
 		const r = Number(row.id.slice(1));
@@ -108,7 +110,12 @@ if (feedRowsPerTick > 0) {
 		for (let k = 0; k < feedRowsPerTick; k++) {
 			const index = Math.floor(random() * rows.length);
 			const row = rows[index];
-			const next = { ...row, c5: Math.floor(random() * 1000), c6: Math.floor(random() * 1000) };
+			const next: BenchRow = { ...row, c5: Math.floor(random() * 1000), c6: Math.floor(random() * 1000) };
+			if (k < feedMovesPerTick) {
+				// Sector s belongs to region s % 8: moving by 8 keeps the row in an existing group of its region.
+				const sector = Number(String(row.sector).slice(7));
+				next.sector = `Sector ${(sector + 8 * (1 + Math.floor(random() * 11))) % 96}`;
+			}
 			rows[index] = next;
 			update.push(next);
 		}
