@@ -30,7 +30,6 @@ import { FullWidthRowRenderer } from './fullWidthRowRenderer.js';
 import { computeRowWindowRetention } from './rowWindowRetention.js';
 import { ViewportPlanner, type ViewportPlan } from './viewportPlanner.js';
 import { LiveFrameBudget } from './liveFrameBudget.js';
-import { snapToDevicePixel } from './layoutPlan.js';
 import { readInteractionState } from '../interaction/interactionState.js';
 import { syncRowRendererInteractionAccessibility } from './rowRendererAccessibility.js';
 import type { ProgrammaticScrollTarget } from './programmaticScrollTarget.js';
@@ -309,26 +308,36 @@ export class RowRenderer<TRowData = unknown> {
 		return this.columnTopologyCoordinator.getCompiledTopology(plan, isScrollFrameActive, this.renderStats);
 	}
 
-	private getRenderedRowTop(
+	/**
+	 * Returns the row's translateY and parents the slot into the layer that owns it. Viewport-pinned
+	 * rows live in zero-height `position: sticky` bands (top / bottom of the scroll viewport), so the
+	 * compositor keeps them stuck and their offset is a constant: no scrollTop term, no per-frame
+	 * write. Body rows live in the rows container at their content-space top.
+	 */
+	private placeRowSlot(
+		slot: RowSlot<TRowData>,
 		rowIndex: number,
 		rowTops: ArrayLike<number>,
-		scrollTop: number,
 		pinTopRows: number,
 		rowCount: number,
 		pinBottomRows: number,
-		viewportHeight: number,
 		totalHeight: number
 	): number {
-		// Pinned rows track scrollTop every frame: snap to device pixels.
+		const viewportRenderer = this.viewportRenderer;
+		let parent: HTMLElement | null;
+		let top: number;
 		if (rowIndex < pinTopRows) {
-			if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
-			return snapToDevicePixel(rowTops[rowIndex] + scrollTop);
+			parent = viewportRenderer.pinnedTopLayer;
+			top = rowTops[rowIndex];
+		} else if (rowIndex >= rowCount - pinBottomRows) {
+			parent = viewportRenderer.pinnedBottomLayer;
+			top = -(totalHeight - rowTops[rowIndex]);
+		} else {
+			parent = viewportRenderer.rowsContainer;
+			top = rowTops[rowIndex];
 		}
-		if (rowIndex >= rowCount - pinBottomRows) {
-			if (this.renderStats) this.renderStats.scrollLinkedPositionWrites++;
-			return snapToDevicePixel(scrollTop + viewportHeight - (totalHeight - rowTops[rowIndex]));
-		}
-		return rowTops[rowIndex];
+		if (parent && slot.element.parentNode !== parent) parent.appendChild(slot.element);
+		return top;
 	}
 
 	// ── Slot-based viewport virtualization core ─────────────────────────────────────
@@ -474,8 +483,6 @@ export class RowRenderer<TRowData = unknown> {
 		const hoistedTotalHeight = nextWindow.pinBottomRows > 0 ? this.engine.geometry.getTotalHeight(state.defaultRowHeight) : 0;
 		const pinTopRows = nextWindow.pinTopRows;
 		const pinBottomRows = nextWindow.pinBottomRows;
-		const scrollTop = this.engine.viewport.scrollTop;
-		const viewportHeight = this.engine.viewport.viewportHeight;
 		const rowTops = this.engine.geometry.rowTops;
 		const rowHeights = this.engine.geometry.rowHeights;
 		const prevVisibleRowStart = this.currentWindow?.visibleRowStart ?? -1;
@@ -551,16 +558,7 @@ export class RowRenderer<TRowData = unknown> {
 				slot.rowKind !== '' &&
 				slot.rowKind !== 'loading'
 			) {
-				const top = this.getRenderedRowTop(
-					r,
-					rowTops,
-					scrollTop,
-					pinTopRows,
-					nextWindow.rowCount,
-					pinBottomRows,
-					viewportHeight,
-					hoistedTotalHeight
-				);
+				const top = this.placeRowSlot(slot, r, rowTops, pinTopRows, nextWindow.rowCount, pinBottomRows, hoistedTotalHeight);
 				slot.updatePosition(top);
 				if (shouldDeferWarmRowVisualRefresh && slot.rowKind === 'data') {
 					this.dirtyRowsAfterScroll.add(r);
@@ -602,16 +600,7 @@ export class RowRenderer<TRowData = unknown> {
 				slot.rowKind !== '' &&
 				slot.rowKind !== 'loading'
 			) {
-				const top = this.getRenderedRowTop(
-					r,
-					rowTops,
-					scrollTop,
-					pinTopRows,
-					nextWindow.rowCount,
-					pinBottomRows,
-					viewportHeight,
-					hoistedTotalHeight
-				);
+				const top = this.placeRowSlot(slot, r, rowTops, pinTopRows, nextWindow.rowCount, pinBottomRows, hoistedTotalHeight);
 				slot.updatePosition(top);
 				if (shouldDeferWarmRowVisualRefresh && slot.rowKind === 'data') {
 					this.dirtyRowsAfterScroll.add(r);
@@ -634,16 +623,7 @@ export class RowRenderer<TRowData = unknown> {
 			let rowTop = rowTops[r];
 			const rowHeight = rowHeights[r];
 
-			rowTop = this.getRenderedRowTop(
-				r,
-				rowTops,
-				scrollTop,
-				pinTopRows,
-				nextWindow.rowCount,
-				pinBottomRows,
-				viewportHeight,
-				hoistedTotalHeight
-			);
+			rowTop = this.placeRowSlot(slot, r, rowTops, pinTopRows, nextWindow.rowCount, pinBottomRows, hoistedTotalHeight);
 
 			// ── Row class name ────────────────────────────────────────────────────────
 			const rowPresentation = resolveRowPresentation(
