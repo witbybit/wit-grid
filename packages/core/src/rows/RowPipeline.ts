@@ -197,7 +197,8 @@ export class RowPipeline<TData = unknown> {
 		let detailRowCount = 0;
 		let loadingRowCount = 0;
 		visualRows.forEach((row, idx) => {
-			visualRowIdToIndex.set(row.id, idx);
+			// Data rows are found through rowIdToVisualIndex (their visual id derives from the row id).
+			if (row.kind !== 'data') visualRowIdToIndex.set(row.id, idx);
 			if (row.kind === 'data') {
 				if (!rowIdToVisualIndex.has(row.rowId)) {
 					rowIdToVisualIndex.set(row.rowId, idx);

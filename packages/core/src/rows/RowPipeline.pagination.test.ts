@@ -60,7 +60,9 @@ describe('RowPipeline client pagination page-window', () => {
 
 	it('builds index maps page-relative (0-based) for the sliced rows only', () => {
 		const out = new RowPipeline<Row>().run(baseInput({ nodes: nodes(250), pagination: { pageSize: 100, page: 1 } }));
-		expect(out.visualRowIdToIndex.size).toBe(100);
+		expect(out.rowIdToVisualIndex.size).toBe(100);
+		// Data rows are found by row id; the visual-id map holds group, total and detail rows only.
+		expect(out.visualRowIdToIndex.size).toBe(0);
 		// Page 2 (index 1) holds r100..r199 at page-relative indices 0..99.
 		expect(out.rowIdToVisualIndex.get('r100')).toBe(0);
 		expect(out.rowIdToVisualIndex.get('r199')).toBe(99);
