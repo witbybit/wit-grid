@@ -39,7 +39,7 @@ export function aggregateStage<TData>(
 }
 
 /** Built-ins computed from running per-column stats; the rest need the leaf rows. */
-const STAT_FUNCS = new Set<string>(['sum', 'avg', 'min', 'max', 'count', 'first', 'last']);
+export const STAT_FUNCS = new Set<string>(['sum', 'avg', 'min', 'max', 'count', 'first', 'last']);
 
 interface AggregationRun<TData> {
 	aggDefs: AggregationDef<TData>[];
@@ -49,7 +49,7 @@ interface AggregationRun<TData> {
 	aggregateTreeParents: boolean;
 }
 
-interface FieldStats {
+export interface FieldStats {
 	totalCount: number;
 	first: unknown;
 	last: unknown;
@@ -59,7 +59,7 @@ interface FieldStats {
 	max: number;
 }
 
-function createStats(): FieldStats {
+export function createStats(): FieldStats {
 	return {
 		totalCount: 0,
 		first: undefined,
@@ -72,7 +72,11 @@ function createStats(): FieldStats {
 }
 
 function addNodeValue<TData>(stats: FieldStats, node: RowNode<TData>, colId: string, context: RowPipelineContext<TData>): void {
-	const value = context.getValue(node, colId);
+	addStatsValue(stats, context.getValue(node, colId));
+}
+
+/** Folds one leaf value into `stats`, in leaf order. */
+export function addStatsValue(stats: FieldStats, value: unknown): void {
 	if (stats.totalCount === 0) stats.first = value;
 	stats.last = value;
 	stats.totalCount++;
@@ -84,7 +88,7 @@ function addNodeValue<TData>(stats: FieldStats, node: RowNode<TData>, colId: str
 	}
 }
 
-function mergeStats(target: FieldStats, source: FieldStats): void {
+export function mergeStats(target: FieldStats, source: FieldStats): void {
 	if (source.totalCount === 0) return;
 	if (target.totalCount === 0) target.first = source.first;
 	target.last = source.last;

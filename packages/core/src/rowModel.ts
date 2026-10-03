@@ -13,6 +13,7 @@ import { groupByColIds, isGroupingActive } from './rows/hierarchyConfig.js';
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
+import { IncrementalRowIndex } from './rows/incrementalRowIndex.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
 import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
@@ -252,6 +253,10 @@ export interface RowModelRefreshResult {
 	nextRowCount?: number;
 	changedStartIndex?: number;
 	changedEndIndex?: number;
+	/** When the changed rows are a few disjoint spans: each of them, ascending (the start/end above are their union). */
+	changedRanges?: ReadonlyArray<{ startIndex: number; endIndex: number }>;
+	/** Rows only swapped places among rows of one height: row geometry needs no re-sync. */
+	heightsUnchanged?: boolean;
 	groupId?: string;
 	/**
 	 * Rows outside the changed range that kept their identity but whose aggregates changed (group,
@@ -1060,6 +1065,10 @@ export class ClientRowModelController<TData = unknown>
 	private _pageWindow: PageWindow | null = null;
 	private _roots: RowTreeNode<TData>[] | null = null;
 	private _hierarchyIndex: HierarchyIndex | null = null;
+	/** The incremental row index for the last full run: undefined = not built yet, null = not applicable. */
+	private _incremental: IncrementalRowIndex<TData> | null | undefined = undefined;
+	/** The configuration the last full run saw; the index is only valid while it is unchanged. */
+	private _incrementalSeed: Record<string, unknown> | null = null;
 
 	/** Built on first use after each pipeline run that produced a row tree. */
 	public getHierarchyIndex = (): HierarchyIndex | null => {
@@ -1428,6 +1437,13 @@ export class ClientRowModelController<TData = unknown>
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
 		}
+		if (impact === 'aggregation-input' || impact === 'sort-key') {
+			const incremental = this.tryIncrementalGroupedUpdate(writeResult);
+			if (incremental) return incremental;
+		} else if (impact !== 'value-only') {
+			// A write the index cannot see may have moved aggregate inputs.
+			this._incremental = undefined;
+		}
 		if (impact === 'group-key' || impact === 'tree-parent' || impact === 'aggregation-input') {
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
@@ -1452,6 +1468,82 @@ export class ClientRowModelController<TData = unknown>
 		}
 		inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
 		return { changed: false };
+	}
+
+	/** The configuration the incremental index depends on, compared by reference. */
+	private captureIncrementalSeed(state: ReturnType<ClientRowModelRuntime<TData>['getState']>): Record<string, unknown> {
+		return {
+			columns: state.columns,
+			sortModel: state.sortModel,
+			filterModel: state.filterModel,
+			quickFilterModel: state.quickFilterModel,
+			queryModel: state.queryModel,
+			grouping: state.grouping,
+			treeData: state.treeData,
+			aggregation: state.aggregation,
+			detail: state.detail,
+			expansion: state.expansion,
+			rowHeights: state.rowHeights,
+			defaultRowHeight: state.defaultRowHeight,
+			pagination: state.pagination,
+		};
+	}
+
+	/**
+	 * Grouped grids: absorbs updates that keep every row's group and filter membership (aggregate
+	 * inputs, sort keys) by patching the tree and flat list, instead of a full pipeline run.
+	 * Null when the update needs the full run.
+	 */
+	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>): RowModelRefreshResult | null {
+		const nodes = writeResult.updatedNodes;
+		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
+		const state = this.runtime.getState();
+		const seed = this._incrementalSeed;
+		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return null;
+		const now = this.captureIncrementalSeed(state);
+		for (const key of Object.keys(now)) if (now[key] !== seed[key]) return null;
+		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return null;
+		if (state.queryModel && state.queryModel.root.children.length > 0) return null;
+		if (this._incremental === undefined) {
+			this._incremental = IncrementalRowIndex.create<TData>({
+				roots: this._roots,
+				columns: state.columns,
+				sortModel: state.sortModel,
+				aggDefs: state.aggregation?.defs ?? [],
+				groupByColIds: groupByColIds(state.grouping),
+				hasGrandTotal: !!state.grouping?.totals?.grand,
+				getSourceIndex: (rowId) => this.dataStore.getSourceIndex(rowId),
+			});
+			if (!this._incremental) return null;
+		}
+		const previousRowCount = this.visualRows.length;
+		const result = this._incremental.apply(nodes, writeResult.changedValuesByRow, {
+			visualRows: this.visualRows,
+			visualRowIdToIndex: this.visualRowIdToIndex,
+			rowIdToVisualIndex: this.rowIdToVisualIndex,
+			groupMeta: this._groupMeta,
+		});
+		if (!result) {
+			this._incremental = undefined;
+			return null;
+		}
+		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
+		const hasRange = result.changedStartIndex !== undefined;
+		if (!hasRange && !aggregates) return { changed: false };
+		return {
+			changed: true,
+			reason: 'sort',
+			layoutTransitionHint: hasRange ? 'live-reorder' : undefined,
+			previousRowCount,
+			nextRowCount: this.visualRows.length,
+			changedStartIndex: result.changedStartIndex,
+			changedEndIndex: result.changedEndIndex,
+			changedRanges: result.changedRanges.length > 0 ? result.changedRanges : undefined,
+			// No per-row heights (callback excluded above), so every data row of a group is the default height.
+			heightsUnchanged: Object.keys(state.rowHeights).length === 0 ? true : undefined,
+			aggregateChangedIndices: aggregates,
+		};
 	}
 
 	private reconcileSortKeyWrite(writeResult: RowModelWriteResult<TData>): RowModelRefreshResult {
@@ -1805,6 +1897,8 @@ export class ClientRowModelController<TData = unknown>
 		this._groupMetaByVisualIndex = result.groupMetaByVisualIndex;
 		this._roots = result.roots;
 		this._hierarchyIndex = null;
+		this._incremental = undefined;
+		this._incrementalSeed = this.captureIncrementalSeed(state);
 		this.dataRowCount = result.stats.totalDataRows;
 
 		this.runtime.bumpGlobalVersion();

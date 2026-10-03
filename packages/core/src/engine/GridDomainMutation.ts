@@ -187,7 +187,7 @@ export interface GridCommitContext<TRowData = unknown> {
 	publishCommittedCellChanges?: (changes: Map<string, Set<string>>) => void;
 	requestLayoutTransitionCapture?: (reason: LayoutTransitionReason) => void;
 	/** Re-syncs row geometry from a visual index after an in-place row reorder. */
-	syncRowGeometryFrom?: (startIndex: number) => void;
+	syncRowGeometryFrom?: (startIndex: number, endIndex?: number) => void;
 }
 
 export interface PreparedDomainMutation<TRowData = unknown, TMutation extends GridDomainMutation<TRowData> = GridDomainMutation<TRowData>> {
@@ -299,8 +299,10 @@ function createInvalidationsFromRefreshResult<TRowData>(
 	// A live sort-key relocation moves rows in place: no globalVersion bump and no row-count
 	// change, so the projection pipeline would keep the old per-index heights. Re-sync geometry
 	// from the first moved index so variable row heights follow their rows.
-	if (result.layoutTransitionHint === 'live-reorder' && result.changedStartIndex !== undefined) {
-		context.syncRowGeometryFrom?.(result.changedStartIndex);
+	if (result.layoutTransitionHint === 'live-reorder' && result.changedStartIndex !== undefined && !result.heightsUnchanged) {
+		// A few disjoint spans (a grouped live feed) sync one by one instead of their whole union.
+		if (result.changedRanges) for (const range of result.changedRanges) context.syncRowGeometryFrom?.(range.startIndex, range.endIndex);
+		else context.syncRowGeometryFrom?.(result.changedStartIndex, result.changedEndIndex);
 	}
 	const effectiveReason: GridInvalidation['reason'] = result.layoutTransitionHint === 'live-reorder' ? 'sort' : reason;
 	// Aggregates changing in place (same rows, same order) need only those rows, not the viewport.
@@ -313,7 +315,11 @@ function createInvalidationsFromRefreshResult<TRowData>(
 	if (result.groupId) {
 		invalidations.push({ kind: 'group', groupId: result.groupId, reason: effectiveReason });
 	}
-	if (result.changedStartIndex !== undefined && result.changedEndIndex !== undefined) {
+	if (result.changedRanges) {
+		for (const range of result.changedRanges) {
+			invalidations.push({ kind: 'row-range', startIndex: range.startIndex, endIndex: range.endIndex, reason: effectiveReason });
+		}
+	} else if (result.changedStartIndex !== undefined && result.changedEndIndex !== undefined) {
 		invalidations.push({
 			kind: 'row-range',
 			startIndex: result.changedStartIndex,

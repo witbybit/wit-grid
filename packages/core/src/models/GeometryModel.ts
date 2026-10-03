@@ -71,12 +71,15 @@ export class GeometryModel {
 	 * first changed index onward, so an unchanged sync costs one read pass and zero writes,
 	 * and a single-row resize near the bottom touches only the rows below it.
 	 *
+	 * `toIndex` (inclusive) likewise bounds the read pass for a caller that knows rows after it are unchanged;
+	 * it is ignored when the row count changed.
+	 *
 	 * `fromIndex` lets a caller that knows rows before it are unchanged (e.g. a live
 	 * reorder that reports its first moved index) skip reading them entirely.
 	 *
 	 * Returns the first index whose top/height changed, or -1 when nothing changed.
 	 */
-	public syncRows(count: number, readHeight: (index: number) => number, fromIndex = 0): number {
+	public syncRows(count: number, readHeight: (index: number) => number, fromIndex = 0, toIndex = Infinity): number {
 		const prevCount = this.rowCount;
 		if (count > this.rowCapacity) {
 			const nextCapacity = Math.max(count, this.rowCapacity * 2);
@@ -94,7 +97,9 @@ export class GeometryModel {
 		const heights = this.rowHeights;
 		let firstChanged = -1;
 		const start = Math.max(0, Math.min(fromIndex, prevCount, count));
-		for (let i = start; i < count; i++) {
+		// Rows after `toIndex` are known unchanged, but only while no row was added or removed.
+		const end = count === prevCount ? Math.min(toIndex, count - 1) : count - 1;
+		for (let i = start; i <= end; i++) {
 			const h = readHeight(i);
 			if (i >= prevCount || heights[i] !== h) {
 				heights[i] = h;
@@ -109,6 +114,8 @@ export class GeometryModel {
 		const tops = this.rowTops;
 		let top = firstChanged > 0 ? tops[firstChanged - 1] + heights[firstChanged - 1] : 0;
 		for (let i = firstChanged; i < count; i++) {
+			// Past the bounded span, a top that already matches means every later top does too.
+			if (i > end && tops[i] === top) break;
 			tops[i] = top;
 			top += heights[i];
 		}

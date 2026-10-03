@@ -9,10 +9,10 @@ much faster. Results must be identical to a full rebuild.
 100,000 rows grouped region (8) › sector (96), aggregates sum(c5) / avg(c6) / count(c7), sorted by c5 desc;
 each 16 ms tick updates N random rows (c5, c6) with `transaction({ rows: { update } })`.
 
-| | p50 ms / transaction |
-| --- | --- |
-| 10 rows per tick | ~180 (p95 264) |
-| 1,000 rows per tick | ~203 |
+|                     | p50 ms / transaction |
+| ------------------- | -------------------- |
+| 10 rows per tick    | ~180 (p95 264)       |
+| 1,000 rows per tick | ~203                 |
 
 Every update ends in `ClientRowModelController.reconcileAfterDataWrite` → `refresh('bulk')` →
 `RowPipeline.run` (impacts `aggregation-input`, `group-key`; `sort-key` with hierarchy rows also refreshes).
@@ -47,6 +47,7 @@ row add/remove beyond the threshold) and rebuilt from the next full run.
 - Source order: a `sourceIndex` per row id (the data store's order) for sort tie-breaks.
 
 `applyChanges(updatedNodes, changedValuesByRow)` per changed row:
+
 1. Filter membership (p5): if it flips, remove or insert the leaf.
 2. Group path: same path → aggregate deltas up the ancestor chain; changed path → remove from the old group
    (delete emptied groups), add to the new one (create missing groups exactly as `groupStage` would).
@@ -71,6 +72,7 @@ maps and group meta.
 
 - p1 — `IncrementalRowIndex` + same-path updates (aggregate deltas + in-group re-sort) + flat span splice +
   property test. Covers `grouped-feed-*`. Target: < 2 ms p50 for 10 rows, < 30 ms for 1,000.
+  **DONE (core only).** `rows/incrementalRowIndex.ts` + hook in `ClientRowModelController.reconcileAfterDataWrite` (impacts aggregation-input / sort-key on grouped grids). Bench tx p50/p95/max: grouped-feed-10 180.3/263.9/324.9 -> 8.1/12.8/95.9 ms (first tick builds the index, ~100 ms); grouped-feed-1000 202.9/268.0/327.3 -> 44.8/134.2/249.3 ms. Targets (<2 / <30 ms) not met: what is left is the O(span) rewrite of the flat list + two id->index Map.set per shifted row (a leaf moving p->q shifts every row between), which p4 (cheaper index maps) must attack. Also added: bounded geometry sync (GeometryModel.syncRows toIndex, refresh result changedRanges + heightsUnchanged), no globalVersion bump for in-place aggregate changes. Falls back to the full run for: group-key/filter-key/insert/remove, detail, tree, pagination, getRowHeight, queryModel, custom (function) aggregations, valueGetter sort/aggregate columns, any config-ref change since the last full run, >max(2000, 5%) changed rows. Float sums use deltas (last-bit drift vs a fresh run is possible for non-integer data).
 - p2 — group-key changes (move between groups, create/delete groups).
 - p3 — filter-key changes (enter/leave), flat sorted grids through the same index (replacing relocateSortedRows).
 - p4 — full-run speedups: per-column accessors instead of per-node Map caches for plain fields, reuse VisualRow

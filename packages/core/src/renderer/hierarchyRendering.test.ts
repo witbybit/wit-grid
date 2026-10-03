@@ -124,6 +124,22 @@ describe('group and total rows as cell rows', () => {
 		grid.destroy();
 	});
 
+	it('live updates repaint group totals through the normal incremental paint (no full paint)', () => {
+		const grid = mountGrid({
+			grouping: { by: ['region'], defaultExpanded: true },
+			aggregation: { defs: [{ colId: 'amount', aggFunc: 'sum' }] },
+		});
+		const flush = () => (grid.renderer as unknown as { flushPaint(): void }).flushPaint();
+		// Two ticks: the first builds the incremental index, the second goes through it.
+		grid.store.transaction({ rows: { update: [{ id: '1', region: 'EMEA', product: 'Cloud', amount: 10.1 }] } });
+		flush();
+		grid.store.transaction({ rows: { update: [{ id: '2', region: 'EMEA', product: 'Hardware', amount: 20.2 }] } });
+		flush();
+		const expected = [...(grid.store.rows().getAll() as Sale[])].filter((row) => row.region === 'EMEA').reduce((sum, row) => sum + row.amount, 0);
+		expect(grid.cellOf(grid.rowAt(0), 'amount')?.textContent).toBe(`$${expected}`);
+		grid.destroy();
+	});
+
 	it('never leaves a group aggregate behind as the placeholder text of a renderer cell', () => {
 		const store = new GridStore<Sale>({
 			columns: [
