@@ -44,11 +44,14 @@ export interface IncrementalIndexConfig<TData> {
 	countSensitiveExpansion?: boolean;
 }
 
-/** The mutable row-model structures the index patches in place. */
+/**
+ * The mutable row-model structures the index patches in place. Data rows have no index map here: a row
+ * is found through its leaf (`leaf.row`, its place in the group) and its group row ({@link visualIndexOfRow}),
+ * so a group that grows or shrinks shifts only group and total rows.
+ */
 export interface IncrementalTarget<TData> {
 	visualRows: VisualRow<TData>[];
 	visualRowIdToIndex: Map<string, number>;
-	rowIdToVisualIndex: Map<string, number>;
 	groupMeta: Map<string, GroupRowMeta>;
 	groupMetaByVisualIndex: Map<number, GroupRowMeta>;
 	stickyGroupMeta: Map<number, number>;
@@ -408,7 +411,7 @@ export class IncrementalRowIndex<TData> {
 
 	private makeDataRow(leaf: LeafNode<TData>, group: GroupNode<TData>, posInSet: number, setSize: number): VisualRow<TData> {
 		const explicitHeight = this.rowHeights[leaf.rowId];
-		return {
+		return (leaf.row = {
 			kind: 'data',
 			id: toDataVisualRowId(leaf.rowId),
 			rowId: leaf.rowId,
@@ -426,7 +429,19 @@ export class IncrementalRowIndex<TData> {
 			height: explicitHeight !== undefined ? explicitHeight : this.defaultRowHeight,
 			selectable: true,
 			editable: true,
-		};
+		});
+	}
+
+	/** A data row's flat index, or undefined when it is filtered out or under a collapsed group. */
+	public visualIndexOfRow(rowId: string, visualRows: readonly VisualRow<TData>[], visualRowIdToIndex: ReadonlyMap<string, number>): number | undefined {
+		const entry = this.leafOf.get(rowId);
+		const row = entry?.leaf.row;
+		if (!entry || !row) return undefined;
+		const gi = visualRowIdToIndex.get(entry.parent.id);
+		const groupRow = gi === undefined ? undefined : visualRows[gi];
+		if (groupRow?.kind !== 'group' || !groupRow.hierarchy.expanded) return undefined;
+		const at = gi! + (visualRows[gi! + 1]?.kind === 'total' ? 1 : 0) + row.hierarchy.posInSet;
+		return visualRows[at] === row ? at : undefined;
 	}
 
 	private applyValidated(
@@ -434,7 +449,13 @@ export class IncrementalRowIndex<TData> {
 		structural: StructuralOp<TData>[],
 		target: IncrementalTarget<TData>
 	): IncrementalApplyResult | null {
-		const { visualRows, visualRowIdToIndex, rowIdToVisualIndex, groupMeta } = target;
+		const { visualRows, visualRowIdToIndex, groupMeta } = target;
+		// A leaf's current visual row, checked against the flat list at its recorded place in the group.
+		const rowOf = (leaf: LeafNode<TData>, base: number): VisualRow<TData> => {
+			const row = leaf.row;
+			if (!row || visualRows[base + row.hierarchy.posInSet - 1] !== row) throw new Error('incremental index out of step');
+			return row;
+		};
 		let moved = false;
 		let start = Infinity;
 		let end = -1;
@@ -475,11 +496,7 @@ export class IncrementalRowIndex<TData> {
 			let oldPositions: number[] | null = null;
 			if (onScreen) {
 				oldPositions = [];
-				for (const leaf of removing) {
-					const at = rowIdToVisualIndex.get(leaf.rowId);
-					if (at === undefined) throw new Error('incremental index out of step');
-					oldPositions.push(at - base);
-				}
+				for (const leaf of removing) oldPositions.push(rowOf(leaf, base).hierarchy.posInSet - 1);
 			}
 			const newPositions = this.reinsert(group.children, removing, inserting, oldPositions);
 			reordered.add(group);
@@ -687,23 +704,18 @@ export class IncrementalRowIndex<TData> {
 		// their order changed), so its rows are found among the span's old rows.
 		for (const { group, base, spans } of moves) {
 			for (const [lo, hi] of spans) {
-				const rowsById = new Map<string, VisualRow<TData>>();
-				for (let index = base + lo; index <= base + hi; index++) {
-					const row = visualRows[index];
-					if (row.kind !== 'data') throw new Error('incremental index out of step');
-					rowsById.set(row.rowId, row);
-				}
+				// Every leaf of the span is checked before any row is written (positions are the old ones).
+				const rows: VisualRow<TData>[] = [];
+				for (let i = lo; i <= hi; i++) rows.push(rowOf(group.children[i] as LeafNode<TData>, base));
 				let changed = false;
 				for (let i = lo; i <= hi; i++) {
-					const row = rowsById.get((group.children[i] as LeafNode<TData>).rowId);
-					if (!row) throw new Error('incremental index out of step');
+					const row = rows[i - lo];
 					const index = base + i;
 					// Rows are this model's own objects: posInSet follows the row's new place in the group.
 					(row.hierarchy as { posInSet: number }).posInSet = i + 1;
 					if (visualRows[index] === row) continue;
 					changed = true;
 					visualRows[index] = row;
-					if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, index);
 				}
 				if (!changed) continue;
 				moved = true;
@@ -728,9 +740,7 @@ export class IncrementalRowIndex<TData> {
 					let row: VisualRow<TData> | undefined;
 					if (added.has(leaf)) row = this.makeDataRow(leaf, group, i + 1, size);
 					else {
-						const at = rowIdToVisualIndex.get(leaf.rowId);
-						row = at === undefined ? undefined : visualRows[at];
-						if (!row || row.kind !== 'data') throw new Error('incremental index out of step');
+						row = rowOf(leaf, base);
 						(row.hierarchy as { posInSet: number; setSize: number }).posInSet = i + 1;
 						(row.hierarchy as { posInSet: number; setSize: number }).setSize = size;
 					}
@@ -738,7 +748,6 @@ export class IncrementalRowIndex<TData> {
 				}
 				return rows;
 			});
-			for (const { work: w } of structSpans) for (const op of w.removed) rowIdToVisualIndex.delete(op.node.id);
 			let totalDelta = 0;
 			for (let k = 0; k < structSpans.length; k++) totalDelta += built[k].length - structSpans[k].oldN;
 			const first = structSpans[0].base;
@@ -751,9 +760,7 @@ export class IncrementalRowIndex<TData> {
 				for (; src < stop; src++, out++) {
 					const row = oldTail[src];
 					visualRows[out] = row;
-					if (out === first + src) continue;
-					if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, out);
-					else visualRowIdToIndex.set(row.id, out);
+					if (out !== first + src && row.kind !== 'data') visualRowIdToIndex.set(row.id, out);
 				}
 			};
 			const infos: SpanInfo[] = [];
@@ -763,7 +770,6 @@ export class IncrementalRowIndex<TData> {
 				const newStart = out;
 				for (const row of built[k]) {
 					visualRows[out] = row;
-					if (row.kind === 'data') rowIdToVisualIndex.set(row.rowId, out);
 					out++;
 				}
 				src += span.oldN;

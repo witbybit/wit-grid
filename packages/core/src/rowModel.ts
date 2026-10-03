@@ -1066,6 +1066,12 @@ export class ClientRowModelController<TData = unknown>
 	private visualRows: Array<VisualRow<TData>> = [];
 	private visualRowIdToIndex = new Map<string, number>();
 	private rowIdToVisualIndex = new Map<string, number>();
+	/**
+	 * Set once the incremental index has moved data rows: it does not keep `rowIdToVisualIndex` (a group
+	 * that grows would shift every later entry), so rows are found through the index, and the map is
+	 * rebuilt only if something else needs it.
+	 */
+	private rowIndexStale = false;
 	private rowIdToVisualRowIds: Map<string, string[]> | undefined;
 	private dataRowCount = 0;
 	private unsubscribers: Array<() => void> = [];
@@ -1103,13 +1109,34 @@ export class ClientRowModelController<TData = unknown>
 		return CLIENT_CAPABILITIES;
 	}
 
+	private dataRowIndex(rowId: string): number | undefined {
+		if (this.rowIndexStale) {
+			if (this._incremental) return this._incremental.visualIndexOfRow(rowId, this.visualRows, this.visualRowIdToIndex);
+			this.ensureRowIndexMap();
+		}
+		return this.rowIdToVisualIndex.get(rowId);
+	}
+
+	/** Rebuilds `rowIdToVisualIndex` after incremental moves, for the paths that read or patch it directly. */
+	private ensureRowIndexMap(): void {
+		if (!this.rowIndexStale) return;
+		this.rowIndexStale = false;
+		const map = this.rowIdToVisualIndex;
+		map.clear();
+		const rows = this.visualRows;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			if (row.kind === 'data' && !map.has(row.rowId)) map.set(row.rowId, i);
+		}
+	}
+
 	/** A visual row's index: group/total/detail rows by visual id, data rows through their row id. */
 	private visualIndexOf(visualRowId: string): number | undefined {
 		const index = this.visualRowIdToIndex.get(visualRowId);
 		if (index !== undefined) return index;
 		const rowId = rowIdFromDataVisualRowId(visualRowId);
 		if (rowId === null) return undefined;
-		const at = this.rowIdToVisualIndex.get(rowId);
+		const at = this.dataRowIndex(rowId);
 		return at !== undefined && this.visualRows[at]?.id === visualRowId ? at : undefined;
 	}
 
@@ -1274,6 +1301,7 @@ export class ClientRowModelController<TData = unknown>
 	private filterMembershipChanged(changedNodes: RowNode<TData>[]): boolean {
 		const state = this.runtime.getState();
 		if (isGroupingActive(state.grouping) || state.treeData) return true;
+		this.ensureRowIndexMap();
 		const preparedFilters = prepareFilters(state.columns, state.filterModel, state.quickFilterModel);
 		for (const node of changedNodes) {
 			const wasVisible = this.rowIdToVisualIndex.has(node.id);
@@ -1328,6 +1356,7 @@ export class ClientRowModelController<TData = unknown>
 
 		// Collect VisualRow objects and old indices for each changed node
 		const toRelocate: Array<{ node: RowNode<TData>; vr: VisualRow<TData>; oldIdx: number }> = [];
+		this.ensureRowIndexMap();
 		for (const node of changedNodes) {
 			const oldIdx = this.rowIdToVisualIndex.get(node.id);
 			if (oldIdx === undefined) continue; // was filtered out; stays filtered (sort-key can't change filter membership)
@@ -1560,7 +1589,6 @@ export class ClientRowModelController<TData = unknown>
 			{
 				visualRows: this.visualRows,
 				visualRowIdToIndex: this.visualRowIdToIndex,
-				rowIdToVisualIndex: this.rowIdToVisualIndex,
 				groupMeta: this._groupMeta,
 				groupMetaByVisualIndex: this._groupMetaByVisualIndex,
 				stickyGroupMeta: this._stickyGroupMeta,
@@ -1572,6 +1600,7 @@ export class ClientRowModelController<TData = unknown>
 			return null;
 		}
 		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		if (result.moved || result.listChanged) this.rowIndexStale = true;
 		if (result.membershipChanged) this._hierarchyIndex = null;
 		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
 		const hasRange = result.changedStartIndex !== undefined;
@@ -1673,6 +1702,7 @@ export class ClientRowModelController<TData = unknown>
 		if (this._pageWindow !== null) return null;
 		if (added.length + removed.length > ClientRowModelController.INCREMENTAL_TX_LIMIT) return null;
 
+		this.ensureRowIndexMap();
 		const mutable = this.visualRows.slice();
 		let earliestChangedIndex = mutable.length;
 
@@ -1813,7 +1843,7 @@ export class ClientRowModelController<TData = unknown>
 	};
 
 	public getVisualIndexByRowId = (rowId: string): number => {
-		const idx = this.rowIdToVisualIndex.get(rowId);
+		const idx = this.dataRowIndex(rowId);
 		if (idx !== undefined) return idx;
 		// Group and total rows are addressed by their visual row id (focus, selection ranges).
 		const visualIdx = this.visualRowIdToIndex.get(rowId);
@@ -1969,6 +1999,7 @@ export class ClientRowModelController<TData = unknown>
 		this._pageWindow = result.pageWindow ?? null;
 		this.visualRowIdToIndex = result.visualRowIdToIndex;
 		this.rowIdToVisualIndex = result.rowIdToVisualIndex;
+		this.rowIndexStale = false;
 		this.rowIdToVisualRowIds = result.rowIdToVisualRowIds;
 		this._stickyGroupMeta = result.stickyGroupMeta;
 		this._groupMeta = result.groupMeta;
