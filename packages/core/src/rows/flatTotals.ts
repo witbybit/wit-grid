@@ -38,7 +38,11 @@ export class FlatTotals<TData> {
 		this.recount();
 	}
 
-	static create<TData>(aggDefs: AggregationDef<TData>[], columns: ColumnDef<TData>[], rows: () => readonly VisualRow<TData>[]): FlatTotals<TData> | null {
+	static create<TData>(
+		aggDefs: AggregationDef<TData>[],
+		columns: ColumnDef<TData>[],
+		rows: () => readonly VisualRow<TData>[]
+	): FlatTotals<TData> | null {
 		if (aggDefs.length === 0 || aggDefs.some((def) => typeof def.aggFunc !== 'string' || !STAT_FUNCS.has(def.aggFunc))) return null;
 		const byField = new Map(columns.map((column) => [column.field, column]));
 		if (aggDefs.some((def) => def.colId.includes('.') || byField.get(def.colId)?.valueGetter)) return null;
@@ -77,14 +81,16 @@ export class FlatTotals<TData> {
 		const rows = this.rows();
 		let first = -1;
 		let last = -1;
-		for (let i = 0; i < rows.length; i++) if (rows[i].kind === 'data') {
-			first = i;
-			break;
-		}
-		for (let i = rows.length - 1; i >= 0; i--) if (rows[i].kind === 'data') {
-			last = i;
-			break;
-		}
+		for (let i = 0; i < rows.length; i++)
+			if (rows[i].kind === 'data') {
+				first = i;
+				break;
+			}
+		for (let i = rows.length - 1; i >= 0; i--)
+			if (rows[i].kind === 'data') {
+				last = i;
+				break;
+			}
 		for (let f = 0; f < this.fields.length; f++) {
 			const stats = this.stats.get(this.fields[f])!;
 			const firstRow = rows[first];

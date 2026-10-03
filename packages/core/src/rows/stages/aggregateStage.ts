@@ -43,7 +43,14 @@ export function aggregateStage<TData>(
 
 /** Built-in (stat) aggregates from per-column stats, exactly as a full run's grand total computes them. */
 export function statAggregates<TData>(aggDefs: AggregationDef<TData>[], statsByField: Map<string, FieldStats>): Record<string, unknown> {
-	const run: AggregationRun<TData> = { aggDefs, context: undefined as never, statFields: [], statReaders: [], leaves: null, aggregateTreeParents: true };
+	const run: AggregationRun<TData> = {
+		aggDefs,
+		context: undefined as never,
+		statFields: [],
+		statReaders: [],
+		leaves: null,
+		aggregateTreeParents: true,
+	};
 	return computeAggregates(run, statsByField, 0, { scope: 'grand', level: -1 });
 }
 

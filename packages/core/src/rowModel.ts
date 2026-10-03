@@ -1662,7 +1662,8 @@ export class ClientRowModelController<TData = unknown>
 		if (defs.length === 0 || isGroupingActive(state.grouping) || state.treeData || state.detail || this._pageWindow !== null) return null;
 		const nodes = writeResult.updatedNodes ?? [];
 		const changedValues = writeResult.changedValuesByRow;
-		if (nodes.length === 0 || !changedValues || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
+		if (nodes.length === 0 || !changedValues || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0)
+			return null;
 		if (impact === 'filter-key') {
 			if (state.queryModel && state.queryModel.root.children.length > 0) return null;
 			if (this.filterMembershipChanged(nodes)) return null;

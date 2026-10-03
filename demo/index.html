@@ -17,7 +17,8 @@
 		     its history (memory grows as you use the demo) and adds work to each React render. It must run
 		     before React, so it is written in as a parser-blocking script. -->
 		<script>
-			if (new URLSearchParams(location.search).has('scan')) document.write('<script src="https://unpkg.com/react-scan/dist/auto.global.js"><\/script>');
+			if (new URLSearchParams(location.search).has('scan'))
+				document.write('<script src="https://unpkg.com/react-scan/dist/auto.global.js"><\/script>');
 		</script>
 	</head>
 	<body class="bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden h-screen w-screen m-0">
