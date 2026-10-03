@@ -1975,7 +1975,8 @@ export class ClientRowModelController<TData = unknown>
 		return this.dataStore.getNode(rowId)?.data ?? null;
 	};
 
-	public getAllDataNodes = (): RowNode<TData>[] => this.dataStore.getAllNodes();
+	// A copy: the store's list is cached and shared with the pipeline.
+	public getAllDataNodes = (): RowNode<TData>[] => this.dataStore.getAllNodes().slice();
 
 	/** Returns all nodes that currently pass the active filter (post-sort). With client pagination, returns only the current page. */
 	public getFilteredDataNodes = (): RowNode<TData>[] => {

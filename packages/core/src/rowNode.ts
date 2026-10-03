@@ -10,6 +10,8 @@ export class RowNode<TRowData = unknown> {
 	 * row holds this node (the model checks); kept as a field so reorders write numbers, not Map entries.
 	 */
 	public visualIndex = -1;
+	/** Internal: this row's data visual id (`row:…`), built once instead of on every pipeline run. */
+	public dataVisualId: string | undefined = undefined;
 
 	private cellValueCache = new Map<string, unknown>();
 

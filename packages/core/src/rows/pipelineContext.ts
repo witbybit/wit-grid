@@ -45,6 +45,7 @@ export function createRowPipelineContext<TData>(
 		columnsById,
 		reportFault,
 		getValue: (node, colId) => readerFor(colId)(node),
+		readerFor,
 		getGroupKey: (node, groupDef: GroupDef<TData>) => {
 			const value = readerFor(groupDef.colId)(node);
 			const keyString = groupDef.keyCreator ? groupDef.keyCreator({ value, row: node.data, rowId: node.id }) : String(value ?? 'None');
