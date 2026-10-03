@@ -18,6 +18,8 @@ export const INCREMENTAL_MIN_ROW_LIMIT = 2000;
 export const INCREMENTAL_ROW_SHARE_LIMIT = 0.25;
 /** A group's column is recomputed exactly after this many deltas, bounding float drift. */
 export const DRIFT_RECOMPUTE_EVERY = 2048;
+/** More moved leaves than this (and than 1/16 of the group) are merged in one pass instead of spliced one by one. */
+export const MERGE_REINSERT_MIN = 32;
 
 const BUILT_IN_FUNCS = new Set<string>([...STAT_FUNCS, 'distinctCount']);
 /** Key for the grand total in the distinct-value caches. */
@@ -427,10 +429,15 @@ export class IncrementalRowIndex<TData> {
 	// ── ordering ────────────────────────────────────────────────────────────────
 
 	/**
-	 * Removes `leaves` from the sorted `children` and inserts each at its sorted place. Returns their
-	 * final positions (an insert at or before an earlier one shifts it down).
+	 * Removes `leaves` from the sorted `children` and puts each at its sorted place; returns their
+	 * final positions. A few moved leaves are spliced in by binary search; many are sorted among
+	 * themselves and merged with the rest in one pass (O(n + m log m) rather than a splice per leaf).
 	 */
 	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[], oldPositions: number[] | null): number[] {
+		// Fresh keys for the moved leaves (their sort values changed).
+		const entries = leaves.map((leaf) => ({ leaf, ...this.sortEntryOf(leaf.node, true) }));
+		// Splices are native memmoves (cheap for a few leaves); a merge reads every row's cached key.
+		if (leaves.length > Math.max(MERGE_REINSERT_MIN, children.length / 16)) return this.mergeReinsert(children, entries);
 		if (oldPositions && oldPositions.every((at, i) => children[at] === leaves[i])) {
 			// Known positions (the group is on screen): splice them out, highest first.
 			for (const at of [...oldPositions].sort((a, b) => b - a)) children.splice(at, 1);
@@ -441,11 +448,7 @@ export class IncrementalRowIndex<TData> {
 			children.length = kept;
 		}
 		const positions: number[] = [];
-		for (const leaf of leaves) {
-			// The moving leaf's sort value changed: refresh its cached key.
-			const entry = this.sortEntryOf(leaf.node, true);
-			const keys = entry.keys;
-			const source = entry.source;
+		for (const { leaf, keys, source } of entries) {
 			let lo = 0;
 			let hi = children.length;
 			while (lo < hi) {
@@ -460,7 +463,42 @@ export class IncrementalRowIndex<TData> {
 		return positions;
 	}
 
-	/** The tree sort's comparison: sort model in order, ties by source order. */
+	private mergeReinsert(
+		children: RowTreeNode<TData>[],
+		moving: Array<{ leaf: LeafNode<TData>; keys: ReturnType<typeof toSortKey>[]; source: number }>
+	): number[] {
+		const movingSet = new Set<RowTreeNode<TData>>(moving.map((m) => m.leaf));
+		const rest: RowTreeNode<TData>[] = [];
+		for (const child of children) if (!movingSet.has(child)) rest.push(child);
+		moving.sort((a, b) => this.compareEntries(a.keys, a.source, b.keys, b.source));
+		const positions: number[] = [];
+		let r = 0;
+		let m = 0;
+		let out = 0;
+		while (r < rest.length || m < moving.length) {
+			// Same rule as a binary insert: a moved leaf goes after every rest leaf it does not sort before.
+			if (m < moving.length && (r >= rest.length || this.compare(moving[m].keys, moving[m].source, (rest[r] as LeafNode<TData>).node) < 0)) {
+				children[out] = moving[m++].leaf;
+				positions.push(out++);
+			} else {
+				children[out++] = rest[r++];
+			}
+		}
+		children.length = out;
+		return positions;
+	}
+
+	private compareEntries(aKeys: ReturnType<typeof toSortKey>[], aSource: number, bKeys: ReturnType<typeof toSortKey>[], bSource: number): number {
+		for (let i = 0; i < this.sortModel.length; i++) {
+			const c = compareSortKeys(aKeys[i], bKeys[i]);
+			if (c !== 0) {
+				const signed = this.sortModel[i].sort === 'desc' ? -c : c;
+				return Number.isNaN(signed) ? aSource - bSource : signed;
+			}
+		}
+		return aSource - bSource;
+	}
+
 	private compare(keys: ReturnType<typeof toSortKey>[], source: number, other: RowNode<TData>): number {
 		const entry = this.sortEntryOf(other, false);
 		for (let i = 0; i < this.sortModel.length; i++) {
