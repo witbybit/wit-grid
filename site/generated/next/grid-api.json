@@ -516,8 +516,8 @@
 				{
 					"name": "setExpanded",
 					"optional": false,
-					"signature": "(id: string, expanded: boolean): void",
-					"description": "Opens or closes a group or tree row, by visual row id (`visualRow.id`)."
+					"signature": "(id: string, expanded: boolean, options?: { deep?: boolean }): void",
+					"description": "Opens or closes a group or tree row, by visual row id (`visualRow.id`). `deep` also opens or closes every group and tree row beneath it."
 				},
 				{
 					"name": "toggleExpanded",
