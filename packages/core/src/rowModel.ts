@@ -9,7 +9,7 @@ import type { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
 import { RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
-import { groupByColIds, isGroupingActive } from './rows/hierarchyConfig.js';
+import { groupByColIds, isGroupingActive, normalizeGroupDefs } from './rows/hierarchyConfig.js';
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
@@ -939,9 +939,22 @@ export function applyClientFilterOnly<TData>(
 	filterModel: FilterModel | null | undefined,
 	quickFilterModel?: QuickFilterModel | null
 ): RowNode<TData>[] {
+	const matches = createClientFilterPredicate(columns, filterModel, quickFilterModel);
+	return matches ? nodes.filter(matches) : nodes;
+}
+
+/**
+ * The single-row form of `applyClientFilterOnly`: whether one node passes the column filters and the
+ * quick filter. Null when no filter is active (every node passes).
+ */
+export function createClientFilterPredicate<TData>(
+	columns: Array<ColumnDef<TData>>,
+	filterModel: FilterModel | null | undefined,
+	quickFilterModel?: QuickFilterModel | null
+): ((node: RowNode<TData>) => boolean) | null {
 	const preparedFilters = prepareFilters(columns, filterModel, quickFilterModel);
-	if (preparedFilters.length === 0) return nodes;
-	return nodes.filter((node) => nodeMatchesPreparedFilters(node, preparedFilters));
+	if (preparedFilters.length === 0) return null;
+	return (node) => nodeMatchesPreparedFilters(node, preparedFilters);
 }
 
 export function applyClientSortAndFilter<TData>(
@@ -1445,9 +1458,10 @@ export class ClientRowModelController<TData = unknown>
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
 		}
-		if (impact === 'aggregation-input' || impact === 'sort-key') {
-			const incremental = this.tryIncrementalGroupedUpdate(writeResult);
+		if (impact === 'aggregation-input' || impact === 'sort-key' || impact === 'group-key' || impact === 'filter-key') {
+			const incremental = this.tryIncrementalGroupedUpdate(writeResult, impact);
 			if (incremental) return incremental;
+			this._incremental = undefined;
 		} else if (impact !== 'value-only') {
 			// A write the index cannot see may have moved aggregate inputs.
 			this._incremental = undefined;
@@ -1502,7 +1516,7 @@ export class ClientRowModelController<TData = unknown>
 	 * inputs, sort keys) by patching the tree and flat list, instead of a full pipeline run.
 	 * Null when the update needs the full run.
 	 */
-	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>): RowModelRefreshResult | null {
+	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
 		const nodes = writeResult.updatedNodes;
 		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
 		const state = this.runtime.getState();
@@ -1512,33 +1526,66 @@ export class ClientRowModelController<TData = unknown>
 		for (const key of Object.keys(now)) if (now[key] !== seed[key]) return null;
 		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return null;
 		if (state.queryModel && state.queryModel.root.children.length > 0) return null;
+		// A row may change group or enter / leave the filter only when those are decided by plain row data.
+		const checkFilter = impact === 'group-key' || impact === 'filter-key';
+		const hasFilter = !!state.quickFilterModel?.text.trim() || (!!state.filterModel && Object.keys(state.filterModel).length > 0);
+		if (checkFilter && hasFilter && state.columns.some((column) => column.valueGetter)) return null;
 		if (this._incremental === undefined) {
+			const expansionBase: unknown = state.expansion.base;
 			this._incremental = IncrementalRowIndex.create<TData>({
 				roots: this._roots,
 				columns: state.columns,
 				sortModel: state.sortModel,
 				aggDefs: state.aggregation?.defs ?? [],
 				groupByColIds: groupByColIds(state.grouping),
+				groupDefs: normalizeGroupDefs(state.grouping.by),
 				hasGrandTotal: !!state.grouping?.totals?.grand,
 				getSourceIndex: (rowId) => this.dataStore.getSourceIndex(rowId),
+				matchesFilter: createClientFilterPredicate(state.columns, state.filterModel, state.quickFilterModel),
+				defaultRowHeight: state.defaultRowHeight,
+				rowHeights: state.rowHeights,
+				countSensitiveExpansion: typeof state.grouping.defaultExpanded === 'function' || typeof expansionBase === 'function',
 			});
 			if (!this._incremental) return null;
 		}
 		const previousRowCount = this.visualRows.length;
-		const result = this._incremental.apply(nodes, writeResult.changedValuesByRow, {
-			visualRows: this.visualRows,
-			visualRowIdToIndex: this.visualRowIdToIndex,
-			rowIdToVisualIndex: this.rowIdToVisualIndex,
-			groupMeta: this._groupMeta,
-		});
+		const result = this._incremental.apply(
+			nodes,
+			writeResult.changedValuesByRow,
+			{
+				visualRows: this.visualRows,
+				visualRowIdToIndex: this.visualRowIdToIndex,
+				rowIdToVisualIndex: this.rowIdToVisualIndex,
+				groupMeta: this._groupMeta,
+				groupMetaByVisualIndex: this._groupMetaByVisualIndex,
+				stickyGroupMeta: this._stickyGroupMeta,
+			},
+			{ checkFilter }
+		);
 		if (!result) {
 			this._incremental = undefined;
 			return null;
 		}
 		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		if (result.membershipChanged) this._hierarchyIndex = null;
 		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
 		const hasRange = result.changedStartIndex !== undefined;
 		if (!hasRange && !aggregates) return { changed: false };
+		if (result.listChanged) {
+			// Rows were rewritten whole (some entered, left or changed group): everything after shifts, so
+			// geometry (group and total rows are not data-row height) and the viewport are rebuilt.
+			this.runtime.bumpGlobalVersion();
+			return {
+				changed: true,
+				reason: impact === 'filter-key' ? 'filter' : 'bulk',
+				previousRowCount,
+				nextRowCount: this.visualRows.length,
+				changedStartIndex: result.changedStartIndex,
+				changedEndIndex: result.changedEndIndex,
+				changedRanges: result.changedRanges.length > 0 ? result.changedRanges : undefined,
+				aggregateChangedIndices: aggregates,
+			};
+		}
 		return {
 			changed: true,
 			reason: 'sort',
