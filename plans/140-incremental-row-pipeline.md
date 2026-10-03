@@ -1,5 +1,7 @@
 # 140 — Incremental row pipeline
 
+**Status: closed (2026-10-04).** Leftovers parked in tracker r14 (incremental group create/delete, flat filter flips and bulk insert/remove, tree data). Follow-up program: the flagship markets desk (tracker group "Flagship desk: flawless").
+
 Branch `incremental-pipeline`. Goal: a grouped, aggregated, sorted 100k-row grid absorbs live updates at a
 cost proportional to the change, not the data set, and its full runs (load, sort/filter/group change) get
 much faster. Results must be identical to a full rebuild.
