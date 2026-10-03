@@ -13,13 +13,14 @@ import { groupByColIds, isGroupingActive, normalizeGroupDefs } from './rows/hier
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
+import { FlatTotals } from './rows/flatTotals.js';
 import { IncrementalRowIndex } from './rows/incrementalRowIndex.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
 import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
-import { rowIdFromDataVisualRowId, toDataVisualRowId } from './rows/visualRowIds.js';
+import { rowIdFromDataVisualRowId, toDataVisualRowId, toTotalVisualRowId } from './rows/visualRowIds.js';
 import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
 import {
 	type FilterModel,
@@ -1029,6 +1030,15 @@ export function applyClientSortAndFilter<TData>(
 	return result;
 }
 
+/** The data rows' span of a flat list: after its top totals, before its bottom totals. */
+function dataBounds<TData>(rows: readonly VisualRow<TData>[]): [number, number] {
+	let start = 0;
+	while (start < rows.length && rows[start].kind === 'total' && (rows[start] as { placement?: string }).placement === 'top') start++;
+	let end = rows.length;
+	while (end > start && rows[end - 1].kind === 'total' && (rows[end - 1] as { placement?: string }).placement === 'bottom') end--;
+	return [start, end];
+}
+
 /** Null unless every value is a number (not NaN); `items` are in source order. */
 function sortByNumber<TItem extends { node: RowNode<TData> }, TData>(
 	items: TItem[],
@@ -1115,6 +1125,8 @@ export class ClientRowModelController<TData = unknown>
 	private _hierarchyIndex: HierarchyIndex | null = null;
 	/** The incremental row index for the last full run: undefined = not built yet, null = not applicable. */
 	private _incremental: IncrementalRowIndex<TData> | null | undefined = undefined;
+	/** A flat grid's grand total kept by deltas (undefined: not built since the last full run; null: not possible). */
+	private _flatTotals: FlatTotals<TData> | null | undefined = undefined;
 	/** Cached {@link getUniformRowHeight} answer (undefined: not known) and the default it was read with. */
 	private _uniformHeight: number | null | undefined = undefined;
 	private _uniformHeightDefault = NaN;
@@ -1395,7 +1407,8 @@ export class ClientRowModelController<TData = unknown>
 	 */
 	private relocateSortedRows(changedNodes: RowNode<TData>[]): number | null {
 		const state = this.runtime.getState();
-		if (hasHierarchyRows(state)) return null;
+		// Aggregation alone adds only grand total rows above/below the data rows; the search stays between them.
+		if (isGroupingActive(state.grouping) || state.treeData || state.detail) return null;
 		if (!state.sortModel || state.sortModel.length === 0) return null;
 		if (this._pageWindow !== null) return null;
 
@@ -1429,8 +1442,7 @@ export class ClientRowModelController<TData = unknown>
 		try {
 			for (const item of toRelocate) {
 				const compare = compareToNode(item.node);
-				let lo = 0,
-					hi = mutable.length;
+				let [lo, hi] = dataBounds(mutable);
 				while (lo < hi) {
 					const mid = (lo + hi) >>> 1;
 					const midVR = mutable[mid];
@@ -1473,9 +1485,10 @@ export class ClientRowModelController<TData = unknown>
 		const movers = toRelocate.map((item) => ({ item, compare: compareToNode(item.node) }));
 		movers.sort((a, b) => a.compare(b.item.node));
 		// Same search as the splice path: before the first data row the mover sorts at or before.
+		const [restStart, restEnd] = dataBounds(rest);
 		const places = movers.map(({ compare }) => {
-			let lo = 0;
-			let hi = rest.length;
+			let lo = restStart;
+			let hi = restEnd;
 			while (lo < hi) {
 				const mid = (lo + hi) >>> 1;
 				const midVR = rest[mid];
@@ -1590,6 +1603,10 @@ export class ClientRowModelController<TData = unknown>
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
 		}
+		if (impact === 'aggregation-input' || impact === 'sort-key' || impact === 'filter-key') {
+			const flat = this.tryFlatAggregateUpdate(writeResult, impact);
+			if (flat) return flat;
+		}
 		if (impact === 'aggregation-input' || impact === 'sort-key' || impact === 'group-key' || impact === 'filter-key') {
 			const incremental = this.tryIncrementalGroupedUpdate(writeResult, impact);
 			if (incremental) return incremental;
@@ -1622,6 +1639,60 @@ export class ClientRowModelController<TData = unknown>
 		}
 		inst.increment(GridMetric.ROW_MUTATION_INCREMENTAL);
 		return { changed: false };
+	}
+
+	/**
+	 * A flat grid with aggregates (a grand total): rows move by the live-sort relocation and the total
+	 * follows by deltas, instead of a full run per write. Null (nothing touched) outside that shape.
+	 */
+	private tryFlatAggregateUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
+		const state = this.runtime.getState();
+		const defs = state.aggregation?.defs ?? [];
+		if (defs.length === 0 || isGroupingActive(state.grouping) || state.treeData || state.detail || this._pageWindow !== null) return null;
+		const nodes = writeResult.updatedNodes ?? [];
+		const changedValues = writeResult.changedValuesByRow;
+		if (nodes.length === 0 || !changedValues || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
+		if (impact === 'filter-key') {
+			if (state.queryModel && state.queryModel.root.children.length > 0) return null;
+			if (this.filterMembershipChanged(nodes)) return null;
+		}
+		// Built from the rows as they are now (values already written), so a fresh one takes no deltas.
+		const fresh = this._flatTotals === undefined;
+		if (fresh) this._flatTotals = FlatTotals.create(defs, state.columns, () => this.visualRows);
+		const totals = this._flatTotals;
+		if (!totals) return null;
+		if (!fresh) totals.apply(changedValues, (rowId) => this.dataRowIndex(rowId) !== undefined);
+
+		let changedStartIndex: number | null = null;
+		if (this.writeMayAffectSortOrder(writeResult)) {
+			changedStartIndex = this.relocateSortedRows(nodes);
+			if (changedStartIndex === null) {
+				this._flatTotals = undefined;
+				return null;
+			}
+		}
+		const aggregateChangedIndices: number[] = [];
+		const totalAt = this.visualRowIdToIndex.get(toTotalVisualRowId(null));
+		const totalRow = totalAt === undefined ? undefined : this.visualRows[totalAt];
+		if (totalRow?.kind === 'total') {
+			this.visualRows[totalAt!] = { ...totalRow, aggregates: totals.aggregates() };
+			aggregateChangedIndices.push(totalAt!);
+		}
+		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		const aggregates = aggregateChangedIndices.length > 0 ? aggregateChangedIndices : undefined;
+		if (changedStartIndex !== null) {
+			return {
+				changed: true,
+				reason: 'sort',
+				layoutTransitionHint: 'live-reorder',
+				changedStartIndex,
+				changedEndIndex: Math.max(changedStartIndex, this.visualRows.length - 1),
+				heightsUnchanged:
+					Object.keys(state.rowHeights).length === 0 && this.getUniformRowHeight(state.defaultRowHeight) !== null ? true : undefined,
+				aggregateChangedIndices: aggregates,
+			};
+		}
+		return aggregates ? { changed: true, reason: 'bulk', aggregateChangedIndices: aggregates } : { changed: false };
 	}
 
 	/** The configuration the incremental index depends on, compared by reference. */
@@ -2095,6 +2166,7 @@ export class ClientRowModelController<TData = unknown>
 		this._roots = result.roots;
 		this._hierarchyIndex = null;
 		this._incremental = undefined;
+		this._flatTotals = undefined;
 		this._uniformHeight = undefined;
 		this._incrementalSeed = this.captureIncrementalSeed(state);
 		this.dataRowCount = result.stats.totalDataRows;
