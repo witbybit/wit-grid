@@ -98,8 +98,13 @@ export function toggle(api: GridApi<Task>, tasks: Task[], id: string) {
 }
 ```
 
-Only the edited row repaints, and selection, scroll position and the rest of the grid are left alone. To read
-the current rows for a change like this, use `api.rows().getAll()`.
+Only the edited row repaints, and selection, scroll position and the rest of the grid are left alone.
+
+Pass `setRows` your own rows array, in your own order. To change rows the grid already holds without keeping your
+own copy, update them instead: `api.transaction({ rows: { update: changed } })` matches rows by id, keeps their
+order, and animates rows that move under the current sort. (`api.rows().getAll()` returns only the rows currently displayed, in display order — sorted, without filtered-out
+rows or rows in collapsed groups — so handing that array back to `setRows` would reorder your rows and drop the
+hidden ones.)
 
 ## `setCellValue`
 

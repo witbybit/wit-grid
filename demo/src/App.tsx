@@ -200,21 +200,23 @@ export default function App() {
 				return;
 			}
 			const rowIdSet = new Set(rowIds);
-			activeApi.setRows(
-				activeApi
-					.rows()
-					.getAll()
-					.map((row) => {
-						if (!rowIdSet.has(row.id)) return row;
-						const next = { ...row } as any;
-						for (const field of columns) {
-							if (action === 'fill') next[field] = '100';
-							else if (action === 'clear') next[field] = 0;
-							else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
-						}
-						return next;
-					})
-			);
+			activeApi.transaction({
+				rows: {
+					update: activeApi
+						.rows()
+						.getAll()
+						.map((row) => {
+							if (!rowIdSet.has(row.id)) return row;
+							const next = { ...row } as any;
+							for (const field of columns) {
+								if (action === 'fill') next[field] = '100';
+								else if (action === 'clear') next[field] = 0;
+								else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
+							}
+							return next;
+						}),
+				},
+			});
 			performance.mark('wit-grid-demo-range-action');
 		},
 		[activeApi]
