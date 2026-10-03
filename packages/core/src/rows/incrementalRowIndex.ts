@@ -95,6 +95,7 @@ export class IncrementalRowIndex<TData> {
 	private readonly leafOf = new Map<string, { leaf: LeafNode<TData>; parent: GroupNode<TData> }>();
 	private readonly parentOf = new Map<GroupNode<TData>, GroupNode<TData> | null>();
 	private readonly statsCache = new Map<GroupNode<TData>, Map<string, FieldStats>>();
+	private readonly sortEntries = new Map<RowNode<TData>, { keys: ReturnType<typeof toSortKey>[]; source: number }>();
 	/** Deltas applied per group and column since its last exact recompute. */
 	private readonly deltaCounts = new Map<GroupNode<TData>, Map<string, number>>();
 	private readonly distinctCache = new Map<GroupNode<TData> | typeof GRAND, Map<string, Map<unknown, number>>>();
@@ -441,8 +442,10 @@ export class IncrementalRowIndex<TData> {
 		}
 		const positions: number[] = [];
 		for (const leaf of leaves) {
-			const keys = this.sortModel.map((s) => toSortKey(this.context.getValue(leaf.node, s.colId)));
-			const source = this.getSourceIndex(leaf.rowId) ?? 0;
+			// The moving leaf's sort value changed: refresh its cached key.
+			const entry = this.sortEntryOf(leaf.node, true);
+			const keys = entry.keys;
+			const source = entry.source;
 			let lo = 0;
 			let hi = children.length;
 			while (lo < hi) {
@@ -459,14 +462,32 @@ export class IncrementalRowIndex<TData> {
 
 	/** The tree sort's comparison: sort model in order, ties by source order. */
 	private compare(keys: ReturnType<typeof toSortKey>[], source: number, other: RowNode<TData>): number {
+		const entry = this.sortEntryOf(other, false);
 		for (let i = 0; i < this.sortModel.length; i++) {
-			const c = compareSortKeys(keys[i], toSortKey(this.context.getValue(other, this.sortModel[i].colId)));
+			const c = compareSortKeys(keys[i], entry.keys[i]);
 			if (c !== 0) {
 				const signed = this.sortModel[i].sort === 'desc' ? -c : c;
-				return Number.isNaN(signed) ? source - (this.getSourceIndex(other.id) ?? 0) : signed;
+				return Number.isNaN(signed) ? source - entry.source : signed;
 			}
 		}
-		return source - (this.getSourceIndex(other.id) ?? 0);
+		return source - entry.source;
+	}
+
+	/**
+	 * A row's sort keys and source position, cached per row node: a binary insert compares against
+	 * ~log(n) rows per moved row, so reading their values each time dominated live feeds. A row's
+	 * entry is refreshed when its own sort value changes (`refresh`); others keep theirs.
+	 */
+	private sortEntryOf(node: RowNode<TData>, refresh: boolean): { keys: ReturnType<typeof toSortKey>[]; source: number } {
+		let entry = refresh ? undefined : this.sortEntries.get(node);
+		if (!entry) {
+			entry = {
+				keys: this.sortModel.map((s) => toSortKey(this.context.getValue(node, s.colId))),
+				source: this.getSourceIndex(node.id) ?? 0,
+			};
+			this.sortEntries.set(node, entry);
+		}
+		return entry;
 	}
 
 	// ── aggregates ──────────────────────────────────────────────────────────────
