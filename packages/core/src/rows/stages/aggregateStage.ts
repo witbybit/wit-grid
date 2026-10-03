@@ -41,6 +41,12 @@ export function aggregateStage<TData>(
 	return computeAggregates(run, grandStats, 0, { scope: 'grand', level: -1 });
 }
 
+/** Built-in (stat) aggregates from per-column stats, exactly as a full run's grand total computes them. */
+export function statAggregates<TData>(aggDefs: AggregationDef<TData>[], statsByField: Map<string, FieldStats>): Record<string, unknown> {
+	const run: AggregationRun<TData> = { aggDefs, context: undefined as never, statFields: [], statReaders: [], leaves: null, aggregateTreeParents: true };
+	return computeAggregates(run, statsByField, 0, { scope: 'grand', level: -1 });
+}
+
 /** Built-ins computed from running per-column stats; the rest need the leaf rows. */
 export const STAT_FUNCS = new Set<string>(['sum', 'avg', 'min', 'max', 'count', 'first', 'last']);
 

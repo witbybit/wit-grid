@@ -4,15 +4,38 @@
 		{
 			"name": "demo",
 			"runtimeExecutable": "pnpm",
-			"runtimeArgs": ["--filter", "demo-app", "dev"],
+			"runtimeArgs": [
+				"--filter",
+				"demo-app",
+				"dev"
+			],
 			"port": 5173,
 			"autoPort": true
 		},
 		{
 			"name": "site",
 			"runtimeExecutable": "pnpm",
-			"runtimeArgs": ["--filter", "wit-grid-site", "dev"],
+			"runtimeArgs": [
+				"--filter",
+				"wit-grid-site",
+				"dev"
+			],
 			"port": 5174
+		},
+		{
+			"name": "demo-prod",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": [
+				"--filter",
+				"demo-app",
+				"exec",
+				"vite",
+				"preview",
+				"--port",
+				"4180",
+				"--strictPort"
+			],
+			"port": 4180
 		}
 	]
 }

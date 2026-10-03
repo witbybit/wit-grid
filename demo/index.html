@@ -13,8 +13,12 @@
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-		<!-- React Scan: Highlight and monitor rendering performance -->
-		<script src="https://unpkg.com/react-scan/dist/auto.global.js"></script>
+		<!-- React Scan (render highlighting) only with ?scan in the URL: it keeps every rendered element in
+		     its history (memory grows as you use the demo) and adds work to each React render. It must run
+		     before React, so it is written in as a parser-blocking script. -->
+		<script>
+			if (new URLSearchParams(location.search).has('scan')) document.write('<script src="https://unpkg.com/react-scan/dist/auto.global.js"><\/script>');
+		</script>
 	</head>
 	<body class="bg-slate-950 text-slate-100 font-sans antialiased overflow-hidden h-screen w-screen m-0">
 		<div id="root" class="h-full w-full"></div>
