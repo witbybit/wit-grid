@@ -163,7 +163,7 @@ function flattenNode<TData>(
 		const children = node.children;
 		const hasChildren = !!children && children.length > 0;
 		const expanded = hasChildren && resolveNodeExpanded(node, level, config);
-		result.push({
+		const row: VisualRow<TData> = {
 			kind: 'data',
 			id,
 			rowId,
@@ -182,7 +182,9 @@ function flattenNode<TData>(
 			height: explicitHeight !== undefined ? explicitHeight : config.defaultRowHeight,
 			selectable: true,
 			editable: true,
-		});
+		};
+		node.row = row;
+		result.push(row);
 
 		if (expanded) {
 			for (let i = 0; i < children!.length; i++) flattenNode(children![i], state, id, level + 1, i + 1, children!.length);

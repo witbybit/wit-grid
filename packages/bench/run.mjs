@@ -215,7 +215,7 @@ async function bundle() {
 		outdir: out,
 		bundle: true,
 		format: 'iife',
-		minify: true,
+		minify: !process.env.BENCH_NOMINIFY,
 		target: 'es2022',
 		define: { 'process.env.NODE_ENV': '"production"' },
 		jsx: 'automatic',
