@@ -15,7 +15,7 @@ type LeafNode<TData> = Extract<RowTreeNode<TData>, { kind: 'data' }>;
 
 /** Above this many changed rows (or this share of all rows) a full pipeline run is cheaper. */
 export const INCREMENTAL_MIN_ROW_LIMIT = 2000;
-export const INCREMENTAL_ROW_SHARE_LIMIT = 0.05;
+export const INCREMENTAL_ROW_SHARE_LIMIT = 0.25;
 /** A group's column is recomputed exactly after this many deltas, bounding float drift. */
 export const DRIFT_RECOMPUTE_EVERY = 2048;
 
@@ -85,6 +85,11 @@ export class IncrementalRowIndex<TData> {
 	private readonly firstLastCols: Set<string>;
 	private readonly aggCols: string[];
 	private readonly groupCols: string[];
+	private readonly groupColSet: Set<string>;
+	private readonly sortColSet: Set<string>;
+	private readonly aggColSet: Set<string>;
+	/** No grouped, sorted or aggregated column is a dotted path: changes match by plain set lookups. */
+	private readonly plainFields: boolean;
 	private readonly hasGrandTotal: boolean;
 	private readonly getSourceIndex: (rowId: string) => number | undefined;
 	private readonly leafOf = new Map<string, { leaf: LeafNode<TData>; parent: GroupNode<TData> }>();
@@ -108,6 +113,10 @@ export class IncrementalRowIndex<TData> {
 		this.minMaxCols = new Set(config.aggDefs.filter((d) => d.aggFunc === 'min' || d.aggFunc === 'max').map((d) => d.colId));
 		this.firstLastCols = new Set(config.aggDefs.filter((d) => d.aggFunc === 'first' || d.aggFunc === 'last').map((d) => d.colId));
 		this.aggCols = [...new Set([...this.statCols, ...this.distinctCols])];
+		this.groupColSet = new Set(this.groupCols);
+		this.sortColSet = new Set(this.sortModel.map((s) => s.colId));
+		this.aggColSet = new Set(this.aggCols);
+		this.plainFields = ![...this.groupColSet, ...this.sortColSet, ...this.aggColSet].some((id) => id.includes('.'));
 		this.index();
 	}
 
@@ -161,6 +170,19 @@ export class IncrementalRowIndex<TData> {
 			const changed = changedValuesByRow.get(node.id);
 			if (!changed) return null;
 			const item: TouchedLeaf<TData> = { leaf: entry.leaf, sortChanged: false, changes: [] };
+			if (this.plainFields) {
+				// No dotted paths anywhere: one pass of set lookups (the live-feed hot path).
+				for (const [key, change] of changed) {
+					if (key.includes('.')) return null;
+					if (this.groupColSet.has(key)) return null;
+					if (this.sortColSet.has(key)) item.sortChanged = true;
+					if (this.aggColSet.has(key)) item.changes.push({ colId: key, oldValue: change.oldValue, newValue: change.newValue });
+				}
+				let byRow = touched.get(entry.parent);
+				if (!byRow) touched.set(entry.parent, (byRow = new Map()));
+				byRow.set(node.id, item);
+				continue;
+			}
 			for (const key of changed.keys()) {
 				for (const groupCol of this.groupCols) if (fieldMatches(key, groupCol)) return null;
 				for (const sort of this.sortModel) if (fieldMatches(key, sort.colId)) item.sortChanged = true;
@@ -210,15 +232,18 @@ export class IncrementalRowIndex<TData> {
 				const base = onScreen ? gi! + 1 + (visualRows[gi! + 1]?.kind === 'total' ? 1 : 0) : -1;
 				let lo = Infinity;
 				let hi = -1;
+				let oldPositions: number[] | null = null;
 				if (onScreen) {
+					oldPositions = [];
 					for (const leaf of moving) {
 						const at = rowIdToVisualIndex.get(leaf.rowId);
 						if (at === undefined) throw new Error('incremental index out of step');
+						oldPositions.push(at - base);
 						lo = Math.min(lo, at - base);
 						hi = Math.max(hi, at - base);
 					}
 				}
-				const inserted = this.reinsert(group.children, moving);
+				const inserted = this.reinsert(group.children, moving, oldPositions);
 				for (const at of inserted) {
 					lo = Math.min(lo, at);
 					hi = Math.max(hi, at);
@@ -404,11 +429,16 @@ export class IncrementalRowIndex<TData> {
 	 * Removes `leaves` from the sorted `children` and inserts each at its sorted place. Returns their
 	 * final positions (an insert at or before an earlier one shifts it down).
 	 */
-	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[]): number[] {
-		const moving = new Set<RowTreeNode<TData>>(leaves);
-		let kept = 0;
-		for (const child of children) if (!moving.has(child)) children[kept++] = child;
-		children.length = kept;
+	private reinsert(children: RowTreeNode<TData>[], leaves: LeafNode<TData>[], oldPositions: number[] | null): number[] {
+		if (oldPositions && oldPositions.every((at, i) => children[at] === leaves[i])) {
+			// Known positions (the group is on screen): splice them out, highest first.
+			for (const at of [...oldPositions].sort((a, b) => b - a)) children.splice(at, 1);
+		} else {
+			const moving = new Set<RowTreeNode<TData>>(leaves);
+			let kept = 0;
+			for (const child of children) if (!moving.has(child)) children[kept++] = child;
+			children.length = kept;
+		}
 		const positions: number[] = [];
 		for (const leaf of leaves) {
 			const keys = this.sortModel.map((s) => toSortKey(this.context.getValue(leaf.node, s.colId)));
