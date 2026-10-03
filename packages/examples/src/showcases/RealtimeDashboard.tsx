@@ -984,7 +984,7 @@ export default function RealtimeDashboard({
 							</span>
 						)}
 					</div>
-					<div className='flex items-center gap-2'>
+					<div className='flex items-center gap-2 flex-wrap'>
 						{!compact && (
 							<label
 								className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${
@@ -1007,7 +1007,7 @@ export default function RealtimeDashboard({
 						)}
 						<button
 							onClick={toggleAutoFire}
-							className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg font-bold text-[10px] border shadow-lg transition-all cursor-pointer ${
+							className={`flex shrink-0 items-center gap-1.5 py-1.5 px-3 rounded-lg font-bold text-[10px] whitespace-nowrap border shadow-lg transition-all cursor-pointer ${
 								autoFire
 									? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500/20 shadow-rose-900/20'
 									: isLight
@@ -1018,25 +1018,37 @@ export default function RealtimeDashboard({
 							<Zap className={`w-3 h-3 ${autoFire ? 'animate-pulse' : ''}`} />
 							{autoFire ? `Auto ${autoFireHzLabel}hz ON` : `Auto ${autoFireHzLabel}hz`}
 						</button>
-						<label
-							className={`flex items-center gap-1.5 py-1 px-2 rounded-lg text-[10px] font-bold border ${
-								isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 text-slate-300 border-slate-700/60'
-							}`}
+						<div
+							role='radiogroup'
+							aria-label='Row motion'
 							title='How rows move when the live sort reorders them'
+							className={`flex shrink-0 items-center gap-0.5 p-0.5 rounded-lg border ${
+								isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-900/80 border-slate-700/60'
+							}`}
 						>
-							Motion
-							<select
-								value={animationPreset}
-								onChange={(event) => setAnimationPreset(event.target.value as keyof typeof ROW_ANIMATION_PRESETS)}
-								className='bg-transparent font-bold outline-none cursor-pointer'
-							>
-								{Object.entries(ROW_ANIMATION_PRESETS).map(([id, preset]) => (
-									<option key={id} value={id}>
-										{preset.label}
-									</option>
-								))}
-							</select>
-						</label>
+							<span className='px-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500'>Motion</span>
+							{(Object.keys(ROW_ANIMATION_PRESETS) as Array<keyof typeof ROW_ANIMATION_PRESETS>).map((id) => {
+								const active = id === animationPreset;
+								return (
+									<button
+										key={id}
+										type='button'
+										role='radio'
+										aria-checked={active}
+										onClick={() => setAnimationPreset(id)}
+										className={`py-1 px-2 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
+											active
+												? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'
+												: isLight
+													? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+													: 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+										}`}
+									>
+										{ROW_ANIMATION_PRESETS[id].label}
+									</button>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 
