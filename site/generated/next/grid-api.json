@@ -32,26 +32,26 @@
 					"signature": "(rows: TRowData[]): GridWriteResult"
 				},
 				{
-					"name": "updateRows",
+					"name": "transaction",
 					"optional": false,
-					"signature": "(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult"
+					"signature": "(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>",
+					"description": "The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)\ncommit atomically — one change, one undo entry, one repaint of what changed — with any grid\nstate (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it\nwith other queued row-only transactions into one commit before the next frame (high-frequency\nfeeds), awaits async validation of its cells, and resolves once committed. Any synchronous\nwrite commits the queue first, so writes land in call order."
 				},
 				{
-					"name": "applyTransaction",
+					"name": "transaction",
 					"optional": false,
-					"signature": "(transaction: RowDataTransaction<TRowData>): RowNodeTransaction<TRowData> | null"
+					"signature": "(transaction: GridTransaction<TRowData>, options: GridTransactionOptions & { async: true }): Promise<GridTransactionResult<TRowData>>"
 				},
 				{
-					"name": "applyTransactionAsync",
+					"name": "transaction",
 					"optional": false,
-					"signature": "(transaction: RowDataTransaction<TRowData>, callback?: (result: RowNodeTransaction<TRowData> | null) => void): void",
-					"description": "Queues a transaction to apply with others before the next frame, in call order. Independent\ntransactions are applied together as one commit and one render, which suits high-frequency\nfeeds. The callback receives this transaction's own result. Any synchronous write (including\napplyTransaction) applies the queue first, so writes always land in the order they were made."
+					"signature": "( transaction: GridTransaction<TRowData>, options?: GridTransactionOptions ): GridTransactionResult<TRowData> | Promise<GridTransactionResult<TRowData>>"
 				},
 				{
-					"name": "flushAsyncTransactions",
+					"name": "flushTransactions",
 					"optional": false,
 					"signature": "(): void",
-					"description": "Applies queued applyTransactionAsync transactions immediately."
+					"description": "Commits queued async transactions now."
 				},
 				{
 					"name": "getRowOrder",
@@ -151,22 +151,8 @@
 				{
 					"name": "setCellValue",
 					"optional": false,
-					"signature": "(rowId: string, colField: string, value: unknown): GridWriteResult"
-				},
-				{
-					"name": "setCellValueAsync",
-					"optional": false,
-					"signature": "(rowId: string, colField: string, value: unknown): Promise<GridWriteResult>"
-				},
-				{
-					"name": "batchCellValues",
-					"optional": false,
-					"signature": "(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): GridWriteResult"
-				},
-				{
-					"name": "batchCellValuesAsync",
-					"optional": false,
-					"signature": "(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): Promise<GridWriteResult>"
+					"signature": "(rowId: string, colField: string, value: unknown): GridWriteResult",
+					"description": "One cell: shorthand for `transaction({ cells: [{ rowId, colField, value }] })`."
 				},
 				{
 					"name": "getRowNode",

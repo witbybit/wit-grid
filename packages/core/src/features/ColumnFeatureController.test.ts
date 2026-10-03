@@ -317,3 +317,34 @@ describe('ColumnFeatureController', () => {
 		});
 	});
 });
+
+describe('setColumns keeps the user column order across equivalent declarations', () => {
+	const declare = () => [
+		{ field: 'id', header: 'ID', width: 50 },
+		{ field: 'name', header: 'Name', width: 150 },
+		{ field: 'price', header: 'Price', width: 100 },
+	];
+	const order = (store: GridStore<TestRow>) => store.getState().columns.map((column) => column.field);
+
+	it('a new but equivalent columns array (a React re-render) keeps a moved column where the user put it', () => {
+		const store = makeStore();
+		store.moveColumn('price', 0);
+		expect(order(store)).toEqual(['price', 'id', 'name']);
+		store.setColumns(declare());
+		expect(order(store)).toEqual(['price', 'id', 'name']);
+		store.setColumns(declare());
+		expect(order(store)).toEqual(['price', 'id', 'name']);
+		store.destroy();
+	});
+
+	it('a changed declaration (reordered, added or removed by the app) is applied as declared', () => {
+		const store = makeStore();
+		store.moveColumn('price', 0);
+		const [id, name, price] = declare();
+		store.setColumns([name, id, price]);
+		expect(order(store)).toEqual(['name', 'id', 'price']);
+		store.setColumns([name, id, price, { field: 'extra' as keyof TestRow & string, header: 'Extra' }]);
+		expect(order(store)).toEqual(['name', 'id', 'price', 'extra']);
+		store.destroy();
+	});
+});

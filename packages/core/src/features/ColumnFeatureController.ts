@@ -1,11 +1,17 @@
-import { withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
+import { isHierarchyColumn, withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { ColumnState } from '../state/GridState.js';
 import type { GridFeatureContext } from './GridFeatureContext.js';
 
 export class ColumnFeatureController<TRowData = unknown> {
-	constructor(private readonly ctx: GridFeatureContext<TRowData>) {}
+	/** The field sequence of the last column list the app declared through setColumns. */
+	private lastDeclaredFields: string | null = null;
+
+	constructor(private readonly ctx: GridFeatureContext<TRowData>) {
+		// The columns the grid was created with are the first declaration.
+		this.lastDeclaredFields = declaredFieldKey(ctx.getState().columns.filter((column) => !isHierarchyColumn(column)));
+	}
 
 	private applyColumnOrder(requested: ColumnDef<TRowData>[]): void {
 		const state = this.ctx.getState();
@@ -115,9 +121,15 @@ export class ColumnFeatureController<TRowData = unknown> {
 	public setColumns(nextColumns: ColumnDef<TRowData>[], undoable = false): void {
 		const state = this.ctx.getState();
 		// The hierarchy column belongs to the grouping / tree configuration, not the caller's list.
-		const { columns, pinnedColumns } = withHierarchyColumnFor(nextColumns, state);
+		const { columns: declaredColumns, pinnedColumns } = withHierarchyColumnFor(nextColumns, state);
 		const pinnedPatch = pinnedColumns ? { pinnedColumns } : {};
 		const prevColumns = state.columns;
+		// The user's column moves survive a re-declaration of the same columns (a React app passing
+		// a new but equivalent columns array on every render); a changed declaration (columns added,
+		// removed or reordered by the app) is applied as declared.
+		const declaredFields = declaredFieldKey(nextColumns);
+		const columns = declaredFields === this.lastDeclaredFields ? inCurrentOrder(declaredColumns, prevColumns) : declaredColumns;
+		this.lastDeclaredFields = declaredFields;
 		const prevWidths = state.columnWidths;
 
 		const nextWidths = columns.reduce<Record<string, number>>((acc, column) => {
@@ -208,4 +220,15 @@ export class ColumnFeatureController<TRowData = unknown> {
 			this.setColumnOrderByFields(states.map((s) => s.field));
 		}
 	}
+}
+
+/** `columns` in the order the same fields have in `current`; unchanged when any field is new. */
+function inCurrentOrder<TRowData>(columns: ColumnDef<TRowData>[], current: readonly ColumnDef<TRowData>[]): ColumnDef<TRowData>[] {
+	const position = new Map(current.map((column, index) => [column.field, index]));
+	if (!columns.every((column) => position.has(column.field))) return columns;
+	return [...columns].sort((a, b) => position.get(a.field)! - position.get(b.field)!);
+}
+
+function declaredFieldKey(columns: readonly { field: string }[]): string {
+	return columns.map((column) => column.field).join('\u0000');
 }

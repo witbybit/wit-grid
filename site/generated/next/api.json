@@ -922,7 +922,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
@@ -1056,7 +1056,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
@@ -1189,7 +1189,7 @@
 					"name": "rendererOptions",
 					"optional": true,
 					"type": "GridInitialState<TRowData>['rendererOptions']",
-					"description": "Grid-wide scroll presentation policy — live-mode budgets, html-snapshot cache limits, text-impostor defaults. Initial-only."
+					"description": "Grid-wide scroll presentation policy — live-mode overscan and per-frame budgets. Initial-only."
 				},
 				{
 					"name": "columnTypes",
