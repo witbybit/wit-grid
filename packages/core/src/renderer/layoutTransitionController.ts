@@ -1,7 +1,5 @@
+import { MAX_STAGGER_SPAN_MS, resolveRowAnimation, type ResolvedRowAnimation, type RowAnimationOptions } from './rowAnimation.js';
 import type { RowSlot } from './rowSlot.js';
-
-const DURATION = 280;
-const EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 /**
  * LayoutTransitionController — animates **discrete** layout changes via the
@@ -36,6 +34,16 @@ export interface LayoutTransitionOptions {
 	isRowIdLive?: (rowId: string) => boolean;
 	/** The grid root element used for semantic, CSS-only layout effects such as pinning. */
 	getGridRoot?: () => HTMLElement | null;
+	/** The grid's current row animation options (style, timing, cascade, which changes animate). */
+	getRowAnimation?: () => RowAnimationOptions | undefined;
+}
+
+interface PendingRowAnimation {
+	el: HTMLElement;
+	keyframes: Keyframe[];
+	/** New top: the cascade runs top to bottom. */
+	top: number;
+	onSettle?: () => void;
 }
 
 interface SnapshotEntry {
@@ -61,6 +69,9 @@ export class LayoutTransitionController<TRowData = unknown> {
 	private snapshotBounds: SnapshotBounds | null = null;
 	private animations = new Map<HTMLElement, Animation>();
 	private exitGhosts = new Set<HTMLElement>();
+	/** Options resolved for the animation being played (read once per beginAnimation). */
+	private current: ResolvedRowAnimation = resolveRowAnimation(undefined);
+	private readonly pending: PendingRowAnimation[] = [];
 	constructor(
 		private readonly getActiveRows: () => ReadonlyMap<number, RowSlot<TRowData>>,
 		private readonly options: LayoutTransitionOptions = {}
@@ -80,6 +91,16 @@ export class LayoutTransitionController<TRowData = unknown> {
 		return true;
 	}
 
+	/** True when this kind of change animates under the grid's row animation options. */
+	private animatesReason(reason: LayoutTransitionReason, options: ResolvedRowAnimation): boolean {
+		if (options.style === 'none' || options.duration === 0) return false;
+		if (reason === 'sort') return options.on.sort;
+		if (reason === 'live-reorder') return options.on.liveReorder;
+		if (reason === 'expansion') return options.on.expand;
+		if (reason === 'detail') return options.on.detail;
+		return true;
+	}
+
 	/**
 	 * Step 1 — record current row positions before the structural state change renders.
 	 * Called synchronously from the invalidation hook (sortModel/expansion/etc.).
@@ -89,6 +110,8 @@ export class LayoutTransitionController<TRowData = unknown> {
 		this.snapshot.clear();
 		this.snapshotReason = reason;
 		this.snapshotBounds = null;
+		// A change that will not animate needs no snapshot (and no ghost clones).
+		if (!this.animatesReason(reason, resolveRowAnimation(this.options.getRowAnimation?.()))) return;
 		const canExit = reason !== 'live-reorder' && !!this.options.getExitLayer && this.animationsEnabled();
 		for (const [, slot] of this.getActiveRows()) {
 			if (slot.visualRowId && slot.lastTop >= 0) {
@@ -114,7 +137,8 @@ export class LayoutTransitionController<TRowData = unknown> {
 	 */
 	public beginAnimation(): void {
 		const hadSnapshot = this.snapshot.size > 0;
-		if (!this.animationsEnabled()) {
+		this.current = resolveRowAnimation(this.options.getRowAnimation?.());
+		if (!this.animationsEnabled() || !this.animatesReason(this.snapshotReason, this.current)) {
 			this.snapshot.clear();
 			this.snapshotBounds = null;
 			this.snapshotReason = 'other';
@@ -141,6 +165,7 @@ export class LayoutTransitionController<TRowData = unknown> {
 					el.style.overflow = 'hidden';
 					this.run(
 						el,
+						slot.lastTop,
 						[
 							{ height: '0px', opacity: 0 },
 							{ height: `${finalHeight}px`, opacity: 1 },
@@ -150,17 +175,26 @@ export class LayoutTransitionController<TRowData = unknown> {
 						}
 					);
 				} else {
-					const fromTop = this.getEnterTop(slot.lastTop, slot.lastHeight ?? 0);
-					this.run(el, [
+					const fromTop = this.current.style === 'fade' ? slot.lastTop : this.getEnterTop(slot.lastTop, slot.lastHeight ?? 0);
+					this.run(el, slot.lastTop, [
 						{ transform: `translateY(${fromTop}px)`, opacity: 0 },
 						{ transform: `translateY(${slot.lastTop}px)`, opacity: 1 },
 					]);
 				}
 			} else if (entry.top !== slot.lastTop) {
-				// MOVE — keyframe from the old top to the live (already-written) new top.
-				this.run(el, [{ transform: `translateY(${entry.top}px)` }, { transform: `translateY(${slot.lastTop}px)` }]);
+				// MOVE — 'slide': from the old top to the live (already-written) new top; 'fade': fade
+				// in at the new top.
+				this.run(
+					el,
+					slot.lastTop,
+					this.current.style === 'fade'
+						? [{ opacity: 0 }, { opacity: 1 }]
+						: [{ transform: `translateY(${entry.top}px)` }, { transform: `translateY(${slot.lastTop}px)` }]
+				);
 			}
 		}
+
+		this.playPending();
 
 		// EXIT — a captured row that is no longer rendered AND no longer in the model truly
 		// left (e.g. a collapsed group's children). Fade out its ghost clone in place. Rows
@@ -212,8 +246,8 @@ export class LayoutTransitionController<TRowData = unknown> {
 				ghost.style.willChange = 'opacity';
 			}
 			const anim = (ghost as unknown as { animate: (k: Keyframe[], o: KeyframeAnimationOptions) => Animation }).animate(keyframes, {
-				duration: DURATION,
-				easing: EASING,
+				duration: this.current.duration,
+				easing: this.current.easing,
 				fill: 'forwards',
 			});
 			const done = () => this.removeGhost(ghost);
@@ -227,21 +261,42 @@ export class LayoutTransitionController<TRowData = unknown> {
 		this.exitGhosts.delete(ghost);
 	}
 
-	private run(el: HTMLElement, keyframes: Keyframe[], onSettle?: () => void): void {
-		const existing = this.animations.get(el);
-		if (existing) existing.cancel();
-		const anim = (el as unknown as { animate: (k: Keyframe[], o: KeyframeAnimationOptions) => Animation }).animate(keyframes, {
-			duration: DURATION,
-			easing: EASING,
-			fill: 'none',
-		});
-		this.animations.set(el, anim);
-		const done = () => {
-			if (this.animations.get(el) === anim) this.animations.delete(el);
-			onSettle?.();
-		};
-		anim.onfinish = done;
-		anim.oncancel = done;
+	/** Queues a row animation at its new top; playPending starts them, cascading top to bottom when staggered. */
+	private run(el: HTMLElement, top: number, keyframes: Keyframe[], onSettle?: () => void): void {
+		this.pending.push({ el, keyframes, top, onSettle });
+	}
+
+	private playPending(): void {
+		const pending = this.pending;
+		if (pending.length === 0) return;
+		const { duration, easing } = this.current;
+		let step = this.current.stagger;
+		if (step > 0) {
+			pending.sort((a, b) => a.top - b.top);
+			// Cap the whole cascade so a large change still finishes quickly.
+			if (step * (pending.length - 1) > MAX_STAGGER_SPAN_MS) step = MAX_STAGGER_SPAN_MS / Math.max(1, pending.length - 1);
+		}
+		for (let i = 0; i < pending.length; i++) {
+			const { el, keyframes, onSettle } = pending[i];
+			const existing = this.animations.get(el);
+			if (existing) existing.cancel();
+			const delay = step * i;
+			const anim = (el as unknown as { animate: (k: Keyframe[], o: KeyframeAnimationOptions) => Animation }).animate(keyframes, {
+				duration,
+				easing,
+				delay,
+				// A delayed row holds its starting keyframe until its turn instead of jumping ahead.
+				fill: delay > 0 ? 'backwards' : 'none',
+			});
+			this.animations.set(el, anim);
+			const done = () => {
+				if (this.animations.get(el) === anim) this.animations.delete(el);
+				onSettle?.();
+			};
+			anim.onfinish = done;
+			anim.oncancel = done;
+		}
+		pending.length = 0;
 	}
 
 	/** Immediately tear down all in-flight animations + exit ghosts; live elements revert

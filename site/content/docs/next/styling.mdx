@@ -64,3 +64,27 @@ Rules are additive: a row or cell can match several rules at once, and all match
 	Use `styleRules` for data-driven decoration (status colors, thresholds, validation highlights). Use the [theming API](/docs/next/theming) for
 	token-level, grid-wide visual changes (surface colors, borders, fonts).
 </Callout>
+
+## Row animations
+
+When a sort, a live value change under the current sort, a group expanding or a detail row opening moves rows,
+they animate to their new place. Scrolling never animates, and users who prefer reduced motion get instant
+changes. Animations use only transform and opacity, so they run on the GPU and cost nothing per frame.
+
+`rowAnimation` chooses how they move. Change it any time; it applies from the next change.
+
+```tsx
+<Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowAnimation={{ style: 'slide', easing: 'spring', duration: 520, stagger: 18 }} />
+```
+
+| Option     | Default    | Effect                                                                                                           |
+| ---------- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| `style`    | `'slide'`  | `'slide'`: rows glide from their old place. `'fade'`: moved rows fade in at their new place. `'none'`.           |
+| `easing`   | `'smooth'` | `'smooth'`, `'snappy'` (quick start, soft stop), `'spring'` (settles with a small overshoot), or any CSS easing. |
+| `duration` | `280`      | Milliseconds per row.                                                                                            |
+| `stagger`  | `0`        | Milliseconds between rows, top to bottom, so they cascade into place. The whole cascade is capped at 240 ms.     |
+| `on`       | all        | `{ sort, liveReorder, expand, detail }`: turn individual kinds of change off.                                    |
+
+Outside React, pass it as `rendererOptions.rowAnimation` when creating the grid and change it with
+`api.setRowAnimation(options)`. The [Realtime Dashboard](/docs/next/examples) has a Motion picker to compare styles
+on a live-sorted feed.

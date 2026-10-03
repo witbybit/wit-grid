@@ -29,6 +29,7 @@ import {
 	type CellRendererProps,
 	type StyleRule,
 	GridInitialState,
+	type RowAnimationOptions,
 } from '@eregister/wit-grid-react';
 import { Activity, BarChart3, Code2, RefreshCw, TrendingUp, Zap, ShieldCheck } from 'lucide-react';
 
@@ -551,6 +552,15 @@ interface RealtimeDashboardProps {
 	theme?: 'light' | 'dark';
 }
 
+/** Row animation styles to try on the live sort: each is a plain `rowAnimation` object. */
+const ROW_ANIMATION_PRESETS = {
+	cascade: { label: 'Cascade', options: { style: 'slide', easing: 'snappy', duration: 360, stagger: 18 } },
+	spring: { label: 'Spring', options: { style: 'slide', easing: 'spring', duration: 520 } },
+	smooth: { label: 'Smooth', options: { style: 'slide', easing: 'smooth', duration: 280 } },
+	fade: { label: 'Fade', options: { style: 'fade', duration: 320, stagger: 12 } },
+	off: { label: 'Off', options: { style: 'none' } },
+} satisfies Record<string, { label: string; options: RowAnimationOptions }>;
+
 export default function RealtimeDashboard({
 	editTrigger = 'doubleClick',
 	arrowKeyNavigationEdit = true,
@@ -580,6 +590,9 @@ export default function RealtimeDashboard({
 	const [eventLogs, setEventLogs] = useState<Array<{ id: number; time: string; msg: string; type: string }>>([]);
 	const eventLogIdRef = useRef(0);
 	const [autoFire, setAutoFire] = useState(true);
+	// Row animation: how rows move when the live sort reorders them. Changes apply from the next tick.
+	const [animationPreset, setAnimationPreset] = useState<keyof typeof ROW_ANIMATION_PRESETS>('cascade');
+	const rowAnimation = ROW_ANIMATION_PRESETS[animationPreset].options;
 	const [autoFireIntervalMs, setAutoFireIntervalMs] = useState(2000);
 	const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const [clock, setClock] = useState<string | null>(null);
@@ -1005,12 +1018,32 @@ export default function RealtimeDashboard({
 							<Zap className={`w-3 h-3 ${autoFire ? 'animate-pulse' : ''}`} />
 							{autoFire ? `Auto ${autoFireHzLabel}hz ON` : `Auto ${autoFireHzLabel}hz`}
 						</button>
+						<label
+							className={`flex items-center gap-1.5 py-1 px-2 rounded-lg text-[10px] font-bold border ${
+								isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 text-slate-300 border-slate-700/60'
+							}`}
+							title='How rows move when the live sort reorders them'
+						>
+							Motion
+							<select
+								value={animationPreset}
+								onChange={(event) => setAnimationPreset(event.target.value as keyof typeof ROW_ANIMATION_PRESETS)}
+								className='bg-transparent font-bold outline-none cursor-pointer'
+							>
+								{Object.entries(ROW_ANIMATION_PRESETS).map(([id, preset]) => (
+									<option key={id} value={id}>
+										{preset.label}
+									</option>
+								))}
+							</select>
+						</label>
 					</div>
 				</div>
 
 				<div className='flex-1 min-h-0 min-w-0'>
 					<Grid
 						rowModelType='client'
+						rowAnimation={rowAnimation}
 						rows={rows}
 						columns={columns}
 						styleRules={styleRules}

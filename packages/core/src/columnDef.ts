@@ -1,3 +1,4 @@
+import type { RowAnimationOptions } from './renderer/rowAnimation.js';
 /**
  * Column definition types, cell renderer interfaces, and path utilities.
  */
@@ -118,6 +119,8 @@ export interface DomAggregateRenderer<TRowData = unknown> {
  * concern, not a per-column one.
  */
 export interface GridRendererOptions {
+	/** How rows animate when a sort, live value change, expansion or detail moves them. Change it later with `api.setRowAnimation`. */
+	rowAnimation?: RowAnimationOptions;
 	/** Budgets for `scroll: 'live'` renderer columns. */
 	live?: {
 		/** DOM renderers: milliseconds of in-frame renderer work allowed per frame before cells show stand-in text. Default 4. */

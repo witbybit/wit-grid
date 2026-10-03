@@ -290,6 +290,7 @@ export {
 	themeToCSSVariables,
 } from './renderer/themes.js';
 export type { ThemeTokens, BuiltInThemeName } from './renderer/themes.js';
+export type { RowAnimationOptions } from './renderer/rowAnimation.js';
 export type { GridDomainVersions } from './state/GridDomainVersions.js';
 export type { GridInstrumentation, GridInstrumentationSnapshot, FrameMetrics, FallbackMetric } from './diagnostics/GridInstrumentation.js';
 export { GridMetric } from './diagnostics/GridInstrumentation.js';

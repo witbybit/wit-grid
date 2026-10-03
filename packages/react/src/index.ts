@@ -71,6 +71,7 @@ export type {
 	SelectFilterCondition,
 } from '@eregister/wit-grid-core';
 export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
+export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
 export { resolveColumnFilterDef } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
