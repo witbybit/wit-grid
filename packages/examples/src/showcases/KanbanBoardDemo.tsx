@@ -380,7 +380,7 @@ function AssigneeCell({ row }: CellRendererProps<KanbanCard>) {
 	return (
 		<div className='flex h-full items-center justify-center px-2'>
 			<div
-				className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-md ring-2 ring-slate-900'
+				className='flex h-7 w-15 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white shadow-md ring-2 ring-slate-900'
 				style={{ backgroundColor: a.color }}
 				title={a.name}
 			>
@@ -481,43 +481,52 @@ const COLUMNS: ColumnDef<KanbanCard>[] = [
 		header: 'Card',
 		width: 440,
 		minWidth: 260,
-		renderer: { kind: 'react', component: TitleCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: TitleCell, capabilities: { scroll: 'live' } },
 	},
 	{
 		field: 'status',
 		header: 'Status',
 		width: 130,
-		renderer: { kind: 'react', component: StatusCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: StatusCell, capabilities: { scroll: 'live' } },
 	},
 	{
-		field: 'assignee',
+		field: 'assignee.name',
 		header: 'Owner',
 		width: 70,
-		renderer: { kind: 'react', component: AssigneeCell, capabilities: { scroll: 'text' } },
+		renderer: {
+			kind: 'react',
+			component: AssigneeCell,
+			capabilities: {
+				scroll: 'text',
+				scrollText: (p) => {
+					return p.formattedValue;
+				},
+			},
+		},
 	},
 	{
 		field: 'progress',
 		header: '%',
 		width: 70,
-		renderer: { kind: 'react', component: ProgressCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: ProgressCell, capabilities: { scroll: 'live' } },
 	},
 	{
 		field: 'storyPoints',
 		header: 'Pts',
 		width: 60,
-		renderer: { kind: 'react', component: PointsCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: PointsCell, capabilities: { scroll: 'live' } },
 	},
 	{
 		field: 'dueDate',
 		header: 'Due',
 		width: 100,
-		renderer: { kind: 'react', component: DueDateCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: DueDateCell, capabilities: { scroll: 'live' } },
 	},
 	{
 		field: 'epic',
 		header: 'Epic',
 		width: 160,
-		renderer: { kind: 'react', component: EpicCell, capabilities: { scroll: 'text' } },
+		renderer: { kind: 'react', component: EpicCell, capabilities: { scroll: 'live' } },
 	},
 ];
 
