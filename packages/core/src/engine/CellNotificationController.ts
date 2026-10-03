@@ -180,11 +180,13 @@ export class CellNotificationController<TRowData = unknown> {
 			this.notifyRowSubscribers(rowId);
 		}
 
+		// One cache clear per changed row (clearing a row's other fields too is safe: they recompute),
+		// and per-cell subscribers only when anyone subscribed to a cell.
+		const hasCellSubscribers = this.cellSubscriptions.size > 0;
 		for (const [rowId, fields] of changes) {
-			for (const colField of fields) {
-				this.deps.data.clearValueGetterCache(rowId, colField);
-				this.notifyCellSubscribers(rowId, colField);
-			}
+			this.deps.data.clearValueGetterCache(rowId);
+			if (!hasCellSubscribers) continue;
+			for (const colField of fields) this.notifyCellSubscribers(rowId, colField);
 		}
 	}
 
