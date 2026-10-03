@@ -432,6 +432,8 @@ export type RowModelKind = 'client' | 'infinite' | 'server';
 export interface RowModel<TRowData = unknown> extends RowModelViewportAccess<TRowData> {
 	readonly kind: RowModelKind;
 	refresh(reason?: RowRefreshReason): RowModelRefreshResult;
+	/** The height every visual row has (`row.height ?? defaultRowHeight`), or null when they differ. */
+	getUniformRowHeight?(defaultRowHeight: number): number | null;
 }
 
 function hasFunctions(value: unknown, names: readonly string[]): boolean {
@@ -1078,6 +1080,9 @@ export class ClientRowModelController<TData = unknown>
 	private _hierarchyIndex: HierarchyIndex | null = null;
 	/** The incremental row index for the last full run: undefined = not built yet, null = not applicable. */
 	private _incremental: IncrementalRowIndex<TData> | null | undefined = undefined;
+	/** Cached {@link getUniformRowHeight} answer (undefined: not known) and the default it was read with. */
+	private _uniformHeight: number | null | undefined = undefined;
+	private _uniformHeightDefault = NaN;
 	/** The configuration the last full run saw; the index is only valid while it is unchanged. */
 	private _incrementalSeed: Record<string, unknown> | null = null;
 
@@ -1575,6 +1580,8 @@ export class ClientRowModelController<TData = unknown>
 			// Rows were rewritten whole (some entered, left or changed group): everything after shifts, so
 			// geometry (group and total rows are not data-row height) and the viewport are rebuilt.
 			this.runtime.bumpGlobalVersion();
+			// Entering rows take their recorded heights, if any.
+			if (Object.keys(state.rowHeights).length > 0) this._uniformHeight = undefined;
 			return {
 				changed: true,
 				reason: impact === 'filter-key' ? 'filter' : 'bulk',
@@ -1710,6 +1717,7 @@ export class ClientRowModelController<TData = unknown>
 					editable: true,
 				};
 
+				if (vr.height !== this._uniformHeight) this._uniformHeight = undefined;
 				if (compareToNode) {
 					const compare = compareToNode(node);
 					let lo = 0,
@@ -1767,6 +1775,25 @@ export class ClientRowModelController<TData = unknown>
 	public getVisualRowCount = (): number => {
 		return this.visualRows.length;
 	};
+
+	/**
+	 * Full runs reset the cache; incremental paths keep it, since the rows they add are data rows of the
+	 * default height whenever no per-row heights exist (the only case the engine asks).
+	 */
+	public getUniformRowHeight(defaultRowHeight: number): number | null {
+		if (this._uniformHeight === undefined || this._uniformHeightDefault !== defaultRowHeight) {
+			let uniform: number | null = defaultRowHeight;
+			for (const row of this.visualRows) {
+				if ((row.height ?? defaultRowHeight) !== defaultRowHeight) {
+					uniform = null;
+					break;
+				}
+			}
+			this._uniformHeight = uniform;
+			this._uniformHeightDefault = defaultRowHeight;
+		}
+		return this._uniformHeight;
+	}
 
 	public getKnownRowCount = (): number | null => {
 		return this.visualRows.length;
@@ -1949,6 +1976,7 @@ export class ClientRowModelController<TData = unknown>
 		this._roots = result.roots;
 		this._hierarchyIndex = null;
 		this._incremental = undefined;
+		this._uniformHeight = undefined;
 		this._incrementalSeed = this.captureIncrementalSeed(state);
 		this.dataRowCount = result.stats.totalDataRows;
 

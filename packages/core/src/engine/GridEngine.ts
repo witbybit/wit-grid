@@ -1339,6 +1339,14 @@ export class GridEngine<TRowData = unknown> {
 		let count = rowModel.getVisualRowCount();
 		if (state.loading && count === 0) {
 			count = state.loadingSkeletonCount ?? 15;
+		} else if (fromIndex === 0 && toIndex === undefined && isEmptyRecord(rowHeightsRecord)) {
+			// Every row the default height (no per-row heights, uniform group/total rows): a row added or
+			// removed only resizes geometry instead of re-reading every row.
+			this.geometry.setReferenceHeight(defaultRowHeight);
+			if (rowModel.getUniformRowHeight?.(defaultRowHeight) === defaultRowHeight) {
+				const resized = this.geometry.resizeUniformRows(count, defaultRowHeight);
+				if (resized !== null) return resized;
+			}
 		}
 		return this.geometry.syncRows(
 			count,
@@ -1743,4 +1751,9 @@ function withNoTransactionChanges<TRowData>(
 		rows: EMPTY_ROW_NODE_TRANSACTION,
 		cells: { committed: [], rejected: cells.map((cell) => ({ cell, reason })) },
 	} as GridTransactionResult<TRowData>;
+}
+
+function isEmptyRecord(record: Record<string, unknown>): boolean {
+	for (const _ in record) return false;
+	return true;
 }
