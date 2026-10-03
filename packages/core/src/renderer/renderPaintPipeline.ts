@@ -237,7 +237,8 @@ export class RenderPaintPipeline<TRowData = unknown> {
 	 */
 	private applyPendingScrollAnchor(notScrolling: boolean): void {
 		const scrollViewport = this.deps.viewportRenderer.scrollViewport;
-		if (!scrollViewport) return;
+		// Reading scrollTop after this frame's DOM writes forces a layout: only when a correction waits.
+		if (!scrollViewport || !this.deps.engine.viewport.hasPendingScrollAnchor()) return;
 		const currentTop = scrollViewport.scrollTop;
 		const delta = this.deps.engine.viewport.consumeScrollAnchor(currentTop);
 		if (!notScrolling || delta === 0 || currentTop <= 0) return;
