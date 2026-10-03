@@ -8,6 +8,7 @@ export type {
 	ServerSideGetRowsResult,
 	ServerSideStoreSnapshot,
 } from './types.js';
+export { GroupToggle, GroupCount } from './GroupParts.js';
 export { useGridApi, useGridSelector, useGridKeySelector } from './hooks.js';
 export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelDef } from './sidebar/GridSidebar.js';
 export {
@@ -69,6 +70,7 @@ export type {
 	FilterSurface,
 	SelectFilterCondition,
 } from '@eregister/wit-grid-core';
+export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
 export { resolveColumnFilterDef } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';

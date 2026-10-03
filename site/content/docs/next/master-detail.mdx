@@ -97,7 +97,7 @@ Set `detail.height: 'auto'` to size each detail row to its content: the grid mea
 Instead of the adapter's `detailRowRenderer`, `detail.renderer` takes a renderer spec: `{ kind: 'dom', renderer }`
 is mounted by the grid itself, synchronously, with `{ row, masterData, api }` — `mount(container, params)` returns
 `{ update?, destroy? }` — and `{ kind: 'react', component }` is rendered by the React adapter with
-`{ visualRow, api }`. `grouping.rowRenderer` does the same for full-width group rows (`grouping.display: 'row'`).
+`{ visualRow, api }`. `grouping.rowRenderer` does the same for full-width group rows (`grouping.display: 'row'`), but with a `GroupRenderContext` instead (see [Row grouping](/docs/next/grouping)).
 
 Open and close detail rows programmatically with `api.setDetailOpen(rowId, open)` or `api.toggleDetailOpen(rowId)`,
 and check state with `api.isDetailOpen(rowId)`. `detailRowRenderer` receives `{ visualRow, api }` where `api` is the **master**

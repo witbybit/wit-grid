@@ -116,6 +116,8 @@ export interface BindAllHierarchyRowCellsRequest<TRowData = unknown> {
 	columnTopology: CompiledColumnTopology;
 	isScrollFrameActive: boolean;
 	state: InternalGridState<TRowData>;
+	/** The row is the stuck copy of a sticky group header (what `GroupRenderContext.isStuck` reports). */
+	isStuck?: boolean;
 }
 
 export interface BindAllLoadingCellsRequest<TRowData = unknown> {
@@ -883,7 +885,7 @@ function bindHierarchyRowCell<TRowData>(
 	if (!col || !cellSlot) return;
 	const width = plan.colWidths[colIndex];
 	if (isHierarchyColumn(col)) {
-		bindHierarchyCell(deps, { cellSlot, row, rowIndex, colIndex, col, lane, left, width, state, isScrollFrameActive });
+		bindHierarchyCell(deps, { cellSlot, row, rowIndex, colIndex, col, lane, left, width, state, isScrollFrameActive, isStuck: request.isStuck });
 		return;
 	}
 	if (isScrollFrameActive) deps.onScrollCellVisited();
@@ -906,20 +908,20 @@ function bindHierarchyRowCell<TRowData>(
 	const spec = col.aggregateRenderer;
 	if (spec && value != null && !cellSlot.directText) {
 		// The column draws its aggregate itself: mounted here, updated in place, destroyed when the
-		// cell shows anything else (see CellSlot.releaseAggregateMount).
+		// cell shows anything else (see CellSlot.releaseContentMount).
 		const params = { value, formattedValue: text, row, col };
-		const mounted = cellSlot.aggregateMount;
+		const mounted = cellSlot.contentMount;
 		if (mounted && mounted.renderer === spec.renderer && mounted.handle.update) {
 			if (mounted.rowId !== row.id || !Object.is(mounted.value, value)) mounted.handle.update(params as never);
 			mounted.rowId = row.id;
 			mounted.value = value;
 		} else if (!mounted || mounted.renderer !== spec.renderer || mounted.rowId !== row.id || !Object.is(mounted.value, value)) {
-			cellSlot.releaseAggregateMount();
+			cellSlot.releaseContentMount();
 			cellSlot.clearText();
 			cellSlot.contentElement.textContent = '';
 			try {
 				const handle = spec.renderer.mount(cellSlot.contentElement, params) ?? {};
-				cellSlot.aggregateMount = {
+				cellSlot.contentMount = {
 					renderer: spec.renderer,
 					handle: handle as { update?(params: never): void; destroy?(): void },
 					rowId: row.id,
@@ -936,7 +938,7 @@ function bindHierarchyRowCell<TRowData>(
 		if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
 		return;
 	}
-	cellSlot.releaseAggregateMount();
+	cellSlot.releaseContentMount();
 	const className = `${buildCellPinClass(lane)} og-cell-aggregate${text === '' ? '' : ' og-cell-aggregate-value'}${focusClass}`;
 	const didWrite = cellSlot.update(
 		colIndex,

@@ -267,20 +267,22 @@ export class CellSlot<TRowData = unknown> {
 	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
 	 */
 	public hasAggregateText = false;
-	/** An aggregate renderer mounted in this cell (group / total rows), and what it last drew. */
+	/** A renderer mounted in this cell by core (an aggregate renderer, or the hierarchy column's renderer), and what it last drew. */
 	// Typed loosely: only the binder, which knows the row type, calls into it.
-	public aggregateMount: {
+	public contentMount: {
 		renderer: unknown;
 		handle: { update?(params: never): void; destroy?(): void };
 		rowId: string;
 		value: unknown;
+		/** Hierarchy cell renderers: the context last drawn. */
+		context?: unknown;
 	} | null = null;
 
-	/** Destroys a mounted aggregate renderer and clears its content. */
-	public releaseAggregateMount(): void {
-		const mount = this.aggregateMount;
+	/** Destroys the mounted renderer and clears its content. */
+	public releaseContentMount(): void {
+		const mount = this.contentMount;
 		if (!mount) return;
-		this.aggregateMount = null;
+		this.contentMount = null;
 		try {
 			mount.handle.destroy?.();
 		} finally {
@@ -718,7 +720,7 @@ export class CellSlot<TRowData = unknown> {
 
 	public unbindCold(): void {
 		this.detachCellCtrl();
-		this.releaseAggregateMount();
+		this.releaseContentMount();
 		if (this.renderer !== null) {
 			this.renderer.destroy();
 			this.renderer = null;

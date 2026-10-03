@@ -154,6 +154,8 @@ export class PortalMountManager<TRowData = unknown> {
 		[],
 	];
 	private mountedRowVisualRows = new Map<string, GridRowContentMount<TRowData>['visualRow']>();
+	/** Whether each mounted group row was drawn stuck: the row alone does not change when its header sticks. */
+	private mountedRowStuck = new Map<string, boolean>();
 	private mountedMenus = new Map<string, HTMLElement | undefined>();
 	private cellReleaseTransactionDepth = 0;
 	private deferredRowMounts = new Map<string, GridRowContentMount<TRowData>>();
@@ -623,8 +625,15 @@ export class PortalMountManager<TRowData = unknown> {
 	public mountRow(mount: GridRowContentMount<TRowData>): void {
 		const existingContainer = this.mountedRows.get(mount.rowKey);
 		const existingVisualRow = this.mountedRowVisualRows.get(mount.rowKey);
-		if (existingContainer === mount.container && isVisualRowEqual(existingVisualRow, mount.visualRow)) return;
+		const stuck = mount.context?.isStuck === true;
+		if (
+			existingContainer === mount.container &&
+			isVisualRowEqual(existingVisualRow, mount.visualRow) &&
+			(this.mountedRowStuck.get(mount.rowKey) ?? false) === stuck
+		)
+			return;
 		this.mountedRows.set(mount.rowKey, mount.container);
+		this.mountedRowStuck.set(mount.rowKey, stuck);
 		this.mountedRowVisualRows.set(mount.rowKey, mount.visualRow);
 		// Full-width rows are few per frame, so they mount during scroll too (bounded per frame)
 		// rather than sitting blank until scroll settles.
@@ -650,6 +659,7 @@ export class PortalMountManager<TRowData = unknown> {
 		if (unmount.container && existingContainer && existingContainer !== unmount.container) return;
 		this.mountedRows.delete(unmount.rowKey);
 		this.mountedRowVisualRows.delete(unmount.rowKey);
+		this.mountedRowStuck.delete(unmount.rowKey);
 		if (this.scrolling) {
 			this.stats.releasesDuringScroll++;
 			this.stats.deferredDuringScroll++;
@@ -717,6 +727,7 @@ export class PortalMountManager<TRowData = unknown> {
 		this.cells.clear();
 		this.mountedRows.clear();
 		this.mountedRowVisualRows.clear();
+		this.mountedRowStuck.clear();
 		this.mountedMenus.clear();
 	}
 

@@ -23,6 +23,8 @@ interface StickySectionHost<TRowData> {
 	/** The header copy: `position: sticky` inside the section, so the browser sticks and pushes it. */
 	header: HTMLDivElement;
 	groupId: string;
+	/** The header is stuck (scroll-derived; what the stuck class and `GroupRenderContext.isStuck` follow). */
+	stuck: boolean;
 	/** Marks the host as used by the current sync pass. */
 	seen: number;
 	/** The header's cells / content must be (re)written on this sync. */
@@ -210,6 +212,11 @@ export class StickyGroupRenderer<TRowData = unknown> {
 		// Stuck: the header's natural top is above where it sticks. Scroll-derived, written only when it flips.
 		const stuck = item.top < scrollTop + item.stickyOffset;
 		const className = this.getHostClassName(item.depth, shadow, stuck);
+		// Custom renderers draw the stuck state themselves (`GroupRenderContext.isStuck`): a flip rebinds the header.
+		if (host.stuck !== stuck) {
+			host.stuck = stuck;
+			if (this.rendersStuckState()) host.needsBind = true;
+		}
 		if (host.className !== className) {
 			host.className = className;
 			el.className = className;
@@ -260,6 +267,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				columnTopology: plan.columnTopology,
 				isScrollFrameActive: false,
 				state: this.engine.stateManager.getState(),
+				isStuck: host.stuck,
 			});
 		} else {
 			el.dataset.rowKey = rowKey;
@@ -271,9 +279,15 @@ export class StickyGroupRenderer<TRowData = unknown> {
 			}
 			if (host.content.parentElement !== el) el.appendChild(host.content);
 			host.content.dataset.rowKey = rowKey;
-			this.fullWidth.mountContent(host.content, rowKey, visualRow);
+			this.fullWidth.mountContent(host.content, rowKey, visualRow, host.stuck);
 			this.portalMountManager.flushDeferredRowMount(rowKey);
 		}
+	}
+
+	/** Whether a configured renderer can draw differently while stuck: only then does a flip cost a rebind. */
+	private rendersStuckState(): boolean {
+		const state = this.engine.stateManager.getState();
+		return state.grouping?.display === 'row' ? !!state.grouping.rowRenderer : !!(state.hierarchyColumn && state.hierarchyColumn.renderer);
 	}
 
 	private acquireHost(groupId: string): StickySectionHost<TRowData> {
@@ -295,6 +309,7 @@ export class StickyGroupRenderer<TRowData = unknown> {
 			section,
 			header,
 			groupId: '',
+			stuck: false,
 			seen: 0,
 			needsBind: true,
 			rowKey: '',

@@ -1,5 +1,6 @@
 import type { DescendantSelectionState } from '../rows/hierarchyIndex.js';
 import type { HierarchyCellModel } from '../rows/hierarchyCellModel.js';
+import type { GroupRenderContext } from '../rows/hierarchyConfig.js';
 
 export { resolveHierarchyCellModel, type HierarchyCellModel, type HierarchyCellDeps, type HierarchyCellInputs } from '../rows/hierarchyCellModel.js';
 
@@ -47,7 +48,11 @@ function createParts(content: HTMLElement): HierarchyCellParts {
  * keep on the cell. Cheap enough for every scroll frame: at most a handful of attribute and text
  * writes, no allocation after the first bind.
  */
-export function writeHierarchyCell(content: HTMLElement, existing: HierarchyCellParts | null, model: HierarchyCellModel): HierarchyCellParts {
+export function writeHierarchyCell(
+	content: HTMLElement,
+	existing: HierarchyCellParts | null,
+	model: Omit<HierarchyCellModel, 'ctx'>
+): HierarchyCellParts {
 	const parts = existing && existing.root.parentNode === content ? existing : createParts(content);
 	const last = parts.last;
 
@@ -103,4 +108,24 @@ export function writeHierarchyCell(content: HTMLElement, existing: HierarchyCell
 		last.count = model.count;
 	}
 	return parts;
+}
+
+/**
+ * The built-in expand/collapse toggle, for a custom group renderer: the same element and classes the
+ * hierarchy cell uses (a rotating chevron when the row has children, an empty slot that keeps labels
+ * aligned when it has none). Clicks are handled by the grid, so no listener is needed; call it again
+ * from `update` to redraw.
+ */
+export function renderGroupToggle(ctx: Pick<GroupRenderContext<never>, 'id' | 'hasChildren' | 'expanded'>): HTMLSpanElement {
+	const toggle = document.createElement('span');
+	if (!ctx.hasChildren) {
+		toggle.className = 'og-hierarchy-toggle og-hierarchy-toggle-none';
+		return toggle;
+	}
+	toggle.className = `og-hierarchy-toggle og-hierarchy-toggle-${ctx.expanded ? 'open' : 'closed'}`;
+	toggle.dataset.ogHierarchyToggle = ctx.id;
+	toggle.setAttribute('role', 'button');
+	toggle.setAttribute('aria-expanded', String(ctx.expanded));
+	toggle.setAttribute('aria-label', ctx.expanded ? 'Collapse' : 'Expand');
+	return toggle;
 }
