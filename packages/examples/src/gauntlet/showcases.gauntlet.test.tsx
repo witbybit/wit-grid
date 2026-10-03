@@ -15,7 +15,10 @@ import RealtimeGroupingDemo from '../showcases/RealtimeGroupingDemo.js';
 import RowDragDemo from '../showcases/RowDragDemo.js';
 
 const SHOWCASES: Record<string, ComponentType<Record<string, unknown>>> = {
-	'realtime-dashboard': RealtimeDashboard as ComponentType<Record<string, unknown>>,
+	// jsdom is slow to repaint, so the gauntlet runs a small universe on a slow trickle of ticks.
+	'realtime-dashboard': ((props: Record<string, unknown>) => <RealtimeDashboard {...props} rowCount={400} rate={5} />) as ComponentType<
+		Record<string, unknown>
+	>,
 	'realtime-grouping': RealtimeGroupingDemo as ComponentType<Record<string, unknown>>,
 	'native-cell-types': NativeCellTypesDemo as ComponentType<Record<string, unknown>>,
 	'data-integrity': DataIntegrityLab as ComponentType<Record<string, unknown>>,

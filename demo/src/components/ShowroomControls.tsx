@@ -120,8 +120,8 @@ export function SortFilterPanel({
 						onChange={(e) => setSortField(e.target.value)}
 						className='w-full bg-slate-950 border border-slate-850 rounded-lg px-2 py-1.5 text-[10px] text-slate-200 outline-none focus:border-purple-500 transition-all font-bold cursor-pointer'
 					>
-						{cols.map((column) => (
-							<option key={column.field} value={column.field}>
+						{cols.map((column, index) => (
+							<option key={`${column.field}:${index}`} value={column.field}>
 								{column.header}
 							</option>
 						))}
@@ -235,8 +235,8 @@ export function ColumnOrderPanel({ activeApi }: ColumnOrderPanelProps) {
 						onChange={(e) => setSelectedField(e.target.value)}
 						className='w-full bg-slate-950 border border-slate-850 rounded-lg px-2 py-1.5 text-[10px] text-slate-200 outline-none focus:border-purple-500 transition-all font-bold cursor-pointer'
 					>
-						{columns.map((column) => (
-							<option key={column.field} value={column.field}>
+						{columns.map((column, index) => (
+							<option key={`${column.field}:${index}`} value={column.field}>
 								{column.header}
 							</option>
 						))}
