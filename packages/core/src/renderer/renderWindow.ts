@@ -708,12 +708,7 @@ export function diffRenderWindow(prev: RenderWindow | null, next: RenderWindow, 
 			}
 		}
 
-		d.hasChanges =
-			rowsEntered.length > 0 ||
-			rowsExited.length > 0 ||
-			colsEntered.length > 0 ||
-			colsExited.length > 0 ||
-			((next.pinTopRows > 0 || next.pinBottomRows > 0) && prev.scrollTop !== next.scrollTop);
+		d.hasChanges = rowsEntered.length > 0 || rowsExited.length > 0 || colsEntered.length > 0 || colsExited.length > 0;
 
 		return d;
 	}
@@ -747,8 +742,7 @@ export function diffRenderWindow(prev: RenderWindow | null, next: RenderWindow, 
 		prev.pinLeftCols !== next.pinLeftCols ||
 		prev.pinRightCols !== next.pinRightCols ||
 		prev.pinTopRows !== next.pinTopRows ||
-		prev.pinBottomRows !== next.pinBottomRows ||
-		((next.pinTopRows > 0 || next.pinBottomRows > 0) && prev.scrollTop !== next.scrollTop);
+		prev.pinBottomRows !== next.pinBottomRows;
 
 	return d;
 }

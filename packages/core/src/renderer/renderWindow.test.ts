@@ -88,12 +88,12 @@ describe('RenderWindow & ViewportDelta calculations', () => {
 		expect(delta.hasChanges).toBe(false);
 	});
 
-	it('treats pinned row scroll offset changes as geometry changes', () => {
+	it('does not treat a scroll offset change as a geometry change (pinned rows ride sticky bands)', () => {
 		const delta = diffRenderWindow(baseWindow, { ...baseWindow, scrollTop: baseWindow.scrollTop + 20 });
 
 		expect(delta.rowsEntered).toEqual([]);
 		expect(delta.rowsExited).toEqual([]);
-		expect(delta.hasChanges).toBe(true);
+		expect(delta.hasChanges).toBe(false);
 	});
 
 	it('preserves pinned rows when max rendered rows clamps the center range', () => {

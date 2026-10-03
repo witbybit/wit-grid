@@ -751,6 +751,26 @@ export const CORE_STYLES = `
     pointer-events: none;
   }
 
+  /*
+   * Viewport-pinned rows: zero-height sticky bands, so the compositor keeps pinned rows stuck with
+   * no per-frame JS. Painted above body rows (25, matching the pinned-row z-index) and below the
+   * sticky group layer (29) and header (30).
+   */
+  .og-layer-pinned-top,
+  .og-layer-pinned-bottom {
+    position: sticky;
+    height: 0;
+    z-index: 25;
+  }
+
+  .og-layer-pinned-top {
+    top: 0;
+  }
+
+  .og-layer-pinned-bottom {
+    bottom: 0;
+  }
+
   .og-sticky-group-row-host {
     pointer-events: auto;
   }
