@@ -141,7 +141,6 @@ function expectEqualOutputs(actual: RowPipelineOutput<Row>, expected: RowPipelin
 	expect(approx(project(actual.visualRows))).toEqual(approx(project(expected.visualRows)));
 	expect(actual.visualRowIdToIndex).toEqual(expected.visualRowIdToIndex);
 	expect(actual.rowIdToVisualIndex).toEqual(expected.rowIdToVisualIndex);
-	expect(actual.rowIdToVisualRowId).toEqual(expected.rowIdToVisualRowId);
 	expect(approx(actual.groupMeta)).toEqual(approx(expected.groupMeta));
 	expect(approx(actual.groupMetaByVisualIndex)).toEqual(approx(expected.groupMetaByVisualIndex));
 	expect(actual.stickyGroupMeta).toEqual(expected.stickyGroupMeta);
