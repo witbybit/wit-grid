@@ -1374,13 +1374,18 @@ export class ClientRowModelController<TData = unknown>
 
 		// Collect VisualRow objects and old indices for each changed node
 		const toRelocate: Array<{ node: RowNode<TData>; vr: VisualRow<TData>; oldIdx: number }> = [];
+		const seen = new Set<RowNode<TData>>();
 		for (const node of changedNodes) {
+			// A batch may update one row more than once; it moves once.
+			if (seen.has(node)) continue;
+			seen.add(node);
 			const oldIdx = this.nodeIndex(node);
 			if (oldIdx === undefined) continue; // was filtered out; stays filtered (sort-key can't change filter membership)
 			const vr = this.visualRows[oldIdx];
 			if (vr?.kind === 'data') toRelocate.push({ node, vr, oldIdx });
 		}
 		if (toRelocate.length === 0) return 0;
+		if (toRelocate.length > ClientRowModelController.SPLICE_RELOCATE_MAX) return this.mergeRelocate(toRelocate, compareToNode);
 
 		// Remove in descending index order so prior splices don't shift remaining indices.
 		// After sort, toRelocate[last].oldIdx is the smallest (earliest) affected position.
@@ -1420,6 +1425,53 @@ export class ClientRowModelController<TData = unknown>
 		const changedStartIndex = Math.min(earliestRemovedIndex, earliestInsertedIndex);
 		this.stampRowPositions(changedStartIndex);
 		return changedStartIndex;
+	}
+
+	/**
+	 * Many moved rows: one pass instead of two O(n) splices per row. The moved rows are sorted, each
+	 * binary-searches its place among the rows that stay, and the list is rewritten once from the
+	 * first changed index.
+	 */
+	private mergeRelocate(
+		toRelocate: Array<{ node: RowNode<TData>; vr: VisualRow<TData>; oldIdx: number }>,
+		compareToNode: (a: RowNode<TData>) => (b: RowNode<TData>) => number
+	): number {
+		const rows = this.visualRows;
+		const moving = new Set<VisualRow<TData>>();
+		for (const item of toRelocate) moving.add(item.vr);
+		const rest: VisualRow<TData>[] = [];
+		for (const row of rows) if (!moving.has(row)) rest.push(row);
+		const movers = toRelocate.map((item) => ({ item, compare: compareToNode(item.node) }));
+		movers.sort((a, b) => a.compare(b.item.node));
+		// Same search as the splice path: before the first data row the mover sorts at or before.
+		const places = movers.map(({ compare }) => {
+			let lo = 0;
+			let hi = rest.length;
+			while (lo < hi) {
+				const mid = (lo + hi) >>> 1;
+				const midVR = rest[mid];
+				if (midVR.kind === 'data' && compare(midVR.node) <= 0) hi = mid;
+				else lo = mid + 1;
+			}
+			return lo;
+		});
+		let start = rows.length;
+		let out = 0;
+		let r = 0;
+		const write = (row: VisualRow<TData>) => {
+			if (rows[out] !== row) {
+				if (out < start) start = out;
+				rows[out] = row;
+			}
+			out++;
+		};
+		for (let m = 0; m < movers.length; m++) {
+			while (r < places[m]) write(rest[r++]);
+			write(movers[m].item.vr);
+		}
+		while (r < rest.length) write(rest[r++]);
+		if (start < rows.length) this.stampRowPositions(start);
+		return start === rows.length ? 0 : start;
 	}
 
 	public replaceRowsStructurally(rows: readonly TData[]): RowModelWriteResult<TData> {
@@ -1695,6 +1747,8 @@ export class ClientRowModelController<TData = unknown>
 	 * individual array splices + map rebuilds outperform a full O(N log N) sort.
 	 */
 	private static readonly INCREMENTAL_TX_LIMIT = 100;
+	/** Above this many moved rows a live sort reorder merges in one pass instead of splicing per row. */
+	private static readonly SPLICE_RELOCATE_MAX = 16;
 
 	/**
 	 * Attempts to apply structural row mutations (adds/removes) incrementally on flat grids.
