@@ -16,6 +16,8 @@ type LeafNode<TData> = Extract<RowTreeNode<TData>, { kind: 'data' }>;
 /** Above this many changed rows (or this share of all rows) a full pipeline run is cheaper. */
 export const INCREMENTAL_MIN_ROW_LIMIT = 2000;
 export const INCREMENTAL_ROW_SHARE_LIMIT = 0.05;
+/** A group's column is recomputed exactly after this many deltas, bounding float drift. */
+export const DRIFT_RECOMPUTE_EVERY = 256;
 
 const BUILT_IN_FUNCS = new Set<string>([...STAT_FUNCS, 'distinctCount']);
 /** Key for the grand total in the distinct-value caches. */
@@ -88,6 +90,8 @@ export class IncrementalRowIndex<TData> {
 	private readonly leafOf = new Map<string, { leaf: LeafNode<TData>; parent: GroupNode<TData> }>();
 	private readonly parentOf = new Map<GroupNode<TData>, GroupNode<TData> | null>();
 	private readonly statsCache = new Map<GroupNode<TData>, Map<string, FieldStats>>();
+	/** Deltas applied per group and column since its last exact recompute. */
+	private readonly deltaCounts = new Map<GroupNode<TData>, Map<string, number>>();
 	private readonly distinctCache = new Map<GroupNode<TData> | typeof GRAND, Map<string, Map<unknown, number>>>();
 
 	private constructor(config: IncrementalIndexConfig<TData>) {
@@ -218,20 +222,53 @@ export class IncrementalRowIndex<TData> {
 			}
 		}
 
-		// 2. Stats of the lowest groups: each changed column is recomputed from the group's leaves, once
-		// per batch, in the same order the full run folds them, so results are bit-identical to a full
-		// rebuild (float sums by delta drift in the last digits). first/last also follow a reorder.
+		// 2. Stats of the lowest groups. sum/avg/count/min/max move by delta; a column is recomputed
+		// from the group's leaves when a delta cannot be exact (the removed value was the min/max,
+		// first/last after an edit or reorder) and every DRIFT_RECOMPUTE_EVERY deltas, so float error
+		// from deltas stays bounded (~1e-15 relative) instead of accumulating.
 		const dirty = new Set<GroupNode<TData>>();
 		for (const [group, leaves] of touched) {
 			dirty.add(group);
 			const cached = this.statsCache.get(group);
 			if (!cached) continue;
-			const changedCols = new Set<string>();
-			for (const item of leaves.values()) for (const change of item.changes) changedCols.add(change.colId);
 			for (const colId of this.statCols) {
-				if (!cached.has(colId)) continue;
-				if (changedCols.has(colId) || (this.firstLastCols.has(colId) && reordered.has(group)))
-					cached.set(colId, this.statsFromLeaves(group, colId));
+				const stats = cached.get(colId);
+				if (!stats) continue;
+				let recompute = this.firstLastCols.has(colId) && reordered.has(group);
+				let deltas = 0;
+				for (const item of leaves.values()) {
+					for (const change of item.changes) {
+						if (change.colId !== colId) continue;
+						deltas++;
+						if (this.firstLastCols.has(colId)) recompute = true;
+						const { oldValue, newValue } = change;
+						if (typeof oldValue === 'number' && !isNaN(oldValue)) {
+							stats.numericCount--;
+							stats.sum -= oldValue;
+							if (this.minMaxCols.has(colId) && (oldValue === stats.min || oldValue === stats.max)) recompute = true;
+						}
+						if (typeof newValue === 'number' && !isNaN(newValue)) {
+							stats.numericCount++;
+							stats.sum += newValue;
+							if (newValue < stats.min) stats.min = newValue;
+							if (newValue > stats.max) stats.max = newValue;
+						}
+					}
+				}
+				if (deltas > 0) {
+					const key = colId;
+					const counts = this.deltaCounts.get(group) ?? new Map<string, number>();
+					this.deltaCounts.set(group, counts);
+					const total = (counts.get(key) ?? 0) + deltas;
+					if (total >= DRIFT_RECOMPUTE_EVERY) recompute = true;
+					counts.set(key, recompute ? 0 : total);
+				}
+				if (recompute) cached.set(colId, this.statsFromLeaves(group, colId));
+				else if (stats.numericCount === 0) {
+					stats.sum = 0;
+					stats.min = Infinity;
+					stats.max = -Infinity;
+				}
 			}
 		}
 
