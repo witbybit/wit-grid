@@ -2293,6 +2293,33 @@ describe('explicit React entrypoints', () => {
 		});
 	});
 
+	it('does not warn when initial-only props are new objects or functions with the same content (inline props)', async () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const ready = vi.fn();
+		const renderInline = () => (
+			<div style={{ width: 400, height: 300 }}>
+				<Grid
+					rowModelType='client'
+					rows={[{ id: '1', name: 'Alice' }]}
+					columns={[{ field: 'name', header: 'Name', width: 100 }]}
+					getRowId={(row: TestRow) => row.id}
+					enableNavigation={false}
+					initialState={{ detail: { height: 120, isMaster: (row: TestRow) => row.id === '1' } }}
+					rendererOptions={{ rowAnimation: { style: 'fade' } }}
+					onGridReady={(event) => ready(event)}
+				/>
+			</div>
+		);
+		const { rerender } = render(renderInline());
+		await waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
+		rerender(renderInline());
+		rerender(renderInline());
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(warnSpy.mock.calls.filter(([message]) => String(message).includes('initial-only'))).toEqual([]);
+		expect(ready).toHaveBeenCalledTimes(1);
+		warnSpy.mockRestore();
+	});
+
 	it('warns when initial-only Grid props change after mount', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const onGridReady = vi.fn();
