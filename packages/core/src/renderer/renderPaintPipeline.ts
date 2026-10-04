@@ -65,6 +65,9 @@ export interface RenderPaintPipelineDeps<TRowData = unknown> {
  * are the scroll pipeline's; frame timing is the FrameCoordinator's.
  */
 export class RenderPaintPipeline<TRowData = unknown> {
+	/** The sort and filter models the headers last showed (see dispatch). */
+	private headerSortModel: unknown = undefined;
+	private headerFilterModel: unknown = undefined;
 	private unsubscribers: Array<() => void> = [];
 	/** A layout transition armed by a structural change, played once rows hold their new positions. */
 	private pendingTransition = false;
@@ -292,7 +295,12 @@ export class RenderPaintPipeline<TRowData = unknown> {
 		// The sticky header copies repeat group rows' cells, so a row or cell repaint rewrites them too.
 		if (frame.rows.size > 0 || cellCount > 0 || frame.columns.size > 0) this.refreshStickyGroups();
 
-		if (frame.headers) {
+		// Headers show the sort and filter state. An async row model (infinite, server) reloads after a
+		// sort without a header invalidation, so any frame repaints them once those models moved.
+		const headerState = this.deps.engine.stateManager.getState();
+		if (frame.headers || headerState.sortModel !== this.headerSortModel || headerState.filterModel !== this.headerFilterModel) {
+			this.headerSortModel = headerState.sortModel;
+			this.headerFilterModel = headerState.filterModel;
 			stats.headerPaints++;
 			this.deps.headerRenderer.sync(frame);
 		}
@@ -336,6 +344,8 @@ export class RenderPaintPipeline<TRowData = unknown> {
 			this.deps.layoutTransition.beginAnimation();
 		}
 		this.deps.headerRenderer.repaintHeaders(layoutPlan);
+		this.headerSortModel = state.sortModel;
+		this.headerFilterModel = state.filterModel;
 		this.deps.floatingFilterRenderer.repaint(layoutPlan);
 		this.deps.overlayRenderer.repaintOverlay();
 		this.deps.rowRenderer.syncInteractionAccessibility(state);
