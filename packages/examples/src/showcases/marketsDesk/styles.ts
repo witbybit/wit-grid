@@ -106,6 +106,7 @@ export const DESK_CSS = `
 .md-grp-label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 64px; flex: 0 1 auto; }
 .md-grp-pct { min-width: 44px; text-align: right; }
 @container (max-width: 320px) { .md-grp-pct { display: none; } }
+@container (max-width: 250px) { .md-grp-bar { display: none; } }
 .md-grp-count { font-size: 10px; color: var(--md-muted); white-space: nowrap; }
 .md-grp-pnl { font: 700 11px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
 .md-grp-pnl[data-dir='up'] { color: var(--md-up); }
