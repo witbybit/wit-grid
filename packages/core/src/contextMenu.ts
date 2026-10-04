@@ -400,7 +400,8 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 		if (!bounds) return;
 
 		const updates: { rowId: string; colField: string; value: unknown }[] = [];
-		const columns = params.api.getStateSnapshot().columns;
+		// Selection bounds index the displayed columns (hidden and reordered columns excluded).
+		const columns = this.runtime.getDisplayedColumns();
 		for (let r = bounds.minRow; r <= bounds.maxRow; r++) {
 			const visualRow = this.runtime.getVisualRow(r);
 			if (visualRow?.kind !== 'data') continue;
@@ -408,6 +409,7 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 			for (let c = bounds.minCol; c <= bounds.maxCol; c++) {
 				const col = columns[c];
 				if (!col) continue;
+				if (this.runtime.can && !this.runtime.can('edit', { rowId, colField: col.field }).allowed) continue;
 				updates.push({ rowId, colField: col.field, value: '' });
 			}
 		}

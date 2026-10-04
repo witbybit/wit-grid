@@ -1114,6 +1114,13 @@ export class GridEngine<TRowData = unknown> {
 	public pasteFromClipboard(): Promise<void> {
 		return this.clipboard.pasteFromClipboard();
 	}
+	/** A native copy/cut event: the selection as TSV into its data (cut also clears it). False when nothing was copied. */
+	public writeSelectionToClipboard(data: DataTransfer, cut: boolean): boolean {
+		return this.clipboard.writeSelectionToClipboard(data, cut);
+	}
+	public pasteText(text: string): Promise<void> {
+		return this.clipboard.pasteText(text);
+	}
 	public copyRange(minRow: number, maxRow: number, minCol: number, maxCol: number): Promise<void> {
 		return this.clipboard.copyRange(minRow, maxRow, minCol, maxCol);
 	}

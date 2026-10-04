@@ -25,6 +25,8 @@ export interface GridInteractionCommandPort {
 	deselectRows(rowIds: string[]): void;
 	copySelectedRange(): Promise<void>;
 	pasteFromClipboard(): Promise<void>;
+	writeSelectionToClipboard(data: DataTransfer, cut: boolean): boolean;
+	pasteText(text: string): Promise<void>;
 	scrollToCell(rowId: string, colField: string): void;
 	scrollToRow(rowId: string): void;
 	startEditing(rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api'): void;
@@ -36,6 +38,7 @@ export interface GridInteractionCommandPort {
 
 export type GridInteractionInputCommand =
 	| { kind: 'key-down'; event: KeyboardEvent }
+	| { kind: 'clipboard'; event: ClipboardEvent }
 	| { kind: 'mouse-down-cell'; pointer: GridCellPointer; event: MouseEvent }
 	| { kind: 'cell-click'; pointer: GridCellPointer; event: MouseEvent }
 	| { kind: 'cell-enter'; pointer: GridCellPointer }
@@ -81,6 +84,10 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 			deselectRows: (rowIds) => this.runtime.deselectRows(rowIds),
 			copySelectedRange: () => this.runtime.copySelectedRange(),
 			pasteFromClipboard: () => this.runtime.pasteFromClipboard(),
+			// A plugin runtime has no event-based clipboard: the browser keeps its default copy/cut, and a
+			// paste goes through the clipboard read.
+			writeSelectionToClipboard: () => false,
+			pasteText: () => this.runtime.pasteFromClipboard(),
 			scrollToCell: (rowId, colField) => this.runtime.scrollToCell(rowId, colField),
 			scrollToRow: (rowId) => this.runtime.scrollToRow(rowId),
 			startEditing: (rowId, colFieldOrInstanceId, source) => this.runtime.startEditing(rowId, colFieldOrInstanceId, source),
@@ -101,6 +108,9 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		switch (command.kind) {
 			case 'key-down':
 				this.handleKeyDown(command.event);
+				return;
+			case 'clipboard':
+				this.handleClipboard(command.event);
 				return;
 			case 'mouse-down-cell':
 				this.handleMouseDown(command.pointer, command.event);
@@ -354,6 +364,22 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		return true;
 	}
 
+	/** Native copy / cut / paste while the grid is active and not editing a cell. */
+	private handleClipboard(event: ClipboardEvent): void {
+		const state = this.runtime.getStateSnapshot();
+		const interaction = readInteractionState(state);
+		const active = interaction.focus.cell;
+		if (!active || this.isEditingPointer(active, interaction.activeEdit.active) || !event.clipboardData) return;
+		if (event.type === 'paste') {
+			const text = event.clipboardData.getData('text/plain');
+			if (!text) return;
+			event.preventDefault();
+			void this.commands.pasteText(text);
+			return;
+		}
+		if (this.commands.writeSelectionToClipboard(event.clipboardData, event.type === 'cut')) event.preventDefault();
+	}
+
 	public handleKeyDown = (event: KeyboardEvent): void => {
 		const state = this.runtime.getStateSnapshot();
 		const interaction = readInteractionState(state);
@@ -366,16 +392,9 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		const isEditing = this.isEditingPointer(active, interaction.activeEdit.active);
 
 		if (!isEditing) {
-			if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
-				event.preventDefault();
-				void this.commands.copySelectedRange();
-				return;
-			}
-			if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
-				event.preventDefault();
-				void this.commands.pasteFromClipboard();
-				return;
-			}
+			// Copy, cut and paste arrive as native clipboard events (handleClipboard): no permission prompt,
+			// and the browser's Edit menu works too. Preventing these keys would cancel those events.
+			if ((event.ctrlKey || event.metaKey) && (event.key === 'c' || event.key === 'x' || event.key === 'v')) return;
 			if (this.handleHierarchyKey(event, row, col)) return;
 			const focusedRow = this.runtime.getVisualRow(row);
 			const onHierarchyRow = focusedRow?.kind === 'group' || focusedRow?.kind === 'total';

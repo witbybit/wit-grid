@@ -101,8 +101,24 @@ export class ClipboardController<TRowData = unknown> {
 		await this._copyRange(minRow, maxRow, minCol, maxCol);
 	}
 
+	/** Reads the system clipboard (the browser may ask for permission) and pastes it; see pasteText. */
 	public async pasteFromClipboard(): Promise<void> {
 		if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+		let text: string;
+		try {
+			text = await navigator.clipboard.readText();
+		} catch {
+			return; // clipboard access denied
+		}
+		return this.pasteText(text);
+	}
+
+	/**
+	 * Pastes tab-separated text at the selection (or focused cell): what a native paste event carries,
+	 * so Ctrl+V needs no clipboard permission.
+	 */
+	public async pasteText(text: string): Promise<void> {
+		if (!text) return;
 		const state = this.c.getState();
 		const selection = readInteractionState(state).cellSelection.selection;
 		const focus = selection.focus;
@@ -116,10 +132,7 @@ export class ClipboardController<TRowData = unknown> {
 		const startRow = liveBounds ? liveBounds.minRow : focusRowIdx;
 		const startCol = liveBounds ? liveBounds.minCol : focusColIdx;
 
-		try {
-			const text = await navigator.clipboard.readText();
-			if (!text) return;
-
+		{
 			const lines = text.split(/\r?\n/);
 			const updates: { rowId: string; colField: string; value: unknown }[] = [];
 			const blockedCapabilityCells: Array<{ rowId: string; colField: string }> = [];
@@ -202,9 +215,42 @@ export class ClipboardController<TRowData = unknown> {
 					blockedCapabilityCells
 				);
 			}
-		} catch {
-			// Clipboard access denied — silently ignore
 		}
+	}
+
+	/**
+	 * Writes the selected range (or the focused cell) as tab-separated text into a native copy/cut
+	 * event's data, synchronously and without clipboard permission. With `cut`, the copied data cells
+	 * are then cleared (an undoable write, subject to edit capabilities). False when nothing was copied.
+	 */
+	public writeSelectionToClipboard(data: DataTransfer, cut: boolean): boolean {
+		const state = this.c.getState();
+		const selection = readInteractionState(state).cellSelection.selection;
+		const bounds = this.getLiveSelectionBounds(selection, state);
+		let result: CopyResult | null;
+		if (bounds) {
+			result = this._buildTsv(bounds.minRow, bounds.maxRow, bounds.minCol, bounds.maxCol, state);
+		} else {
+			const focus = selection.focus;
+			const column = focus ? this.resolveColumnFromPointer(focus, state) : null;
+			if (!focus || !column) return false;
+			const text = this._getCellText(focus.rowId, column, state);
+			result = { text, cells: [{ rowId: focus.rowId, colField: column.field }], rowCount: 1, colCount: 1 };
+		}
+		if (!result) return false;
+		data.setData('text/plain', result.text);
+		this.c.dispatchEvent(GridEventName.cellsCopied, { cells: result.cells, rowCount: result.rowCount, colCount: result.colCount, text: result.text });
+		if (cut) this.clearCells(result.cells);
+		return true;
+	}
+
+	private clearCells(cells: ReadonlyArray<{ rowId: string; colField: string }>): void {
+		const updates = cells
+			.filter((cell) => !this.c.checkCapability || this.c.checkCapability('edit', cell).allowed)
+			.map((cell) => ({ rowId: cell.rowId, colField: cell.colField, value: '' }));
+		if (updates.length === 0) return;
+		const result = this.c.writeCells(updates, 'paste');
+		if (isWriteBlockedResult(result)) dispatchWriteBlockedEvent(this.c.dispatchEvent, 'paste', result, updates);
 	}
 
 	private getExactRejectedCell(
