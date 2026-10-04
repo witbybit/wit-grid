@@ -963,7 +963,7 @@ describe('bindAllDataCells — visibility boundary refresh', () => {
 		// custom-live with empty portal host → synthesizes stand-in; fidelity lane upgrades it.
 		expect(onScrollCellPatched).toHaveBeenCalledTimes(1);
 		expect(deps.cellBinderDeps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
-		expect(cell.lastContentMode).toBe('empty'); // no getCheapDisplayValue mock → empty stand-in
+		expect(cell.lastContentMode).toBe('fallback'); // no cached display value → the field's own text as the stand-in
 	});
 
 	it('does not mark a warm visible cell dirty solely because insight layers exist when its mounted visual versions are fresh', () => {
