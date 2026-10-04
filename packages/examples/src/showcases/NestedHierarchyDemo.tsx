@@ -515,12 +515,55 @@ export interface NestedHierarchyDemoProps extends WitGridExampleRuntimeProps {
 	onGridReady?: (event: GridReadyEvent<any>) => void;
 }
 
+// Initial-only grid props, created once: a new object per render makes the grid warn (and is ignored).
+const SPRING_RENDERER_OPTIONS = { rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } };
+const REPO_INITIAL_STATE = {
+	treeData: {
+		getParentId: (row: RepoNodeRow) => row.parentId,
+		column: 'name',
+		defaultExpanded: true,
+		filterMode: 'includeDescendants',
+		aggregateParents: true,
+		selectDescendants: true,
+	},
+	hierarchyColumn: {
+		header: 'Repository',
+		width: 320,
+		indentPerLevel: 18,
+		show: { toggle: true, checkbox: true, count: true },
+	},
+} as const;
+const ORDER_INITIAL_STATE = {
+	detail: {
+		height: 250,
+		estimatedHeight: 250,
+		isMaster: (row: OrderRow) => Boolean(initialOrderLines[row.id]?.length),
+	},
+} as const;
+
 export default function NestedHierarchyDemo({ onGridReady, compact = false }: NestedHierarchyDemoProps) {
 	const [activeTab, setActiveTab] = useState<TabId>('groups');
 	const [groupApi, setGroupApi] = useState<GridApi<WorkforceRow> | null>(null);
 	const [treeApi, setTreeApi] = useState<GridApi<RepoNodeRow> | null>(null);
 	const [detailApi, setDetailApi] = useState<GridApi<OrderRow> | null>(null);
 	const [groupBy, setGroupBy] = useState(['department', 'region']);
+	// The grouping it mounts with; later changes go through the API.
+	const [workforceInitialState] = useState(() => ({
+		grouping: {
+			by: groupBy,
+			display: 'columns' as const,
+			rowHeight: 42,
+			stickyHeaders: true,
+			totals: { groups: 'bottom' as const, grand: 'bottom' as const },
+		},
+		aggregation: { defs: workforceAggs },
+		hierarchyColumn: {
+			header: 'Organization',
+			width: 280,
+			indentPerLevel: 18,
+			show: { toggle: true, checkbox: false, count: true },
+		},
+	}));
 	const [expandedOrders, setExpandedOrders] = useState(false);
 	const [ledgerRevision, setLedgerRevision] = useState(0);
 	const [ledgerRun, setLedgerRun] = useState<{
@@ -769,28 +812,13 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={workforceRows}
 								columns={workforceColumns}
 								persistence='wit-grid-hierarchy-workforce'
-								initialState={{
-									grouping: {
-										by: groupBy,
-										display: 'columns',
-										rowHeight: 42,
-										stickyHeaders: true,
-										totals: { groups: 'bottom', grand: 'bottom' },
-									},
-									aggregation: { defs: workforceAggs },
-									hierarchyColumn: {
-										header: 'Organization',
-										width: 280,
-										indentPerLevel: 18,
-										show: { toggle: true, checkbox: false, count: true },
-									},
-								}}
+								initialState={workforceInitialState}
 								pinLeftColumns={1}
 								onGridReady={(event) => {
 									setGroupApi(event.api);
 									handleGridReady(event);
 								}}
-								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
+								rendererOptions={SPRING_RENDERER_OPTIONS}
 							/>
 						)}
 
@@ -800,28 +828,13 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={repoRows}
 								columns={repoColumns}
 								persistence='wit-grid-hierarchy-repo-tree'
-								initialState={{
-									treeData: {
-										getParentId: (row: RepoNodeRow) => row.parentId,
-										column: 'name',
-										defaultExpanded: true,
-										filterMode: 'includeDescendants',
-										aggregateParents: true,
-										selectDescendants: true,
-									},
-									hierarchyColumn: {
-										header: 'Repository',
-										width: 320,
-										indentPerLevel: 18,
-										show: { toggle: true, checkbox: true, count: true },
-									},
-								}}
+								initialState={REPO_INITIAL_STATE}
 								rowSelection='multiple'
 								onGridReady={(event) => {
 									setTreeApi(event.api);
 									handleGridReady(event);
 								}}
-								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
+								rendererOptions={SPRING_RENDERER_OPTIONS}
 							/>
 						)}
 
@@ -831,13 +844,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={orderRows}
 								columns={orderColumns}
 								persistence='wit-grid-hierarchy-orders'
-								initialState={{
-									detail: {
-										height: 250,
-										estimatedHeight: 250,
-										isMaster: (row: OrderRow) => Boolean(initialOrderLines[row.id]?.length),
-									},
-								}}
+								initialState={ORDER_INITIAL_STATE}
 								detailRowRenderer={({ visualRow, api }) => (
 									<DetailGrid
 										visualRow={visualRow}
@@ -849,7 +856,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 									setDetailApi(event.api);
 									handleGridReady(event);
 								}}
-								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
+								rendererOptions={SPRING_RENDERER_OPTIONS}
 							/>
 						)}
 					</div>

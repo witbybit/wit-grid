@@ -435,7 +435,8 @@ function fillScrollDispatchInput<TRowData>(
 	cellCtrl: CellCtrl,
 	rowCtrl: RowCtrl<TRowData>,
 	rowVersion: number,
-	mountValue?: unknown
+	/** Present when the cell mounts or updates a renderer; `value` may itself be undefined (a column with no field). */
+	mount?: { value: unknown }
 ): DispatchCellPresentationInput<TRowData> {
 	target.deps = deps;
 	target.cellCtrl = cellCtrl;
@@ -460,12 +461,12 @@ function fillScrollDispatchInput<TRowData>(
 	runtime.colWidth = request.ctx.plan?.colWidths?.[request.colIndex];
 	runtime.checkbox = undefined;
 	runtime.mount =
-		mountValue === undefined
+		mount === undefined
 			? undefined
 			: {
 					node: request.node,
 					col: request.col,
-					value: mountValue,
+					value: mount.value,
 					isLoading: request.isRowLoading,
 					isSelected: false,
 					renderPhase: 'scroll' as const,
@@ -943,7 +944,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				rowCtrl,
 				rowVersion,
 				cellCtrl.presentationState.kind === 'live-renderer' || cellCtrl.presentationState.kind === 'dom-update'
-					? getScrollMountValue(deps, request.node, request.col, request.cellSlot, request.isRowLoading)
+					? { value: getScrollMountValue(deps, request.node, request.col, request.cellSlot, request.isRowLoading) }
 					: undefined
 			)
 		);
