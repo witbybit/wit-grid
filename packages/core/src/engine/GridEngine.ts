@@ -593,6 +593,7 @@ export class GridEngine<TRowData = unknown> {
 			invalidation: this.invalidation,
 			requestRender: (reason) => this.requestRender(reason),
 			checkCapability: (action, p) => this.capabilityManager.can(action, p),
+			notifyRowStateChanged: (rowId) => this.cellNotifications.notifyRowStateChanged(rowId),
 		});
 		this.editingFeature = new EditingFeatureController<TRowData>({
 			ctx: featureContext,

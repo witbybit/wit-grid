@@ -141,6 +141,7 @@ export function GridView<TRowData = unknown>({
 						isScrolling: mount.isScrolling,
 						isFocused: mount.isFocused,
 						isSelected: mount.isSelected,
+						rowVersion: mount.rowVersion,
 						physicalIdentity: {
 							cellInstanceId: mount.cellInstanceId ?? '',
 							rowSlotId: mount.rowSlotId,

@@ -174,6 +174,15 @@ export class CellNotificationController<TRowData = unknown> {
 		this.deps.rowVersions.set(rowId, ++rowVersionClock);
 	}
 
+	/**
+	 * A row's UI state changed without its data (its detail opened or closed): a new row version makes
+	 * its cells, renderer cells included, draw again with the new state.
+	 */
+	public notifyRowStateChanged(rowId: string): void {
+		this.bumpRowVersion(rowId);
+		this.notifyRowSubscribers(rowId);
+	}
+
 	public publishCommittedCellChanges(changes: Map<string, Set<string>>): void {
 		for (const rowId of changes.keys()) {
 			this.bumpRowVersion(rowId);

@@ -331,6 +331,7 @@ function PortalCellWrapperInner<TRowData = unknown>({ cellKey, store }: PortalCe
 			isScrolling={effectiveData.isScrolling}
 			isFocused={effectiveData.isFocused}
 			isSelected={effectiveData.isSelected}
+			rowVersion={effectiveData.rowVersion}
 		/>
 	);
 }
