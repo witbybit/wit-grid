@@ -988,7 +988,7 @@ describe('bindCellDuringScroll', () => {
 		});
 
 		expect(snapshotSet).not.toHaveBeenCalled();
-		expect(cellSlot.lastContentMode).toBe('empty');
+		expect(cellSlot.lastContentMode).toBe('fallback'); // the row's own field, as a text stand-in
 		expect(cellSlot.lastPortalKey).toBeUndefined();
 		expect(cellSlot.element.title).toBe('');
 		expect(cellSlot.element.dataset.validationError).toBeUndefined();
@@ -2362,8 +2362,8 @@ describe('bindCellDuringScroll', () => {
 		// is shown as a cheap text stand-in and deferred to the post-scroll fidelity lane.
 		expect(mountCellImmediately).not.toHaveBeenCalled();
 		expect(dirty).toHaveBeenCalledWith(cellSlot.element);
-		// No getCheapDisplayValue mock → empty fallback; cell shows 'empty' mode.
-		expect(cellSlot.lastContentMode).toBe('empty');
+		// No cached display value: the plain field's own text is the stand-in.
+		expect(cellSlot.lastContentMode).toBe('fallback'); // the row's own field, as a text stand-in
 	});
 
 	it('honestly reports isScrolling:true and a distinct phase for the force-live-interactive-exception mount', () => {
@@ -2664,9 +2664,9 @@ describe('warm DOM cannot authorize correctness (adversarial row rebind)', () =>
 
 		// The stale row-A portal must be released, not frozen in place for row B.
 		expect(releaseCellPortal).toHaveBeenCalledWith(cellSlot.element, false, 'invalidated', expect.any(String));
-		// The slot must land on a deterministic placeholder (empty, since no cheap value is
-		// available either) rather than continuing to display row A's live portal content.
+		// The slot must land on a deterministic placeholder (row B's own field as text, since no cached
+		// value is available) rather than continuing to display row A's live portal content.
 		expect(cellSlot.lastContentMode).not.toBe('portal');
-		expect(cellSlot.lastContentMode).toBe('empty');
+		expect(cellSlot.lastContentMode).toBe('fallback'); // the row's own field, as a text stand-in
 	});
 });

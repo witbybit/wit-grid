@@ -81,7 +81,13 @@ function readStandInText<TRowData>(
 	isInVisibleContent: boolean
 ): string {
 	const cheap = deps.getCheapDisplayValue(node.id, col.field) ?? '';
-	if (cheap !== '' || !isInVisibleContent || !deps.primeDisplayValue) return cheap;
+	if (cheap !== '') return cheap;
+	// Nothing cached yet (a row the grid has not drawn before): a plain field is its own text.
+	if (!col.valueGetter) {
+		const own = readPrimitiveDisplayText(deps, node, col.field);
+		if (own !== undefined) return own;
+	}
+	if (!isInVisibleContent || !deps.primeDisplayValue) return cheap;
 	if (!col.valueGetter && !deps.hasFormula?.(node.id, col.field)) return cheap;
 	return deps.primeDisplayValue(node.id, col.field) ?? '';
 }
@@ -357,6 +363,12 @@ export function resolveScrollCellPresentation<TRowData>(
 			!canReuseSnapshotPortal && !canReuseSnapshotContent && rendererKind === 'primitive'
 				? readScrollDisplayText(deps, node, col, compiledPlan?.mode)
 				: undefined;
+		// A renderer cell with nothing to reuse gets its text stand-in, as the visible band would give it:
+		// left empty, a row scrolling in showed blank cells for a frame before its next bind.
+		const standIn =
+			!canReuseSnapshotPortal && !canReuseSnapshotContent && directText === undefined && rendererKind !== 'loading'
+				? applyScrollText(deps, node, col, readStandInText(deps, node, col, false))
+				: '';
 		const preservedContentMode: CellContentMode = canReuseSnapshotPortal
 			? 'portal'
 			: canReuseSnapshotContent
@@ -365,7 +377,9 @@ export function resolveScrollCellPresentation<TRowData>(
 					? 'text'
 					: rendererKind === 'loading'
 						? 'loading'
-						: 'empty';
+						: standIn !== ''
+							? 'fallback'
+							: 'empty';
 		return {
 			kind: 'buffered',
 			className: cellClassName,
@@ -373,7 +387,7 @@ export function resolveScrollCellPresentation<TRowData>(
 			formattedValue:
 				canReuseSnapshotContent && (preservedContentMode === 'text' || preservedContentMode === 'fallback')
 					? primitiveSnapshot.formattedValue
-					: (directText ?? ''),
+					: (directText ?? standIn),
 			portalKey: preservedContentMode === 'portal' && canReuseSnapshotPortal ? cellSlot.lastPortalKey : undefined,
 			title: snapshot?.title || null,
 			validationError: snapshot?.validationError,
