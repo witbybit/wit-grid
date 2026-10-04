@@ -24,6 +24,7 @@ export interface CellRendererLifecycle<TRowData = unknown> {
 			rowSlotId: string;
 			slotGeneration: number;
 			cellRowBindingGeneration: number;
+			rowVersion?: number;
 			cellInstanceId: string;
 			portalHostId: string;
 			isEditing: boolean;
@@ -47,6 +48,7 @@ export interface CellRendererLifecycle<TRowData = unknown> {
 			rowSlotId: string;
 			slotGeneration: number;
 			cellRowBindingGeneration: number;
+			rowVersion?: number;
 			cellInstanceId: string;
 			portalHostId: string;
 			isEditing: boolean;
@@ -87,6 +89,7 @@ export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TR
 				rowSlotId: mount.rowSlotId,
 				slotGeneration: mount.slotGeneration,
 				cellRowBindingGeneration: mount.cellRowBindingGeneration,
+				rowVersion: mount.rowVersion,
 				cellInstanceId: mount.cellInstanceId,
 				portalHostId: mount.portalHostId,
 				isEditing: mount.isEditing,
@@ -110,6 +113,7 @@ export function createCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TR
 				rowSlotId: mount.rowSlotId,
 				slotGeneration: mount.slotGeneration,
 				cellRowBindingGeneration: mount.cellRowBindingGeneration,
+				rowVersion: mount.rowVersion,
 				cellInstanceId: mount.cellInstanceId,
 				portalHostId: mount.portalHostId,
 				isEditing: mount.isEditing,
