@@ -18,7 +18,7 @@ export const INCREMENTAL_MIN_ROW_LIMIT = 2000;
 export const INCREMENTAL_ROW_SHARE_LIMIT = 0.25;
 /** A group's column is recomputed exactly after this many deltas, bounding float drift. */
 export const DRIFT_RECOMPUTE_EVERY = 2048;
-/** More moved leaves than this (and than 1/16 of the group) are merged in one pass instead of spliced one by one. */
+/** More moved leaves than this are merged in one pass instead of spliced one by one. */
 export const MERGE_REINSERT_MIN = 32;
 
 const BUILT_IN_FUNCS = new Set<string>([...STAT_FUNCS, 'distinctCount']);
@@ -946,7 +946,9 @@ export class IncrementalRowIndex<TData> {
 		// Fresh keys for the inserted leaves (their sort values may have changed, or they are new here).
 		const entries = insert.map((leaf) => ({ leaf, ...this.sortEntryOf(leaf.node, true) }));
 		// Splices are native memmoves (cheap for a few leaves); a merge reads every row's cached key.
-		if (Math.max(remove.length, insert.length) > Math.max(MERGE_REINSERT_MIN, children.length / 16))
+		// k splices move ~k·n elements, a merge compares ~n cached keys: the break-even k is about
+		// constant, whatever the group size (an n/16 term let 10k-leaf groups splice hundreds of times).
+		if (Math.max(remove.length, insert.length) > MERGE_REINSERT_MIN)
 			return this.mergeReinsert(children, remove, entries);
 		if (oldPositions && oldPositions.every((at, i) => children[at] === remove[i])) {
 			// Known positions (the group is on screen): splice them out, highest first.
@@ -986,20 +988,32 @@ export class IncrementalRowIndex<TData> {
 		const rest: RowTreeNode<TData>[] = [];
 		for (const child of children) if (!leaving.has(child)) rest.push(child);
 		moving.sort((a, b) => this.compareEntries(a.keys, a.source, b.keys, b.source));
+		// Each moved leaf binary-searches its place among the staying ones (same rule as a binary insert:
+		// after every leaf it does not sort before; places ascend with the sorted movers), then one plain
+		// copy writes the group: k log n comparisons instead of one per staying leaf.
+		const places: number[] = new Array(moving.length);
+		let from = 0;
+		for (let m = 0; m < moving.length; m++) {
+			const { keys, source } = moving[m];
+			let lo = from;
+			let hi = rest.length;
+			while (lo < hi) {
+				const mid = (lo + hi) >>> 1;
+				if (this.compare(keys, source, (rest[mid] as LeafNode<TData>).node) < 0) hi = mid;
+				else lo = mid + 1;
+			}
+			places[m] = from = lo;
+		}
 		const positions = new Map<LeafNode<TData>, number>();
 		let r = 0;
-		let m = 0;
 		let out = 0;
-		while (r < rest.length || m < moving.length) {
-			// Same rule as a binary insert: a moved leaf goes after every rest leaf it does not sort before.
-			if (m < moving.length && (r >= rest.length || this.compare(moving[m].keys, moving[m].source, (rest[r] as LeafNode<TData>).node) < 0)) {
-				const leaf = moving[m++].leaf;
-				children[out] = leaf;
-				positions.set(leaf, out++);
-			} else {
-				children[out++] = rest[r++];
-			}
+		for (let m = 0; m < moving.length; m++) {
+			while (r < places[m]) children[out++] = rest[r++];
+			const leaf = moving[m].leaf;
+			children[out] = leaf;
+			positions.set(leaf, out++);
 		}
+		while (r < rest.length) children[out++] = rest[r++];
 		children.length = out;
 		return positions;
 	}
