@@ -63,27 +63,30 @@ function diffRows(prevRow: unknown, nextRow: unknown): RowDiff | null {
 	let changedFields: Set<string> | null = null;
 	let changedValues: Map<string, { oldValue: unknown; newValue: unknown }> | null = null;
 
-	const recordChange = (key: string, oldValue: unknown, newValue: unknown) => {
-		if (!changedFields) {
-			changedFields = new Set<string>();
-			changedValues = new Map<string, { oldValue: unknown; newValue: unknown }>();
-		}
-		changedFields.add(key);
-		changedValues!.set(key, { oldValue, newValue });
-	};
-
-	for (const key of Object.keys(prevRecord)) {
+	// One pass over the old row (for-in walks a cached key list; no Object.keys arrays per row), then a
+	// count of the new row's keys: only a new row with keys the old one lacks needs a second look.
+	let shared = 0;
+	for (const key in prevRecord) {
+		if (!hasOwn.call(prevRecord, key)) continue;
 		const oldValue = prevRecord[key];
 		const hasNextKey = hasOwn.call(nextRecord, key);
+		if (hasNextKey) shared++;
 		const newValue = nextRecord[key];
-		if (!hasNextKey || oldValue !== newValue) {
-			recordChange(key, oldValue, newValue);
-		}
+		if (hasNextKey && oldValue === newValue) continue;
+		changedFields ??= new Set<string>();
+		changedValues ??= new Map<string, { oldValue: unknown; newValue: unknown }>();
+		changedFields.add(key);
+		changedValues.set(key, { oldValue, newValue });
 	}
-
-	for (const key of Object.keys(nextRecord)) {
-		if (!hasOwn.call(prevRecord, key)) {
-			recordChange(key, undefined, nextRecord[key]);
+	let nextKeys = 0;
+	for (const key in nextRecord) if (hasOwn.call(nextRecord, key)) nextKeys++;
+	if (nextKeys !== shared) {
+		for (const key in nextRecord) {
+			if (!hasOwn.call(nextRecord, key) || hasOwn.call(prevRecord, key)) continue;
+			changedFields ??= new Set<string>();
+			changedValues ??= new Map<string, { oldValue: unknown; newValue: unknown }>();
+			changedFields.add(key);
+			changedValues.set(key, { oldValue: undefined, newValue: nextRecord[key] });
 		}
 	}
 

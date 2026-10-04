@@ -560,8 +560,9 @@ export class IncrementalRowIndex<TData> {
 
 		// 2. Stats of the lowest groups. sum/avg/count/min/max move by delta; a column is recomputed
 		// from the group's leaves when a delta cannot be exact (the removed value was the min/max,
-		// first/last after an edit or reorder) and every DRIFT_RECOMPUTE_EVERY deltas, so float error
-		// from deltas stays bounded (~1e-15 relative) instead of accumulating.
+		// first/last after an edit or reorder) and after as many deltas as the group has leaves (at least
+		// DRIFT_RECOMPUTE_EVERY): float error from deltas stays bounded (~1e-12 relative) instead of
+		// accumulating, at O(1) amortized per delta however large the group.
 		const dirty = new Set<GroupNode<TData>>();
 		const statGroups = new Set<GroupNode<TData>>(touched.keys());
 		for (const [group, w] of work) if (w.removed.length > 0 || w.added.length > 0) statGroups.add(group);
@@ -628,7 +629,7 @@ export class IncrementalRowIndex<TData> {
 					const counts = this.deltaCounts.get(group) ?? new Map<string, number>();
 					this.deltaCounts.set(group, counts);
 					const total = (counts.get(key) ?? 0) + deltas;
-					if (total >= DRIFT_RECOMPUTE_EVERY) recompute = true;
+					if (total >= Math.max(DRIFT_RECOMPUTE_EVERY, group.leafCount)) recompute = true;
 					counts.set(key, recompute ? 0 : total);
 				}
 				if (recompute) cached.set(colId, this.statsFromLeaves(group, colId));
@@ -956,9 +957,13 @@ export class IncrementalRowIndex<TData> {
 			for (const child of children) if (!leaving.has(child)) children[kept++] = child;
 			children.length = kept;
 		}
+		// In sorted order each leaf lands after the previous one: placed leaves never shift, and each
+		// search starts past the last insert.
+		entries.sort((x, y) => this.compareEntries(x.keys, x.source, y.keys, y.source));
 		const positions = new Map<LeafNode<TData>, number>();
+		let from = 0;
 		for (const { leaf, keys, source } of entries) {
-			let lo = 0;
+			let lo = from;
 			let hi = children.length;
 			while (lo < hi) {
 				const mid = (lo + hi) >>> 1;
@@ -966,8 +971,8 @@ export class IncrementalRowIndex<TData> {
 				else lo = mid + 1;
 			}
 			children.splice(lo, 0, leaf);
-			for (const [placed, at] of positions) if (at >= lo) positions.set(placed, at + 1);
 			positions.set(leaf, lo);
+			from = lo + 1;
 		}
 		return positions;
 	}

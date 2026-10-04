@@ -1179,9 +1179,13 @@ export const CORE_STYLES = `
     font-weight: 600;
   }
 
-  /* Group and total rows drawn as cell rows. */
+  /*
+   * Group and total rows drawn as cell rows. The tint over an opaque base (as the sticky copy and the
+   * selection do): the pinned lanes inherit it, and a translucent lane let centre cells scrolled under
+   * it show through.
+   */
   .og-row.og-row-group:not(.og-row-group-sticky) {
-    background: var(--og-group-row-bg);
+    background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
     color: var(--og-group-row-text);
     font-weight: var(--og-group-row-font-weight);
   }
@@ -1196,14 +1200,15 @@ export const CORE_STYLES = `
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   }
 
+  /* Pinned cells and lanes take the row's whole background (a tint over a base, not just the colour). */
   .og-cell-pinned-left {
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
   }
 
   .og-cell-pinned-right {
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
   }
 
   /*
@@ -1223,7 +1228,7 @@ export const CORE_STYLES = `
     height: 100%;
     flex-shrink: 0;
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
     overflow: hidden;
     contain: layout paint;
   }

@@ -9,6 +9,8 @@ import { Telemetry, type TelemetrySnapshot } from './telemetry';
 
 export const RATE_OPTIONS = [100, 1_000, 10_000, 50_000] as const;
 const MAX_FRAME_DT_MS = 100;
+/** A frame's grid transaction aims at this, leaving the rest of the frame to paint (see adaptBudget). */
+const FRAME_TX_TARGET_MS = 6;
 const PNL_SERIES_LENGTH = 120;
 const PUBLISH_MS = 250;
 
@@ -65,7 +67,15 @@ export class FeedEngine {
 	private carry = 0;
 	private running = false;
 	private listeners = new Set<Listener>();
+	/**
+	 * Conflated rows waiting to reach the grid, oldest first. A row ticking again merges into its draft,
+	 * so a row the frame budget defers shows its latest value a frame or two later; nothing is dropped.
+	 */
 	private readonly drafts = new Map<number, MarketRow>();
+	/** Drafts whose price history already holds their pending point (a later tick replaces it). */
+	private readonly historyPending = new Set<number>();
+	/** Rows per frame the grid is handed, adapted so a frame's transaction stays near FRAME_TX_TARGET_MS. */
+	private frameBudget = 1500;
 	private readonly nonActive = new Set<number>();
 	private nonActiveList: number[] = [];
 
@@ -86,6 +96,8 @@ export class FeedEngine {
 
 	constructor(count: number, seed = 2026) {
 		this.rows = generateMarket(count, seed);
+		this.drafts.clear();
+		this.historyPending.clear();
 		this.rand = mulberry32(seed ^ 0x9e3779b9);
 		this.sectorOf = new Uint16Array(count);
 		const sectorIndex = new Map<string, number>();
@@ -189,7 +201,7 @@ export class FeedEngine {
 		const rows = this.rows;
 		const n = rows.length;
 		const drafts = this.drafts;
-		drafts.clear();
+		const touched = new Set<number>();
 		const exact = this.carry + (this.rate * dtMs) / 1000;
 		const ticks = Math.floor(exact);
 		this.carry = exact - ticks;
@@ -205,6 +217,7 @@ export class FeedEngine {
 				d = { ...base };
 				drafts.set(idx, d);
 			}
+			touched.add(idx);
 			const tickVol = (d.volatility / 40) * 0.0007;
 			let step = gauss(rand) * tickVol;
 			// A soft leash keeps the session from random-walking far away from the previous close.
@@ -221,42 +234,41 @@ export class FeedEngine {
 		// Rare structural changes: a status flip or a desk move, so group and filter membership moves too.
 		if (rand() < 0.04) this.structuralChange(drafts, now);
 
-		for (const [idx, d] of drafts) {
-			const old = rows[idx];
-			if (d.price !== old.price) {
-				d.spread = d.price * d.spreadFrac * 2;
-				d.bid = d.price - d.spread / 2;
-				d.ask = d.price + d.spread / 2;
-				d.change = d.price - d.prevClose;
-				d.changePct = (d.price / d.prevClose - 1) * 100;
-				d.notional = Math.abs(d.position) * d.price;
-				d.unrealizedPnl = d.position * (d.price - d.avgCost);
-				d.vwap += (d.price - d.vwap) * 0.02;
-				const h = old.history.slice(1);
+		// Derived fields once per frame for the rows that ticked in it (a deferred row keeps its draft).
+		for (const idx of touched) {
+			const d = drafts.get(idx)!;
+			d.spread = d.price * d.spreadFrac * 2;
+			d.bid = d.price - d.spread / 2;
+			d.ask = d.price + d.spread / 2;
+			d.change = d.price - d.prevClose;
+			d.changePct = (d.price / d.prevClose - 1) * 100;
+			d.notional = Math.abs(d.position) * d.price;
+			d.unrealizedPnl = d.position * (d.price - d.avgCost);
+			d.vwap += (d.price - d.vwap) * 0.02;
+			if (this.historyPending.has(idx)) {
+				const h = d.history.slice();
+				h[h.length - 1] = d.price;
+				d.history = h;
+			} else {
+				const h = rows[idx].history.slice(1);
 				h.push(d.price);
 				d.history = h;
-				d.lastTickAt = now;
-				this.grossNotional += d.notional - old.notional;
-				this.totalPnl += d.unrealizedPnl - old.unrealizedPnl;
-				const s = this.sectorOf[idx];
-				this.sectorPct[s] += d.changePct - old.changePct;
-				this.sectorNotional[s] += d.notional - old.notional;
-				const was = old.changePct > 0 ? 1 : old.changePct < 0 ? -1 : 0;
-				const is = d.changePct > 0 ? 1 : d.changePct < 0 ? -1 : 0;
-				if (was !== is) {
-					if (was === 1) this.advancers--;
-					else if (was === -1) this.decliners--;
-					if (is === 1) this.advancers++;
-					else if (is === -1) this.decliners++;
-				}
+				this.historyPending.add(idx);
 			}
+			d.lastTickAt = now;
 		}
 
-		const changed = drafts.size;
-		if (changed === 0) return;
-		const update = Array.from(drafts.values());
+		if (drafts.size === 0) return;
 		const api = this.api;
 		if (!api) return;
+		// Oldest drafts first, up to the frame budget; the rest wait for the next frame.
+		const update: MarketRow[] = [];
+		const committed: number[] = [];
+		for (const [idx, d] of drafts) {
+			if (update.length >= this.frameBudget) break;
+			update.push(d);
+			committed.push(idx);
+		}
 		const t0 = performance.now();
 		try {
 			api.transaction({ rows: { update } });
@@ -268,8 +280,37 @@ export class FeedEngine {
 			return;
 		}
 		const t1 = performance.now();
-		this.telemetry.transaction(t1, t1 - t0, changed, applied);
-		for (const [idx, d] of drafts) rows[idx] = d;
+		this.adaptBudget(t1 - t0, drafts.size - update.length);
+		this.telemetry.transaction(t1, t1 - t0, update.length, applied);
+		for (const idx of committed) this.commit(idx, drafts.get(idx)!);
+	}
+
+	/** Shrinks the budget when a frame's transaction runs long, grows it while a backlog waits and frames are cheap. */
+	private adaptBudget(txMs: number, backlog: number): void {
+		if (txMs > FRAME_TX_TARGET_MS * 1.3) this.frameBudget = Math.max(200, Math.floor(this.frameBudget * 0.85));
+		else if (backlog > 0 && txMs < FRAME_TX_TARGET_MS * 0.7) this.frameBudget = Math.min(6000, Math.ceil(this.frameBudget * 1.1));
+	}
+
+	/** The grid now shows `d`: it becomes the row, and the desk totals move by its difference. */
+	private commit(idx: number, d: MarketRow): void {
+		const old = this.rows[idx];
+		this.drafts.delete(idx);
+		this.historyPending.delete(idx);
+		this.rows[idx] = d;
+		if (d.price === old.price) return;
+		this.grossNotional += d.notional - old.notional;
+		this.totalPnl += d.unrealizedPnl - old.unrealizedPnl;
+		const s = this.sectorOf[idx];
+		this.sectorPct[s] += d.changePct - old.changePct;
+		this.sectorNotional[s] += d.notional - old.notional;
+		const was = old.changePct > 0 ? 1 : old.changePct < 0 ? -1 : 0;
+		const is = d.changePct > 0 ? 1 : d.changePct < 0 ? -1 : 0;
+		if (was !== is) {
+			if (was === 1) this.advancers--;
+			else if (was === -1) this.decliners--;
+			if (is === 1) this.advancers++;
+			else if (is === -1) this.decliners++;
+		}
 	}
 
 	private structuralChange(drafts: Map<number, MarketRow>, now: number): void {
