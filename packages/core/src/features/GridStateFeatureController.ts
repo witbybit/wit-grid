@@ -188,11 +188,7 @@ export class GridStateFeatureController<TRowData = unknown> {
 		}
 		const oldSort = this.deps.stateManager.getState().sortModel;
 		const hasRowModel = this.deps.getRowModel?.() != null;
-		// Headers show the sort whatever the row model: the infinite and server models reload rows
-		// asynchronously, and nothing else repainted the header's sort indicator.
-		const forwardInvalidations = hasRowModel
-			? [{ kind: 'headers', reason: 'sort' } as const]
-			: [{ kind: 'headers', reason: 'sort' } as const, { kind: 'full', reason: 'sort' } as const];
+		const forwardInvalidations = hasRowModel ? [] : [{ kind: 'headers', reason: 'sort' } as const, { kind: 'full', reason: 'sort' } as const];
 		this.deps.applyChange({
 			reason: 'rows:set-sort-model',
 			state: { sortModel },

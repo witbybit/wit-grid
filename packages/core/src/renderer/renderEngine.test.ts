@@ -1669,6 +1669,8 @@ describe('RenderEngine', () => {
 		await vi.waitFor(() => {
 			expect(container.querySelector('[data-row-index="0"] .og-cell[data-col-field="name"]')?.textContent).toBe('Zulu');
 		});
+		// The header shows the sort too: async row models reload without a header invalidation.
+		expect(container.querySelector('[role="columnheader"][data-col-field="name"]')?.getAttribute('aria-sort')).toBe('descending');
 
 		const stats = renderer.getRenderStats();
 		expect(stats.scrollFrames).toBe(0);
