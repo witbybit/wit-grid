@@ -285,6 +285,7 @@ export class PortalMountManager<TRowData = unknown> {
 			rowSlotId: mount.rowSlotId,
 			slotGeneration: mount.slotGeneration,
 			cellRowBindingGeneration: mount.cellRowBindingGeneration ?? 0,
+			rowVersion: mount.rowVersion,
 			cellInstanceId: mount.cellInstanceId,
 			portalHostId: mount.portalHostId,
 			parentContainer: mount.container,
