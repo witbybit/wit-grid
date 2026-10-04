@@ -324,7 +324,7 @@ describe('GridContextMenuPlugin', () => {
 		const menuEl = testPlugin.menuElement as HTMLDivElement;
 		expect(menuEl).toBeDefined();
 		const items = Array.from(menuEl.querySelectorAll('.og-context-menu-item'));
-		const texts = items.map((el) => el.textContent);
+		const texts = items.map((el) => el.querySelector('.og-context-menu-item-label')?.textContent ?? el.textContent);
 
 		expect(texts).not.toContain('Copy Selected Range');
 		expect(texts).not.toContain('Clear Selection');

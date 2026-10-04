@@ -22,7 +22,14 @@ export interface GridContextMenuItem<TRowData = unknown> {
 	action?: (params: ContextMenuParams<TRowData>) => void;
 	disabled?: boolean | ((params: ContextMenuParams<TRowData>) => boolean);
 	hidden?: boolean | ((params: ContextMenuParams<TRowData>) => boolean);
+	/** Shown right-aligned as a hint (e.g. 'Ctrl+C'); the menu does not bind it. */
+	shortcut?: string;
+	/** 'danger' tints a destructive action. */
+	variant?: 'danger';
 }
+
+/** ⌘ on Apple platforms, Ctrl elsewhere, for shortcut hints. */
+const MOD_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? '⌘' : 'Ctrl+';
 
 export interface GridContextMenuOptions<TRowData = unknown> {
 	disabled?: boolean;
@@ -114,6 +121,8 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 			this.detachKeyboardNav = null;
 		}
 		if (this.menuElement) {
+			// Closing has its own quicker ease-in (og-closing), then the element goes.
+			this.menuElement.classList.add('og-closing');
 			this.menuElement.classList.remove('og-visible');
 			const el = this.menuElement;
 			setTimeout(() => {
@@ -173,18 +182,21 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 		const defaultItems: Array<GridContextMenuItem<TRowData>> = [
 			{
 				id: 'copy',
+				shortcut: `${MOD_KEY}C`,
 				label: 'Copy Selected Range',
 				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`,
 				action: (p) => this.copySelectedRange(p),
 			},
 			{
 				id: 'cut',
+				shortcut: `${MOD_KEY}X`,
 				label: 'Cut Selection',
 				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><line x1="9.8" y1="8.2" x2="21" y2="19"></line><line x1="9.8" y1="15.8" x2="21" y2="5"></line></svg>`,
 				action: (p) => this.cutSelectedRange(p),
 			},
 			{
 				id: 'paste',
+				shortcut: `${MOD_KEY}V`,
 				label: 'Paste Clipboard',
 				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>`,
 				action: (p) => {
@@ -193,6 +205,8 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 			},
 			{
 				id: 'clear',
+				variant: 'danger',
+				disabled: (p) => !p.selection.bounds,
 				label: 'Clear Selection',
 				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>`,
 				action: (p) => this.clearSelection(p),
@@ -305,6 +319,13 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 				labelSpan.className = 'og-context-menu-item-label';
 				labelSpan.textContent = item.label;
 				el.appendChild(labelSpan);
+				if (item.shortcut) {
+					const shortcut = document.createElement('kbd');
+					shortcut.className = 'og-context-menu-item-shortcut';
+					shortcut.textContent = item.shortcut;
+					el.appendChild(shortcut);
+				}
+				if (item.variant === 'danger') el.classList.add('og-danger');
 
 				if (!isItemDisabled && item.action) {
 					el.addEventListener('click', (e) => {

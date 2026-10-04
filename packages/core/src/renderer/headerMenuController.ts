@@ -397,6 +397,7 @@ export class HeaderMenuController<TRowData = unknown> {
 			this.filterDebounceTimer = null;
 		}
 		if (this.activePopover) {
+			this.activePopover.classList.add('og-closing');
 			this.activePopover.classList.remove('og-visible');
 			const el = this.activePopover;
 			const colField = this.activeHeaderCell?.dataset.colField;
