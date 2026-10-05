@@ -2293,6 +2293,37 @@ describe('explicit React entrypoints', () => {
 		});
 	});
 
+	it('re-applies columns only when their content changes (an inline array with the same data does not)', async () => {
+		let api: { getStateSnapshot: () => { columns: unknown } } | null = null;
+		const format = ({ value }: { value: unknown }) => String(value);
+		const renderWith = (header: string, valueFormatter = format) => (
+			<div style={{ width: 400, height: 300 }}>
+				<Grid
+					rowModelType='client'
+					rows={[{ id: '1', name: 'Alice' }]}
+					columns={[{ field: 'name', header, width: 100, valueFormatter }]}
+					getRowId={(row: TestRow) => row.id}
+					enableNavigation={false}
+					onGridReady={(event) => {
+						api = event.api as never;
+					}}
+				/>
+			</div>
+		);
+		const { rerender } = render(renderWith('Name'));
+		await waitFor(() => expect(api).not.toBeNull());
+		// The grid's columns state only changes identity when setColumns is applied.
+		const applied = api!.getStateSnapshot().columns;
+		rerender(renderWith('Name'));
+		rerender(renderWith('Name'));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).toBe(applied));
+		rerender(renderWith('Full name'));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).not.toBe(applied));
+		const renamed = api!.getStateSnapshot().columns;
+		rerender(renderWith('Full name', ({ value }) => `#${String(value)}`));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).not.toBe(renamed));
+	});
+
 	it('does not warn when initial-only props are new objects or functions with the same content (inline props)', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const ready = vi.fn();
