@@ -1,16 +1,21 @@
 import { isHierarchyColumn, withHierarchyColumnFor } from '../rows/hierarchyColumn.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { ColumnDef } from '../columnDef.js';
+import { displayOnlyFunctionChanges } from '../columns/columnDiff.js';
 import type { ColumnState } from '../state/GridState.js';
 import type { GridFeatureContext } from './GridFeatureContext.js';
 
 export class ColumnFeatureController<TRowData = unknown> {
 	/** The field sequence of the last column list the app declared through setColumns. */
 	private lastDeclaredFields: string | null = null;
+	/** The last column list the app declared, to tell a re-declaration that only changed functions. */
+	private lastDeclaredColumns: ColumnDef<TRowData>[] | null = null;
 
 	constructor(private readonly ctx: GridFeatureContext<TRowData>) {
 		// The columns the grid was created with are the first declaration.
-		this.lastDeclaredFields = declaredFieldKey(ctx.getState().columns.filter((column) => !isHierarchyColumn(column)));
+		const declared = ctx.getState().columns.filter((column) => !isHierarchyColumn(column));
+		this.lastDeclaredFields = declaredFieldKey(declared);
+		this.lastDeclaredColumns = declared;
 	}
 
 	private applyColumnOrder(requested: ColumnDef<TRowData>[]): void {
@@ -128,9 +133,25 @@ export class ColumnFeatureController<TRowData = unknown> {
 		// a new but equivalent columns array on every render); a changed declaration (columns added,
 		// removed or reordered by the app) is applied as declared.
 		const declaredFields = declaredFieldKey(nextColumns);
-		const columns = declaredFields === this.lastDeclaredFields ? inCurrentOrder(declaredColumns, prevColumns) : declaredColumns;
+		const sameDeclaration = declaredFields === this.lastDeclaredFields;
+		const columns = sameDeclaration ? inCurrentOrder(declaredColumns, prevColumns) : declaredColumns;
+		// A re-declaration that only changed display functions (inline formatters in a React app) repaints
+		// just those columns and keeps the rest (geometry, the row index); identical content changes nothing.
+		const functionChanges = sameDeclaration && !undoable ? displayOnlyFunctionChanges(this.lastDeclaredColumns, nextColumns) : null;
 		this.lastDeclaredFields = declaredFields;
+		this.lastDeclaredColumns = nextColumns;
 		const prevWidths = state.columnWidths;
+		if (functionChanges && columns.length === prevColumns.length) {
+			if (functionChanges.size === 0) return;
+			this.ctx.applyChange({
+				reason: 'columns:set',
+				state: { columns, ...pinnedPatch },
+				invalidations: [...functionChanges].map((colId) => ({ kind: 'column' as const, colId })),
+				domains: ['columns'],
+				events: [{ type: GridEventName.columnsChanged, payload: { columns, columnFields: columns.map((c) => c.field) } }],
+			});
+			return;
+		}
 
 		const nextWidths = columns.reduce<Record<string, number>>((acc, column) => {
 			const existingWidth = prevWidths[column.field];
