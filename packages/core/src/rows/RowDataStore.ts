@@ -1,4 +1,3 @@
-import { validateRowIds } from '../ids.js';
 import { RowNode } from '../rowNode.js';
 
 export type RowUpdate<T> = (rows: T[]) => T[];
@@ -152,26 +151,35 @@ export class RowDataStore<T> {
 			return { sameOrder, changedNodes, changedFieldsByRow, changedValuesByRow, added: [], removed: [] };
 		}
 
-		validateRowIds(ids, 'setRows');
+		// One pass builds the next id map and rejects empty or duplicate ids (what validateRowIds checks,
+		// without a separate Set of every id) before any existing row is touched, so a bad id still
+		// leaves the store as it was; the second pass applies the data changes.
 		const added: RowNode<T>[] = [];
 		const nextNodeMap = new Map<string, RowNode<T>>();
+		const nodes = new Array<RowNode<T>>(rows.length);
 		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
 			const id = ids[i];
+			if (!id) throw new Error('Wit Grid [setRows]: getRowId returned an empty string. Every row must have a non-empty ID.');
+			if (nextNodeMap.has(id)) throw new Error(`Wit Grid [setRows]: duplicate row ID "${id}". Each row must have a unique ID.`);
 			let node = this.rowsById.get(id);
 			if (!node) {
-				node = new RowNode<T>(id, row);
+				node = new RowNode<T>(id, rows[i]);
 				added.push(node);
-			} else if (node.data !== row) {
-				const diff = diffRows(node.data, row);
-				node.setData(row);
-				if (diff) {
-					changedNodes.push(node);
-					changedFieldsByRow.set(id, diff.changedFields);
-					changedValuesByRow.set(id, diff.changedValues);
-				}
 			}
 			nextNodeMap.set(id, node);
+			nodes[i] = node;
+		}
+		for (let i = 0; i < rows.length; i++) {
+			const node = nodes[i];
+			const row = rows[i];
+			if (node.data === row) continue;
+			const diff = diffRows(node.data, row);
+			node.setData(row);
+			if (diff) {
+				changedNodes.push(node);
+				changedFieldsByRow.set(node.id, diff.changedFields);
+				changedValuesByRow.set(node.id, diff.changedValues);
+			}
 		}
 		const removed: RowNode<T>[] = [];
 		for (const [id, node] of this.rowsById) if (!nextNodeMap.has(id)) removed.push(node);

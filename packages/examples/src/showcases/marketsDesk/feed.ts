@@ -94,8 +94,9 @@ export class FeedEngine {
 	private lastSeriesAt = 0;
 	snapshot: DeskSnapshot;
 
-	constructor(count: number, seed = 2026) {
-		this.rows = generateMarket(count, seed);
+	/** `rows` from generateMarketAsync (a large universe built without freezing the page); generated here otherwise. */
+	constructor(count: number, seed = 2026, rows?: MarketRow[]) {
+		this.rows = rows ?? generateMarket(count, seed);
 		this.drafts.clear();
 		this.historyPending.clear();
 		this.rand = mulberry32(seed ^ 0x9e3779b9);

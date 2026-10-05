@@ -20,7 +20,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { GridReadyEvent, RowAnimationOptions } from '@eregister/wit-grid-react';
 import { Pause, Play, TrendingUp } from 'lucide-react';
 import { DeskGrid, type GroupBy, type GroupDisplay } from './marketsDesk/DeskGrid';
-import type { MarketRow } from './marketsDesk/data';
+import { generateMarketAsync, type MarketRow } from './marketsDesk/data';
 import { FeedEngine } from './marketsDesk/feed';
 import { KpiStrip, PnlChart, SectorHeatmap, TelemetryBadge, TelemetryPanel } from './marketsDesk/panels';
 import { DESK_CSS } from './marketsDesk/styles';
@@ -152,21 +152,48 @@ export default function RealtimeDashboard({
 	const [preset, setPreset] = useState<PresetId>('cascade');
 	const [sectorFilter, setSectorFilter] = useState<string | null>(null);
 	const [engine, setEngine] = useState<FeedEngine | null>(null);
+	const engineRef = useRef<FeedEngine | null>(null);
+	// The universe being built for a new row count (the current one keeps running until it is ready).
+	const [building, setBuilding] = useState<{ count: number; done: number } | null>(null);
 
-	// A new row count builds a new universe and feed. Built in an effect, after the loading frame paints.
+	// A new row count builds its universe in slices (the page stays responsive, progress shows), then
+	// swaps it into the same grid; the old feed runs until then.
 	useEffect(() => {
-		setEngine(null);
-		let created: FeedEngine | null = null;
-		const id = setTimeout(() => {
-			created = new FeedEngine(rowCount);
-			created.start();
-			setEngine(created);
-		}, 0);
-		return () => {
-			clearTimeout(id);
-			created?.dispose();
-		};
+		const controller = new AbortController();
+		let lastProgressAt = 0;
+		setBuilding({ count: rowCount, done: 0 });
+		generateMarketAsync(rowCount, {
+			signal: controller.signal,
+			onProgress: (done) => {
+				const now = performance.now();
+				if (now - lastProgressAt < 100) return;
+				lastProgressAt = now;
+				setBuilding({ count: rowCount, done });
+			},
+		})
+			.then((rows) => {
+				if (controller.signal.aborted) return;
+				const created = new FeedEngine(rowCount, 2026, rows);
+				created.start();
+				const previous = engineRef.current;
+				engineRef.current = created;
+				setEngine(created);
+				setBuilding(null);
+				previous?.dispose();
+			})
+			.catch((error: unknown) => {
+				if ((error as { name?: string })?.name !== 'AbortError') throw error;
+			});
+		return () => controller.abort();
 	}, [rowCount]);
+
+	useEffect(
+		() => () => {
+			engineRef.current?.dispose();
+			engineRef.current = null;
+		},
+		[]
+	);
 
 	useEffect(() => {
 		engine?.setRate(rate);
@@ -249,7 +276,8 @@ export default function RealtimeDashboard({
 							<TelemetryPanel engine={engine} isLight={isLight} />
 						</div>
 					)}
-					<div className='min-h-[260px] min-w-0 flex-1'>
+					<div className='relative min-h-[260px] min-w-0 flex-1'>
+						{building && <BuildingBadge building={building} isLight={isLight} />}
 						<DeskGrid
 							engine={engine}
 							display={display}
@@ -267,9 +295,28 @@ export default function RealtimeDashboard({
 				</>
 			) : (
 				<div className={`flex flex-1 items-center justify-center text-xs ${ui.title}`}>
-					Generating {rowCount.toLocaleString('en-US')} instruments…
+					Generating {rowCount.toLocaleString('en-US')} instruments…{' '}
+					{building ? `${Math.round((building.done / building.count) * 100)}%` : ''}
 				</div>
 			)}
+		</div>
+	);
+}
+
+/** Over the live grid while the next universe builds: the current one stays interactive until the swap. */
+function BuildingBadge({ building, isLight }: { building: { count: number; done: number }; isLight: boolean }) {
+	const pct = Math.round((building.done / building.count) * 100);
+	return (
+		<div
+			role='status'
+			className={`pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-lg ${
+				isLight ? 'border-slate-200 bg-white/95 text-slate-700' : 'border-slate-700/70 bg-slate-900/95 text-slate-200'
+			}`}
+		>
+			<span className='relative h-1.5 w-16 overflow-hidden rounded-full bg-slate-500/25'>
+				<span className='absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-[width] duration-150' style={{ width: `${pct}%` }} />
+			</span>
+			Preparing {building.count.toLocaleString('en-US')} instruments · {pct}%
 		</div>
 	);
 }
