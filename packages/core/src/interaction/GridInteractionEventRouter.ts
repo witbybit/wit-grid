@@ -23,6 +23,7 @@ export interface GridInteractionEventRouterDeps<TRowData = unknown> {
 export interface GridInteractionEventRouter {
 	bind(container: HTMLElement, options?: { window?: Window; document?: Document }): () => void;
 	handleWindowKeyDown(event: KeyboardEvent): void;
+	handleDocumentClipboard(event: ClipboardEvent): void;
 	handleWindowMouseUp(): void;
 	handleDocumentMouseDown(event: MouseEvent): void;
 	handleContainerFocusIn(event: FocusEvent): void;
@@ -73,10 +74,12 @@ export function createGridInteractionEventRouter<TRowData>(deps: GridInteraction
 			container.addEventListener('dblclick', this.handleContainerDoubleClick);
 			container.addEventListener('contextmenu', this.handleContainerContextMenu);
 			targetWindow.addEventListener('keydown', this.handleWindowKeyDown);
+			for (const type of ['copy', 'cut', 'paste'] as const) targetDocument.addEventListener(type, this.handleDocumentClipboard);
 			targetWindow.addEventListener('mouseup', this.handleWindowMouseUp);
 			targetDocument.addEventListener('mousedown', this.handleDocumentMouseDown, true);
 			return () => {
 				targetWindow.removeEventListener('keydown', this.handleWindowKeyDown);
+				for (const type of ['copy', 'cut', 'paste'] as const) targetDocument.removeEventListener(type, this.handleDocumentClipboard);
 				targetWindow.removeEventListener('mouseup', this.handleWindowMouseUp);
 				targetDocument.removeEventListener('mousedown', this.handleDocumentMouseDown, true);
 				container.removeEventListener('focusin', this.handleContainerFocusIn);
@@ -96,6 +99,17 @@ export function createGridInteractionEventRouter<TRowData>(deps: GridInteraction
 			if (deps.isEventWithinGrid(activeEl) || isGridActive) {
 				interaction.dispatchInput({ kind: 'key-down', event });
 			}
+		},
+
+		handleDocumentClipboard(event) {
+			const interaction = deps.getInteraction();
+			if (!interaction || event.defaultPrevented) return;
+			const activeEl = typeof document !== 'undefined' ? document.activeElement : null;
+			const withinGrid = deps.isEventWithinGrid(activeEl);
+			if (!withinGrid && !isGridActive) return;
+			// Text fields outside the grid keep their own copy/paste, even right after a grid click.
+			if (!withinGrid && activeEl instanceof HTMLElement && (activeEl.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(activeEl.tagName))) return;
+			interaction.dispatchInput({ kind: 'clipboard', event });
 		},
 
 		handleWindowMouseUp() {

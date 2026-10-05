@@ -39,7 +39,7 @@ export function sortTreeStage<TData>(
 	}
 	const sorter: TreeSorter<TData> = {
 		sortModel: activeSort ?? [],
-		getters: (activeSort ?? []).map((sortItem) => (node: RowNode<TData>) => context.getValue(node, sortItem.colId)),
+		getters: (activeSort ?? []).map((sortItem) => context.readerFor(sortItem.colId)),
 		descByField,
 		comparatorByField,
 	};
@@ -75,6 +75,8 @@ function sortSiblings<TData>(children: RowTreeNode<TData>[], sorter: TreeSorter<
 	const hasSort = sortModel.length > 0;
 	// Without a sort model only comparator-bearing group levels move.
 	if (!hasSort && !children.some((child) => child.kind === 'group' && comparatorByField.has(child.field))) return;
+
+	if (hasSort && sortModel.length === 1 && sortNumericLeaves(children, getters[0], sortModel[0].sort === 'desc')) return;
 
 	const entries: SiblingEntry<TData>[] = new Array(children.length);
 	for (let i = 0; i < children.length; i++) {
@@ -119,4 +121,28 @@ function sortSiblings<TData>(children: RowTreeNode<TData>[], sorter: TreeSorter<
 	});
 
 	for (let i = 0; i < entries.length; i++) children[i] = entries[i].node;
+}
+
+/**
+ * One sort column over leaves whose values are all numbers (not NaN): sorts the numbers directly,
+ * ties by original position — the same order the general path produces. False (nothing touched)
+ * for anything else.
+ */
+function sortNumericLeaves<TData>(children: RowTreeNode<TData>[], read: (node: RowNode<TData>) => unknown, desc: boolean): boolean {
+	const n = children.length;
+	const values = new Float64Array(n);
+	for (let i = 0; i < n; i++) {
+		const child = children[i];
+		if (child.kind !== 'data') return false;
+		const value = read(child.node);
+		if (typeof value !== 'number' || value !== value) return false;
+		values[i] = value;
+	}
+	const order: number[] = new Array(n);
+	for (let i = 0; i < n; i++) order[i] = i;
+	if (desc) order.sort((a, b) => values[b] - values[a] || a - b);
+	else order.sort((a, b) => values[a] - values[b] || a - b);
+	const original = children.slice();
+	for (let i = 0; i < n; i++) children[i] = original[order[i]];
+	return true;
 }

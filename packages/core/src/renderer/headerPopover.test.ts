@@ -87,7 +87,7 @@ describe('HeaderPopoverMenu', () => {
 		expect((engine as any).headerMenu.activePopover).toBeNull();
 	});
 
-	it('should sort ascending and descending when sort options are clicked', () => {
+	it('should sort ascending and descending when sort options are clicked', async () => {
 		const nameCell = Array.from(container.querySelectorAll('.og-header-cell')).find(
 			(el) => (el as HTMLElement).dataset.colField === 'name'
 		) as HTMLElement;
@@ -105,14 +105,15 @@ describe('HeaderPopoverMenu', () => {
 		expect(sortAscBtn).not.toBeNull();
 		sortAscBtn.click();
 
-		// Check rows are sorted by name asc (A, B, C)
-		expect(store.getDataRowAtVisualIndex(0)?.name).toBe('Product A');
+		// The header shows the sort at once; the rows follow after the next paint (A, B, C).
+		expect(nameCell.getAttribute('aria-sort')).toBe('ascending');
+		await vi.waitFor(() => expect(store.getDataRowAtVisualIndex(0)?.name).toBe('Product A'));
 		expect(store.getDataRowAtVisualIndex(1)?.name).toBe('Product B');
 		expect(store.getDataRowAtVisualIndex(2)?.name).toBe('Product C');
 
-		// Open popover again
+		// Open popover again (the previous one may still be fading out)
 		menuBtn.click();
-		const nextPopover = document.querySelector('.og-header-popover') as HTMLDivElement;
+		const nextPopover = document.querySelector('.og-header-popover.og-visible') as HTMLDivElement;
 
 		// Click sort descending
 		const sortDescBtn = Array.from(nextPopover.querySelectorAll('.og-popover-item')).find((el) =>
@@ -122,7 +123,7 @@ describe('HeaderPopoverMenu', () => {
 		sortDescBtn.click();
 
 		// Check rows are sorted by name desc (C, B, A)
-		expect(store.getDataRowAtVisualIndex(0)?.name).toBe('Product C');
+		await vi.waitFor(() => expect(store.getDataRowAtVisualIndex(0)?.name).toBe('Product C'));
 		expect(store.getDataRowAtVisualIndex(1)?.name).toBe('Product B');
 		expect(store.getDataRowAtVisualIndex(2)?.name).toBe('Product A');
 	});
@@ -216,7 +217,7 @@ describe('HeaderPopoverMenu', () => {
 		expect(params.container.textContent).toContain('Custom Filter Title');
 	});
 
-	it('should cycle sorting when clicking the header cell itself (excluding buttons)', () => {
+	it('should cycle sorting when clicking the header cell itself (excluding buttons)', async () => {
 		const nameCell = Array.from(container.querySelectorAll('.og-header-cell')).find(
 			(el) => (el as HTMLElement).dataset.colField === 'name'
 		) as HTMLElement;
@@ -225,23 +226,23 @@ describe('HeaderPopoverMenu', () => {
 
 		// Simulate simple click (mousedown followed by mouseup without move)
 		const mousedownEvent = new MouseEvent('mousedown', { bubbles: true, button: 0 });
-		nameCell.dispatchEvent(mousedownEvent);
-
 		const mouseupEvent = new MouseEvent('mouseup', { bubbles: true });
-		window.dispatchEvent(mouseupEvent);
+		const click = () => {
+			nameCell.dispatchEvent(mousedownEvent);
+			window.dispatchEvent(mouseupEvent);
+		};
 
-		// Should sort Ascending
-		expect(store.getState().sortModel).toEqual([{ colId: 'name', sort: 'asc' }]);
+		// The header shows the new sort at once; the sort itself runs after the next paint.
+		click();
+		expect(nameCell.getAttribute('aria-sort')).toBe('ascending');
+		await vi.waitFor(() => expect(store.getState().sortModel).toEqual([{ colId: 'name', sort: 'asc' }]));
 
-		// Click again to cycle to Descending
-		nameCell.dispatchEvent(mousedownEvent);
-		window.dispatchEvent(mouseupEvent);
-		expect(store.getState().sortModel).toEqual([{ colId: 'name', sort: 'desc' }]);
+		click();
+		expect(nameCell.getAttribute('aria-sort')).toBe('descending');
+		await vi.waitFor(() => expect(store.getState().sortModel).toEqual([{ colId: 'name', sort: 'desc' }]));
 
-		// Click again to clear sorting
-		nameCell.dispatchEvent(mousedownEvent);
-		window.dispatchEvent(mouseupEvent);
-		expect(store.getState().sortModel).toBeNull();
+		click();
+		await vi.waitFor(() => expect(store.getState().sortModel).toBeNull());
 	});
 
 	it('should hide the menu button when suppressHeaderMenu is true', () => {

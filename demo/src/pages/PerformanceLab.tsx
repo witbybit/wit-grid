@@ -141,20 +141,35 @@ const DeferredMetric = React.memo(function DeferredMetric({ value }: CellRendere
 	return <span className={`font-mono text-[10px] font-extrabold ${color}`}>{n}</span>;
 });
 
+const METRIC_COLUMN_COUNT = 996;
+
+/**
+ * Every row's 996 metric values, computed on read from the row's index: plain fields to the grid (no
+ * valueGetter, so the scroll fast paths apply) without storing 100k x 996 strings. Each row only
+ * holds its index.
+ */
+const metricPrototype: object = (() => {
+	const proto = {};
+	for (let col = 0; col < METRIC_COLUMN_COUNT; col++) {
+		Object.defineProperty(proto, `m_${col}`, {
+			get(this: { _i: number }) {
+				return `${(this._i * 17 + col * 31) % 10000}`;
+			},
+			enumerable: false,
+		});
+	}
+	return proto;
+})();
+
 function makeRows(count: number): LabRow[] {
 	const statuses = ['Active', 'Pending', 'Inactive'];
 	return Array.from({ length: count }, (_, rowIndex) => {
-		const row: LabRow = {
-			id: `LAB-${rowIndex}`,
-			name: `Instrument ${rowIndex}`,
-			price: (100 + (rowIndex % 900)).toString(),
-			status: statuses[rowIndex % statuses.length],
-		};
-		// Populate 200 metric columns — enough to have real values throughout
-		// the Glide scroll path without allocating 100k × 996 strings.
-		for (let col = 0; col < 200; col++) {
-			row[`m_${col}`] = `${(rowIndex * 17 + col * 31) % 10000}`;
-		}
+		const row = Object.create(metricPrototype) as LabRow;
+		Object.defineProperty(row, '_i', { value: rowIndex, enumerable: false });
+		row.id = `LAB-${rowIndex}`;
+		row.name = `Instrument ${rowIndex}`;
+		row.price = (100 + (rowIndex % 900)).toString();
+		row.status = statuses[rowIndex % statuses.length];
 		return row;
 	});
 }
@@ -175,7 +190,7 @@ function makeColumns(mode: RendererMode): ColumnDef<LabRow>[] {
 	//   index % 40 === 20 → Imperative React    (~25 columns)
 	//   index % 40 === 10 → Deferred React      (~25 columns)  [only in deferredReact mode for extra load]
 	//   rest               → plain text
-	const metricColumns: ColumnDef<LabRow>[] = Array.from({ length: 996 }, (_, index) => {
+	const metricColumns: ColumnDef<LabRow>[] = Array.from({ length: METRIC_COLUMN_COUNT }, (_, index) => {
 		const base = { field: `m_${index}`, header: `Metric ${index}`, width: 96 + (index % 5) * 12 } as const;
 		if (index % 40 === 0) {
 			return { ...base, renderer: { kind: 'dom' as const, renderer: metricBarDomRenderer } };

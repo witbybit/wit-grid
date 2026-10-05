@@ -24,13 +24,30 @@ export function createRowPipelineContext<TData>(
 	for (const column of columns) {
 		columnsById.set(column.field, column);
 	}
+	// One reader per column id, resolved once per run: a plain field is a direct property read (the
+	// per-node value cache costs more than it saves for those); getters keep the cached path.
+	const readers = new Map<string, (node: RowNode<TData>) => unknown>();
+	const readerFor = (colId: string): ((node: RowNode<TData>) => unknown) => {
+		let reader = readers.get(colId);
+		if (!reader) {
+			const column = columnsById.get(colId);
+			if (column?.valueGetter) reader = (node) => getCellValueForPipeline(node, column, colId);
+			else {
+				const getter = compilePathGetter(column?.field ?? colId) as (data: TData) => unknown;
+				reader = (node) => getter(node.data);
+			}
+			readers.set(colId, reader);
+		}
+		return reader;
+	};
 
 	return {
 		columnsById,
 		reportFault,
-		getValue: (node, colId) => getCellValueForPipeline(node, columnsById.get(colId), colId),
+		getValue: (node, colId) => readerFor(colId)(node),
+		readerFor,
 		getGroupKey: (node, groupDef: GroupDef<TData>) => {
-			const value = getCellValueForPipeline(node, columnsById.get(groupDef.colId), groupDef.colId);
+			const value = readerFor(groupDef.colId)(node);
 			const keyString = groupDef.keyCreator ? groupDef.keyCreator({ value, row: node.data, rowId: node.id }) : String(value ?? 'None');
 			return { key: value, keyString };
 		},

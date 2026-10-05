@@ -29,6 +29,19 @@ export function toDataVisualRowId(rowId: string): string {
 	return `row:${encodeIdPart(rowId)}`;
 }
 
+/** {@link toDataVisualRowId}, cached on the node. */
+export function dataVisualRowIdOf(node: { id: string; dataVisualId: string | undefined }): string {
+	return (node.dataVisualId ??= toDataVisualRowId(node.id));
+}
+
+/** The row id inside a data row's visual id (`row:…`), or null for other visual ids. */
+export function rowIdFromDataVisualRowId(visualRowId: string): string | null {
+	if (!visualRowId.startsWith('row:')) return null;
+	const part = visualRowId.slice(4);
+	// encodeIdPart percent-encodes every unsafe character, '%' included, so this is its inverse.
+	return part.includes('%') ? decodeURIComponent(part) : part;
+}
+
 export function toDetailVisualRowId(rowId: string): string {
 	return `detail:${encodeIdPart(rowId)}`;
 }

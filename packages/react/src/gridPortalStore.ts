@@ -252,7 +252,7 @@ export function createPortalStore<TRowData = unknown>() {
 
 		// ── Cell mounts ──────────────────────────────────────────────────────────
 		mountCell(cellKey: string, container: HTMLElement, props: CellPortalProps<TRowData>) {
-			const { value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected, physicalIdentity } = props;
+			const { value, node, col, isEditing, isLoading, phase, isScrolling, isFocused, isSelected, physicalIdentity, rowVersion } = props;
 			const existing = portals.get(cellKey);
 
 			// Full equality check — skip everything when nothing changed.
@@ -271,6 +271,7 @@ export function createPortalStore<TRowData = unknown>() {
 				existing.isScrolling === isScrolling &&
 				existing.isFocused === isFocused &&
 				existing.isSelected === isSelected &&
+				existing.rowVersion === rowVersion &&
 				isSamePhysicalIdentity(existing.physicalIdentity, physicalIdentity)
 			) {
 				cellPortalKeyByContainer.set(container, cellKey);
@@ -302,6 +303,7 @@ export function createPortalStore<TRowData = unknown>() {
 				isScrolling,
 				isFocused,
 				isSelected,
+				rowVersion,
 				physicalIdentity,
 			});
 			cellPortalKeyByContainer.set(container, cellKey);

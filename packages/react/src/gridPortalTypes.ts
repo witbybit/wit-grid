@@ -33,6 +33,8 @@ export interface PortalCellProps<TRowData = unknown> {
 	isScrolling?: boolean;
 	isFocused?: boolean;
 	isSelected?: boolean;
+	/** Not shown to the renderer: a change makes the memoised cell render again (see CellPortalProps.rowVersion). */
+	rowVersion?: number;
 }
 
 /** Everything a cell renderer is shown; passed whole to the store's mount/update entry points. */
@@ -46,6 +48,8 @@ export interface CellPortalProps<TRowData = unknown> {
 	isScrolling: boolean | undefined;
 	isFocused: boolean | undefined;
 	isSelected: boolean | undefined;
+	/** The row's version at mount: a new one redraws the cell even when the props above are equal (row-scoped state such as a detail opening). */
+	rowVersion?: number;
 	/** Physical ownership identity for pooled cell portals. */
 	physicalIdentity: CellPortalPhysicalIdentity;
 }

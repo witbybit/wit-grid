@@ -40,6 +40,8 @@ export interface GroupingFeatureControllerDeps<TRowData = unknown> {
 	invalidation: InvalidationManager;
 	requestRender?: (reason: string) => void;
 	checkCapability?: (action: GridCapabilityAction, params: Partial<GridCapabilityParams<TRowData>>) => GridCapabilityResult;
+	/** New row version for a row whose UI state (detail open) changed, so its renderer cells redraw. */
+	notifyRowStateChanged?: (rowId: string) => void;
 }
 
 /** A hierarchy configuration change restructures rows: geometry, rows, headers and overlays all follow. */
@@ -63,6 +65,7 @@ export class GroupingFeatureController<TRowData = unknown> {
 	private readonly invalidation: InvalidationManager;
 	private readonly requestRender: (reason: string) => void;
 	private readonly checkCapability?: (action: GridCapabilityAction, params: Partial<GridCapabilityParams<TRowData>>) => GridCapabilityResult;
+	private readonly notifyRowStateChanged?: (rowId: string) => void;
 
 	constructor(deps: GroupingFeatureControllerDeps<TRowData>) {
 		this.ctx = deps.ctx;
@@ -70,6 +73,7 @@ export class GroupingFeatureController<TRowData = unknown> {
 		this.invalidation = deps.invalidation;
 		this.requestRender = deps.requestRender ?? (() => {});
 		this.checkCapability = deps.checkCapability;
+		this.notifyRowStateChanged = deps.notifyRowStateChanged;
 	}
 
 	private getExpansionCapableRowModel(): RowExpansionCapableModel<TRowData> | null {
@@ -334,6 +338,12 @@ export class GroupingFeatureController<TRowData = unknown> {
 	public setDetailOpen(rowId: string, open: boolean): void {
 		const result = this.getExpansionCapableRowModel()?.setDetailOpen(rowId, open);
 		this.applyRowModelRefreshInvalidation(result, 'detail');
+		// The row's own cells show its open state (a toggle renderer reads it): redraw them even when the
+		// row does not move.
+		if (result?.changed) {
+			this.notifyRowStateChanged?.(rowId);
+			this.invalidation.invalidateRow(rowId, 'detail');
+		}
 		if (result?.changed) this.dispatchExpansionChanged({ target: 'detail', id: rowId, expanded: open });
 	}
 

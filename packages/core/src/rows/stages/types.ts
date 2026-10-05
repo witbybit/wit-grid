@@ -2,6 +2,7 @@ import type { RowNode } from '../../store.js';
 import { type ColumnDef } from '../../store.js';
 import type { GroupDef } from '../hierarchyConfig.js';
 import type { GroupPathItem } from '../visualRowIds.js';
+import type { VisualRow } from '../../visualRow.js';
 
 export type RowTreeNode<TData = unknown> =
 	| {
@@ -12,6 +13,8 @@ export type RowTreeNode<TData = unknown> =
 			children?: RowTreeNode<TData>[];
 			/** Tree parents, when aggregation is configured: the aggregate of their descendants. */
 			aggregates?: Record<string, unknown>;
+			/** The leaf's visual row from the last flatten (stale once its group collapses); the incremental index locates rows through it. */
+			row?: VisualRow<TData>;
 	  }
 	| {
 			kind: 'group';
@@ -32,6 +35,8 @@ export type RowTreeNode<TData = unknown> =
 export interface RowPipelineContext<TData = unknown> {
 	columnsById: Map<string, ColumnDef<TData>>;
 	getValue: (node: RowNode<TData>, colId: string) => unknown;
+	/** The value reader for a column id, resolved once per run (hoist it out of per-row loops). */
+	readerFor: (colId: string) => (node: RowNode<TData>) => unknown;
 	getGroupKey: (node: RowNode<TData>, groupDef: GroupDef<TData>) => { key: unknown; keyString: string };
 	reportFault?: (operation: string, error: unknown, context?: Record<string, unknown>) => void;
 }

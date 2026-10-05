@@ -47,25 +47,45 @@ export function createPublicRowNodeFromInternal<TRowData>(deps: PublicRowNodeDis
 	});
 }
 
+/**
+ * Public row nodes for a transaction result, built on first read: a live feed that never looks at
+ * `result.rows` (most callers) pays nothing for it.
+ */
 export function mapInternalRowNodeTransaction<TRowData>(
 	deps: PublicRowNodeDispatchDeps<TRowData>,
 	transaction: InternalRowNodeTransaction<TRowData>
 ): RowNodeTransaction<TRowData> {
-	return {
-		add: transaction.add.map((node) => createPublicRowNodeFromInternal(deps, node)),
-		remove: transaction.remove.map((node) => createPublicRowNodeFromInternal(deps, node)),
-		update: transaction.update.map((node) => createPublicRowNodeFromInternal(deps, node)),
-	};
+	const map = (nodes: InternalRowNodeTransaction<TRowData>['add']) => nodes.map((node) => createPublicRowNodeFromInternal(deps, node));
+	return lazyFields({ add: () => map(transaction.add), remove: () => map(transaction.remove), update: () => map(transaction.update) });
 }
 
 export function mapRowsUpdatedDispatchPayload<TRowData>(
 	deps: PublicRowNodeDispatchDeps<TRowData>,
 	payload: RowsUpdatedDispatchPayload<TRowData>
 ): GridEventPayloadMap<TRowData>[GridEventName.rowsUpdated] {
-	return {
-		changedValuesByRow: payload.changedValuesByRow,
-		changedNodes: payload.changedNodes.map((node) => createPublicRowNodeFromInternal(deps, node)),
-		addedNodes: payload.addedNodes?.map((node) => createPublicRowNodeFromInternal(deps, node)),
-		removedNodes: payload.removedNodes?.map((node) => createPublicRowNodeFromInternal(deps, node)),
-	};
+	const map = (nodes: RowsUpdatedDispatchPayload<TRowData>['changedNodes']) => nodes.map((node) => createPublicRowNodeFromInternal(deps, node));
+	// Built on first read: listeners that only look at changedValuesByRow pay nothing for row nodes.
+	return lazyFields({
+		changedValuesByRow: () => payload.changedValuesByRow,
+		changedNodes: () => map(payload.changedNodes),
+		addedNodes: () => (payload.addedNodes ? map(payload.addedNodes) : undefined),
+		removedNodes: () => (payload.removedNodes ? map(payload.removedNodes) : undefined),
+	}) as GridEventPayloadMap<TRowData>[GridEventName.rowsUpdated];
+}
+
+/** An object whose fields are computed on first read and then kept (enumerable, so spreads see them). */
+function lazyFields<T extends Record<string, unknown>>(factories: { [K in keyof T]: () => T[K] }): T {
+	const target = {} as T;
+	for (const key of Object.keys(factories) as Array<keyof T>) {
+		Object.defineProperty(target, key, {
+			configurable: true,
+			enumerable: true,
+			get() {
+				const value = factories[key]();
+				Object.defineProperty(target, key, { value, enumerable: true, writable: true, configurable: true });
+				return value;
+			},
+		});
+	}
+	return target;
 }

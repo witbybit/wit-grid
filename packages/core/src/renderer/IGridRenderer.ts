@@ -48,6 +48,11 @@ export interface GridCellContentMount<TRowData = unknown> {
 	formattedValue?: string;
 	node: RowNode<TRowData>;
 	col: ColumnDef<TRowData>;
+	/**
+	 * The row's version when mounted: it moves with the row's data and its row-scoped state (a detail
+	 * opening), so an adapter can redraw content whose other inputs are unchanged.
+	 */
+	rowVersion?: number;
 	rowIndex?: number;
 	colIndex?: number;
 	/** Stable physical slot ID — bypasses the stale activeRows resolver during the binding loop. */

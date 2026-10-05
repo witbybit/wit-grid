@@ -1,4 +1,3 @@
-import { validateRowIds } from '../ids.js';
 import { RowNode } from '../rowNode.js';
 
 export type RowUpdate<T> = (rows: T[]) => T[];
@@ -63,27 +62,30 @@ function diffRows(prevRow: unknown, nextRow: unknown): RowDiff | null {
 	let changedFields: Set<string> | null = null;
 	let changedValues: Map<string, { oldValue: unknown; newValue: unknown }> | null = null;
 
-	const recordChange = (key: string, oldValue: unknown, newValue: unknown) => {
-		if (!changedFields) {
-			changedFields = new Set<string>();
-			changedValues = new Map<string, { oldValue: unknown; newValue: unknown }>();
-		}
-		changedFields.add(key);
-		changedValues!.set(key, { oldValue, newValue });
-	};
-
-	for (const key of Object.keys(prevRecord)) {
+	// One pass over the old row (for-in walks a cached key list; no Object.keys arrays per row), then a
+	// count of the new row's keys: only a new row with keys the old one lacks needs a second look.
+	let shared = 0;
+	for (const key in prevRecord) {
+		if (!hasOwn.call(prevRecord, key)) continue;
 		const oldValue = prevRecord[key];
 		const hasNextKey = hasOwn.call(nextRecord, key);
+		if (hasNextKey) shared++;
 		const newValue = nextRecord[key];
-		if (!hasNextKey || oldValue !== newValue) {
-			recordChange(key, oldValue, newValue);
-		}
+		if (hasNextKey && oldValue === newValue) continue;
+		changedFields ??= new Set<string>();
+		changedValues ??= new Map<string, { oldValue: unknown; newValue: unknown }>();
+		changedFields.add(key);
+		changedValues.set(key, { oldValue, newValue });
 	}
-
-	for (const key of Object.keys(nextRecord)) {
-		if (!hasOwn.call(prevRecord, key)) {
-			recordChange(key, undefined, nextRecord[key]);
+	let nextKeys = 0;
+	for (const key in nextRecord) if (hasOwn.call(nextRecord, key)) nextKeys++;
+	if (nextKeys !== shared) {
+		for (const key in nextRecord) {
+			if (!hasOwn.call(nextRecord, key) || hasOwn.call(prevRecord, key)) continue;
+			changedFields ??= new Set<string>();
+			changedValues ??= new Map<string, { oldValue: unknown; newValue: unknown }>();
+			changedFields.add(key);
+			changedValues.set(key, { oldValue: undefined, newValue: nextRecord[key] });
 		}
 	}
 
@@ -149,26 +151,35 @@ export class RowDataStore<T> {
 			return { sameOrder, changedNodes, changedFieldsByRow, changedValuesByRow, added: [], removed: [] };
 		}
 
-		validateRowIds(ids, 'setRows');
+		// One pass builds the next id map and rejects empty or duplicate ids (what validateRowIds checks,
+		// without a separate Set of every id) before any existing row is touched, so a bad id still
+		// leaves the store as it was; the second pass applies the data changes.
 		const added: RowNode<T>[] = [];
 		const nextNodeMap = new Map<string, RowNode<T>>();
+		const nodes = new Array<RowNode<T>>(rows.length);
 		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
 			const id = ids[i];
+			if (!id) throw new Error('Wit Grid [setRows]: getRowId returned an empty string. Every row must have a non-empty ID.');
+			if (nextNodeMap.has(id)) throw new Error(`Wit Grid [setRows]: duplicate row ID "${id}". Each row must have a unique ID.`);
 			let node = this.rowsById.get(id);
 			if (!node) {
-				node = new RowNode<T>(id, row);
+				node = new RowNode<T>(id, rows[i]);
 				added.push(node);
-			} else if (node.data !== row) {
-				const diff = diffRows(node.data, row);
-				node.setData(row);
-				if (diff) {
-					changedNodes.push(node);
-					changedFieldsByRow.set(id, diff.changedFields);
-					changedValuesByRow.set(id, diff.changedValues);
-				}
 			}
 			nextNodeMap.set(id, node);
+			nodes[i] = node;
+		}
+		for (let i = 0; i < rows.length; i++) {
+			const node = nodes[i];
+			const row = rows[i];
+			if (node.data === row) continue;
+			const diff = diffRows(node.data, row);
+			node.setData(row);
+			if (diff) {
+				changedNodes.push(node);
+				changedFieldsByRow.set(node.id, diff.changedFields);
+				changedValuesByRow.set(node.id, diff.changedValues);
+			}
 		}
 		const removed: RowNode<T>[] = [];
 		for (const [id, node] of this.rowsById) if (!nextNodeMap.has(id)) removed.push(node);
@@ -269,7 +280,28 @@ export class RowDataStore<T> {
 		return this.rowsById.get(rowId) ?? null;
 	}
 
+	/** Nodes in source order, cached until the order or membership changes. Callers must not mutate it. */
+	private nodesInOrder: RowNode<T>[] | null = null;
+	private orderSeen: readonly string[] | null = null;
+	private nodesSeen: Map<string, RowNode<T>> | null = null;
+
 	public getAllNodes(): RowNode<T>[] {
+		// Every order change assigns a new array or pushes onto it (length), membership edits replace
+		// or edit rowsById (size): cheap identity checks instead of hooks in every mutation path.
+		if (
+			this.nodesInOrder &&
+			this.orderSeen === this.sourceOrder &&
+			this.nodesInOrder.length === this.sourceOrder.length &&
+			this.nodesSeen === this.rowsById &&
+			this.rowsById.size === this.nodesInOrder.length
+		)
+			return this.nodesInOrder;
+		this.orderSeen = this.sourceOrder;
+		this.nodesSeen = this.rowsById;
+		return (this.nodesInOrder = this.computeAllNodes());
+	}
+
+	private computeAllNodes(): RowNode<T>[] {
 		return this.sourceOrder.map((id) => this.rowsById.get(id)!);
 	}
 

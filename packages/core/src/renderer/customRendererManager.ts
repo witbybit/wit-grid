@@ -11,6 +11,8 @@ export interface RendererInstance<TRowData = unknown> {
 	rowSlotId: string;
 	slotGeneration: number;
 	cellRowBindingGeneration: number;
+	/** The row's version (its data and row-scoped state); a change redraws content. */
+	rowVersion?: number;
 	/**
 	 * Physical CellSlot identity last sent to the adapter. Forwarded on every mount, update and
 	 * unmount so the adapter's strict identity check (React portal store) matches — an unmount
@@ -37,6 +39,8 @@ export interface AcquireRendererParams<TRowData = unknown> {
 	rowSlotId: string;
 	slotGeneration: number;
 	cellRowBindingGeneration: number;
+	/** The row's version (its data and row-scoped state); a change redraws content. */
+	rowVersion?: number;
 	cellInstanceId?: string;
 	portalHostId?: string;
 	parentContainer: HTMLElement;
@@ -238,6 +242,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			rowSlotId: params.rowSlotId,
 			slotGeneration: params.slotGeneration,
 			cellRowBindingGeneration: params.cellRowBindingGeneration,
+			rowVersion: params.rowVersion,
 			cellInstanceId: params.cellInstanceId,
 			portalHostId: params.portalHostId,
 			container,
@@ -264,6 +269,7 @@ export class CustomRendererManager<TRowData = unknown> {
 			rowSlotId: params.rowSlotId,
 			slotGeneration: params.slotGeneration,
 			cellRowBindingGeneration: params.cellRowBindingGeneration,
+			rowVersion: params.rowVersion,
 			cellInstanceId: params.cellInstanceId,
 			portalHostId: params.portalHostId,
 			container,
@@ -427,6 +433,8 @@ export class CustomRendererManager<TRowData = unknown> {
 			instance.isLoading !== params.isLoading ||
 			instance.isFocused !== params.isFocused ||
 			instance.isSelected !== params.isSelected ||
+			// Row-scoped state (a detail opening) moves the version while the value stays put.
+			instance.rowVersion !== params.rowVersion ||
 			(receivesScrollState && (instance.phase !== params.phase || instance.isScrolling !== params.isScrolling)) ||
 			instance.rendererKey !== params.rendererKey ||
 			instance.cellKey !== params.cellKey ||
@@ -446,6 +454,7 @@ export class CustomRendererManager<TRowData = unknown> {
 		instance.rowSlotId = params.rowSlotId;
 		instance.slotGeneration = params.slotGeneration;
 		instance.cellRowBindingGeneration = params.cellRowBindingGeneration;
+		instance.rowVersion = params.rowVersion;
 		instance.cellInstanceId = params.cellInstanceId;
 		instance.portalHostId = params.portalHostId;
 		instance.value = params.value;
@@ -479,6 +488,7 @@ export class CustomRendererManager<TRowData = unknown> {
 				rowSlotId: params.rowSlotId,
 				slotGeneration: params.slotGeneration,
 				cellRowBindingGeneration: params.cellRowBindingGeneration,
+				rowVersion: params.rowVersion,
 				cellInstanceId: params.cellInstanceId,
 				portalHostId: params.portalHostId,
 				container: instance.container,

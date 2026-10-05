@@ -168,3 +168,19 @@ describe('CustomRendererManager – scroll state is opt-in', () => {
 		expect(rebindCount(true)).toBe(1);
 	});
 });
+
+describe('CustomRendererManager – row-scoped state', () => {
+	it('forwards a same-value rebind whose row version moved (a detail opened) and passes the version on', () => {
+		const manager = new CustomRendererManager<Row>(makeEngineStub());
+		const mounts: Array<{ rowVersion?: number }> = [];
+		manager.onMountCellContent = (mount) => {
+			mounts.push(mount);
+		};
+		const parent = document.createElement('div');
+		const base = acquireParams(0, 0, parent);
+		manager.acquire({ ...base, rowVersion: 1 } as any);
+		manager.acquire({ ...base, rowVersion: 1 } as any);
+		manager.acquire({ ...base, rowVersion: 2 } as any);
+		expect(mounts.map((m) => m.rowVersion)).toEqual([1, 2]);
+	});
+});

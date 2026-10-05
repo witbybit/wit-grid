@@ -65,6 +65,9 @@ export interface RenderPaintPipelineDeps<TRowData = unknown> {
  * are the scroll pipeline's; frame timing is the FrameCoordinator's.
  */
 export class RenderPaintPipeline<TRowData = unknown> {
+	/** The sort and filter models the headers last showed (see dispatch). */
+	private headerSortModel: unknown = undefined;
+	private headerFilterModel: unknown = undefined;
 	private unsubscribers: Array<() => void> = [];
 	/** A layout transition armed by a structural change, played once rows hold their new positions. */
 	private pendingTransition = false;
@@ -237,12 +240,14 @@ export class RenderPaintPipeline<TRowData = unknown> {
 	 */
 	private applyPendingScrollAnchor(notScrolling: boolean): void {
 		const scrollViewport = this.deps.viewportRenderer.scrollViewport;
-		if (!scrollViewport) return;
+		// Reading scrollTop after this frame's DOM writes forces a layout: only when a correction waits.
+		if (!scrollViewport || !this.deps.engine.viewport.hasPendingScrollAnchor()) return;
 		const currentTop = scrollViewport.scrollTop;
 		const delta = this.deps.engine.viewport.consumeScrollAnchor(currentTop);
 		if (!notScrolling || delta === 0 || currentTop <= 0) return;
 		this.deps.viewportLayout.syncLayoutPlan();
 		scrollViewport.scrollTop = Math.max(0, currentTop + delta);
+		this.deps.viewportRenderer.invalidatePositionReads();
 		// Read back: the browser may clamp. Keep the engine in step without faking scroll velocity.
 		this.deps.engine.viewport.applyAnchoredScrollTop(scrollViewport.scrollTop);
 	}
@@ -290,7 +295,12 @@ export class RenderPaintPipeline<TRowData = unknown> {
 		// The sticky header copies repeat group rows' cells, so a row or cell repaint rewrites them too.
 		if (frame.rows.size > 0 || cellCount > 0 || frame.columns.size > 0) this.refreshStickyGroups();
 
-		if (frame.headers) {
+		// Headers show the sort and filter state. An async row model (infinite, server) reloads after a
+		// sort without a header invalidation, so any frame repaints them once those models moved.
+		const headerState = this.deps.engine.stateManager.getState();
+		if (frame.headers || headerState.sortModel !== this.headerSortModel || headerState.filterModel !== this.headerFilterModel) {
+			this.headerSortModel = headerState.sortModel;
+			this.headerFilterModel = headerState.filterModel;
 			stats.headerPaints++;
 			this.deps.headerRenderer.sync(frame);
 		}
@@ -309,8 +319,9 @@ export class RenderPaintPipeline<TRowData = unknown> {
 	private syncViewport(): void {
 		// Sync DOM-measured scroll viewport width before computing layout — ensures
 		// scrollViewportClientWidth is fresh after container resizes (e.g. sidebar open/close)
-		// without needing a full paint cycle.
-		this.deps.viewportRenderer.syncViewportScrollFromDom();
+		// without needing a full paint cycle. A scroll frame in this flush already read it: reuse that
+		// instead of reading after its DOM writes (a forced layout).
+		this.deps.viewportRenderer.syncViewportScrollFromDom('frame');
 		const layoutPlan = this.deps.viewportLayout.syncLayoutPlan();
 		this.deps.viewportLayout.recycleViewport(false, undefined, layoutPlan.renderWindow);
 		this.deps.stickyGroupRenderer.sync(layoutPlan);
@@ -333,6 +344,8 @@ export class RenderPaintPipeline<TRowData = unknown> {
 			this.deps.layoutTransition.beginAnimation();
 		}
 		this.deps.headerRenderer.repaintHeaders(layoutPlan);
+		this.headerSortModel = state.sortModel;
+		this.headerFilterModel = state.filterModel;
 		this.deps.floatingFilterRenderer.repaint(layoutPlan);
 		this.deps.overlayRenderer.repaintOverlay();
 		this.deps.rowRenderer.syncInteractionAccessibility(state);

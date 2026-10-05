@@ -543,8 +543,8 @@ export class GridEngine<TRowData = unknown> {
 				applyStructuralWriteEffects: (writeResult) => this.dataMutation.applyStructuralWriteEffects(writeResult),
 				publishCommittedCellChanges: (changes) => this.publishCommittedCellChanges(changes),
 				requestLayoutTransitionCapture: (reason) => this.requestLayoutTransitionCapture(reason),
-				syncRowGeometryFrom: (startIndex) => {
-					this.syncRowGeometry(startIndex);
+				syncRowGeometryFrom: (startIndex, endIndex) => {
+					this.syncRowGeometry(startIndex, endIndex);
 				},
 			},
 			domainMutationExecutorRegistry: createDefaultGridDomainMutationExecutorRegistry<TRowData>(),
@@ -593,6 +593,7 @@ export class GridEngine<TRowData = unknown> {
 			invalidation: this.invalidation,
 			requestRender: (reason) => this.requestRender(reason),
 			checkCapability: (action, p) => this.capabilityManager.can(action, p),
+			notifyRowStateChanged: (rowId) => this.cellNotifications.notifyRowStateChanged(rowId),
 		});
 		this.editingFeature = new EditingFeatureController<TRowData>({
 			ctx: featureContext,
@@ -1113,6 +1114,13 @@ export class GridEngine<TRowData = unknown> {
 	public pasteFromClipboard(): Promise<void> {
 		return this.clipboard.pasteFromClipboard();
 	}
+	/** A native copy/cut event: the selection as TSV into its data (cut also clears it). False when nothing was copied. */
+	public writeSelectionToClipboard(data: DataTransfer, cut: boolean): boolean {
+		return this.clipboard.writeSelectionToClipboard(data, cut);
+	}
+	public pasteText(text: string): Promise<void> {
+		return this.clipboard.pasteText(text);
+	}
 	public copyRange(minRow: number, maxRow: number, minCol: number, maxCol: number): Promise<void> {
 		return this.clipboard.copyRange(minRow, maxRow, minCol, maxCol);
 	}
@@ -1321,23 +1329,32 @@ export class GridEngine<TRowData = unknown> {
 	 *
 	 * Returns the first changed row index, or -1 when geometry was already current.
 	 */
-	public syncRowGeometry(fromIndex = 0): number {
+	public syncRowGeometry(fromIndex = 0, toIndex?: number): number {
 		const rowModel = this.rowModel;
 		if (!rowModel) return -1;
 		const state = this.stateManager.getState();
-		return this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight, fromIndex);
+		return this.syncRowGeometryFrom(rowModel, state.rowHeights, state.defaultRowHeight, fromIndex, toIndex);
 	}
 
 	private syncRowGeometryFrom(
 		rowModel: RowModel<TRowData>,
 		rowHeightsRecord: Record<string, number>,
 		defaultRowHeight: number,
-		fromIndex = 0
+		fromIndex = 0,
+		toIndex?: number
 	): number {
 		const state = this.stateManager.getState();
 		let count = rowModel.getVisualRowCount();
 		if (state.loading && count === 0) {
 			count = state.loadingSkeletonCount ?? 15;
+		} else if (fromIndex === 0 && toIndex === undefined && isEmptyRecord(rowHeightsRecord)) {
+			// Every row the default height (no per-row heights, uniform group/total rows): a row added or
+			// removed only resizes geometry instead of re-reading every row.
+			this.geometry.setReferenceHeight(defaultRowHeight);
+			if (rowModel.getUniformRowHeight?.(defaultRowHeight) === defaultRowHeight) {
+				const resized = this.geometry.resizeUniformRows(count, defaultRowHeight);
+				if (resized !== null) return resized;
+			}
 		}
 		return this.geometry.syncRows(
 			count,
@@ -1355,7 +1372,8 @@ export class GridEngine<TRowData = unknown> {
 				const explicitHeight = row.height ?? rowHeightsRecord[row.id];
 				return explicitHeight !== undefined ? explicitHeight : defaultRowHeight;
 			},
-			fromIndex
+			fromIndex,
+			toIndex
 		);
 	}
 
@@ -1741,4 +1759,9 @@ function withNoTransactionChanges<TRowData>(
 		rows: EMPTY_ROW_NODE_TRANSACTION,
 		cells: { committed: [], rejected: cells.map((cell) => ({ cell, reason })) },
 	} as GridTransactionResult<TRowData>;
+}
+
+function isEmptyRecord(record: Record<string, unknown>): boolean {
+	for (const _ in record) return false;
+	return true;
 }

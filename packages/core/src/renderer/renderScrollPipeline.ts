@@ -166,6 +166,7 @@ export class RenderScrollPipeline<TRowData = unknown> {
 	}
 
 	public onScroll = (scrollTop: number, scrollLeft: number, timestamp?: number): void => {
+		this.deps.viewportRenderer.notePositionFromScrollEvent();
 		const clampedScrollLeft = Math.max(0, Math.min(this.cachedMaxScrollLeft, scrollLeft));
 		if (clampedScrollLeft !== scrollLeft && this.deps.viewportRenderer.scrollViewport) {
 			this.deps.viewportRenderer.scrollViewport.scrollLeft = clampedScrollLeft;
@@ -187,7 +188,8 @@ export class RenderScrollPipeline<TRowData = unknown> {
 	public flushScrollFrame = (): void => {
 		const scrollViewport = this.deps.viewportRenderer.scrollViewport;
 		if (!scrollViewport) return;
-		this.deps.viewportRenderer.syncViewportScrollFromDom();
+		// The scroll event already read the position, before this frame's DOM writes (a live feed's).
+		this.deps.viewportRenderer.syncViewportScrollFromDom('event');
 
 		const state = this.deps.engine.stateManager.getState();
 		const interaction = readInteractionState(state);

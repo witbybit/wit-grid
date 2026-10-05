@@ -2293,6 +2293,66 @@ describe('explicit React entrypoints', () => {
 		});
 	});
 
+	it('re-applies columns only when their content changes (an inline array with the same data does not)', async () => {
+		let api: { getStateSnapshot: () => { columns: unknown } } | null = null;
+		const format = ({ value }: { value: unknown }) => String(value);
+		const renderWith = (header: string, valueFormatter = format) => (
+			<div style={{ width: 400, height: 300 }}>
+				<Grid
+					rowModelType='client'
+					rows={[{ id: '1', name: 'Alice' }]}
+					columns={[{ field: 'name', header, width: 100, valueFormatter }]}
+					getRowId={(row: TestRow) => row.id}
+					enableNavigation={false}
+					onGridReady={(event) => {
+						api = event.api as never;
+					}}
+				/>
+			</div>
+		);
+		const { rerender } = render(renderWith('Name'));
+		await waitFor(() => expect(api).not.toBeNull());
+		// The grid's columns state only changes identity when setColumns is applied.
+		const applied = api!.getStateSnapshot().columns;
+		rerender(renderWith('Name'));
+		rerender(renderWith('Name'));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).toBe(applied));
+		rerender(renderWith('Full name'));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).not.toBe(applied));
+		const renamed = api!.getStateSnapshot().columns;
+		rerender(renderWith('Full name', ({ value }) => `#${String(value)}`));
+		await waitFor(() => expect(api!.getStateSnapshot().columns).not.toBe(renamed));
+		// Only the formatter changed: the column repaints with it (no full re-apply needed).
+		await waitFor(() => expect(document.querySelector('.og-cell[data-col-field="name"]')?.textContent).toBe('#Alice'));
+	});
+
+	it('does not warn when initial-only props are new objects or functions with the same content (inline props)', async () => {
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const ready = vi.fn();
+		const renderInline = () => (
+			<div style={{ width: 400, height: 300 }}>
+				<Grid
+					rowModelType='client'
+					rows={[{ id: '1', name: 'Alice' }]}
+					columns={[{ field: 'name', header: 'Name', width: 100 }]}
+					getRowId={(row: TestRow) => row.id}
+					enableNavigation={false}
+					initialState={{ detail: { height: 120, isMaster: (row: TestRow) => row.id === '1' } }}
+					rendererOptions={{ rowAnimation: { style: 'fade' } }}
+					onGridReady={(event) => ready(event)}
+				/>
+			</div>
+		);
+		const { rerender } = render(renderInline());
+		await waitFor(() => expect(ready).toHaveBeenCalledTimes(1));
+		rerender(renderInline());
+		rerender(renderInline());
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(warnSpy.mock.calls.filter(([message]) => String(message).includes('initial-only'))).toEqual([]);
+		expect(ready).toHaveBeenCalledTimes(1);
+		warnSpy.mockRestore();
+	});
+
 	it('warns when initial-only Grid props change after mount', async () => {
 		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 		const onGridReady = vi.fn();

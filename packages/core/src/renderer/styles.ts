@@ -1179,9 +1179,13 @@ export const CORE_STYLES = `
     font-weight: 600;
   }
 
-  /* Group and total rows drawn as cell rows. */
+  /*
+   * Group and total rows drawn as cell rows. The tint over an opaque base (as the sticky copy and the
+   * selection do): the pinned lanes inherit it, and a translucent lane let centre cells scrolled under
+   * it show through.
+   */
   .og-row.og-row-group:not(.og-row-group-sticky) {
-    background: var(--og-group-row-bg);
+    background: linear-gradient(var(--og-group-row-bg), var(--og-group-row-bg)), var(--og-bg-color);
     color: var(--og-group-row-text);
     font-weight: var(--og-group-row-font-weight);
   }
@@ -1196,14 +1200,15 @@ export const CORE_STYLES = `
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   }
 
+  /* Pinned cells and lanes take the row's whole background (a tint over a base, not just the colour). */
   .og-cell-pinned-left {
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
   }
 
   .og-cell-pinned-right {
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
   }
 
   /*
@@ -1223,7 +1228,7 @@ export const CORE_STYLES = `
     height: 100%;
     flex-shrink: 0;
     z-index: 40;
-    background-color: inherit;
+    background: inherit;
     overflow: hidden;
     contain: layout paint;
   }
@@ -1857,35 +1862,44 @@ export const CORE_STYLES = `
     background-color: var(--og-focus-ring);
   }
 
-  /* Context menu — modern (shadcn-style): solid surface, subtle border + ring, soft
-     shadow, rounded inset items with a muted accent hover, origin-aware entrance. */
-  .og-context-menu {
+  /*
+   * Menus (context menu and column menu) share one surface: a solid panel with a hairline border and
+   * soft shadow, 30px rows, muted icons, subtle hover/active fills. They spring open from their anchor
+   * and leave with a quicker ease-in (og-closing); reduced motion gets a plain fade.
+   */
+  .og-context-menu,
+  .og-header-popover {
     position: fixed;
-    z-index: 1000;
-    background: var(--og-popover-bg, rgba(17, 20, 28, 0.97));
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--og-popover-border, rgba(255, 255, 255, 0.08));
-    border-radius: 8px;
+    background: var(--og-popover-bg, rgba(15, 18, 26, 0.98));
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid var(--og-popover-border, rgba(255, 255, 255, 0.09));
+    border-radius: 10px;
     box-shadow:
-      0 10px 38px -10px rgba(0, 0, 0, 0.55),
-      0 2px 8px -2px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.04);
-    padding: 4px;
-    min-width: 200px;
+      0 16px 40px -12px rgba(0, 0, 0, 0.55),
+      0 4px 12px -4px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+    padding: 5px;
     font-family: var(--og-font-family), inherit;
+    font-size: 13px;
     color: var(--og-popover-text, #e7e9ee);
     opacity: 0;
-    transform: translateY(-4px) scale(0.96);
-    transform-origin: top center;
+    transform: translateY(-6px) scale(0.96);
+    transform-origin: top left;
     transition:
-      opacity 0.15s ease,
-      transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity 0.16s ease-out,
+      transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: none;
+    will-change: transform, opacity;
   }
-  .og-context-menu.og-placement-top {
-    transform: translateY(4px) scale(0.96);
-    transform-origin: bottom center;
+  .og-context-menu {
+    z-index: 1000;
+    min-width: 220px;
+  }
+  .og-context-menu.og-placement-top,
+  .og-header-popover.og-placement-top {
+    transform: translateY(6px) scale(0.96);
+    transform-origin: bottom left;
   }
   .og-context-menu.og-placement-left {
     transform-origin: top right;
@@ -1893,72 +1907,105 @@ export const CORE_STYLES = `
   .og-context-menu.og-placement-top.og-placement-left {
     transform-origin: bottom right;
   }
-  .og-context-menu.og-visible {
+  .og-context-menu.og-visible,
+  .og-header-popover.og-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
   }
+  .og-context-menu.og-closing,
+  .og-header-popover.og-closing {
+    transform: translateY(-2px) scale(0.98);
+    transition:
+      opacity 0.11s ease-in,
+      transform 0.11s cubic-bezier(0.4, 0, 1, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .og-context-menu,
+    .og-header-popover,
+    .og-context-menu.og-closing,
+    .og-header-popover.og-closing {
+      transform: none !important;
+      transition: opacity 0.1s linear;
+    }
+  }
   .og-context-menu-item {
     display: flex;
     align-items: center;
-    padding: 7px 8px;
-    margin: 1px 0;
+    gap: 10px;
+    height: 30px;
+    padding: 0 8px;
     border-radius: 6px;
     font-size: 13px;
-    line-height: 1.1;
+    font-weight: 450;
+    line-height: 1;
     cursor: pointer;
-    transition: background-color 0.11s ease, color 0.11s ease;
+    transition: background-color 0.1s ease, color 0.1s ease;
     user-select: none;
     color: var(--og-popover-text, #e7e9ee);
   }
   .og-context-menu-item:hover,
   .og-context-menu-item.og-menu-active {
     background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.07));
-    color: var(--og-popover-text, #ffffff);
   }
-  /* Keyboard navigation highlights via .og-menu-active; the focused item shows that
-     state rather than a separate browser outline. */
+  /* Keyboard navigation highlights via .og-menu-active; no separate browser outline. */
   .og-context-menu-item:focus,
   .og-context-menu-item:focus-visible {
     outline: none;
   }
+  .og-context-menu-item.og-danger {
+    color: var(--og-danger-text, #f87171);
+  }
+  .og-context-menu-item.og-danger:hover,
+  .og-context-menu-item.og-danger.og-menu-active {
+    background-color: var(--og-danger-hover-bg, rgba(248, 113, 113, 0.1));
+  }
   .og-context-menu-item.og-disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    color: #8b93a3;
+    opacity: 0.38;
+    cursor: default;
   }
   .og-context-menu-item.og-disabled:hover {
     background-color: transparent;
-    color: #8b93a3;
   }
   .og-context-menu-item-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 15px;
-    height: 15px;
-    margin-right: 9px;
-    font-size: 14px;
+    width: 16px;
+    height: 16px;
     flex-shrink: 0;
     color: inherit;
-    opacity: 0.7;
+    opacity: 0.6;
+    transition: opacity 0.1s ease;
+  }
+  .og-context-menu-item:hover .og-context-menu-item-icon,
+  .og-context-menu-item.og-menu-active .og-context-menu-item-icon {
+    opacity: 0.95;
+  }
+  .og-context-menu-item-icon svg {
+    width: 15px;
+    height: 15px;
   }
   .og-context-menu-item-label {
     flex-grow: 1;
-    font-weight: 500;
+    white-space: nowrap;
   }
   .og-context-menu-item-shortcut {
     margin-left: auto;
-    padding-left: 18px;
+    padding-left: 20px;
+    font-family: inherit;
     font-size: 11px;
+    font-weight: 500;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.4px;
-    opacity: 0.5;
+    letter-spacing: 0.3px;
+    opacity: 0.45;
+    background: none;
+    border: 0;
   }
   .og-context-menu-divider {
     height: 1px;
     background-color: var(--og-popover-divider, rgba(255, 255, 255, 0.07));
-    margin: 4px 6px;
+    margin: 5px -5px;
   }
 
   /* Column Header Popover Styles & Developer Themeable CSS Variables */
@@ -1997,170 +2044,151 @@ export const CORE_STYLES = `
   }
   
   .og-header-popover {
-    position: fixed;
     z-index: 1100;
-    background: var(--og-popover-bg, rgba(17, 20, 28, 0.97));
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid var(--og-popover-border, rgba(255, 255, 255, 0.08));
-    border-radius: 8px;
-    box-shadow:
-      0 10px 38px -10px rgba(0, 0, 0, 0.55),
-      0 2px 8px -2px rgba(0, 0, 0, 0.5),
-      0 0 0 1px rgba(255, 255, 255, 0.04);
-    padding: 5px;
-    width: 220px;
-    font-family: var(--og-font-family), inherit;
-    color: var(--og-popover-text, #e7e9ee);
-    opacity: 0;
-    transform: translateY(-4px) scale(0.96);
-    transform-origin: top center;
-    transition:
-      opacity 0.15s ease,
-      transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: none;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .og-header-popover.og-placement-top {
-    transform: translateY(4px) scale(0.96);
-    transform-origin: bottom center;
-  }
-  .og-header-popover.og-visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
-  .og-popover-sort-section {
+    width: 236px;
     display: flex;
     flex-direction: column;
     gap: 2px;
   }
+  .og-popover-sort-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
   .og-popover-item {
     display: flex;
     align-items: center;
-    padding: 6px 10px;
-    font-size: 12px;
-    cursor: pointer;
+    gap: 10px;
+    height: 30px;
+    padding: 0 8px;
     border-radius: 6px;
-    transition: background-color 0.12s ease, color 0.12s ease;
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1;
+    cursor: pointer;
     color: inherit;
-    opacity: 0.85;
-    gap: 8px;
+    transition: background-color 0.1s ease, color 0.1s ease;
+    user-select: none;
   }
   .og-popover-item svg {
-    color: #94a3b8;
+    width: 15px;
+    height: 15px;
     flex-shrink: 0;
+    color: inherit;
+    opacity: 0.6;
+    transition: opacity 0.1s ease;
   }
-  .og-popover-item:hover {
-    background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.06));
-    color: var(--og-popover-text, #ffffff);
-    opacity: 1;
-  }
-  /* Keyboard focus ring for the (non-native) sort rows; native filter controls keep
-     their own focus styling. */
+  .og-popover-item:hover,
   .og-popover-item:focus-visible {
-    outline: 2px solid var(--og-focus-ring, #3b82f6);
-    outline-offset: -2px;
-    color: #ffffff;
-    opacity: 1;
+    background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.07));
+    outline: none;
   }
+  .og-popover-item:hover svg,
+  .og-popover-item:focus-visible svg {
+    opacity: 0.95;
+  }
+  /* The current sort: a soft accent tint and a dot, not a solid block competing with hover. */
   .og-popover-item.og-active {
-    background-color: var(--og-popover-item-active-bg, var(--og-focus-ring, #3b82f6));
-    color: #ffffff;
-    opacity: 1;
+    background-color: color-mix(in srgb, var(--og-popover-item-active-bg, var(--og-focus-ring, #3b82f6)) 16%, transparent);
+    color: color-mix(in srgb, var(--og-popover-item-active-bg, var(--og-focus-ring, #3b82f6)) 65%, var(--og-popover-text, #ffffff));
   }
   .og-popover-item.og-active svg {
-    color: #ffffff;
+    opacity: 1;
+  }
+  .og-popover-item.og-active::after {
+    content: '';
+    margin-left: auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
   }
   .og-popover-item.og-danger {
-    color: #f87171;
+    color: var(--og-danger-text, #f87171);
   }
-  .og-popover-item.og-danger:hover {
-    background-color: rgba(248, 113, 113, 0.08);
-    color: #f87171;
+  .og-popover-item.og-danger:hover,
+  .og-popover-item.og-danger:focus-visible {
+    background-color: var(--og-danger-hover-bg, rgba(248, 113, 113, 0.1));
   }
   .og-popover-divider {
     height: 1px;
     background-color: var(--og-popover-divider, rgba(255, 255, 255, 0.07));
-    margin: 4px 2px;
+    margin: 4px -5px;
   }
   .og-popover-filter-section {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 0 4px;
+    padding: 4px 3px 3px;
   }
   .og-popover-section-title {
-    font-size: 9px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #94a3b8;
-    margin-bottom: 2px;
+    letter-spacing: 0.6px;
+    opacity: 0.5;
+    padding: 0 5px;
+  }
+  .og-popover-select,
+  .og-popover-input {
+    height: 30px;
+    background: var(--og-popover-input-bg, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--og-popover-input-border, rgba(255, 255, 255, 0.09));
+    color: inherit;
+    border-radius: 6px;
+    padding: 0 9px;
+    font-size: 12px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
   }
   .og-popover-select {
-    background: var(--og-popover-input-bg, rgba(30, 41, 59, 0.7));
-    border: 1px solid var(--og-popover-input-border, rgba(255, 255, 255, 0.08));
-    color: inherit;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 11px;
-    outline: none;
     cursor: pointer;
-    font-family: inherit;
   }
   .og-popover-select option {
-    background: var(--og-popover-input-bg, #0f172a);
+    background: var(--og-popover-option-bg, #0f172a);
     color: var(--og-popover-text, #f1f5f9);
   }
-  .og-popover-input {
-    background: var(--og-popover-input-bg, rgba(30, 41, 59, 0.7));
-    border: 1px solid var(--og-popover-input-border, rgba(255, 255, 255, 0.08));
-    color: inherit;
-    border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 11px;
-    outline: none;
-    font-family: inherit;
-    transition: border-color 0.12s ease;
-  }
+  .og-popover-select:focus,
   .og-popover-input:focus {
     border-color: var(--og-focus-ring, #3b82f6);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-focus-ring, #3b82f6) 22%, transparent);
+  }
+  .og-popover-input::placeholder {
+    color: inherit;
+    opacity: 0.4;
   }
   .og-popover-btn-group {
     display: flex;
     gap: 6px;
-    margin-top: 4px;
+    margin-top: 2px;
   }
   .og-popover-btn {
     flex: 1;
-    font-size: 11px;
+    height: 28px;
+    font-size: 12px;
     font-weight: 600;
-    padding: 6px 12px;
     border-radius: 6px;
-    border: none;
+    border: 1px solid transparent;
     cursor: pointer;
     font-family: inherit;
-    transition: opacity 0.12s ease, background-color 0.12s ease;
+    transition: background-color 0.12s ease, border-color 0.12s ease, filter 0.12s ease;
   }
   .og-btn-primary {
     background-color: var(--og-popover-item-active-bg, var(--og-focus-ring, #3b82f6));
     color: #ffffff;
   }
   .og-btn-primary:hover {
-    opacity: 0.9;
+    filter: brightness(1.1);
   }
   .og-btn-secondary {
-    background-color: var(--og-popover-input-bg, rgba(255, 255, 255, 0.08));
-    border: 1px solid var(--og-popover-input-border, transparent);
-    color: var(--og-popover-text, #e2e8f0);
+    background-color: transparent;
+    border-color: var(--og-popover-input-border, rgba(255, 255, 255, 0.12));
+    color: inherit;
   }
   .og-btn-secondary:hover {
-    background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.12));
+    background-color: var(--og-popover-item-hover-bg, rgba(255, 255, 255, 0.06));
   }
-
   .og-group-row-toggle {
     width: 18px;
     height: 18px;

@@ -20,7 +20,7 @@ import {
 	type TreeDataConfig,
 } from './hierarchyConfig.js';
 import type { RowTreeNode } from './stages/types.js';
-import { toDataVisualRowId } from './visualRowIds.js';
+import { dataVisualRowIdOf, toDataVisualRowId } from './visualRowIds.js';
 import { computePageWindow, type PageWindow } from './pageModel.js';
 
 export type { GroupDef } from './hierarchyConfig.js';
@@ -56,7 +56,6 @@ export interface RowPipelineOutput<TData = unknown> {
 	visualRows: VisualRow<TData>[];
 	visualRowIdToIndex: Map<string, number>;
 	rowIdToVisualIndex: Map<string, number>;
-	rowIdToVisualRowId: Map<string, string>;
 	rowIdToVisualRowIds?: Map<string, string[]>;
 	/** Maps each expanded group row's visual index → its last descendant's visual index. */
 	stickyGroupMeta: Map<number, number>;
@@ -123,11 +122,16 @@ export class RowPipeline<TData = unknown> {
 				queryModel
 			);
 			if (!detail && aggDefs.length === 0) {
+				let recorded: Record<string, number> | null = null;
+				for (const _ in rowHeightsRecord) {
+					recorded = rowHeightsRecord;
+					break;
+				}
 				visualRows = filteredNodes.map((node) => {
-					const explicitHeight = rowHeightsRecord[node.id] ?? getRowHeight?.(node.data, node.id);
+					const explicitHeight = recorded?.[node.id] ?? getRowHeight?.(node.data, node.id);
 					return {
 						kind: 'data',
-						id: toDataVisualRowId(node.id),
+						id: dataVisualRowIdOf(node),
 						rowId: node.id,
 						node,
 						hierarchy: FLAT_HIERARCHY,
@@ -192,24 +196,32 @@ export class RowPipeline<TData = unknown> {
 		}
 
 		const visualRowIdToIndex = new Map<string, number>();
-		const rowIdToVisualIndex = new Map<string, number>();
-		const rowIdToVisualRowId = new Map<string, string>();
+		// Built on first read: the client row model keeps positions on RowNodes and never asks.
+		const finalRows = visualRows;
+		let rowIdToVisualIndex: Map<string, number> | undefined;
+		const rowIndex = (): Map<string, number> => {
+			if (!rowIdToVisualIndex) {
+				const map = (rowIdToVisualIndex = new Map<string, number>());
+				finalRows.forEach((row, idx) => {
+					if (row.kind === 'data' && !map.has(row.rowId)) map.set(row.rowId, idx);
+				});
+			}
+			return rowIdToVisualIndex;
+		};
 		let rowIdToVisualRowIds: Map<string, string[]> | undefined;
 		let groupCount = 0;
 		let detailRowCount = 0;
 		let loadingRowCount = 0;
 		visualRows.forEach((row, idx) => {
+			// Data rows are found through rowIdToVisualIndex (their visual id derives from the row id).
+			if (row.kind === 'data') return;
 			visualRowIdToIndex.set(row.id, idx);
-			if (row.kind === 'data') {
-				if (!rowIdToVisualIndex.has(row.rowId)) {
-					rowIdToVisualIndex.set(row.rowId, idx);
-					rowIdToVisualRowId.set(row.rowId, row.id);
-				}
-			} else if (row.kind === 'detail') {
+			if (row.kind === 'detail') {
 				rowIdToVisualRowIds ??= new Map<string, string[]>();
 				const parentRowId = row.parentRowId ?? row.parentId;
 				const ids = rowIdToVisualRowIds.get(parentRowId) ?? [];
-				const dataVisualRowId = rowIdToVisualRowId.get(parentRowId);
+				// A data row's visual id is derived from its row id.
+				const dataVisualRowId = rowIndex().has(parentRowId) ? toDataVisualRowId(parentRowId) : undefined;
 				if (ids.length === 0 && dataVisualRowId) {
 					ids.push(dataVisualRowId);
 				}
@@ -228,8 +240,9 @@ export class RowPipeline<TData = unknown> {
 		return {
 			visualRows,
 			visualRowIdToIndex,
-			rowIdToVisualIndex,
-			rowIdToVisualRowId,
+			get rowIdToVisualIndex() {
+				return rowIndex();
+			},
 			rowIdToVisualRowIds,
 			stickyGroupMeta,
 			groupMeta,
@@ -356,7 +369,6 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 				lastChildIndex: row.hierarchy.expanded ? visualRows.length - 1 : -1,
 				firstLeafIndex: -1,
 				lastLeafIndex: -1,
-				visibleDescendantRowIds: [],
 				childGroupIds: [],
 				leafCount: row.hierarchy.leafCount,
 				childCount: row.hierarchy.childCount,
@@ -369,7 +381,6 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 			if (row.hierarchy.expanded) stack.push(meta);
 		} else if (row.kind === 'data') {
 			for (const group of stack) {
-				group.visibleDescendantRowIds.push(row.rowId);
 				if (group.firstLeafIndex === -1) group.firstLeafIndex = i;
 				group.lastLeafIndex = i;
 			}

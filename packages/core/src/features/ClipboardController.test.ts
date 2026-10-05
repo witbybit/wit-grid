@@ -528,3 +528,58 @@ describe('ClipboardController', () => {
 		store.destroy();
 	});
 });
+
+describe('native clipboard events (Ctrl+C / Ctrl+X / Ctrl+V)', () => {
+	function fakeEvent(type: 'copy' | 'cut' | 'paste', text = '') {
+		let data = text;
+		return {
+			type,
+			defaultPrevented: false,
+			clipboardData: {
+				setData: (_format: string, value: string) => {
+					data = value;
+				},
+				getData: () => data,
+			},
+			preventDefault: vi.fn(),
+			get text() {
+				return data;
+			},
+		};
+	}
+	function setup() {
+		const store = makeStore();
+		makeController(store);
+		store.selectCell({ rowId: '1', colField: 'name' });
+		store.selectRange({ rowId: '1', colField: 'name' }, { rowId: '2', colField: 'price' });
+		const dispatch = (event: ReturnType<typeof fakeEvent>) =>
+			(store as unknown as { interactionController: { dispatchInput(c: unknown): void } }).interactionController.dispatchInput({ kind: 'clipboard', event });
+		const values = () => (store.rows().getAll() as TestRow[]).map((row) => `${row.name}|${row.price}`);
+		return { store, dispatch, values };
+	}
+
+	it('copy writes the selected range as TSV into the event, without the clipboard API', () => {
+		const { dispatch, values } = setup();
+		const event = fakeEvent('copy');
+		dispatch(event);
+		expect(event.text).toBe('Alpha\t10\nBeta\t200');
+		expect(event.preventDefault).toHaveBeenCalled();
+		expect(values()).toEqual(['Alpha|10', 'Beta|200']);
+	});
+
+	it('cut copies the range and clears its cells', () => {
+		const { dispatch, values } = setup();
+		const event = fakeEvent('cut');
+		dispatch(event);
+		expect(event.text).toBe('Alpha\t10\nBeta\t200');
+		expect(values()).toEqual(['|', '|']);
+	});
+
+	it('paste writes the event text at the selection', async () => {
+		const { dispatch, values } = setup();
+		const event = fakeEvent('paste', 'Gamma\t30\nDelta\t40');
+		dispatch(event);
+		expect(event.preventDefault).toHaveBeenCalled();
+		await vi.waitFor(() => expect(values()).toEqual(['Gamma|30', 'Delta|40']));
+	});
+});

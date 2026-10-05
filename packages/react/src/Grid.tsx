@@ -3,6 +3,7 @@ import type { RowAnimationOptions } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
 import { GridProvider } from './gridContext.js';
 import { GridView, type GridViewProps } from './GridView.js';
+import { isProductionBuild, sameColumnDefs, sameInitialValue } from './initialProps.js';
 import { resolveColumnTypes } from './resolveColumnTypes.js';
 import type {
 	ColumnDef,
@@ -128,10 +129,13 @@ function createInitialState<TRowData>(
 
 function warnInitialOnlyGridProp(propName: string): void {
 	console.warn(
-		`[@eregister/wit-grid-react] Prop "${propName}" is initial-only on <Grid /> after mount. ` +
-			'Changing it does not reconfigure the existing grid instance. Remount the grid if you need the new value to take effect.'
+		`[@eregister/wit-grid-react] Prop "${propName}" is initial-only on <Grid /> after mount, and its value changed. ` +
+			'The existing grid keeps the value it was created with; remount the grid (change its key) to apply the new one.'
 	);
 }
+
+/** Callback props the grid calls through a stable trampoline: a new function each render is free; only adding or removing one matters. */
+const CALLBACK_PROPS = new Set(['getRowId', 'getRowHeight']);
 
 export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	const {
@@ -175,6 +179,13 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 			rowDragMode?: 'managed' | 'unmanaged';
 		};
 	const readyFiredRef = useRef(false);
+	// The grid holds stable trampolines to the latest callbacks, so inline arrow functions cost nothing.
+	const getRowIdRef = useRef(getRowId);
+	getRowIdRef.current = getRowId;
+	const getRowHeightRef = useRef(getRowHeight);
+	getRowHeightRef.current = getRowHeight;
+	const onGridReadyRef = useRef(onGridReady);
+	onGridReadyRef.current = onGridReady;
 	const lastColumnsRef = useRef(columns);
 	const lastColumnTypesRef = useRef(columnTypes);
 	const didMountServerRef = useRef(false);
@@ -203,10 +214,11 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	const api = useMemo(() => {
 		// Normalize string persistence key to a GridPersistenceAdapter so core always receives the adapter type.
 		const resolvedPersistence = typeof persistence === 'string' ? createLocalStorageAdapter(persistence) : persistence;
+		const stableGetRowId: typeof getRowId = getRowId ? ((row: TRowData) => getRowIdRef.current!(row)) as typeof getRowId : undefined;
 		const initial = createInitialState(
 			{
 				columns,
-				getRowId,
+				getRowId: stableGetRowId,
 				initialState,
 				persistence,
 				rowOverscanPx,
@@ -225,7 +237,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				datasource: datasource as InfiniteDatasource<TRowData>,
 				columns: resolveColumnTypes(columns, columnTypes),
 				blockSize,
-				getRowId,
+				getRowId: stableGetRowId,
 				persistence: resolvedPersistence,
 				workspace,
 				rowSelection,
@@ -240,7 +252,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				datasource: datasource as ServerSideDatasource<TRowData>,
 				columns: resolveColumnTypes(columns, columnTypes),
 				blockSize,
-				getRowId,
+				getRowId: stableGetRowId,
 				persistence: resolvedPersistence,
 				workspace,
 				rowSelection,
@@ -254,8 +266,8 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		return createClientGrid({
 			rows: rows as TRowData[],
 			columns: resolveColumnTypes(columns, columnTypes),
-			getRowId,
-			getRowHeight: getRowHeight ? (row) => getRowHeight(row as TRowData) : undefined,
+			getRowId: stableGetRowId,
+			getRowHeight: getRowHeight ? (row) => getRowHeightRef.current?.(row as TRowData) : undefined,
 			persistence: resolvedPersistence,
 			workspace,
 			rowSelection,
@@ -308,9 +320,12 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	}, [api, rowModelType, datasource]);
 
 	useEffect(() => {
-		if (columns === lastColumnsRef.current && columnTypes === lastColumnTypesRef.current) return;
+		// An inline columns array is new every render: re-applying it repaints every cell and resets the
+		// incremental row index, so only a change in content (or in a function's identity) applies.
+		const unchanged = sameColumnDefs(columns, lastColumnsRef.current) && sameColumnDefs(columnTypes, lastColumnTypesRef.current);
 		lastColumnsRef.current = columns;
 		lastColumnTypesRef.current = columnTypes;
+		if (unchanged) return;
 		api.setColumns(resolveColumnTypes(columns, columnTypes));
 	}, [api, columns, columnTypes]);
 
@@ -318,15 +333,16 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		if (readyFiredRef.current) return;
 		readyFiredRef.current = true;
 		const resolvedRowModelType = rowModelType ?? 'client';
-		onGridReady?.({ api, rowModelType: resolvedRowModelType });
-	}, [api, rowModelType, onGridReady]);
+		onGridReadyRef.current?.({ api, rowModelType: resolvedRowModelType });
+	}, [api, rowModelType]);
 
 	useEffect(() => {
 		const initialOnlyProps = initialOnlyPropsRef.current;
 		const checks: Array<[string, unknown, unknown]> = [
 			['rowModelType', initialOnlyProps.rowModelType, rowModelType],
 			['getRowId', initialOnlyProps.getRowId, getRowId],
-			['initialState', initialOnlyProps.initialState, initialState],
+			// initialState is not checked: its name says it is read once, and apps derive it from state
+			// they later apply through the api.
 			['persistence', initialOnlyProps.persistence, persistence],
 			['workspace', initialOnlyProps.workspace, workspace],
 			['rowOverscanPx', initialOnlyProps.rowOverscanPx, rowOverscanPx],
@@ -343,8 +359,10 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 			['getRowHeight', initialOnlyProps.getRowHeight, getRowHeight],
 		];
 
+		if (isProductionBuild()) return;
 		for (const [propName, initialValue, currentValue] of checks) {
-			if (Object.is(initialValue, currentValue)) continue;
+			const same = CALLBACK_PROPS.has(propName) ? !initialValue === !currentValue : sameInitialValue(initialValue, currentValue);
+			if (same) continue;
 			if (warnedInitialOnlyPropsRef.current.has(propName)) continue;
 			warnedInitialOnlyPropsRef.current.add(propName);
 			warnInitialOnlyGridProp(propName);
@@ -352,7 +370,6 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	}, [
 		rowModelType,
 		getRowId,
-		initialState,
 		persistence,
 		workspace,
 		rowOverscanPx,
@@ -366,6 +383,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		showStatusBar,
 		rowDragMode,
 		blockSize,
+		getRowHeight,
 	]);
 
 	useInsertionEffect(() => {

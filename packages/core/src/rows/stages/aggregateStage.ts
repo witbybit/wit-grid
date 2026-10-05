@@ -24,32 +24,50 @@ export function aggregateStage<TData>(
 ): Record<string, unknown> {
 	if (aggDefs.length === 0) return {};
 
+	// Values are gathered once per column, however many built-in definitions read it.
+	const statFields = [...new Set(aggDefs.filter((def) => STAT_FUNCS.has(def.aggFunc as string)).map((def) => def.colId))];
 	const run: AggregationRun<TData> = {
 		aggDefs,
 		context,
-		// Values are gathered once per column, however many built-in definitions read it.
-		statFields: [...new Set(aggDefs.filter((def) => STAT_FUNCS.has(def.aggFunc as string)).map((def) => def.colId))],
+		statFields,
+		statReaders: statFields.map((colId) => context.readerFor(colId)),
 		// One shared DFS-ordered accumulator: a subtree's leaves are a contiguous tail of it.
 		leaves: aggDefs.some((def) => !STAT_FUNCS.has(def.aggFunc as string)) ? [] : null,
 		aggregateTreeParents: options.aggregateTreeParents ?? true,
 	};
 	const grandStats = new Map<string, FieldStats>();
-	for (const root of roots) aggregateNodeRecursively(root, run, grandStats);
+	if (allPlainLeaves(roots)) foldLeaves(roots, run, grandStats);
+	else for (const root of roots) aggregateNodeRecursively(root, run, grandStats);
 	return computeAggregates(run, grandStats, 0, { scope: 'grand', level: -1 });
 }
 
+/** Built-in (stat) aggregates from per-column stats, exactly as a full run's grand total computes them. */
+export function statAggregates<TData>(aggDefs: AggregationDef<TData>[], statsByField: Map<string, FieldStats>): Record<string, unknown> {
+	const run: AggregationRun<TData> = {
+		aggDefs,
+		context: undefined as never,
+		statFields: [],
+		statReaders: [],
+		leaves: null,
+		aggregateTreeParents: true,
+	};
+	return computeAggregates(run, statsByField, 0, { scope: 'grand', level: -1 });
+}
+
 /** Built-ins computed from running per-column stats; the rest need the leaf rows. */
-const STAT_FUNCS = new Set<string>(['sum', 'avg', 'min', 'max', 'count', 'first', 'last']);
+export const STAT_FUNCS = new Set<string>(['sum', 'avg', 'min', 'max', 'count', 'first', 'last']);
 
 interface AggregationRun<TData> {
 	aggDefs: AggregationDef<TData>[];
 	context: RowPipelineContext<TData>;
 	statFields: string[];
+	/** `context.readerFor` of each stat field, resolved once. */
+	statReaders: Array<(node: RowNode<TData>) => unknown>;
 	leaves: RowNode<TData>[] | null;
 	aggregateTreeParents: boolean;
 }
 
-interface FieldStats {
+export interface FieldStats {
 	totalCount: number;
 	first: unknown;
 	last: unknown;
@@ -59,7 +77,7 @@ interface FieldStats {
 	max: number;
 }
 
-function createStats(): FieldStats {
+export function createStats(): FieldStats {
 	return {
 		totalCount: 0,
 		first: undefined,
@@ -71,8 +89,30 @@ function createStats(): FieldStats {
 	};
 }
 
-function addNodeValue<TData>(stats: FieldStats, node: RowNode<TData>, colId: string, context: RowPipelineContext<TData>): void {
-	const value = context.getValue(node, colId);
+type LeafTreeNode<TData> = Extract<RowTreeNode<TData>, { kind: 'data' }>;
+
+function allPlainLeaves<TData>(nodes: RowTreeNode<TData>[]): nodes is LeafTreeNode<TData>[] {
+	for (const node of nodes) if (node.kind !== 'data' || (node.children !== undefined && node.children.length > 0)) return false;
+	return true;
+}
+
+/**
+ * Folds plain leaves into `parentStats`: each group's stats are resolved once, and each row is read
+ * once for all columns (row by row keeps a large data set's rows in cache; column by column did not).
+ */
+function foldLeaves<TData>(leaves: LeafTreeNode<TData>[], run: AggregationRun<TData>, parentStats: Map<string, FieldStats>): void {
+	if (run.leaves) for (const leaf of leaves) run.leaves.push(leaf.node);
+	const fields = run.statFields.length;
+	const stats = run.statFields.map((colId) => getStats(parentStats, colId));
+	const readers = run.statReaders;
+	for (const leaf of leaves) {
+		const node = leaf.node;
+		for (let f = 0; f < fields; f++) addStatsValue(stats[f], readers[f](node));
+	}
+}
+
+/** Folds one leaf value into `stats`, in leaf order. */
+export function addStatsValue(stats: FieldStats, value: unknown): void {
 	if (stats.totalCount === 0) stats.first = value;
 	stats.last = value;
 	stats.totalCount++;
@@ -84,7 +124,7 @@ function addNodeValue<TData>(stats: FieldStats, node: RowNode<TData>, colId: str
 	}
 }
 
-function mergeStats(target: FieldStats, source: FieldStats): void {
+export function mergeStats(target: FieldStats, source: FieldStats): void {
 	if (source.totalCount === 0) return;
 	if (target.totalCount === 0) target.first = source.first;
 	target.last = source.last;
@@ -115,13 +155,14 @@ function aggregateNodeRecursively<TData>(node: RowTreeNode<TData>, run: Aggregat
 
 	if (isLeaf) {
 		run.leaves?.push(node.node);
-		for (const colId of run.statFields) addNodeValue(getStats(parentStats, colId), node.node, colId, run.context);
+		for (let f = 0; f < run.statFields.length; f++) addStatsValue(getStats(parentStats, run.statFields[f]), run.statReaders[f](node.node));
 		return;
 	}
 
 	const leafStart = run.leaves ? run.leaves.length : 0;
 	const statsByField = new Map<string, FieldStats>();
-	for (const child of children ?? []) aggregateNodeRecursively(child, run, statsByField);
+	if (children && allPlainLeaves(children)) foldLeaves(children, run, statsByField);
+	else for (const child of children ?? []) aggregateNodeRecursively(child, run, statsByField);
 	for (const [colId, stats] of statsByField) mergeStats(getStats(parentStats, colId), stats);
 
 	if (node.kind === 'group') {
