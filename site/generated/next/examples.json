@@ -70656,7 +70656,7 @@
 			"title": "Realtime dashboard",
 			"description": "A 400-row live portfolio grid comparing DOM, imperative React, and standard React cell renderers side by side, plus the data integrity pipeline.",
 			"sourcePath": "packages/examples/src/showcases/RealtimeDashboard.tsx",
-			"source": "/**\n * Markets Desk — a high-frequency live markets dashboard on Wit Grid.\n *\n * A seeded universe of 10k / 50k / 200k instruments (5k in `compact`) ticks through a random-walk feed:\n * ticks accumulate and land as ONE `api.transaction({ rows: { update } })` per animation frame.\n * The grid is grouped (asset class › sector), sticky-headed, aggregated, sorted live by change %,\n * and drawn with DOM renderers (price flash, sparkline, heat bar, day range, P&L bar, gauges),\n * React cells for low-frequency badges, and a custom group renderer. A telemetry panel measures\n * the grid honestly (transaction wall time, frame time, dropped frames, long tasks) and mirrors\n * the numbers on `window.__marketsDeskTelemetry`.\n *\n * Theme-aware: `theme=\"light\"` uses the built-in `'spreadsheet'` grid theme and re-tints the cells\n * through CSS variables. Defaults to `'dark'` for hosts (like the demo app) that don't pass it.\n *\n * Files: ./marketsDesk/{data, feed, telemetry, columns, domRenderers, reactCells, panels, DeskGrid, styles}.\n */\n'use client';\n\nimport React, { useCallback, useEffect, useRef, useState } from 'react';\nimport type { GridReadyEvent, RowAnimationOptions } from '@eregister/wit-grid-react';\nimport { Pause, Play, TrendingUp } from 'lucide-react';\nimport { DeskGrid, type GroupBy, type GroupDisplay } from './marketsDesk/DeskGrid';\nimport type { MarketRow } from './marketsDesk/data';\nimport { FeedEngine } from './marketsDesk/feed';\nimport { KpiStrip, PnlChart, SectorHeatmap, TelemetryBadge, TelemetryPanel } from './marketsDesk/panels';\nimport { DESK_CSS } from './marketsDesk/styles';\n\nexport type { MarketRow } from './marketsDesk/data';\n\ninterface RealtimeDashboardProps {\n\teditTrigger?: 'singleClick' | 'doubleClick';\n\tarrowKeyNavigationEdit?: boolean;\n\tonCellValueChanged?: (event: { rowId: string; colField: string; oldValue: unknown; newValue: unknown }) => void;\n\tonGridReady?: (event: GridReadyEvent<MarketRow>) => void;\n\t/**\n\t * Landing-page layout: 5k rows grouped by asset class, a KPI strip, a one-line telemetry badge\n\t * and the grid; the heatmap, P&L chart and telemetry panel are left out.\n\t */\n\tcompact?: boolean;\n\t/**\n\t * Light switches the grid to the built-in `'spreadsheet'` theme and re-tints this component's own\n\t * chrome and custom renderers to match. Defaults to `'dark'`.\n\t */\n\ttheme?: 'light' | 'dark';\n\t/** Initial instrument count. Default: 50,000 (5,000 in `compact`). The gauntlet passes a small number. */\n\trowCount?: number;\n\t/** Initial updates per second (100 / 1,000 / 10,000 / 50,000). Default: 10,000 (1,000 in `compact`). */\n\trate?: number;\n\t/** Start with the feed paused. */\n\tpaused?: boolean;\n}\n\n/** Row animation styles to try on the live sort: each is a plain `rowAnimation` object. */\nexport const ROW_ANIMATION_PRESETS = {\n\tcascade: { label: 'Cascade', options: { style: 'slide', easing: 'snappy', duration: 360, stagger: 18 } },\n\tspring: { label: 'Spring', options: { style: 'slide', easing: 'spring', duration: 520 } },\n\tsmooth: { label: 'Smooth', options: { style: 'slide', easing: 'smooth', duration: 280 } },\n\tfade: { label: 'Fade', options: { style: 'fade', duration: 320, stagger: 12 } },\n\toff: { label: 'Off', options: { style: 'none' } },\n} satisfies Record<string, { label: string; options: RowAnimationOptions }>;\n\ntype PresetId = keyof typeof ROW_ANIMATION_PRESETS;\nconst PRESET_IDS = Object.keys(ROW_ANIMATION_PRESETS) as PresetId[];\n\nconst ROW_COUNTS = [\n\t{ value: 10_000, label: '10k' },\n\t{ value: 50_000, label: '50k' },\n\t{ value: 200_000, label: '200k' },\n];\nconst RATES = [\n\t{ value: 100, label: '100' },\n\t{ value: 1_000, label: '1k' },\n\t{ value: 10_000, label: '10k' },\n\t{ value: 50_000, label: '50k' },\n];\nconst GROUPINGS: { value: GroupBy; label: string }[] = [\n\t{ value: 'none', label: 'None' },\n\t{ value: 'class', label: 'Class' },\n\t{ value: 'sector', label: 'Class › Sector' },\n\t{ value: 'region', label: 'Class › Sector › Region' },\n];\nconst DISPLAYS: { value: GroupDisplay; label: string }[] = [\n\t{ value: 'column', label: 'Column' },\n\t{ value: 'row', label: 'Row' },\n];\n\nfunction Segmented<T extends string | number>({\n\tlabel,\n\tvalue,\n\toptions,\n\tonChange,\n\tisLight,\n\ttitle,\n}: {\n\tlabel: string;\n\tvalue: T;\n\toptions: { value: T; label: string }[];\n\tonChange: (value: T) => void;\n\tisLight: boolean;\n\ttitle?: string;\n}) {\n\treturn (\n\t\t<div\n\t\t\trole='radiogroup'\n\t\t\taria-label={label}\n\t\t\ttitle={title ?? label}\n\t\t\tclassName={`flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5 ${isLight ? 'border-slate-300 bg-slate-100' : 'border-slate-700/60 bg-slate-900/80'}`}\n\t\t>\n\t\t\t<span className='px-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500'>{label}</span>\n\t\t\t{options.map((o) => {\n\t\t\t\tconst active = o.value === value;\n\t\t\t\treturn (\n\t\t\t\t\t<button\n\t\t\t\t\t\tkey={String(o.value)}\n\t\t\t\t\t\ttype='button'\n\t\t\t\t\t\trole='radio'\n\t\t\t\t\t\taria-checked={active}\n\t\t\t\t\t\tonClick={() => onChange(o.value)}\n\t\t\t\t\t\tclassName={`cursor-pointer rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${\n\t\t\t\t\t\t\tactive\n\t\t\t\t\t\t\t\t? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'\n\t\t\t\t\t\t\t\t: isLight\n\t\t\t\t\t\t\t\t\t? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'\n\t\t\t\t\t\t\t\t\t: 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'\n\t\t\t\t\t\t}`}\n\t\t\t\t\t>\n\t\t\t\t\t\t{o.label}\n\t\t\t\t\t</button>\n\t\t\t\t);\n\t\t\t})}\n\t\t</div>\n\t);\n}\n\nexport default function RealtimeDashboard({\n\teditTrigger = 'doubleClick',\n\tarrowKeyNavigationEdit = true,\n\tonCellValueChanged,\n\tonGridReady,\n\tcompact = false,\n\ttheme = 'dark',\n\trowCount: rowCountProp,\n\trate: rateProp,\n\tpaused: pausedProp,\n}: RealtimeDashboardProps = {}) {\n\tconst isLight = theme === 'light';\n\tconst [rowCount, setRowCount] = useState(rowCountProp ?? (compact ? 5_000 : 50_000));\n\tconst [rate, setRate] = useState(rateProp ?? (compact ? 1_000 : 10_000));\n\tconst [paused, setPaused] = useState(pausedProp ?? false);\n\tconst [groupBy, setGroupBy] = useState<GroupBy>(compact ? 'class' : 'sector');\n\tconst [display, setDisplay] = useState<GroupDisplay>('column');\n\tconst [preset, setPreset] = useState<PresetId>('cascade');\n\tconst [sectorFilter, setSectorFilter] = useState<string | null>(null);\n\tconst [engine, setEngine] = useState<FeedEngine | null>(null);\n\n\t// A new row count builds a new universe and feed. Built in an effect, after the loading frame paints.\n\tuseEffect(() => {\n\t\tsetEngine(null);\n\t\tlet created: FeedEngine | null = null;\n\t\tconst id = setTimeout(() => {\n\t\t\tcreated = new FeedEngine(rowCount);\n\t\t\tcreated.start();\n\t\t\tsetEngine(created);\n\t\t}, 0);\n\t\treturn () => {\n\t\t\tclearTimeout(id);\n\t\t\tcreated?.dispose();\n\t\t};\n\t}, [rowCount]);\n\n\tuseEffect(() => {\n\t\tengine?.setRate(rate);\n\t\tengine?.setPaused(paused);\n\t}, [engine, rate, paused]);\n\n\t// Host callbacks may change identity each render; the memoised grid reads them through refs.\n\tconst hostRef = useRef({ onCellValueChanged, onGridReady });\n\thostRef.current = { onCellValueChanged, onGridReady };\n\tconst handleCellValueChanged = useCallback<NonNullable<RealtimeDashboardProps['onCellValueChanged']>>(\n\t\t(e) => hostRef.current.onCellValueChanged?.(e),\n\t\t[]\n\t);\n\tconst handleGridReady = useCallback((e: GridReadyEvent<MarketRow>) => hostRef.current.onGridReady?.(e), []);\n\n\tconst ui = isLight\n\t\t? { shell: 'bg-white', bar: 'border-slate-200 bg-slate-50', title: 'text-slate-600', dot: 'bg-emerald-600', icon: 'text-emerald-600' }\n\t\t: { shell: '', bar: 'border-slate-900 bg-slate-900/10', title: 'text-slate-400', dot: 'bg-emerald-500', icon: 'text-emerald-400' };\n\n\tconst pauseButton = (\n\t\t<button\n\t\t\ttype='button'\n\t\t\tonClick={() => setPaused((p) => !p)}\n\t\t\tclassName={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-colors ${\n\t\t\t\tpaused\n\t\t\t\t\t? 'border-emerald-500/30 bg-emerald-600 text-white hover:bg-emerald-700'\n\t\t\t\t\t: isLight\n\t\t\t\t\t\t? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'\n\t\t\t\t\t\t: 'border-slate-700/60 bg-slate-800 text-slate-300 hover:bg-slate-700'\n\t\t\t}`}\n\t\t>\n\t\t\t{paused ? <Play className='h-3 w-3' /> : <Pause className='h-3 w-3' />}\n\t\t\t{paused ? 'Resume feed' : 'Pause feed'}\n\t\t</button>\n\t);\n\n\tconst motion = (\n\t\t<Segmented\n\t\t\tlabel='Motion'\n\t\t\ttitle='How rows move when the live sort reorders them'\n\t\t\tisLight={isLight}\n\t\t\tvalue={preset}\n\t\t\tonChange={setPreset}\n\t\t\toptions={PRESET_IDS.map((id) => ({ value: id, label: ROW_ANIMATION_PRESETS[id].label }))}\n\t\t/>\n\t);\n\n\treturn (\n\t\t<div className={`md-root ${isLight ? 'md-light' : 'md-dark'} flex h-full w-full min-w-0 flex-col gap-2 overflow-hidden ${ui.shell}`}>\n\t\t\t<style>{DESK_CSS}</style>\n\n\t\t\t<div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border p-2 ${ui.bar}`}>\n\t\t\t\t<span className={`flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider ${ui.title}`}>\n\t\t\t\t\t<span className={`h-2 w-2 rounded-full ${paused ? 'bg-slate-500' : `animate-ping ${ui.dot}`}`} />\n\t\t\t\t\t<TrendingUp className={`h-4 w-4 ${ui.icon}`} />\n\t\t\t\t\tMarkets desk\n\t\t\t\t</span>\n\t\t\t\t<Segmented label='Rate' title='Price updates per second' isLight={isLight} value={rate} onChange={setRate} options={RATES} />\n\t\t\t\t{!compact && (\n\t\t\t\t\t<Segmented label='Rows' title='Instrument count' isLight={isLight} value={rowCount} onChange={setRowCount} options={ROW_COUNTS} />\n\t\t\t\t)}\n\t\t\t\t{!compact && <Segmented label='Group' isLight={isLight} value={groupBy} onChange={setGroupBy} options={GROUPINGS} />}\n\t\t\t\t{!compact && groupBy !== 'none' && (\n\t\t\t\t\t<Segmented label='Display' isLight={isLight} value={display} onChange={setDisplay} options={DISPLAYS} />\n\t\t\t\t)}\n\t\t\t\t<div className='ml-auto flex flex-wrap items-center gap-2'>\n\t\t\t\t\t<div className={compact ? 'hidden md:block' : ''}>{motion}</div>\n\t\t\t\t\t{pauseButton}\n\t\t\t\t\t{compact && engine && <TelemetryBadge engine={engine} isLight={isLight} />}\n\t\t\t\t</div>\n\t\t\t</div>\n\n\t\t\t{engine ? (\n\t\t\t\t<>\n\t\t\t\t\t<KpiStrip engine={engine} isLight={isLight} compact={compact} />\n\t\t\t\t\t{!compact && (\n\t\t\t\t\t\t<div className='hidden h-[132px] shrink-0 gap-2 md:flex'>\n\t\t\t\t\t\t\t<SectorHeatmap engine={engine} isLight={isLight} selected={sectorFilter} onSelect={setSectorFilter} />\n\t\t\t\t\t\t\t<PnlChart engine={engine} isLight={isLight} />\n\t\t\t\t\t\t\t<TelemetryPanel engine={engine} isLight={isLight} />\n\t\t\t\t\t\t</div>\n\t\t\t\t\t)}\n\t\t\t\t\t<div className='min-h-[260px] min-w-0 flex-1'>\n\t\t\t\t\t\t<DeskGrid\n\t\t\t\t\t\t\tengine={engine}\n\t\t\t\t\t\t\tdisplay={display}\n\t\t\t\t\t\t\tgroupBy={groupBy}\n\t\t\t\t\t\t\tisLight={isLight}\n\t\t\t\t\t\t\tcompact={compact}\n\t\t\t\t\t\t\tsectorFilter={sectorFilter}\n\t\t\t\t\t\t\trowAnimation={ROW_ANIMATION_PRESETS[preset].options}\n\t\t\t\t\t\t\teditTrigger={editTrigger}\n\t\t\t\t\t\t\tarrowKeyNavigationEdit={arrowKeyNavigationEdit}\n\t\t\t\t\t\t\tonCellValueChanged={handleCellValueChanged}\n\t\t\t\t\t\t\tonGridReady={handleGridReady}\n\t\t\t\t\t\t/>\n\t\t\t\t\t</div>\n\t\t\t\t</>\n\t\t\t) : (\n\t\t\t\t<div className={`flex flex-1 items-center justify-center text-xs ${ui.title}`}>\n\t\t\t\t\tGenerating {rowCount.toLocaleString('en-US')} instruments…\n\t\t\t\t</div>\n\t\t\t)}\n\t\t</div>\n\t);\n}\n",
+			"source": "/**\n * Markets Desk — a high-frequency live markets dashboard on Wit Grid.\n *\n * A seeded universe of 10k / 50k / 200k instruments (5k in `compact`) ticks through a random-walk feed:\n * ticks accumulate and land as ONE `api.transaction({ rows: { update } })` per animation frame.\n * The grid is grouped (asset class › sector), sticky-headed, aggregated, sorted live by change %,\n * and drawn with DOM renderers (price flash, sparkline, heat bar, day range, P&L bar, gauges),\n * React cells for low-frequency badges, and a custom group renderer. A telemetry panel measures\n * the grid honestly (transaction wall time, frame time, dropped frames, long tasks) and mirrors\n * the numbers on `window.__marketsDeskTelemetry`.\n *\n * Theme-aware: `theme=\"light\"` uses the built-in `'spreadsheet'` grid theme and re-tints the cells\n * through CSS variables. Defaults to `'dark'` for hosts (like the demo app) that don't pass it.\n *\n * Files: ./marketsDesk/{data, feed, telemetry, columns, domRenderers, reactCells, panels, DeskGrid, styles}.\n */\n'use client';\n\nimport React, { useCallback, useEffect, useRef, useState } from 'react';\nimport type { GridReadyEvent, RowAnimationOptions } from '@eregister/wit-grid-react';\nimport { Pause, Play, TrendingUp } from 'lucide-react';\nimport { DeskGrid, type GroupBy, type GroupDisplay } from './marketsDesk/DeskGrid';\nimport { generateMarketAsync, type MarketRow } from './marketsDesk/data';\nimport { FeedEngine } from './marketsDesk/feed';\nimport { KpiStrip, PnlChart, SectorHeatmap, TelemetryBadge, TelemetryPanel } from './marketsDesk/panels';\nimport { DESK_CSS } from './marketsDesk/styles';\n\nexport type { MarketRow } from './marketsDesk/data';\n\ninterface RealtimeDashboardProps {\n\teditTrigger?: 'singleClick' | 'doubleClick';\n\tarrowKeyNavigationEdit?: boolean;\n\tonCellValueChanged?: (event: { rowId: string; colField: string; oldValue: unknown; newValue: unknown }) => void;\n\tonGridReady?: (event: GridReadyEvent<MarketRow>) => void;\n\t/**\n\t * Landing-page layout: 5k rows grouped by asset class, a KPI strip, a one-line telemetry badge\n\t * and the grid; the heatmap, P&L chart and telemetry panel are left out.\n\t */\n\tcompact?: boolean;\n\t/**\n\t * Light switches the grid to the built-in `'spreadsheet'` theme and re-tints this component's own\n\t * chrome and custom renderers to match. Defaults to `'dark'`.\n\t */\n\ttheme?: 'light' | 'dark';\n\t/** Initial instrument count. Default: 50,000 (5,000 in `compact`). The gauntlet passes a small number. */\n\trowCount?: number;\n\t/** Initial updates per second (100 / 1,000 / 10,000 / 50,000). Default: 10,000 (1,000 in `compact`). */\n\trate?: number;\n\t/** Start with the feed paused. */\n\tpaused?: boolean;\n}\n\n/** Row animation styles to try on the live sort: each is a plain `rowAnimation` object. */\nexport const ROW_ANIMATION_PRESETS = {\n\tcascade: { label: 'Cascade', options: { style: 'slide', easing: 'snappy', duration: 360, stagger: 18 } },\n\tspring: { label: 'Spring', options: { style: 'slide', easing: 'spring', duration: 520 } },\n\tsmooth: { label: 'Smooth', options: { style: 'slide', easing: 'smooth', duration: 280 } },\n\tfade: { label: 'Fade', options: { style: 'fade', duration: 320, stagger: 12 } },\n\toff: { label: 'Off', options: { style: 'none' } },\n} satisfies Record<string, { label: string; options: RowAnimationOptions }>;\n\ntype PresetId = keyof typeof ROW_ANIMATION_PRESETS;\nconst PRESET_IDS = Object.keys(ROW_ANIMATION_PRESETS) as PresetId[];\n\nconst ROW_COUNTS = [\n\t{ value: 10_000, label: '10k' },\n\t{ value: 50_000, label: '50k' },\n\t{ value: 200_000, label: '200k' },\n];\nconst RATES = [\n\t{ value: 100, label: '100' },\n\t{ value: 1_000, label: '1k' },\n\t{ value: 10_000, label: '10k' },\n\t{ value: 50_000, label: '50k' },\n];\nconst GROUPINGS: { value: GroupBy; label: string }[] = [\n\t{ value: 'none', label: 'None' },\n\t{ value: 'class', label: 'Class' },\n\t{ value: 'sector', label: 'Class › Sector' },\n\t{ value: 'region', label: 'Class › Sector › Region' },\n];\nconst DISPLAYS: { value: GroupDisplay; label: string }[] = [\n\t{ value: 'column', label: 'Column' },\n\t{ value: 'row', label: 'Row' },\n];\n\nfunction Segmented<T extends string | number>({\n\tlabel,\n\tvalue,\n\toptions,\n\tonChange,\n\tisLight,\n\ttitle,\n}: {\n\tlabel: string;\n\tvalue: T;\n\toptions: { value: T; label: string }[];\n\tonChange: (value: T) => void;\n\tisLight: boolean;\n\ttitle?: string;\n}) {\n\treturn (\n\t\t<div\n\t\t\trole='radiogroup'\n\t\t\taria-label={label}\n\t\t\ttitle={title ?? label}\n\t\t\tclassName={`flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5 ${isLight ? 'border-slate-300 bg-slate-100' : 'border-slate-700/60 bg-slate-900/80'}`}\n\t\t>\n\t\t\t<span className='px-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500'>{label}</span>\n\t\t\t{options.map((o) => {\n\t\t\t\tconst active = o.value === value;\n\t\t\t\treturn (\n\t\t\t\t\t<button\n\t\t\t\t\t\tkey={String(o.value)}\n\t\t\t\t\t\ttype='button'\n\t\t\t\t\t\trole='radio'\n\t\t\t\t\t\taria-checked={active}\n\t\t\t\t\t\tonClick={() => onChange(o.value)}\n\t\t\t\t\t\tclassName={`cursor-pointer rounded-md px-2 py-1 text-[10px] font-bold transition-colors ${\n\t\t\t\t\t\t\tactive\n\t\t\t\t\t\t\t\t? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'\n\t\t\t\t\t\t\t\t: isLight\n\t\t\t\t\t\t\t\t\t? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'\n\t\t\t\t\t\t\t\t\t: 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'\n\t\t\t\t\t\t}`}\n\t\t\t\t\t>\n\t\t\t\t\t\t{o.label}\n\t\t\t\t\t</button>\n\t\t\t\t);\n\t\t\t})}\n\t\t</div>\n\t);\n}\n\nexport default function RealtimeDashboard({\n\teditTrigger = 'doubleClick',\n\tarrowKeyNavigationEdit = true,\n\tonCellValueChanged,\n\tonGridReady,\n\tcompact = false,\n\ttheme = 'dark',\n\trowCount: rowCountProp,\n\trate: rateProp,\n\tpaused: pausedProp,\n}: RealtimeDashboardProps = {}) {\n\tconst isLight = theme === 'light';\n\tconst [rowCount, setRowCount] = useState(rowCountProp ?? (compact ? 5_000 : 50_000));\n\tconst [rate, setRate] = useState(rateProp ?? (compact ? 1_000 : 10_000));\n\tconst [paused, setPaused] = useState(pausedProp ?? false);\n\tconst [groupBy, setGroupBy] = useState<GroupBy>(compact ? 'class' : 'sector');\n\tconst [display, setDisplay] = useState<GroupDisplay>('column');\n\tconst [preset, setPreset] = useState<PresetId>('cascade');\n\tconst [sectorFilter, setSectorFilter] = useState<string | null>(null);\n\tconst [engine, setEngine] = useState<FeedEngine | null>(null);\n\tconst engineRef = useRef<FeedEngine | null>(null);\n\t// The universe being built for a new row count (the current one keeps running until it is ready).\n\tconst [building, setBuilding] = useState<{ count: number; done: number } | null>(null);\n\n\t// A new row count builds its universe in slices (the page stays responsive, progress shows), then\n\t// swaps it into the same grid; the old feed runs until then.\n\tuseEffect(() => {\n\t\tconst controller = new AbortController();\n\t\tlet lastProgressAt = 0;\n\t\tsetBuilding({ count: rowCount, done: 0 });\n\t\tgenerateMarketAsync(rowCount, {\n\t\t\tsignal: controller.signal,\n\t\t\tonProgress: (done) => {\n\t\t\t\tconst now = performance.now();\n\t\t\t\tif (now - lastProgressAt < 100) return;\n\t\t\t\tlastProgressAt = now;\n\t\t\t\tsetBuilding({ count: rowCount, done });\n\t\t\t},\n\t\t})\n\t\t\t.then((rows) => {\n\t\t\t\tif (controller.signal.aborted) return;\n\t\t\t\tconst created = new FeedEngine(rowCount, 2026, rows);\n\t\t\t\tcreated.start();\n\t\t\t\tconst previous = engineRef.current;\n\t\t\t\tengineRef.current = created;\n\t\t\t\tsetEngine(created);\n\t\t\t\tsetBuilding(null);\n\t\t\t\tprevious?.dispose();\n\t\t\t})\n\t\t\t.catch((error: unknown) => {\n\t\t\t\tif ((error as { name?: string })?.name !== 'AbortError') throw error;\n\t\t\t});\n\t\treturn () => controller.abort();\n\t}, [rowCount]);\n\n\tuseEffect(\n\t\t() => () => {\n\t\t\tengineRef.current?.dispose();\n\t\t\tengineRef.current = null;\n\t\t},\n\t\t[]\n\t);\n\n\tuseEffect(() => {\n\t\tengine?.setRate(rate);\n\t\tengine?.setPaused(paused);\n\t}, [engine, rate, paused]);\n\n\t// Host callbacks may change identity each render; the memoised grid reads them through refs.\n\tconst hostRef = useRef({ onCellValueChanged, onGridReady });\n\thostRef.current = { onCellValueChanged, onGridReady };\n\tconst handleCellValueChanged = useCallback<NonNullable<RealtimeDashboardProps['onCellValueChanged']>>(\n\t\t(e) => hostRef.current.onCellValueChanged?.(e),\n\t\t[]\n\t);\n\tconst handleGridReady = useCallback((e: GridReadyEvent<MarketRow>) => hostRef.current.onGridReady?.(e), []);\n\n\tconst ui = isLight\n\t\t? { shell: 'bg-white', bar: 'border-slate-200 bg-slate-50', title: 'text-slate-600', dot: 'bg-emerald-600', icon: 'text-emerald-600' }\n\t\t: { shell: '', bar: 'border-slate-900 bg-slate-900/10', title: 'text-slate-400', dot: 'bg-emerald-500', icon: 'text-emerald-400' };\n\n\tconst pauseButton = (\n\t\t<button\n\t\t\ttype='button'\n\t\t\tonClick={() => setPaused((p) => !p)}\n\t\t\tclassName={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[10px] font-bold transition-colors ${\n\t\t\t\tpaused\n\t\t\t\t\t? 'border-emerald-500/30 bg-emerald-600 text-white hover:bg-emerald-700'\n\t\t\t\t\t: isLight\n\t\t\t\t\t\t? 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'\n\t\t\t\t\t\t: 'border-slate-700/60 bg-slate-800 text-slate-300 hover:bg-slate-700'\n\t\t\t}`}\n\t\t>\n\t\t\t{paused ? <Play className='h-3 w-3' /> : <Pause className='h-3 w-3' />}\n\t\t\t{paused ? 'Resume feed' : 'Pause feed'}\n\t\t</button>\n\t);\n\n\tconst motion = (\n\t\t<Segmented\n\t\t\tlabel='Motion'\n\t\t\ttitle='How rows move when the live sort reorders them'\n\t\t\tisLight={isLight}\n\t\t\tvalue={preset}\n\t\t\tonChange={setPreset}\n\t\t\toptions={PRESET_IDS.map((id) => ({ value: id, label: ROW_ANIMATION_PRESETS[id].label }))}\n\t\t/>\n\t);\n\n\treturn (\n\t\t<div className={`md-root ${isLight ? 'md-light' : 'md-dark'} flex h-full w-full min-w-0 flex-col gap-2 overflow-hidden ${ui.shell}`}>\n\t\t\t<style>{DESK_CSS}</style>\n\n\t\t\t<div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border p-2 ${ui.bar}`}>\n\t\t\t\t<span className={`flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider ${ui.title}`}>\n\t\t\t\t\t<span className={`h-2 w-2 rounded-full ${paused ? 'bg-slate-500' : `animate-ping ${ui.dot}`}`} />\n\t\t\t\t\t<TrendingUp className={`h-4 w-4 ${ui.icon}`} />\n\t\t\t\t\tMarkets desk\n\t\t\t\t</span>\n\t\t\t\t<Segmented label='Rate' title='Price updates per second' isLight={isLight} value={rate} onChange={setRate} options={RATES} />\n\t\t\t\t{!compact && (\n\t\t\t\t\t<Segmented label='Rows' title='Instrument count' isLight={isLight} value={rowCount} onChange={setRowCount} options={ROW_COUNTS} />\n\t\t\t\t)}\n\t\t\t\t{!compact && <Segmented label='Group' isLight={isLight} value={groupBy} onChange={setGroupBy} options={GROUPINGS} />}\n\t\t\t\t{!compact && groupBy !== 'none' && (\n\t\t\t\t\t<Segmented label='Display' isLight={isLight} value={display} onChange={setDisplay} options={DISPLAYS} />\n\t\t\t\t)}\n\t\t\t\t<div className='ml-auto flex flex-wrap items-center gap-2'>\n\t\t\t\t\t<div className={compact ? 'hidden md:block' : ''}>{motion}</div>\n\t\t\t\t\t{pauseButton}\n\t\t\t\t\t{compact && engine && <TelemetryBadge engine={engine} isLight={isLight} />}\n\t\t\t\t</div>\n\t\t\t</div>\n\n\t\t\t{engine ? (\n\t\t\t\t<>\n\t\t\t\t\t<KpiStrip engine={engine} isLight={isLight} compact={compact} />\n\t\t\t\t\t{!compact && (\n\t\t\t\t\t\t<div className='hidden h-[132px] shrink-0 gap-2 md:flex'>\n\t\t\t\t\t\t\t<SectorHeatmap engine={engine} isLight={isLight} selected={sectorFilter} onSelect={setSectorFilter} />\n\t\t\t\t\t\t\t<PnlChart engine={engine} isLight={isLight} />\n\t\t\t\t\t\t\t<TelemetryPanel engine={engine} isLight={isLight} />\n\t\t\t\t\t\t</div>\n\t\t\t\t\t)}\n\t\t\t\t\t<div className='relative min-h-[260px] min-w-0 flex-1'>\n\t\t\t\t\t\t{building && <BuildingBadge building={building} isLight={isLight} />}\n\t\t\t\t\t\t<DeskGrid\n\t\t\t\t\t\t\tengine={engine}\n\t\t\t\t\t\t\tdisplay={display}\n\t\t\t\t\t\t\tgroupBy={groupBy}\n\t\t\t\t\t\t\tisLight={isLight}\n\t\t\t\t\t\t\tcompact={compact}\n\t\t\t\t\t\t\tsectorFilter={sectorFilter}\n\t\t\t\t\t\t\trowAnimation={ROW_ANIMATION_PRESETS[preset].options}\n\t\t\t\t\t\t\teditTrigger={editTrigger}\n\t\t\t\t\t\t\tarrowKeyNavigationEdit={arrowKeyNavigationEdit}\n\t\t\t\t\t\t\tonCellValueChanged={handleCellValueChanged}\n\t\t\t\t\t\t\tonGridReady={handleGridReady}\n\t\t\t\t\t\t/>\n\t\t\t\t\t</div>\n\t\t\t\t</>\n\t\t\t) : (\n\t\t\t\t<div className={`flex flex-1 items-center justify-center text-xs ${ui.title}`}>\n\t\t\t\t\tGenerating {rowCount.toLocaleString('en-US')} instruments…{' '}\n\t\t\t\t\t{building ? `${Math.round((building.done / building.count) * 100)}%` : ''}\n\t\t\t\t</div>\n\t\t\t)}\n\t\t</div>\n\t);\n}\n\n/** Over the live grid while the next universe builds: the current one stays interactive until the swap. */\nfunction BuildingBadge({ building, isLight }: { building: { count: number; done: number }; isLight: boolean }) {\n\tconst pct = Math.round((building.done / building.count) * 100);\n\treturn (\n\t\t<div\n\t\t\trole='status'\n\t\t\tclassName={`pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-lg ${\n\t\t\t\tisLight ? 'border-slate-200 bg-white/95 text-slate-700' : 'border-slate-700/70 bg-slate-900/95 text-slate-200'\n\t\t\t}`}\n\t\t>\n\t\t\t<span className='relative h-1.5 w-16 overflow-hidden rounded-full bg-slate-500/25'>\n\t\t\t\t<span className='absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-[width] duration-150' style={{ width: `${pct}%` }} />\n\t\t\t</span>\n\t\t\tPreparing {building.count.toLocaleString('en-US')} instruments · {pct}%\n\t\t</div>\n\t);\n}\n",
 			"tokens": [
 				[
 					{
@@ -70899,7 +70899,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ",
+						"content": " { generateMarketAsync, ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -70907,7 +70907,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { MarketRow } ",
+						"content": " MarketRow } ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74342,6 +74342,196 @@
 						"color": "#E1E4E8"
 					}
 				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "engineRef",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "useRef",
+						"color": "#B392F0"
+					},
+					{
+						"content": "<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "FeedEngine",
+						"color": "#B392F0"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "|",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ">(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// The universe being built for a new row count (the current one keeps running until it is ready).",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "building",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setBuilding",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "useState",
+						"color": "#B392F0"
+					},
+					{
+						"content": "<{ ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "count",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "; ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "done",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " } ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "|",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ">(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
 				[],
 				[
 					{
@@ -74349,7 +74539,17 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "// A new row count builds a new universe and feed. Built in an effect, after the loading frame paints.",
+						"content": "// A new row count builds its universe in slices (the page stays responsive, progress shows), then",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// swaps it into the same grid; the old feed runs until then.",
 						"color": "#6A737D"
 					}
 				],
@@ -74381,19 +74581,43 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "setEngine",
-						"color": "#B392F0"
+						"content": "const",
+						"color": "#F97583"
 					},
 					{
-						"content": "(",
+						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "null",
+						"content": "controller",
 						"color": "#79B8FF"
 					},
 					{
-						"content": ");",
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "new",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "AbortController",
+						"color": "#B392F0"
+					},
+					{
+						"content": "();",
 						"color": "#E1E4E8"
 					}
 				],
@@ -74407,39 +74631,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " created",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "FeedEngine",
-						"color": "#B392F0"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "|",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
+						"content": " lastProgressAt ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74451,7 +74643,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "null",
+						"content": "0",
 						"color": "#79B8FF"
 					},
 					{
@@ -74465,35 +74657,61 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "id",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "setTimeout",
+						"content": "setBuilding",
 						"color": "#B392F0"
 					},
 					{
-						"content": "(() ",
+						"content": "({ count: rowCount, done: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " });",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "generateMarketAsync",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(rowCount, {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tsignal: controller.signal,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "onProgress",
+						"color": "#B392F0"
+					},
+					{
+						"content": ": (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "done",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74507,7 +74725,199 @@
 				],
 				[
 					{
-						"content": "\t\t\tcreated ",
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "now",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " performance.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "now",
+						"color": "#B392F0"
+					},
+					{
+						"content": "();",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "if",
+						"color": "#F97583"
+					},
+					{
+						"content": " (now ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "-",
+						"color": "#F97583"
+					},
+					{
+						"content": " lastProgressAt ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "<",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "100",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "return",
+						"color": "#F97583"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tlastProgressAt ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " now;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setBuilding",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ count: rowCount, done });",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t})",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "then",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "rows",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "if",
+						"color": "#F97583"
+					},
+					{
+						"content": " (controller.signal.aborted) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "return",
+						"color": "#F97583"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "created",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74531,13 +74941,21 @@
 						"color": "#B392F0"
 					},
 					{
-						"content": "(rowCount);",
+						"content": "(rowCount, ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2026",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", rows);",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\t\tcreated.",
+						"content": "\t\t\t\tcreated.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74551,7 +74969,51 @@
 				],
 				[
 					{
-						"content": "\t\t\t",
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "previous",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " engineRef.current;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tengineRef.current ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " created;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74565,15 +75027,157 @@
 				],
 				[
 					{
-						"content": "\t\t}, ",
+						"content": "\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "0",
+						"content": "setBuilding",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
 						"color": "#79B8FF"
 					},
 					{
 						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tprevious?.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "dispose",
+						"color": "#B392F0"
+					},
+					{
+						"content": "();",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t})",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "catch",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "error",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "unknown",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "if",
+						"color": "#F97583"
+					},
+					{
+						"content": " ((error ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "as",
+						"color": "#F97583"
+					},
+					{
+						"content": " { ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "name",
+						"color": "#FFAB70"
+					},
+					{
+						"content": "?:",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " })?.name ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!==",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'AbortError'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "throw",
+						"color": "#F97583"
+					},
+					{
+						"content": " error;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t});",
 						"color": "#E1E4E8"
 					}
 				],
@@ -74595,27 +75199,64 @@
 						"color": "#F97583"
 					},
 					{
+						"content": " controller.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "abort",
+						"color": "#B392F0"
+					},
+					{
+						"content": "();",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t}, [rowCount]);",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "useEffect",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " () ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
 						"content": " {",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "clearTimeout",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(id);",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\tcreated?.",
+						"content": "\t\t\tengineRef.current?.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -74629,13 +75270,41 @@
 				],
 				[
 					{
-						"content": "\t\t};",
+						"content": "\t\t\tengineRef.current ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t}, [rowCount]);",
+						"content": "\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t[]",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t);",
 						"color": "#E1E4E8"
 					}
 				],
@@ -77001,11 +77670,57 @@
 						"color": "#F97583"
 					},
 					{
-						"content": "'min-h-[260px] min-w-0 flex-1'",
+						"content": "'relative min-h-[260px] min-w-0 flex-1'",
 						"color": "#9ECBFF"
 					},
 					{
 						"content": ">",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t{building ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "&&",
+						"color": "#F97583"
+					},
+					{
+						"content": " <",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "BuildingBadge",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "building",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{building} ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "isLight",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{isLight} />}",
 						"color": "#E1E4E8"
 					}
 				],
@@ -77333,7 +78048,129 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ")} instruments…",
+						"content": ")} instruments…{",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "' '",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{building ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "Math",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "round",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "building",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "done",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "/",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "building",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "count",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ") ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "100",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ")",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}%`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}",
 						"color": "#E1E4E8"
 					}
 				],
@@ -77354,6 +78191,465 @@
 				[
 					{
 						"content": "\t\t\t)}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t</",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "div",
+						"color": "#85E89D"
+					},
+					{
+						"content": ">",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t);",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "}",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "/** Over the live grid while the next universe builds: the current one stays interactive until the swap. */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "function",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "BuildingBadge",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "building",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "isLight",
+						"color": "#FFAB70"
+					},
+					{
+						"content": " }",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " { ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "building",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " { ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "count",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "; ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "done",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " }; ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "isLight",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "boolean",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " }) {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pct",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " Math.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "round",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((building.done ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "/",
+						"color": "#F97583"
+					},
+					{
+						"content": " building.count) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "100",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "return",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "div",
+						"color": "#85E89D"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "role",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "'status'",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`pointer-events-none absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold shadow-lg ${",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "isLight",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'border-slate-200 bg-white/95 text-slate-700'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'border-slate-700/70 bg-slate-900/95 text-slate-200'",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t>",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "span",
+						"color": "#85E89D"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "'relative h-1.5 w-16 overflow-hidden rounded-full bg-slate-500/25'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ">",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "span",
+						"color": "#85E89D"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "'absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-[width] duration-150'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "style",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{{ width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "pct",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "}%`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }} />",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t</",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "span",
+						"color": "#85E89D"
+					},
+					{
+						"content": ">",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tPreparing {building.count.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "toLocaleString",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'en-US'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ")} instruments · {pct}%",
 						"color": "#E1E4E8"
 					}
 				],
