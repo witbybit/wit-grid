@@ -2,7 +2,8 @@ import type { GridEngine } from '../engine/GridEngine.js';
 import type { GroupPanelRenderer } from './groupPanelRenderer.js';
 import type { GridLayoutPlan } from './layoutPlan.js';
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
-import type { GridScheduler } from './gridScheduler.js';
+import { afterNextPaint, type GridScheduler } from './gridScheduler.js';
+import { paintSortIndicator } from './headerRenderer.js';
 
 /**
  * Compute the per-column horizontal shift (px) that previews a reorder of `fromIndex`
@@ -279,6 +280,13 @@ export class ColumnInteractionController<TRowData = unknown> {
 		this.updateHorizontalAutoScroll(e.clientX);
 		this.updateColumnDropTarget(e);
 	};
+	private findHeaderCell(colField: string): HTMLElement | null {
+		const root = this.getScrollViewport()?.closest('.og-grid-container') ?? null;
+		if (!root) return null;
+		for (const cell of root.querySelectorAll<HTMLElement>('[role="columnheader"]')) if (cell.dataset.colField === colField) return cell;
+		return null;
+	}
+
 	private onHeaderColumnDragMouseUp = (): void => {
 		const wasReordering = this.isColumnReordering;
 		const fromIndex = this.columnDragFromIndex;
@@ -301,13 +309,16 @@ export class ColumnInteractionController<TRowData = unknown> {
 			const column = state.columns.find((c) => c.field === colField);
 			if (column && column.sortable !== false) {
 				const currentSort = state.sortModel?.find((s) => s.colId === colField);
-				if (!currentSort) {
-					this.engine.setSortModel([{ colId: colField, sort: 'asc' }]);
-				} else if (currentSort.sort === 'asc') {
-					this.engine.setSortModel([{ colId: colField, sort: 'desc' }]);
-				} else {
-					this.engine.setSortModel(null);
-				}
+				const next = !currentSort ? 'asc' : currentSort.sort === 'asc' ? 'desc' : null;
+				// The header shows the new sort now; the sort (a full rebuild on large grids) runs after the
+				// browser paints it, so the click answers at once.
+				const headerCell = this.findHeaderCell(colField);
+				if (headerCell) paintSortIndicator(headerCell, next, true);
+				afterNextPaint(() => {
+					// A sort applied meanwhile (another click, the api) wins.
+					if (this.engine.stateManager.getState().sortModel !== state.sortModel) return;
+					this.engine.setSortModel(next ? [{ colId: colField, sort: next }] : null);
+				}, this.gridScheduler);
 			}
 			return;
 		}

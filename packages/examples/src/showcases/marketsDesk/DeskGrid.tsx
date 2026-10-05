@@ -142,15 +142,27 @@ function DeskGridImpl({
 
 	useEffect(() => {
 		if (!api || !applied.current || applied.current.display !== display) return;
-		if (applied.current.groupBy !== groupBy) {
-			api.setGrouping(buildGrouping(groupBy, display));
-			api.transaction({ pins: { bottom: groupBy === 'none' ? 0 : 1 } });
-			applied.current.groupBy = groupBy;
-		}
-		if (applied.current.sectorFilter !== sectorFilter) {
-			api.setFilterModel(sectorFilterModel(sectorFilter));
-			applied.current.sectorFilter = sectorFilter;
-		}
+		// A regroup or filter rebuilds every row: let the pressed control paint first (a frame, then a task),
+		// so the click answers at once. A newer choice cancels a pending one.
+		let cancelled = false;
+		const frame = requestAnimationFrame(() =>
+			setTimeout(() => {
+				if (cancelled || !applied.current) return;
+				if (applied.current.groupBy !== groupBy) {
+					api.setGrouping(buildGrouping(groupBy, display));
+					api.transaction({ pins: { bottom: groupBy === 'none' ? 0 : 1 } });
+					applied.current.groupBy = groupBy;
+				}
+				if (applied.current.sectorFilter !== sectorFilter) {
+					api.setFilterModel(sectorFilterModel(sectorFilter));
+					applied.current.sectorFilter = sectorFilter;
+				}
+			}, 0)
+		);
+		return () => {
+			cancelled = true;
+			cancelAnimationFrame(frame);
+		};
 	}, [api, display, groupBy, sectorFilter]);
 
 	return (
