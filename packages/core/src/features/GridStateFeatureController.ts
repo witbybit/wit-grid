@@ -187,6 +187,8 @@ export class GridStateFeatureController<TRowData = unknown> {
 			if (!result.allowed) return;
 		}
 		const oldSort = this.deps.stateManager.getState().sortModel;
+		// Apps sync sort state from effects and often re-apply the current model: nothing to rebuild.
+		if (sameModel(normalizeEmpty(oldSort), normalizeEmpty(sortModel))) return;
 		const hasRowModel = this.deps.getRowModel?.() != null;
 		const forwardInvalidations = hasRowModel ? [] : [{ kind: 'headers', reason: 'sort' } as const, { kind: 'full', reason: 'sort' } as const];
 		this.deps.applyChange({
@@ -225,6 +227,8 @@ export class GridStateFeatureController<TRowData = unknown> {
 			if (!result.allowed) return;
 		}
 		const oldFilter = this.deps.stateManager.getState().filterModel;
+		// Re-applying the current filter (an effect setting `null` on mount) would rerun the whole pipeline.
+		if (sameModel(normalizeEmpty(oldFilter), normalizeEmpty(filterModel))) return;
 		const hasRowModel = this.deps.getRowModel?.() != null;
 		const forwardInvalidations = hasRowModel ? [] : [{ kind: 'full' } as const];
 		this.deps.applyChange({
@@ -266,6 +270,7 @@ export class GridStateFeatureController<TRowData = unknown> {
 			const result = this.checkCapability('filter', {});
 			if (!result.allowed) return;
 		}
+		if (sameModel(this.deps.stateManager.getState().quickFilterModel ?? null, quickFilterModel ?? null)) return;
 		const hasRowModel = this.deps.getRowModel?.() != null;
 		const forwardInvalidations = hasRowModel ? [] : [{ kind: 'full' } as const];
 		this.deps.applyChange({
@@ -361,4 +366,26 @@ export class GridStateFeatureController<TRowData = unknown> {
 			requestRender: true,
 		});
 	}
+}
+
+/** An empty sort or filter model ([] / {}) means none. */
+function normalizeEmpty(model: unknown): unknown {
+	if (model == null) return null;
+	if (Array.isArray(model)) return model.length === 0 ? null : model;
+	if (typeof model === 'object' && Object.keys(model as object).length === 0) return null;
+	return model;
+}
+
+/** Sort, filter and quick-filter models are plain data: equal by content. */
+function sameModel(a: unknown, b: unknown, depth = 0): boolean {
+	if (Object.is(a, b)) return true;
+	if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null || depth > 10) return false;
+	if (Array.isArray(a) !== Array.isArray(b)) return false;
+	const keys = Object.keys(a);
+	if (keys.length !== Object.keys(b).length) return false;
+	for (const key of keys) {
+		if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
+		if (!sameModel((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key], depth + 1)) return false;
+	}
+	return true;
 }
