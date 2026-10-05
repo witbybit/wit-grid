@@ -22,8 +22,10 @@ import {
 	type WarmVisibleCellStatusDeps,
 } from './warmCellStatus.js';
 import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
-import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
+import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell, markCellForPostScrollRepair } from './binders/binderShared.js';
+import { PostScrollRepairReason } from './cellPresentationStateMachine.js';
 import { reportRendererFault } from './rendererFaults.js';
+import { resolvePostScrollRepair } from './cellPresentationStateMachine.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
 export interface CellSlotRetentionTelemetrySink {
@@ -549,7 +551,18 @@ function bindDataCell<TRowData>(
 		}
 	}
 	if (skip) {
-		if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
+		if (needsVisibleRefresh) {
+			markCellForPostScrollRepair(
+				deps.cellBinderDeps,
+				cellSlot,
+				resolvePostScrollRepair({
+					hasCustomRenderer: !!(col as InternalColumnDef<TRowData>).cellRenderer,
+					isCheckbox: !!col.checkboxSelection,
+					contentMode: cellSlot.lastContentMode,
+				}),
+				PostScrollRepairReason.WarmCell
+			);
+		}
 		return;
 	}
 
@@ -790,7 +803,16 @@ function bindLoadingCell<TRowData>(row: LoadingRowBindState<TRowData>, cellSlot:
 	const cellClassName = decorationSuffix ? LOADING_CELL_BASE_CLASS + decorationSuffix : LOADING_CELL_BASE_CLASS;
 	if (isScrollFrameActive) {
 		deps.onScrollCellPatched();
-		deps.markCellDirtyAfterScroll(cellSlot.element);
+		markCellForPostScrollRepair(
+			deps.cellBinderDeps,
+			cellSlot,
+			resolvePostScrollRepair({
+				hasCustomRenderer: !!(col as InternalColumnDef<TRowData>).cellRenderer,
+				isCheckbox: !!col.checkboxSelection,
+				contentMode: 'loading',
+			}),
+			PostScrollRepairReason.Loading
+		);
 	} else {
 		deps.ensureLoadingSkeleton(cellSlot.element);
 	}

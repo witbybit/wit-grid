@@ -7,6 +7,7 @@ import { createCellInstanceRendererKey } from './identityKeys.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
 import type { HierarchyCellParts } from './hierarchyCell.js';
+import type { CellPresentationRepair } from './cellPresentationStateMachine.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
 export interface CellCtrlOwner {
@@ -235,6 +236,12 @@ export class CellSlot<TRowData = unknown> {
 	public lastAriaInvalid: boolean | undefined = undefined;
 	public lastClassName = '';
 	public lastContentMode: CellContentMode = 'empty';
+	/** Explicit post-scroll work lane; set when enqueued and cleared when repaired or unbound. */
+	public postScrollRepair: CellPresentationRepair = 'none';
+	/** Bitset of causes that requested the current deferred repair. */
+	public postScrollRepairReasons = 0;
+	/** Binding generation that requested the repair; a mismatch makes queued work obsolete. */
+	public postScrollRepairBindingGeneration = -1;
 	public lastPortalKey: string | undefined = undefined;
 	// Cached so unbindHot can skip the hasAttribute DOM read in the hot path.
 	public hasTabIndex = false;
@@ -419,6 +426,9 @@ export class CellSlot<TRowData = unknown> {
 		}
 		this.lastClassName = '';
 		this.lastContentMode = 'empty';
+		this.postScrollRepair = 'none';
+		this.postScrollRepairReasons = 0;
+		this.postScrollRepairBindingGeneration = -1;
 		this.lastPortalKey = undefined;
 		this.hasTabIndex = false;
 		this.lastMountedRowVersion = -1;
@@ -750,6 +760,9 @@ export class CellSlot<TRowData = unknown> {
 		}
 		this.lastClassName = '';
 		this.lastContentMode = 'empty';
+		this.postScrollRepair = 'none';
+		this.postScrollRepairReasons = 0;
+		this.postScrollRepairBindingGeneration = -1;
 		this.lastPortalKey = undefined;
 		this.hasTabIndex = false;
 		this.lastMountedRowVersion = -1;

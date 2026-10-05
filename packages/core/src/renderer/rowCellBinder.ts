@@ -37,7 +37,8 @@ import {
 	type CellBindRuntime,
 	type DispatchCellPresentationInput,
 } from './binders/cellPresentationDispatcher.js';
-import { buildCellPinClass, getScrollMountValue } from './binders/binderShared.js';
+import { buildCellPinClass, getScrollMountValue, markCellForPostScrollRepair } from './binders/binderShared.js';
+import { PostScrollRepairReason } from './cellPresentationStateMachine.js';
 import { getOrCreateCellCtrl, createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
 import type { CellCtrl } from './controllers/CellCtrl.js';
 import { CellCtrlStore } from './controllers/CellCtrlStore.js';
@@ -906,7 +907,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				styleRuleClass === undefined &&
 				(ctx.selectionChangedDuringScroll || !isWarmBindingVersionFresh || ctx.styleChangedDuringScroll || ctx.loadingChangedDuringScroll)));
 	if (shouldDeferCellStyleRefresh) {
-		deps.markCellDirtyAfterScroll(cellSlot.element);
+		markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Style);
 		deps.incrementStyleHookCallsDuringScroll();
 	}
 

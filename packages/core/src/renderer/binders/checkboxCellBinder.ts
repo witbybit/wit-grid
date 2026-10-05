@@ -1,13 +1,16 @@
 import { recordCellSlotMountedVisualVersions } from '../cellSlot.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { applyCellAccessibilityState, recordDispatchWrite } from './binderShared.js';
+import { applyCellAccessibilityState, markCellForPostScrollRepair, recordDispatchWrite } from './binderShared.js';
+import { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 /** The `checkbox` render state: the row-selection checkbox column. */
 export function applyCheckboxCellPresentation<TRowData>(input: DispatchCellPresentationInput<TRowData>): void {
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
 
-	if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
+	if (input.phase === 'scroll' && presentation.repair !== 'none') {
+		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	}
 	if (input.phase === 'full-bind' && runtime.checkbox) {
 		// Cached on the slot; the parent check re-queries only if something replaced it.
 		let checkbox = cellSlot.rowCheckbox;

@@ -19,7 +19,10 @@ function makeDeps(runtimeStats: RenderRuntimeStats) {
 			getStats: () => ({ cells: 0, rows: 0, menus: 0 }),
 			customRendererManager: { getStats: () => ({}) },
 		},
-		rowRenderer: {},
+		rowRenderer: {
+			dirtyCellsAfterScroll: new Set(),
+			stalePostScrollRepairsRejected: 0,
+		},
 		runtimeStats,
 	} as any;
 }
@@ -51,5 +54,19 @@ describe('collectRenderStats', () => {
 		expect(stats.cellsPatchedPerScrollFrame).toEqual([3]);
 		expect(stats.lastInvalidationReasons).toEqual(['sort']);
 		expect(stats.lastInvalidationReasons).not.toBe(runtime.lastInvalidationReasons);
+	});
+
+	it('reports the current repair backlog and its combined causes', () => {
+		const runtime = createRenderRuntimeStats();
+		const deps = makeDeps(runtime);
+		const motion = { __cellSlot: { postScrollRepair: 'motion', postScrollRepairReasons: 1 } } as unknown as HTMLDivElement;
+		const fidelity = { __cellSlot: { postScrollRepair: 'fidelity', postScrollRepairReasons: 6 } } as unknown as HTMLDivElement;
+		deps.rowRenderer.dirtyCellsAfterScroll = new Set([motion, fidelity]);
+
+		const stats = collectRenderStats(deps);
+
+		expect(stats.pendingPostScrollMotionRepairs).toBe(1);
+		expect(stats.pendingPostScrollFidelityRepairs).toBe(1);
+		expect(stats.pendingPostScrollRepairReasonBits).toBe(7);
 	});
 });

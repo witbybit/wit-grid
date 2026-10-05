@@ -7,6 +7,7 @@ import type { ScrollCellPresentation } from '../scrollCellPresentation.js';
 import { dispatchCellPresentation } from './cellPresentationDispatcher.js';
 import { createCellCtrl } from '../controllers/CellCtrl.js';
 import { getColumnInstanceIdentity } from '../../columnDef.js';
+import { resolveCellPresentationRepair } from '../cellPresentationStateMachine.js';
 
 /**
  * One golden test per mode per lane (4 modes x 3 lanes = 12) — proves cellPresentationDispatcher.ts
@@ -127,13 +128,11 @@ function makeDispatchInput(
 		className: presentation.className,
 		title: 'title' in presentation ? (presentation.title ?? null) : null,
 		validationError: 'validationError' in presentation ? presentation.validationError : undefined,
-		requiresFidelity: false,
+		repair: resolveCellPresentationRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false),
 		freshness: cellCtrl.freshness!,
 		contentMode: 'contentMode' in presentation ? presentation.contentMode : undefined,
 		formattedValue: 'formattedValue' in presentation ? presentation.formattedValue : undefined,
 		portalKey: 'portalCellKey' in presentation ? presentation.portalCellKey : 'portalKey' in presentation ? presentation.portalKey : undefined,
-		markDirty:
-			'markDirty' in presentation ? presentation.markDirty : 'shouldMarkDirty' in presentation ? presentation.shouldMarkDirty : undefined,
 		isEditing: 'isEditing' in presentation ? presentation.isEditing : false,
 		isFocused: 'isFocused' in presentation ? presentation.isFocused : false,
 		forceLiveInteractive: 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined,
@@ -212,6 +211,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			expect(request.cellSlot.lastFormattedValue).toBe('hello');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
+			expect(request.cellSlot.postScrollRepair).toBe('motion');
 		});
 
 		it(`live mode (${lane}): mounts the real renderer immediately`, () => {
@@ -271,6 +271,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			};
 			dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
+			expect(request.cellSlot.postScrollRepair).toBe('fidelity');
 			expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 			expect(request.cellSlot.lastFormattedValue).toBe('★ chip');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);

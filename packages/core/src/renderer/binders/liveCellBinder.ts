@@ -11,7 +11,9 @@ import {
 	stampMountedVersions,
 	getCellRendererLifecycle,
 	isOverscanLiveCell,
+	markCellForPostScrollRepair,
 } from './binderShared.js';
+import { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 /**
  * Scroll binds never run assignRendererHandle, so a portal mounted here must be recorded on the
@@ -38,7 +40,7 @@ function applyLiveStandIn<TRowData>(input: DispatchCellPresentationInput<TRowDat
 	const scrollText = (runtime.mount?.col as InternalColumnDef<TRowData> | undefined)?.cellRendererCapabilities?.scrollText;
 	const standIn = scrollText ? scrollText({ value: runtime.mount?.value, formattedValue: cheap }) || cheap : cheap;
 	deps.incrementLiveReactStandInsDuringScroll?.();
-	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
+	if (input.phase === 'scroll') markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Budget);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
@@ -86,7 +88,7 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 
 	if (!(deps.tryConsumeDomUpdateBudget?.() ?? true)) {
 		deps.incrementDomUpdatesDeferredDuringScroll?.();
-		deps.markCellDirtyAfterScroll(cellSlot.element);
+		markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Budget);
 		const didWrite = cellSlot.update(
 			geometry.colIndex,
 			cellCtrl.field,
@@ -171,13 +173,15 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
 	if (presentation.kind === 'dom-update') return applyDomUpdateCellPresentation(input);
+	if (input.phase === 'scroll' && presentation.repair !== 'none') {
+		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	}
 	const lifecycle = getCellRendererLifecycle(deps);
 	const mountRuntime = runtime.mount;
 	if (!mountRuntime) throw new Error('Live cell presentation requires mount runtime.');
 
 	if (presentation.forceLiveInteractive) {
 		if (input.phase === 'scroll') deps.incrementForceLiveMountsDuringScroll?.();
-		if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 		const ensuredPortalHost = deps.ensureCellPortalHost(cellSlot.element);
 		lifecycle.mountLive({
 			cellCtrl,
@@ -249,7 +253,6 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 		else deps.incrementLiveReactUpdatesDuringScroll?.();
 		if (isOverscanLiveExecution(input)) deps.incrementLiveReactOverscanMountsDuringScroll?.();
 	}
-	if (input.phase === 'scroll') deps.markCellDirtyAfterScroll(cellSlot.element);
 	const ensuredPortalHost = deps.ensureCellPortalHost(cellSlot.element);
 	const token = {
 		epoch: runtime.globalVersion,

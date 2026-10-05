@@ -13,6 +13,8 @@ import type { SelectionPaintManager } from './selectionPaintManager.js';
 import { getMemoizedColumnTopology } from './columnTopology.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
+import type { CellSlot } from './cellSlot.js';
+import { isPostScrollRepairCurrent } from './cellPresentationStateMachine.js';
 
 export interface RowCellBindRequest<TRowData = unknown> {
 	cellSlot: {
@@ -44,6 +46,7 @@ export interface RowRenderMaintenanceDeps<TRowData = unknown> {
 	dirtyRowsAfterScroll: Set<number>;
 	dirtyBuckets: [HTMLDivElement[], HTMLDivElement[], HTMLDivElement[], HTMLDivElement[]];
 	incrementPostScrollDirtyCellsDecorated: () => void;
+	incrementStalePostScrollRepairsRejected: () => void;
 	bindCellFull: (request: RowCellBindRequest<TRowData>) => void;
 	/** Rebinds a group / total row's cells (focus, selection and value changes reach them here). */
 	rebindHierarchyRow?: (slot: RowSlot<TRowData>, row: GroupVisualRow<TRowData> | TotalVisualRow<TRowData>, rowIndex: number) => void;
@@ -152,19 +155,22 @@ function isDirtyRepairQueueCurrent(
 	return true;
 }
 
-function classifyDirtyCellLane<TRowData>(cell: HTMLDivElement, columns: readonly ColumnDef<TRowData>[]): Exclude<PostScrollRepairLane, 'all'> {
-	const cs = (
-		cell as unknown as {
-			__cellSlot?: { colIndex: number; lastContentMode?: string };
-		}
-	).__cellSlot;
-	const colIndex = cs?.colIndex ?? -1;
-	const col = colIndex >= 0 ? columns[colIndex] : undefined;
-	if (col?.checkboxSelection) return 'fidelity';
-	if ((col as ColumnDef<TRowData> & { cellRenderer?: unknown })?.cellRenderer) return 'fidelity';
-	const lastContentMode = cs?.lastContentMode;
-	if (lastContentMode === 'portal' || lastContentMode === 'custom') return 'fidelity';
-	return 'motion';
+function getDirtyCellSlot(cell: HTMLDivElement): CellSlot | undefined {
+	return (cell as unknown as { __cellSlot?: CellSlot }).__cellSlot;
+}
+
+function getDirtyCellLane(cell: HTMLDivElement): Exclude<PostScrollRepairLane, 'all'> {
+	const cs = getDirtyCellSlot(cell);
+	if (cs?.postScrollRepair === 'motion' || cs?.postScrollRepair === 'fidelity') return cs.postScrollRepair;
+	throw new Error('Dirty cell has no post-scroll repair lane.');
+}
+
+function clearDirtyCellRepair(cell: HTMLDivElement): void {
+	const cs = getDirtyCellSlot(cell);
+	if (!cs) return;
+	cs.postScrollRepair = 'none';
+	cs.postScrollRepairReasons = 0;
+	cs.postScrollRepairBindingGeneration = -1;
 }
 
 function getDisplayedColumnIndexesForField<TRowData>(columns: readonly ColumnDef<TRowData>[], colField: string): number[] {
@@ -324,6 +330,7 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 
 	const rowModel = deps.engine.getVisualRowModel();
 	if (!rowModel) {
+		for (const cell of deps.dirtyCellsAfterScroll) clearDirtyCellRepair(cell);
 		deps.dirtyCellsAfterScroll.clear();
 		deps.dirtyRowsAfterScroll.clear();
 		return { remaining: 0, processed: 0, remainingMotion: 0, remainingFidelity: 0 };
@@ -412,22 +419,20 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 	for (let i = 0; i < queued.length; i++) {
 		const cell = queued[i];
 		if (!deps.dirtyCellsAfterScroll.has(cell)) continue;
-		if (processed >= maxCells || (lane !== 'all' && classifyDirtyCellLane(cell, columns) !== lane)) {
+		if (processed >= maxCells || (lane !== 'all' && getDirtyCellLane(cell) !== lane)) {
 			queued[kept++] = cell;
 			continue;
 		}
 		deps.dirtyCellsAfterScroll.delete(cell);
-		const cs = (
-			cell as unknown as {
-				__cellSlot?: {
-					rowIndex: number;
-					colField?: string;
-					colIndex: number;
-					element: HTMLDivElement;
-				};
-			}
-		).__cellSlot;
-		if (!cs || cs.rowIndex < 0 || !cs.colField) continue;
+		const cs = getDirtyCellSlot(cell);
+		if (!cs) continue;
+		if (!isPostScrollRepairCurrent(cs.rowBindingGeneration, cs.postScrollRepairBindingGeneration)) {
+			clearDirtyCellRepair(cell);
+			deps.incrementStalePostScrollRepairsRejected();
+			continue;
+		}
+		clearDirtyCellRepair(cell);
+		if (cs.rowIndex < 0 || !cs.colField) continue;
 
 		const rowIndex = cs.rowIndex;
 		const visualRow = rowModel.getVisualRow(rowIndex);
@@ -488,7 +493,7 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 	let remainingMotion = 0;
 	let remainingFidelity = 0;
 	for (const cell of deps.dirtyCellsAfterScroll) {
-		if (classifyDirtyCellLane(cell, columns) === 'fidelity') remainingFidelity++;
+		if (getDirtyCellLane(cell) === 'fidelity') remainingFidelity++;
 		else remainingMotion++;
 	}
 	if (remaining === 0) {

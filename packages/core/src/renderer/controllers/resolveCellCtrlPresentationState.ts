@@ -9,6 +9,7 @@ import {
 	type ScrollCellPresentationDeps,
 	type ScrollCellPresentationInput,
 } from '../scrollCellPresentation.js';
+import { resolveCellPresentationRepair } from '../cellPresentationStateMachine.js';
 
 export type CellCtrlBindPhase = 'scroll' | 'full-bind' | 'prewarm' | 'fidelity';
 
@@ -99,12 +100,11 @@ function hydrateCellCtrlFromScrollDecision<TRowData>(
 	state.className = presentation.className;
 	state.title = title;
 	state.validationError = validationError;
-	state.requiresFidelity = presentation.kind === 'primitive' || presentation.kind === 'frozen-portal' || presentation.kind === 'stand-in';
+	state.repair = resolveCellPresentationRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false);
 	state.freshness = freshness;
 	state.contentMode = 'contentMode' in presentation ? presentation.contentMode : undefined;
 	state.formattedValue = formattedValue;
 	state.portalKey = portalKey;
-	state.markDirty = 'markDirty' in presentation ? presentation.markDirty : undefined;
 	state.isEditing = 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing;
 	state.isFocused = 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused;
 	state.forceLiveInteractive = 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined;
@@ -146,7 +146,7 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
 		className: context.className,
 		title: context.title,
 		validationError: context.validationError,
-		requiresFidelity: false,
+		repair: 'none',
 		freshness: context.freshness,
 		contentMode: context.contentMode,
 		formattedValue: context.formattedValue,
