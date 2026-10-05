@@ -126,25 +126,23 @@ describe('InfiniteRowModelController — adversarial generation invariants', () 
 
 			if (op === 0) {
 				bump('sort');
-				const sortMode = sequence % 3;
-				store.setSortModel(sortMode === 0 ? null : [{ colId: 'name', sort: sortMode === 1 ? 'asc' : 'desc' }]);
+				// Re-applying the current sort is a no-op (no new generation), so churn always picks a different one.
+				const sortFor = (mode: number) => (mode === 0 ? null : [{ colId: 'name', sort: mode === 1 ? ('asc' as const) : ('desc' as const) }]);
+				let sortMode = sequence % 3;
+				if (JSON.stringify(sortFor(sortMode)) === JSON.stringify(store.getState().sortModel ?? null)) sortMode = (sortMode + 1) % 3;
+				store.setSortModel(sortFor(sortMode));
 				expect(store.getState().loading, `[${label}] new generation should enter loading`).toBe(true);
 				continue;
 			}
 
 			if (op === 1) {
 				bump('filter');
-				store.setFilterModel(
-					sequence % 2 === 0
-						? null
-						: {
-								name: {
-									type: 'text',
-									operator: 'contains',
-									value: sequence % 4 === 0 ? 'A' : 'B',
-								},
-							}
-				);
+				// As for sort: the same filter again is a no-op, so churn always picks a different one.
+				const filters = [null, { name: { type: 'text', operator: 'contains', value: 'B' } }, { name: { type: 'text', operator: 'contains', value: 'A' } }] as const;
+				let pick = sequence % 2 === 0 ? 0 : sequence % 4 === 0 ? 2 : 1;
+				const current = JSON.stringify(store.getState().filterModel ?? null);
+				if (JSON.stringify(filters[pick]) === current) pick = (pick + 1) % filters.length;
+				store.setFilterModel(filters[pick] as never);
 				expect(store.getState().loading, `[${label}] filter purge should enter loading`).toBe(true);
 				continue;
 			}
@@ -215,7 +213,8 @@ describe('InfiniteRowModelController — adversarial generation invariants', () 
 		}
 
 		bump('final-sort');
-		store.setSortModel([{ colId: 'name', sort: 'asc' }]);
+		const finalSort = store.getState().sortModel?.[0]?.sort === 'asc' ? 'desc' : 'asc';
+		store.setSortModel([{ colId: 'name', sort: finalSort }]);
 		const finalRequest = pending.splice(
 			pending.findIndex((request) => request.token === currentToken),
 			1
