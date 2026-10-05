@@ -82,3 +82,12 @@ export class DefaultGridScheduler implements GridScheduler {
 }
 
 export const defaultGridScheduler: GridScheduler = new DefaultGridScheduler();
+
+/**
+ * Runs `callback` once the browser has painted the current frame (a frame callback, then a task): a
+ * gesture's feedback (a pressed control, a header's new sort icon) shows before the heavy work it
+ * starts, instead of after it.
+ */
+export function afterNextPaint(callback: () => void, scheduler: GridScheduler = defaultGridScheduler): void {
+	scheduler.raf(() => scheduler.timeout(callback, 0));
+}

@@ -267,26 +267,9 @@ export class HeaderRenderer<TRowData = unknown> {
 				}
 
 				const currentSort = state.sortModel?.find((s) => s.colId === cell.field);
-				// Each indicator's display is decided once and written only when it changes: this runs for
-				// every visible header cell on every horizontal scroll frame, and an inline-style write
-				// (even one that restores the same value) makes the browser restyle the element.
-				const sortIndicator = headerCell.querySelector('.og-header-sort-indicator') as HTMLDivElement | null;
-				if (sortIndicator) {
-					setDisplay(sortIndicator, currentSort && !cell.checkboxSelection ? 'flex' : 'none');
-					if (currentSort) {
-						const isAsc = currentSort.sort === 'asc';
-						const svgAsc = sortIndicator.querySelector('.og-sort-svg-asc') as SVGElement | null;
-						const svgDesc = sortIndicator.querySelector('.og-sort-svg-desc') as SVGElement | null;
-						if (svgAsc) setDisplay(svgAsc, isAsc ? 'block' : 'none');
-						if (svgDesc) setDisplay(svgDesc, isAsc ? 'none' : 'block');
-					}
-				}
+				paintSortIndicator(headerCell, cell.checkboxSelection ? null : (currentSort?.sort ?? null), cell.sortable !== false);
 				const filterIndicator = headerCell.querySelector('.og-header-filter-indicator') as HTMLDivElement | null;
 				if (filterIndicator) setDisplay(filterIndicator, state.filterModel && state.filterModel[cell.field] ? 'flex' : 'none');
-				// ARIA sort state (none unless this column is sorted, and only for sortable columns).
-				const nextSort = currentSort ? (currentSort.sort === 'asc' ? 'ascending' : 'descending') : cell.sortable === false ? null : 'none';
-				if (nextSort === null) headerCell.removeAttribute('aria-sort');
-				else if (headerCell.getAttribute('aria-sort') !== nextSort) headerCell.setAttribute('aria-sort', nextSort);
 
 				if (headerCell.dataset.colField !== cell.field) headerCell.dataset.colField = cell.field;
 				const colIndexText = String(cell.colStart);
@@ -459,4 +442,27 @@ export class HeaderRenderer<TRowData = unknown> {
 
 		return headerCell;
 	}
+}
+
+/**
+ * A header cell's sort indicator and aria-sort for `sort` (null: unsorted). Each value is written only
+ * when it changes: this runs for every visible header cell on every horizontal scroll frame, and an
+ * inline-style write (even one restoring the same value) restyles the element. Also used to show a
+ * clicked header's new sort at once, before the sort itself runs after the next paint.
+ */
+export function paintSortIndicator(headerCell: HTMLElement, sort: 'asc' | 'desc' | null, sortable: boolean): void {
+	const sortIndicator = headerCell.querySelector('.og-header-sort-indicator') as HTMLDivElement | null;
+	if (sortIndicator) {
+		setDisplay(sortIndicator, sort ? 'flex' : 'none');
+		if (sort) {
+			const svgAsc = sortIndicator.querySelector('.og-sort-svg-asc') as SVGElement | null;
+			const svgDesc = sortIndicator.querySelector('.og-sort-svg-desc') as SVGElement | null;
+			if (svgAsc) setDisplay(svgAsc, sort === 'asc' ? 'block' : 'none');
+			if (svgDesc) setDisplay(svgDesc, sort === 'asc' ? 'none' : 'block');
+		}
+	}
+	// ARIA sort state (none unless this column is sorted, and only for sortable columns).
+	const nextSort = sort ? (sort === 'asc' ? 'ascending' : 'descending') : sortable ? 'none' : null;
+	if (nextSort === null) headerCell.removeAttribute('aria-sort');
+	else if (headerCell.getAttribute('aria-sort') !== nextSort) headerCell.setAttribute('aria-sort', nextSort);
 }
