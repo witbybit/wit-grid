@@ -53,7 +53,7 @@ function resolveFocusedCellElement<TRowData>(
 		return cellSlot.element;
 	}
 
-	const cells = viewportRenderer.rowsContainer?.querySelectorAll<HTMLDivElement>('.og-cell');
+	const cells = viewportRenderer.scrollViewport?.querySelectorAll<HTMLDivElement>('.og-cell');
 	if (!cells) return null;
 	for (const cell of cells) {
 		if (cell.dataset.rowId !== focusedCell.rowId) continue;

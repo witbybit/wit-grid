@@ -150,6 +150,7 @@ export type {
 } from './visualRow.js';
 export type {
 	GroupingConfig,
+	StickyHeadersOptions,
 	GroupInfo,
 	TreeDataConfig,
 	TreeRowInfo,
@@ -162,6 +163,10 @@ export type {
 	ExpansionState,
 	HierarchyColumnConfig,
 	HierarchyCellContext,
+	GroupRenderContext,
+	GroupRendererSpec,
+	GroupRendererHandle,
+	DomGroupRenderer,
 	RowRendererSpec,
 	DomRowRenderer,
 	DomRowRendererHandle,
@@ -170,6 +175,7 @@ export type {
 export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn, hierarchyColumnGroupColId } from './rows/hierarchyColumn.js';
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';
 export type { ExpandAllOptions } from './rowModel.js';
+export { renderGroupToggle } from './renderer/hierarchyCell.js';
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
 export { isDomCellRenderer } from './columnDef.js';
@@ -284,6 +290,7 @@ export {
 	themeToCSSVariables,
 } from './renderer/themes.js';
 export type { ThemeTokens, BuiltInThemeName } from './renderer/themes.js';
+export type { RowAnimationOptions } from './renderer/rowAnimation.js';
 export type { GridDomainVersions } from './state/GridDomainVersions.js';
 export type { GridInstrumentation, GridInstrumentationSnapshot, FrameMetrics, FallbackMetric } from './diagnostics/GridInstrumentation.js';
 export { GridMetric } from './diagnostics/GridInstrumentation.js';

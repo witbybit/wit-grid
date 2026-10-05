@@ -404,7 +404,7 @@ describe('GroupingFeatureController', () => {
 			feature.collapseAll();
 			feature.setDetailOpen('1', true);
 
-			expect(model.setExpanded).toHaveBeenCalledWith('group:a', true);
+			expect(model.setExpanded).toHaveBeenCalledWith('group:a', true, undefined);
 			expect(model.expandAll).toHaveBeenCalledWith({ maxLevel: 1 });
 			expect(model.collapseAll).toHaveBeenCalledOnce();
 			expect(model.setDetailOpen).toHaveBeenCalledWith('1', true);
@@ -428,7 +428,7 @@ describe('GroupingFeatureController', () => {
 			feature.toggleDetailOpen('1');
 
 			expect(model.isExpanded).toHaveBeenCalledWith('row:p1');
-			expect(model.setExpanded).toHaveBeenCalledWith('row:p1', false);
+			expect(model.setExpanded).toHaveBeenCalledWith('row:p1', false, undefined);
 			expect(model.isDetailOpen).toHaveBeenCalledWith('1');
 			expect(model.setDetailOpen).toHaveBeenCalledWith('1', true);
 			expect(feature.isExpanded('row:p1')).toBe(true);

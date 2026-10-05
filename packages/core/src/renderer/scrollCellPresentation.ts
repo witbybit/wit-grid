@@ -279,6 +279,8 @@ export interface ScrollCellPresentationInput<TRowData> {
 	isWarmBindingVersionFresh: boolean;
 	rowVersion: number;
 	cellKey: string;
+	/** Cell style-rule classes evaluated for this frame, when the cell has no fresh snapshot or warm class. */
+	styleRuleClass: string | undefined;
 }
 
 function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {
@@ -337,6 +339,8 @@ export function resolveScrollCellPresentation<TRowData>(
 		cellClassName = snapshot.className;
 	} else if (isWarmBindingVersionFresh && cellSlot.lastClassName) {
 		cellClassName = cellSlot.lastClassName;
+	} else if (input.styleRuleClass) {
+		cellClassName += ' ' + input.styleRuleClass;
 	}
 
 	// 'live' cells in the overscan band mount/update too (within budget), so they are already

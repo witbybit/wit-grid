@@ -5,10 +5,10 @@ import type { ClientRowModelRuntime } from './engine/runtimePorts.js';
 import { GridMetric } from './diagnostics/GridInstrumentation.js';
 import { getFieldRoot } from './ids.js';
 import { createGridRowDataRef } from './publicRowRef.js';
-import { RowNode } from './rowNode.js';
+import type { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
-import { RowPipeline, type RowPipelineInput, type RowPipelineOutput } from './rows/RowPipeline.js';
+import { RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
 import { groupByColIds, isGroupingActive } from './rows/hierarchyConfig.js';
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
@@ -31,6 +31,9 @@ import {
 	type CompoundFilterCondition,
 	type ColumnFilter,
 } from './filterModel.js';
+import type { RowTransactionMutation } from './engine/GridDomainMutation.js';
+import type { InfiniteDatasource } from './infiniteRowModel.js';
+import type { ServerSideDatasource, ServerSideRefreshOptions, ServerSideStoreSnapshot } from './serverSideRowModel.js';
 
 export type {
 	FilterModel,
@@ -262,9 +265,14 @@ export interface ExpandAllOptions {
 	maxLevel?: number;
 }
 
+export interface SetExpandedOptions {
+	/** Also open or close every group and tree row beneath the row. Default: false. */
+	deep?: boolean;
+}
+
 /** Expansion for groups and tree rows (by visual row id) and detail rows (by row id). */
 export interface RowExpansionCapableModel<TRowData = unknown> {
-	setExpanded(id: string, expanded: boolean): RowModelRefreshResult | void;
+	setExpanded(id: string, expanded: boolean, options?: SetExpandedOptions): RowModelRefreshResult | void;
 	expandAll(options?: ExpandAllOptions): RowModelRefreshResult | void;
 	collapseAll(): RowModelRefreshResult | void;
 	setDetailOpen(rowId: string, open: boolean): RowModelRefreshResult | void;
@@ -335,14 +343,10 @@ export interface RowModelWriteResult<TRowData = unknown> {
  * dispatch events, invalidate formulas, or bump versions.
  */
 export interface ClientStructuralRowModel<TRowData = unknown> extends RowOrderCapableModel {
-	captureTransactionSnapshot(
-		mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TRowData>
-	): RowModelTransactionSnapshot<TRowData>;
+	captureTransactionSnapshot(mutation: RowTransactionMutation<TRowData>): RowModelTransactionSnapshot<TRowData>;
 	restoreTransactionSnapshot(snapshot: RowModelTransactionSnapshot<TRowData>): void;
 	replaceRowsStructurally(rows: readonly TRowData[]): RowModelWriteResult<TRowData>;
-	applyTransactionStructurally(
-		transaction: import('./api/GridApi.js').RowDataTransaction<TRowData>
-	): RowModelWriteResult<TRowData> & InternalRowNodeTransaction<TRowData>;
+	applyTransactionStructurally(transaction: RowDataTransaction<TRowData>): RowModelWriteResult<TRowData> & InternalRowNodeTransaction<TRowData>;
 	writeCellValueStructurally(
 		rowId: string,
 		colField: string,
@@ -371,17 +375,7 @@ export function classifyWriteImpact(rowModel: RowModel<unknown> | null, changedF
 }
 
 export function asClientStructuralRowModel<TRowData = unknown>(rowModel: RowModel<TRowData> | null): ClientStructuralRowModel<TRowData> | null {
-	return hasFunctions(rowModel, [
-		'captureTransactionSnapshot',
-		'restoreTransactionSnapshot',
-		'replaceRowsStructurally',
-		'applyTransactionStructurally',
-		'writeCellValueStructurally',
-		'reconcileAfterDataWrite',
-		'classifyFieldMutation',
-	])
-		? (rowModel as unknown as ClientStructuralRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'client' ? (rowModel as unknown as ClientStructuralRowModel<TRowData>) : null;
 }
 
 /**
@@ -406,15 +400,15 @@ export function asAnyModelCellWritable<TRowData = unknown>(rowModel: RowModel<TR
 /** Capability interface for the infinite (block/range) row model. */
 export interface InfiniteControllableRowModel<TRowData = unknown> {
 	purgeCache(): void;
-	setDatasource(datasource: import('./infiniteRowModel.js').InfiniteDatasource<TRowData>, blockSize?: number): void;
+	setDatasource(datasource: InfiniteDatasource<TRowData>, blockSize?: number): void;
 }
 
 /** Capability interface for the real server-side row model (SSRM). */
 export interface ServerSideControllableRowModel<TRowData = unknown> {
-	setServerSideDatasource(datasource: import('./serverSideRowModel.js').ServerSideDatasource<TRowData>): void;
-	refreshServerSide(options?: import('./serverSideRowModel.js').ServerSideRefreshOptions): void;
-	purgeServerSide(options?: Omit<import('./serverSideRowModel.js').ServerSideRefreshOptions, 'purge'>): void;
-	getServerSideStoreState(): readonly import('./serverSideRowModel.js').ServerSideStoreSnapshot[];
+	setServerSideDatasource(datasource: ServerSideDatasource<TRowData>): void;
+	refreshServerSide(options?: ServerSideRefreshOptions): void;
+	purgeServerSide(options?: Omit<ServerSideRefreshOptions, 'purge'>): void;
+	getServerSideStoreState(): readonly ServerSideStoreSnapshot[];
 }
 
 export interface VisibleBlockLoadCapableRowModel {
@@ -427,7 +421,11 @@ export interface RowModelTransactionSnapshot<TRowData = unknown> {
 }
 
 /** Shared row-model contract used across engine and rendering code. */
+/** Which row model this is: client-side rows, infinite blocks, or the server-side row model. */
+export type RowModelKind = 'client' | 'infinite' | 'server';
+
 export interface RowModel<TRowData = unknown> extends RowModelViewportAccess<TRowData> {
+	readonly kind: RowModelKind;
 	refresh(reason?: RowRefreshReason): RowModelRefreshResult;
 }
 
@@ -483,17 +481,13 @@ export function asRowOrderCapableModel(rowModel: RowModel<unknown> | null): RowO
 export function asInfiniteControllableRowModel<TRowData = unknown>(
 	rowModel: RowModel<TRowData> | null
 ): InfiniteControllableRowModel<TRowData> | null {
-	return hasFunctions(rowModel, ['purgeCache', 'setDatasource', 'loadVisibleBlocks'])
-		? (rowModel as unknown as InfiniteControllableRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'infinite' ? (rowModel as unknown as InfiniteControllableRowModel<TRowData>) : null;
 }
 
 export function asServerSideControllableRowModel<TRowData = unknown>(
 	rowModel: RowModel<TRowData> | null
 ): ServerSideControllableRowModel<TRowData> | null {
-	return hasFunctions(rowModel, ['setServerSideDatasource', 'refreshServerSide', 'purgeServerSide', 'getServerSideStoreState'])
-		? (rowModel as unknown as ServerSideControllableRowModel<TRowData>)
-		: null;
+	return rowModel?.kind === 'server' ? (rowModel as unknown as ServerSideControllableRowModel<TRowData>) : null;
 }
 
 export function asStickyGroupMetaCapableVisualRowModel(rowModel: VisualRowModel<unknown> | null): StickyGroupMetaCapableVisualRowModel | null {
@@ -1046,6 +1040,7 @@ export class ClientRowModelController<TData = unknown>
 		ClientStructuralRowModel<TData>,
 		CapableRowModel
 {
+	public readonly kind = 'client' as const;
 	private readonly runtime: ClientRowModelRuntime<TData>;
 	private dataStore: RowDataStore<TData>;
 	private readonly getRowHeight: ClientRowModelOptions<TData>['getRowHeight'];
@@ -1098,7 +1093,17 @@ export class ClientRowModelController<TData = unknown>
 		});
 	};
 
-	public setExpanded = (id: string, expanded: boolean): RowModelRefreshResult => {
+	public setExpanded = (id: string, expanded: boolean, options?: SetExpandedOptions): RowModelRefreshResult => {
+		const below = options?.deep ? (this.getHierarchyIndex()?.getDescendantContainerIds(id) ?? []) : [];
+		if (below.length > 0) {
+			// One write for the whole subtree, so one refresh.
+			this.runtime.updateExpansion((expansion) => {
+				const rows = { ...expansion.rows, [id]: expanded };
+				for (const childId of below) rows[childId] = expanded;
+				return { ...expansion, rows };
+			});
+			return this.refresh('expansion', id);
+		}
 		if (this.isExpanded(id) === expanded) return { changed: false };
 		this.runtime.updateExpansion((expansion) => ({ ...expansion, rows: { ...expansion.rows, [id]: expanded } }));
 		return this.refresh('expansion', id);
@@ -1350,9 +1355,7 @@ export class ClientRowModelController<TData = unknown>
 		};
 	}
 
-	public applyTransactionStructurally(
-		transaction: import('./api/GridApi.js').RowDataTransaction<TData>
-	): RowModelWriteResult<TData> & InternalRowNodeTransaction<TData> {
+	public applyTransactionStructurally(transaction: RowDataTransaction<TData>): RowModelWriteResult<TData> & InternalRowNodeTransaction<TData> {
 		const result = this.dataStore.applyTransaction(transaction);
 		const hasStructural = result.added.length > 0 || result.removed.length > 0;
 		return {
@@ -1593,9 +1596,7 @@ export class ClientRowModelController<TData = unknown>
 		return earliestChangedIndex === mutable.length ? 0 : earliestChangedIndex;
 	}
 
-	public captureTransactionSnapshot = (
-		mutation: import('./engine/GridDomainMutation.js').RowTransactionMutation<TData>
-	): RowModelTransactionSnapshot<TData> => {
+	public captureTransactionSnapshot = (mutation: RowTransactionMutation<TData>): RowModelTransactionSnapshot<TData> => {
 		// Delta snapshot: only the rows this transaction touches, captured by reference.
 		return {
 			modelType: 'client',

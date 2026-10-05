@@ -21,7 +21,7 @@ For a fully custom full-width group row instead, set `grouping.display: 'row'` a
 
 ```tsx
 import { useCallback, useMemo } from 'react';
-import { Grid, type ColumnDef, type VisualRow, type GridApi } from '@eregister/wit-grid-react';
+import { Grid, GroupToggle, GroupCount, type ColumnDef, type GroupRenderContext } from '@eregister/wit-grid-react';
 
 interface EmployeeRow {
 	id: string;
@@ -41,12 +41,11 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 		[]
 	);
 
-	const groupRowRenderer = useCallback(({ visualRow, api }: { visualRow: VisualRow<EmployeeRow>; api: GridApi<EmployeeRow> }) => {
-		if (visualRow.kind !== 'group') return null;
+	const groupRowRenderer = useCallback((ctx: GroupRenderContext<EmployeeRow>) => {
 		return (
-			<div onClick={() => api.toggleExpanded(visualRow.id)} style={{ paddingLeft: visualRow.hierarchy.level * 20 + 10 }}>
-				{visualRow.hierarchy.expanded ? '▼' : '▶'} {visualRow.field}: {String(visualRow.key)} ({visualRow.hierarchy.leafCount}) · total{' '}
-				{String(visualRow.aggregates.salary ?? '')}
+			<div style={{ paddingLeft: ctx.indentPx + 10, background: ctx.isStuck ? '#f5f5f5' : undefined }}>
+				<GroupToggle ctx={ctx} /> {ctx.label} <GroupCount ctx={ctx} /> · total {String(ctx.aggregates?.salary ?? '')}
+				<button onClick={ctx.expandAll}>Expand all</button>
 			</div>
 		);
 	}, []);
@@ -67,8 +66,8 @@ export function GroupedEmployeesGrid({ data }: { data: EmployeeRow[] }) {
 ```
 
 <Callout title='Expansion' type='info'>
-	Group rows carry `field`, `key`, `path`, `aggregates` and their `hierarchy`. Expansion is keyed by visual row id: `api.setExpanded(id, open)`,
-	`api.toggleExpanded(id)`, `api.isExpanded(id)`. `api.expandAll({maxLevel})` and `api.collapseAll()` replace individual choices.
+	Group rows carry `field`, `key`, `path`, `aggregates` and their `hierarchy`. Expansion is keyed by visual row id: `api.setExpanded(id, open)`
+	(`{ deep: true }` also opens or closes every group beneath it), `api.toggleExpanded(id)`, `api.isExpanded(id)`. `api.expandAll({maxLevel})` and `api.collapseAll()` replace individual choices.
 	`grouping.defaultExpanded` takes `true`, a number of open levels, or a predicate over the group — and a default-open group can still be closed.
 </Callout>
 
@@ -143,9 +142,119 @@ their descendants (`treeData.aggregateParents`, default on).
 `cellClass` to replace a part — each receives the row's kind, level, key or value, formatted value and
 aggregates. `hierarchyColumn: false` removes it.
 
+### One context for every group renderer
+
+Group rows (`grouping.rowRenderer`, or the React adapter's `groupRowRenderer` / `totalRowRenderer`), the hierarchy cell
+(`hierarchyColumn.renderer`) and the stuck copy of a sticky header are all drawn with the same `GroupRenderContext`:
+the fields above plus `row`, `isTotal`, `isStuck`, `path`, `indentPx`, `label` and `count` (what the built-in cell would
+show), `api`, and actions bound to the row: `toggle()`, `setExpanded(open)`, `expandAll()` / `collapseAll()` for the
+group's subtree, and `selectChildren(selected)`. Read the selection state with `api.getDescendantSelection(ctx.id)`.
+
+A renderer is either `{ kind: 'dom', renderer }` (`mount(container, ctx)` returns `{ update?(ctx), destroy? }` and runs
+synchronously in the grid) or `{ kind: 'react', component }`, rendered with the context as its props. A sticky header
+that sticks or releases gets `update` with `isStuck` flipped, so a renderer can restyle it. `hierarchyColumn.renderer`
+replaces the cell's content entirely (`label`, `count` and `cellClass` still apply); build it from the built-in parts
+with `renderGroupToggle(ctx)` (DOM) or `<GroupToggle ctx={ctx} />` and `<GroupCount ctx={ctx} />` (React).
+
+A complete React renderer with actions and a compact stuck layout. Memoize the config so a re-render does not reset the grid:
+
+```tsx
+import { useMemo } from 'react';
+import { Grid, GroupToggle, GroupCount, type GroupRenderContext } from '@eregister/wit-grid-react';
+
+function GroupRow(ctx: GroupRenderContext<Order>) {
+	const revenue = Number(ctx.aggregates?.revenue ?? 0);
+	if (ctx.isStuck) {
+		// Compact while stuck: just the toggle, the name and the total.
+		return (
+			<div className='stuck-row' style={{ paddingLeft: ctx.indentPx }}>
+				<GroupToggle ctx={ctx} /> {ctx.label} <strong>{revenue.toLocaleString()}</strong>
+			</div>
+		);
+	}
+	return (
+		<div className='group-row' style={{ paddingLeft: ctx.indentPx }}>
+			<GroupToggle ctx={ctx} /> {ctx.label} <GroupCount ctx={ctx} />
+			<strong>{revenue.toLocaleString()}</strong>
+			<button onClick={ctx.expandAll}>Expand below</button>
+			<button onClick={ctx.collapseAll}>Collapse</button>
+			<button onClick={() => ctx.selectChildren(true)}>Select all</button>
+		</div>
+	);
+}
+
+export function OrdersGrid({ orders }: { orders: Order[] }) {
+	const initialState = useMemo(
+		() => ({
+			grouping: {
+				by: ['region', 'country'],
+				display: 'row' as const,
+				stickyHeaders: true,
+				rowRenderer: { kind: 'react' as const, component: GroupRow },
+			},
+			aggregation: { defs: [{ colId: 'revenue', aggFunc: 'sum' as const }] },
+		}),
+		[]
+	);
+	return <Grid rows={orders} columns={columns} getRowId={(r) => r.id} rowSelection='multiple' initialState={initialState} />;
+}
+```
+
+The same component works as `hierarchyColumn.renderer` for `display: 'column'` and `'columns'`.
+
+```ts
+hierarchyColumn: {
+	renderer: {
+		kind: 'dom',
+		renderer: {
+			mount(container, ctx) {
+				const el = document.createElement('div');
+				const draw = (c: GroupRenderContext<Row>) => {
+					el.replaceChildren(renderGroupToggle(c), `${c.label} (${c.count ?? ''})`);
+					el.style.paddingLeft = `${c.indentPx}px`;
+					el.classList.toggle('is-stuck', c.isStuck);
+				};
+				draw(ctx);
+				container.append(el);
+				return { update: draw, destroy: () => el.remove() };
+			},
+		},
+	},
+},
+```
+
 A column's aggregate can be drawn instead of written: `aggregateRenderer: { kind: 'dom', renderer }` is mounted by
 the grid into that column's cells on group and total rows, with `{ value, formattedValue, row, col }`
 (`mount(container, params)` returns `{ update?, destroy? }`) — a sparkline, a progress bar, a badge.
+
+## Sticky group headers
+
+`grouping.stickyHeaders` keeps expanded group headers in view while their rows scroll past:
+
+```ts
+grouping: { by: ['region', 'country'], stickyHeaders: true }
+// or tune it
+grouping: { by: ['region', 'country'], stickyHeaders: { levels: 1, shadow: false } }
+```
+
+| Option   | Meaning                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------ |
+| `levels` | How many grouping levels stick, outermost first. `1` sticks only top-level groups. Default: all. |
+| `shadow` | A shadow under the stuck stack. Default: `true`.                                                 |
+
+How it behaves:
+
+- **Native.** Headers use the browser's own sticky positioning, so a stuck header moves with the scroll on the GPU, with no JavaScript per frame.
+- **Stacking.** One header per level stacks under the column header. Rows pinned to the top (`api.transaction({ pins: { top } })`) sit above the stack, and pinned bottom rows stay at the bottom.
+- **Push-up.** When a group ends, its header is pushed up by the next group's header, as in a long contacts list.
+- **Stuck state.** A header that is stuck carries the class `og-row-group-stuck`, and a custom renderer sees `ctx.isStuck`.
+
+```css
+.og-row-group-stuck {
+	background: #f8fafc;
+	font-weight: 600;
+}
+```
 
 ## Keyboard, accessibility, selection and export
 

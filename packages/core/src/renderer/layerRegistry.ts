@@ -167,15 +167,14 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		},
 	},
 	{
-		id: 'sticky-groups',
-		className: 'og-layer-sticky-groups',
+		// Zero-height sticky band for viewport-pinned top rows. Slots in it are positioned at their
+		// constant content offset; the compositor keeps the band stuck below the top chrome.
+		id: 'pinned-top',
+		className: 'og-layer-pinned-top',
 		parent: 'scroll-viewport',
-		order: 4,
+		order: 5,
 		apply(el, plan) {
 			el.style.width = `${plan.dimensions.contentWidth}px`;
-			// Stuck just below the top chrome from the first pixel of scroll. The layer already sits
-			// after the chrome in flow, so a translate here would place it a chrome height too low
-			// until it sticks.
 			el.style.top = `${plan.origins.stickyGroupLayerTop}px`;
 			setViewportWidthVar(el, plan);
 		},
@@ -184,9 +183,21 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		id: 'rows',
 		className: 'og-rows-container',
 		parent: 'scroll-viewport',
-		order: 5,
+		order: 6,
 		apply(el, plan) {
 			el.style.height = `${plan.dimensions.contentHeight}px`;
+			el.style.width = `${plan.dimensions.contentWidth}px`;
+			setViewportWidthVar(el, plan);
+		},
+	},
+	{
+		// Zero-height sticky band at the bottom edge of the scroll viewport for pinned bottom rows,
+		// which sit at a constant negative offset above it.
+		id: 'pinned-bottom',
+		className: 'og-layer-pinned-bottom',
+		parent: 'scroll-viewport',
+		order: 7,
+		apply(el, plan) {
 			el.style.width = `${plan.dimensions.contentWidth}px`;
 			setViewportWidthVar(el, plan);
 		},

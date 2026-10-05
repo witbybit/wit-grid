@@ -26,6 +26,7 @@ import {
 	TrendingUp,
 } from 'lucide-react';
 import type { WitGridExampleRuntimeProps } from '../types';
+import { ROW_ANIMATION_PRESETS } from './RealtimeDashboard';
 
 type TabId = 'groups' | 'tree' | 'detail';
 
@@ -768,29 +769,28 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={workforceRows}
 								columns={workforceColumns}
 								persistence='wit-grid-hierarchy-workforce'
-								initialState={
-									{
-										grouping: {
-											by: groupBy,
-											display: 'columns',
-											rowHeight: 42,
-											stickyHeaders: true,
-											totals: { groups: 'bottom', grand: 'bottom' },
-										},
-										aggregation: { defs: workforceAggs },
-										hierarchyColumn: {
-											header: 'Organization',
-											width: 280,
-											indentPerLevel: 18,
-											show: { toggle: true, checkbox: false, count: true },
-										},
-									} as any
-								}
+								initialState={{
+									grouping: {
+										by: groupBy,
+										display: 'columns',
+										rowHeight: 42,
+										stickyHeaders: true,
+										totals: { groups: 'bottom', grand: 'bottom' },
+									},
+									aggregation: { defs: workforceAggs },
+									hierarchyColumn: {
+										header: 'Organization',
+										width: 280,
+										indentPerLevel: 18,
+										show: { toggle: true, checkbox: false, count: true },
+									},
+								}}
 								pinLeftColumns={1}
 								onGridReady={(event) => {
 									setGroupApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 
@@ -800,29 +800,28 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={repoRows}
 								columns={repoColumns}
 								persistence='wit-grid-hierarchy-repo-tree'
-								initialState={
-									{
-										treeData: {
-											getParentId: (row: RepoNodeRow) => row.parentId,
-											column: 'name',
-											defaultExpanded: true,
-											filterMode: 'includeDescendants',
-											aggregateParents: true,
-											selectDescendants: true,
-										},
-										hierarchyColumn: {
-											header: 'Repository',
-											width: 320,
-											indentPerLevel: 18,
-											show: { toggle: true, checkbox: true, count: true },
-										},
-									} as any
-								}
+								initialState={{
+									treeData: {
+										getParentId: (row: RepoNodeRow) => row.parentId,
+										column: 'name',
+										defaultExpanded: true,
+										filterMode: 'includeDescendants',
+										aggregateParents: true,
+										selectDescendants: true,
+									},
+									hierarchyColumn: {
+										header: 'Repository',
+										width: 320,
+										indentPerLevel: 18,
+										show: { toggle: true, checkbox: true, count: true },
+									},
+								}}
 								rowSelection='multiple'
 								onGridReady={(event) => {
 									setTreeApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 
@@ -832,15 +831,13 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 								rows={orderRows}
 								columns={orderColumns}
 								persistence='wit-grid-hierarchy-orders'
-								initialState={
-									{
-										detail: {
-											height: 250,
-											estimatedHeight: 250,
-											isMaster: (row: OrderRow) => Boolean(initialOrderLines[row.id]?.length),
-										},
-									} as any
-								}
+								initialState={{
+									detail: {
+										height: 250,
+										estimatedHeight: 250,
+										isMaster: (row: OrderRow) => Boolean(initialOrderLines[row.id]?.length),
+									},
+								}}
 								detailRowRenderer={({ visualRow, api }) => (
 									<DetailGrid
 										visualRow={visualRow}
@@ -852,6 +849,7 @@ export default function NestedHierarchyDemo({ onGridReady, compact = false }: Ne
 									setDetailApi(event.api);
 									handleGridReady(event);
 								}}
+								rendererOptions={{ rowAnimation: { ...ROW_ANIMATION_PRESETS['spring'].options } }}
 							/>
 						)}
 					</div>

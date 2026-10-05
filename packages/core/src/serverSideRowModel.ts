@@ -389,6 +389,7 @@ type ServerSideRuntimeStore<TRowData> = {
 export class ServerSideRowModelController<TRowData = unknown>
 	implements RowModel<TRowData>, ServerSideControllableRowModel<TRowData>, RowExpansionCapableModel<TRowData>, RowExpansionStateReadableModel
 {
+	public readonly kind = 'server' as const;
 	private datasource: ServerSideDatasource<TRowData>;
 	private readonly getRowId: (row: TRowData) => string;
 	private blockSize: number;

@@ -1,6 +1,6 @@
 import type { InternalGridState, GridStateUpdater } from '../state/GridState.js';
 import type { GridEventPayloadMap } from '../api/GridEvents.js';
-import { GridEventName } from '../api/GridEvents.js';
+import type { GridEventName } from '../api/GridEvents.js';
 import type { StateManager } from '../state/StateManager.js';
 import { normalizeInvalidationPlan, type InvalidationManager, type GridInvalidation } from '../renderer/invalidationManager.js';
 import type { EventBus } from '../events/EventBus.js';
@@ -17,6 +17,7 @@ import type {
 import type { StateCommitPhase } from '../state/StateManager.js';
 import type { RowsUpdatedDispatchPayload } from './runtimePorts.js';
 import type { GridCausalTraceSink } from '../diagnostics/GridCausalTrace.js';
+import type { GridMutationRejection } from './GridDomainMutation.js';
 
 export type GridCommitReason =
 	| 'columns:set-data'
@@ -140,10 +141,10 @@ export type GridCommitResult =
 			status: 'committed';
 			changeId: number;
 			faults: readonly RuntimeFault[];
-			rejectedMutations?: readonly import('./GridDomainMutation.js').GridMutationRejection[];
+			rejectedMutations?: readonly GridMutationRejection[];
 	  }
 	| { status: 'noop' }
-	| { status: 'rejected'; reason: GridCommitRejectionReason; rejections?: readonly import('./GridDomainMutation.js').GridMutationRejection[] }
+	| { status: 'rejected'; reason: GridCommitRejectionReason; rejections?: readonly GridMutationRejection[] }
 	| { status: 'failed-before-commit'; fault: RuntimeFault };
 
 interface GridCommitRecord<TRowData = unknown> {
@@ -198,7 +199,7 @@ export interface GridCommitKernelDeps<TRowData = unknown> {
 export type GridChangeApplierDeps<TRowData = unknown> = GridCommitKernelDeps<TRowData>;
 
 class GridCommitRejectedError {
-	constructor(readonly rejections: readonly import('./GridDomainMutation.js').GridMutationRejection[]) {}
+	constructor(readonly rejections: readonly GridMutationRejection[]) {}
 }
 
 export class GridCommitKernel<TRowData = unknown> {
@@ -615,9 +616,7 @@ export class GridCommitKernel<TRowData = unknown> {
 		};
 	}
 
-	private collectRejectedMutations(
-		appliedMutations: readonly AppliedDomainMutation<TRowData>[]
-	): readonly import('./GridDomainMutation.js').GridMutationRejection[] | undefined {
+	private collectRejectedMutations(appliedMutations: readonly AppliedDomainMutation<TRowData>[]): readonly GridMutationRejection[] | undefined {
 		const rejections = appliedMutations.flatMap((mutation) => mutation.rejections ?? []);
 		return rejections.length > 0 ? rejections : undefined;
 	}

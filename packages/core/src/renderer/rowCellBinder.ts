@@ -4,8 +4,8 @@ import type { GridEngine } from '../engine/GridEngine.js';
 import { createEditRendererKey, createCellInstanceRendererKey } from './identityKeys.js';
 import { reportRendererFault } from './rendererFaults.js';
 import type { CellRendererPhase, ColumnDef, ColumnInstanceId, GridCellClassParams, InternalColumnDef } from '../columnDef.js';
-import { getColumnInstanceIdentity } from '../columnDef.js';
-import type { CanonicalGridCellPointer, GridCellPointer } from '../api/GridApi.js';
+import { getColumnInstanceIdentity, getValueByPath } from '../columnDef.js';
+
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
 import type { InternalGridState } from '../state/GridState.js';
 import type { RowNode } from '../rowNode.js';
@@ -29,7 +29,7 @@ import {
 	mergeCellSnapshotTitle,
 	type CellDisplaySnapshot,
 } from './cellDisplaySnapshot.js';
-import type { VisualFreshness } from './visualFreshness.js';
+
 import type { ScrollCellPresentationDeps, ScrollCellPresentationInput } from './scrollCellPresentation.js';
 import {
 	dispatchCellPresentation,
@@ -37,7 +37,7 @@ import {
 	type CellBindRuntime,
 	type DispatchCellPresentationInput,
 } from './binders/cellPresentationDispatcher.js';
-import { buildCellPinClass, applyCellTitlesAndValidation, getScrollMountValue } from './binders/binderShared.js';
+import { buildCellPinClass, getScrollMountValue } from './binders/binderShared.js';
 import { getOrCreateCellCtrl, createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
 import type { CellCtrl } from './controllers/CellCtrl.js';
 import { CellCtrlStore } from './controllers/CellCtrlStore.js';
@@ -793,7 +793,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 
 /** A data bind never inherits a group / total row's aggregate text (see CellSlot.hasAggregateText). */
 function clearAggregateText<TRowData>(cellSlot: CellSlot<TRowData>): void {
-	cellSlot.releaseAggregateMount();
+	cellSlot.releaseContentMount();
 	if (!cellSlot.hasAggregateText) return;
 	cellSlot.hasAggregateText = false;
 	cellSlot.clearText();
@@ -814,6 +814,48 @@ function bindHierarchyCellFor<TRowData>(
 		{ ...request, row, left, width, state: deps.engine.stateManager.getState(), isScrollFrameActive }
 	);
 	return true;
+}
+
+/**
+ * Cell style-rule classes for a cell entering view during scroll, or undefined when they cannot be
+ * evaluated without a semantic read (a getter or formula column) and stay deferred to settle.
+ * Returns '' when no rule matches: the class is then known, not deferred.
+ */
+function evaluateScrollStyleRuleClass<TRowData>(
+	deps: RowCellBinderDeps<TRowData>,
+	ctx: ScrollRenderContext<TRowData>,
+	node: RowNode<TRowData>,
+	col: ColumnDef<TRowData>,
+	rowIndex: number,
+	colIndex: number,
+	isFocused: boolean,
+	isEditing: boolean
+): string | undefined {
+	const rules = ctx.compiledStyleRules;
+	if (!rules?.hasCellRules || !node.data || col.valueGetter || deps.engine.hasFormula(node.id, col.field)) return undefined;
+	try {
+		const value = getValueByPath(node.data, col.field);
+		const s = deps.cellClassScratch;
+		s.row = node.data;
+		s.rowId = node.id;
+		s.rowIndex = rowIndex;
+		s.col = col;
+		s.colField = col.field;
+		s.colIndex = colIndex;
+		s.isFocused = isFocused;
+		s.isRowFocused = !!ctx.focusedCell && ctx.focusedCell.rowId === node.id;
+		s.isRowSelected = false;
+		s.isSelected = isCellSelectedInBounds(ctx.selectionBounds, rowIndex, colIndex);
+		s.isEditing = isEditing;
+		s.value = value;
+		s.rawValue = value;
+		s.isLoading = false;
+		deps.incrementStyleHookCallsDuringScroll();
+		return evaluateCellStyleRules(rules, col, node.data, s);
+	} catch (e) {
+		reportRendererFault(deps.engine, 'cell-class', e, { rowId: node.id, rowIndex, colField: col.field, colIndex });
+		return undefined;
+	}
 }
 
 export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>, request: BindCellDuringScrollRequest<TRowData>): void {
@@ -845,6 +887,14 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		if (isProgrammatic) deps.clearProgrammaticScrollCell();
 	}
 
+	// Cell style rules (conditional formatting) are drawn as the cell enters view, like its text:
+	// evaluated on the row when there is no fresh snapshot or warm class to reuse. A column whose
+	// value needs a getter or formula keeps the deferred refresh (its value is a semantic read).
+	const styleRuleClass =
+		ctx.hasDeferredCellStyleRules && !snapshot && !(isWarmBindingVersionFresh && cellSlot.lastClassName) && !isRowLoading
+			? evaluateScrollStyleRuleClass(deps, ctx, node, col, rowIndex, colIndex, isFocused, isEditing)
+			: undefined;
+
 	// Likewise, deferring a style refresh to the fidelity lane is a decision independent of the
 	// content presentation itself.
 	const shouldDeferCellStyleRefresh =
@@ -852,6 +902,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		((ctx.hasInsightDecorations && !snapshot) ||
 			(ctx.hasDeferredCellStyleRules &&
 				!snapshot &&
+				styleRuleClass === undefined &&
 				(ctx.selectionChangedDuringScroll || !isWarmBindingVersionFresh || ctx.styleChangedDuringScroll || ctx.loadingChangedDuringScroll)));
 	if (shouldDeferCellStyleRefresh) {
 		deps.markCellDirtyAfterScroll(cellSlot.element);
@@ -879,6 +930,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 		input.isWarmBindingVersionFresh = isWarmBindingVersionFresh;
 		input.rowVersion = rowVersion;
 		input.cellKey = cellKey;
+		input.styleRuleClass = styleRuleClass;
 		resolveCellCtrlScrollDecisionState(cellCtrl, getScrollDecisionDeps(deps), input);
 
 		// 3. Dispatch to the mode-specific binder — enqueues fidelity work, updates mounted slot bookkeeping.

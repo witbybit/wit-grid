@@ -29,6 +29,8 @@ export interface RenderStats {
 	headerRangeSyncsDuringScroll: number;
 	overlayPaintsDuringScroll: number;
 	overlayCheapSyncsDuringScroll: number;
+	/** Elements JS re-positioned because the content scrolled (sticky headers, pinned rows, selection box): each lags the compositor's scroll by a frame. */
+	scrollLinkedPositionWrites: number;
 	portalFlushesDuringScroll: number;
 	portalDeferredDuringScroll: number;
 	portalMountsDuringScroll: number;
@@ -153,6 +155,7 @@ export function createEmptyRenderStats(): RenderStats {
 		headerRangeSyncsDuringScroll: 0,
 		overlayPaintsDuringScroll: 0,
 		overlayCheapSyncsDuringScroll: 0,
+		scrollLinkedPositionWrites: 0,
 		portalFlushesDuringScroll: 0,
 		portalDeferredDuringScroll: 0,
 		portalMountsDuringScroll: 0,
@@ -271,6 +274,8 @@ export interface RenderRuntimeStats {
 	headerRangeSyncsDuringScroll: number;
 	overlayPaintsDuringScroll: number;
 	overlayCheapSyncsDuringScroll: number;
+	/** Elements JS re-positioned because the content scrolled (sticky headers, pinned rows, selection box): each lags the compositor's scroll by a frame. */
+	scrollLinkedPositionWrites: number;
 	cellsPatchedPerScrollFrame: number[];
 	rowsRecycledPerScrollFrame: number[];
 	stateReadsDuringScroll: number;
@@ -355,6 +360,7 @@ export function createRenderRuntimeStats(): RenderRuntimeStats {
 		headerRangeSyncsDuringScroll: 0,
 		overlayPaintsDuringScroll: 0,
 		overlayCheapSyncsDuringScroll: 0,
+		scrollLinkedPositionWrites: 0,
 		cellsPatchedPerScrollFrame: [],
 		rowsRecycledPerScrollFrame: [],
 		stateReadsDuringScroll: 0,

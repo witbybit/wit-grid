@@ -6,7 +6,6 @@ import type {
 	GridSelectionState,
 	GridCellRangeBounds,
 } from '../api/GridApi.js';
-import type { InternalGridState } from '../state/GridState.js';
 
 export interface GridFocusState {
 	cell: CanonicalGridCellPointer | null;

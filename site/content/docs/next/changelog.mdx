@@ -11,6 +11,35 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Added — row animation styles
+
+`rowAnimation` (React prop; `rendererOptions.rowAnimation` and `api.setRowAnimation` in core) chooses how rows
+move on sorts, live reorders, expansion and detail rows: `style` (`'slide'`, `'fade'`, `'none'`), `easing`
+(`'smooth'`, `'snappy'`, `'spring'` or any CSS easing), `duration`, a capped `stagger` cascade, and `on` to switch
+kinds of change off. See [Styling](/docs/next/styling#row-animations).
+
+### Added — sticky group headers, native, with options
+
+Expanded group headers stick under the column header while their rows scroll, stack one per level, and are pushed up when their group ends. They use the browser's native sticky positioning, so a stuck header moves with the scroll on the GPU, with no JavaScript per frame. `grouping.stickyHeaders` takes `true` or `{ levels, shadow }` to cap how many levels stick or drop the shadow. A stuck header carries the class `og-row-group-stuck`. See [Sticky group headers](/docs/next/grouping#sticky-group-headers).
+
+### Changed — pinned rows stay put natively
+
+Rows pinned to the top or bottom (`pins: { top, bottom }`, `pinTopRows`, `pinBottomRows`) no longer move with JavaScript while scrolling. They stay in place on their own, so they no longer lag behind fast scrolls.
+
+### Fixed — the selection box scrolls with the cells
+
+The range selection box now moves with the cells it covers while you scroll.
+
+### Changed — one group renderer API across display modes
+
+Full-width group rows, the hierarchy cell and sticky headers are all drawn by the same renderer, with the same `GroupRenderContext`: `level`, `expanded`, `label`, `count`, `aggregates`, `isStuck`, and actions `toggle()`, `setExpanded()`, `expandAll()`, `collapseAll()` and `selectChildren()`. React gets `<GroupToggle>` and `<GroupCount>`; DOM renderers get `renderGroupToggle(ctx)`. See [One context for every group renderer](/docs/next/grouping#one-context-for-every-group-renderer).
+
+**Breaking:** `grouping.rowRenderer` now receives a `GroupRenderContext`, and React group row components (`groupRowRenderer`, `totalRowRenderer`) receive that context as props instead of `{ visualRow, api }`. Read `ctx.row` for the row and `ctx.api` for the API.
+
+### Fixed — column order is kept when the `columns` prop is replaced with equivalent columns
+
+Passing a new `columns` array with the same columns no longer undoes a reorder the user made.
+
 ### Changed — two scroll choices for custom renderers: `text` and `live`
 
 A custom renderer now picks one of two behaviors during scroll with `capabilities.scroll`. `'text'` (the React
@@ -54,7 +83,7 @@ and added rows after they commit, and removed rows drop their issues (`validatio
 | `batchCellValues(updates, source)`       | `transaction({ cells: updates, source })`                                      |
 | `batchCellValuesAsync(updates, source)`  | `transaction({ cells: updates, source }, { async: true })`                     |
 | `setCellValueAsync(rowId, field, value)` | `transaction({ cells: [{ rowId, colField: field, value }] }, { async: true })` |
-| `updateRows(fn)`                         | `setRows(fn(api.rows().getAll()))`                                             |
+| `updateRows(fn)`                         | `transaction({ rows: { update: changedRows } })`                               |
 | `transaction({ rowTransaction })`        | `transaction({ rows })`                                                        |
 | `transaction({ rows: allRows })`         | `setRows(allRows)`                                                             |
 | type `BatchCellValueUpdate`              | `GridCellWrite`                                                                |

@@ -29,6 +29,7 @@ const WideGridDemo = lazy(() => import('./pages/WideGridDemo'));
 const ColumnGroupHeaderDemo = lazy(() => import('./pages/ColumnGroupHeaderDemo'));
 const ClipboardDemo = lazy(() => import('@eregister/wit-grid-examples/clipboard'));
 const FloatingFiltersDemo = lazy(() => import('./pages/FloatingFiltersDemo'));
+const GroupingStickyDemo = lazy(() => import('@eregister/wit-grid-examples/grouping-sticky'));
 const RowDragDemo = lazy(() => import('@eregister/wit-grid-examples/row-drag'));
 const AdvancedFiltersDemo = lazy(() => import('@eregister/wit-grid-examples/advanced-filters'));
 const DataIntegrityLab = lazy(() => import('@eregister/wit-grid-examples/data-integrity'));
@@ -58,6 +59,7 @@ const PAGES: readonly GridPageType[] = [
 	'colgroups',
 	'floatingfilters',
 	'rowdrag',
+	'grouping-sticky',
 	'advancedfilters',
 	'integrity',
 	'projects',
@@ -198,21 +200,23 @@ export default function App() {
 				return;
 			}
 			const rowIdSet = new Set(rowIds);
-			activeApi.setRows(
-				activeApi
-					.rows()
-					.getAll()
-					.map((row) => {
-						if (!rowIdSet.has(row.id)) return row;
-						const next = { ...row } as any;
-						for (const field of columns) {
-							if (action === 'fill') next[field] = '100';
-							else if (action === 'clear') next[field] = 0;
-							else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
-						}
-						return next;
-					})
-			);
+			activeApi.transaction({
+				rows: {
+					update: activeApi
+						.rows()
+						.getAll()
+						.map((row) => {
+							if (!rowIdSet.has(row.id)) return row;
+							const next = { ...row } as any;
+							for (const field of columns) {
+								if (action === 'fill') next[field] = '100';
+								else if (action === 'clear') next[field] = 0;
+								else next[field] = ((parseFloat(String((row as any)[field])) || 0) * 1.1).toFixed(0);
+							}
+							return next;
+						}),
+				},
+			});
 			performance.mark('wit-grid-demo-range-action');
 		},
 		[activeApi]
@@ -257,6 +261,7 @@ export default function App() {
 		if (activePage === 'clipboard') return <ClipboardDemo />;
 		if (activePage === 'floatingfilters') return <FloatingFiltersDemo {...commonGridProps} />;
 		if (activePage === 'rowdrag') return <RowDragDemo />;
+		if (activePage === 'grouping-sticky') return <GroupingStickyDemo />;
 		if (activePage === 'advancedfilters') return <AdvancedFiltersDemo />;
 		if (activePage === 'integrity') return <DataIntegrityLab />;
 		if (activePage === 'projects') return <ProjectsComplianceDemo onGridReady={handleGridReady} />;

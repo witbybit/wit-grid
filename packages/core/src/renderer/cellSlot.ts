@@ -6,6 +6,7 @@ import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
 import { createCellInstanceRendererKey } from './identityKeys.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
+import type { HierarchyCellParts } from './hierarchyCell.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
 export interface CellCtrlOwner {
@@ -266,20 +267,22 @@ export class CellSlot<TRowData = unknown> {
 	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
 	 */
 	public hasAggregateText = false;
-	/** An aggregate renderer mounted in this cell (group / total rows), and what it last drew. */
+	/** A renderer mounted in this cell by core (an aggregate renderer, or the hierarchy column's renderer), and what it last drew. */
 	// Typed loosely: only the binder, which knows the row type, calls into it.
-	public aggregateMount: {
+	public contentMount: {
 		renderer: unknown;
 		handle: { update?(params: never): void; destroy?(): void };
 		rowId: string;
 		value: unknown;
+		/** Hierarchy cell renderers: the context last drawn. */
+		context?: unknown;
 	} | null = null;
 
-	/** Destroys a mounted aggregate renderer and clears its content. */
-	public releaseAggregateMount(): void {
-		const mount = this.aggregateMount;
+	/** Destroys the mounted renderer and clears its content. */
+	public releaseContentMount(): void {
+		const mount = this.contentMount;
 		if (!mount) return;
-		this.aggregateMount = null;
+		this.contentMount = null;
 		try {
 			mount.handle.destroy?.();
 		} finally {
@@ -288,7 +291,7 @@ export class CellSlot<TRowData = unknown> {
 		}
 	}
 	/** Hierarchy-column cells: their parts, reused across rebinds (see hierarchyCell.ts). */
-	public hierarchyParts: import('./hierarchyCell.js').HierarchyCellParts | null = null;
+	public hierarchyParts: HierarchyCellParts | null = null;
 
 	// JS-side mirrors of DOM state, so steady-state binds never read the DOM back.
 
@@ -717,7 +720,7 @@ export class CellSlot<TRowData = unknown> {
 
 	public unbindCold(): void {
 		this.detachCellCtrl();
-		this.releaseAggregateMount();
+		this.releaseContentMount();
 		if (this.renderer !== null) {
 			this.renderer.destroy();
 			this.renderer = null;

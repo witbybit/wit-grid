@@ -305,3 +305,75 @@ describe('LayoutTransitionController — detail height animation (Plan 045)', ()
 		c.destroy();
 	});
 });
+
+describe('row animation options', () => {
+	const originalAnimate = (HTMLElement.prototype as any).animate;
+	afterEach(() => {
+		(HTMLElement.prototype as any).animate = originalAnimate;
+	});
+	function recordAnimate() {
+		const calls: { kf: Keyframe[]; options: KeyframeAnimationOptions; el: HTMLElement }[] = [];
+		(HTMLElement.prototype as any).animate = function (kf: Keyframe[], options: KeyframeAnimationOptions) {
+			calls.push({ kf, options, el: this });
+			return { cancel: vi.fn(), onfinish: null, oncancel: null } as unknown as Animation;
+		};
+		return calls;
+	}
+	function sortOf(count: number) {
+		const slots = Array.from({ length: count }, (_, i) => slot(`r${i}`, i * 40));
+		return { slots, reverse: () => slots.forEach((s, i) => (s.lastTop = (count - 1 - i) * 40)) };
+	}
+
+	it('stagger cascades rows top to bottom (by new position), holding their start until their turn', () => {
+		const calls = recordAnimate();
+		const { slots, reverse } = sortOf(3);
+		const c = new LayoutTransitionController(makeRows(slots), { getRowAnimation: () => ({ stagger: 30, easing: 'snappy', duration: 400 }) });
+		c.captureSnapshot('sort');
+		reverse();
+		c.beginAnimation();
+		const byTop = [...calls]
+			.sort((a, b) => (a.options.delay ?? 0) - (b.options.delay ?? 0))
+			.map((x) => slots.find((s) => s.element === x.el)!.lastTop);
+		// The middle row of a reversed three keeps its place, so it does not animate.
+		expect(byTop).toEqual([0, 80]);
+		expect(calls.map((x) => x.options.delay).sort((a, b) => a! - b!)).toEqual([0, 30]);
+		expect(calls.find((x) => x.options.delay === 30)!.options.fill).toBe('backwards');
+		expect(calls[0].options.duration).toBe(400);
+		expect(calls[0].options.easing).toBe('cubic-bezier(0.2, 0, 0, 1)');
+		c.destroy();
+	});
+
+	it('caps the whole cascade so a large change still finishes quickly', () => {
+		const calls = recordAnimate();
+		const { slots, reverse } = sortOf(50);
+		const c = new LayoutTransitionController(makeRows(slots), { getRowAnimation: () => ({ stagger: 40 }) });
+		c.captureSnapshot('sort');
+		reverse();
+		c.beginAnimation();
+		expect(Math.max(...calls.map((x) => x.options.delay ?? 0))).toBeLessThanOrEqual(240);
+		c.destroy();
+	});
+
+	it("'fade' fades moved rows in place; 'none' and a switched-off change do not animate", () => {
+		let calls = recordAnimate();
+		let { slots, reverse } = sortOf(2);
+		let c = new LayoutTransitionController(makeRows(slots), { getRowAnimation: () => ({ style: 'fade' }) });
+		c.captureSnapshot('sort');
+		reverse();
+		c.beginAnimation();
+		expect(calls).toHaveLength(2);
+		expect(calls[0].kf).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+		c.destroy();
+
+		for (const options of [{ style: 'none' as const }, { on: { sort: false } }]) {
+			calls = recordAnimate();
+			({ slots, reverse } = sortOf(2));
+			c = new LayoutTransitionController(makeRows(slots), { getRowAnimation: () => options });
+			c.captureSnapshot('sort');
+			reverse();
+			c.beginAnimation();
+			expect(calls).toHaveLength(0);
+			c.destroy();
+		}
+	});
+});

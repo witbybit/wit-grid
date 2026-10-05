@@ -1,5 +1,5 @@
 import { flushSync } from 'react-dom';
-import type { ColumnDef, VisualRow, RowRendererSpec } from '@eregister/wit-grid-core';
+import type { ColumnDef, VisualRow, RowRendererSpec, GroupRendererSpec, GroupRenderContext } from '@eregister/wit-grid-core';
 import type {
 	PortalData,
 	RowPortalData,
@@ -95,13 +95,18 @@ export function createPortalStore<TRowData = unknown>() {
 		});
 	}
 
+	// Row and menu content commits in one flushSync from a microtask, like cell data: a recycled
+	// row container (a group row, a custom hierarchy cell) must not show the previous row's
+	// content for a frame while React's scheduler gets to it.
 	function notifyRowMenuStructural() {
 		debugStats.rowMenuStructuralPublishes++;
 		if (rowMenuScheduled) return;
 		rowMenuScheduled = true;
 		queueMicrotask(() => {
 			rowMenuScheduled = false;
-			for (const l of rowMenuStructuralListeners) l();
+			flushSync(() => {
+				for (const l of rowMenuStructuralListeners) l();
+			});
 		});
 	}
 
@@ -330,9 +335,21 @@ export function createPortalStore<TRowData = unknown>() {
 		},
 
 		// ── Row mounts ───────────────────────────────────────────────────────────
-		mountRow(rowKey: string, container: HTMLElement, visualRow: VisualRow<TRowData>, renderer?: RowRendererSpec<TRowData>) {
+		mountRow(
+			rowKey: string,
+			container: HTMLElement,
+			visualRow: VisualRow<TRowData>,
+			renderer?: RowRendererSpec<TRowData> | GroupRendererSpec<TRowData>,
+			context?: GroupRenderContext<TRowData>
+		) {
 			const existing = rowPortals.get(rowKey);
-			if (existing && existing.container === container && existing.visualRow === visualRow && existing.renderer === renderer) {
+			if (
+				existing &&
+				existing.container === container &&
+				existing.visualRow === visualRow &&
+				existing.renderer === renderer &&
+				existing.context === context
+			) {
 				rowPortalKeyByContainer.set(container, rowKey);
 				return;
 			}
@@ -343,7 +360,7 @@ export function createPortalStore<TRowData = unknown>() {
 			if (existingKeyForContainer && existingKeyForContainer !== rowKey) {
 				rowPortals.delete(existingKeyForContainer);
 			}
-			rowPortals.set(rowKey, { rowKey, container, visualRow, renderer });
+			rowPortals.set(rowKey, { rowKey, container, visualRow, renderer, context });
 			rowPortalKeyByContainer.set(container, rowKey);
 			rebuildRowMenuSnapshot();
 			notifyRowMenuStructural();

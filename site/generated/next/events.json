@@ -209,7 +209,7 @@
 		{
 			"name": "serverSideStateChanged",
 			"value": "serverSideStateChanged",
-			"payload": "{ loading: boolean; error: string | null; storeStates: readonly import('../serverSideRowModel.js').ServerSideStoreSnapshot[]; }",
+			"payload": "{ loading: boolean; error: string | null; storeStates: readonly ServerSideStoreSnapshot[]; }",
 			"category": "Server row model"
 		},
 		{
@@ -269,7 +269,7 @@
 		{
 			"name": "queryModelChanged",
 			"value": "queryModelChanged",
-			"payload": "{ queryModel: import('../query/GridQueryModel.js').GridQueryModel | null }",
+			"payload": "{ queryModel: GridQueryModel | null }",
 			"category": "Query model"
 		},
 		{

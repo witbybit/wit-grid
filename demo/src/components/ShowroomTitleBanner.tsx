@@ -1,4 +1,5 @@
 import {
+	Layers,
 	Cpu,
 	Database,
 	FileSpreadsheet,
@@ -62,6 +63,7 @@ export default function ShowroomTitleBanner({
 					{activePage === 'colgroups' && <LayoutTemplate className='w-4.5 h-4.5' />}
 					{activePage === 'floatingfilters' && <SlidersHorizontal className='w-4.5 h-4.5' />}
 					{activePage === 'rowdrag' && <GripVertical className='w-4.5 h-4.5' />}
+					{activePage === 'grouping-sticky' && <Layers className='w-4.5 h-4.5' />}
 					{activePage === 'integrity' && <ShieldCheck className='w-4.5 h-4.5' />}
 					{activePage === 'projects' && <Building2 className='w-4.5 h-4.5' />}
 					{activePage === 'docs' && <BookOpen className='w-4.5 h-4.5' />}
@@ -85,6 +87,7 @@ export default function ShowroomTitleBanner({
 						{activePage === 'colgroups' && 'Multi-Level Column Header Groups'}
 						{activePage === 'floatingfilters' && 'Floating Filters — Inline Filter Row with Custom Renderers'}
 						{activePage === 'rowdrag' && 'Row Drag & Drop — Managed and Unmanaged Reorder Modes'}
+						{activePage === 'grouping-sticky' && 'Sticky Groups — Native Sticky Headers, Pinned Rows, Group Renderer'}
 						{activePage === 'projects' && 'Projects Compliance Dashboard — Tree Data · Style Rules · Live Filter'}
 					</h2>
 					<p className='text-[10px] text-slate-400 leading-tight mt-0.5'>
@@ -119,6 +122,8 @@ export default function ShowroomTitleBanner({
 							'Always-visible filter row per column below the header. Text debounce, number eq, date, set-badge, and custom DOM renderer (probability slider). Horizontally virtualised, pinned-lane aware.'}
 						{activePage === 'rowdrag' &&
 							'Drag the gripper handle to reorder rows. Managed mode auto-applies the new order; unmanaged mode lets the host drive the update. Auto-scroll at viewport edges, Escape to cancel.'}
+						{activePage === 'grouping-sticky' &&
+							'Group headers stick natively and stack per level; pinned rows stay put. Switch display modes, depth and the custom group renderer live.'}
 						{activePage === 'integrity' &&
 							'Walk through all 5 insight layers: data quality rules, EOD diff comparison, live price streaming, and server-vs-local conflict resolution — all composable on the same grid.'}
 						{activePage === 'projects' &&

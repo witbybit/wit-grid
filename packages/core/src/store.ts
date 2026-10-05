@@ -1,8 +1,5 @@
 import type {
-	FilterModel,
 	QuickFilterModel,
-	SortModel,
-	RowModel,
 	ClientStructuralRowModel,
 	InfiniteControllableRowModel,
 	ServerSideControllableRowModel,
@@ -21,7 +18,10 @@ import {
 	asCapableRowModel,
 	UnsupportedRowModelOperationError,
 } from './rowModel.js';
-import type { GridDomainVersions } from './state/GridDomainVersions.js';
+
+import type { GridCapabilitiesConfig, GridCapabilityAction, GridCapabilityParams, GridCapabilityResult } from './capabilities/capabilityTypes.js';
+import type { GridDataIntegrityConfig, GridIntegrityApi } from './features/dataIntegrity/integrityTypes.js';
+import type { RuntimeFaultInput } from './diagnostics/RuntimeFaultReporter.js';
 export type { RowModel, RowRefreshReason, RowModelRefreshResult } from './rowModel.js';
 import type { InfiniteDatasource } from './infiniteRowModel.js';
 import type { ServerSideDatasource, ServerSideRefreshOptions, ServerSideStoreSnapshot } from './serverSideRowModel.js';
@@ -97,7 +97,7 @@ export * from './api/GridApi.js';
 export * from './api/GridEvents.js';
 export type { GridInitialState, ColumnState, GridCellRangeBounds } from './state/GridState.js';
 // ── Internal imports (for use by definitions in this file) ───────────────────
-import { RowNode } from './rowNode.js';
+import type { RowNode } from './rowNode.js';
 import type { ColumnDef, ColumnInstanceId, GridStyleRule } from './columnDef.js';
 import { validateColumns } from './columnDef.js';
 import type { VisualRow } from './visualRow.js';
@@ -113,8 +113,6 @@ import type {
 	GridPluginRuntime,
 	GridRowsAccessor,
 	GridWriteResult,
-	RowDataTransaction,
-	RowNodeTransaction,
 	GridTransaction,
 	GridTransactionOptions,
 	GridTransactionResult,
@@ -141,6 +139,7 @@ import type { InternalGridState, GridInitialState, ColumnState, RowModelType } f
 import type { GridEventPayloadMap, GridEventListener } from './api/GridEvents.js';
 import { GridEventName } from './api/GridEvents.js';
 import { GridPluginRegistry } from './plugins/GridPluginRegistry.js';
+import { bindEngineForwards, INTERNAL_ENGINE_FORWARDS, PUBLIC_ENGINE_FORWARDS, type EngineForwards } from './internal/engineForwards.js';
 import { createGridPluginRuntime } from './plugins/createGridPluginRuntime.js';
 import type { AutoSizeColumnOptions, AutoSizeAllColumnsOptions } from './features/ColumnAutoSizeController.js';
 import { makeNoopIntegrityApi } from './features/dataIntegrity/noopIntegrityApi.js';
@@ -177,6 +176,12 @@ const _EMPTY_WS_STATE: GridWorkspaceState = {
  * This class is used by core implementation wiring and test fixtures.
  * The supported external surface is the frozen GridApi returned by createGrid().
  */
+/** Members that call straight into the engine; bound in the constructor from `internal/engineForwards.ts`. */
+export interface GridStore<TRowData = unknown>
+	extends EngineForwards<TRowData, typeof PUBLIC_ENGINE_FORWARDS>, EngineForwards<TRowData, typeof INTERNAL_ENGINE_FORWARDS> {}
+
+// The interface above types the engine forwards that the constructor binds with Object.assign.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> {
 	public engine: GridEngine<TRowData>;
 	public readonly interactionController: GridInteractionController<TRowData>;
@@ -200,8 +205,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	constructor(
 		initialState: Partial<GridInitialState<TRowData>> = {},
 		engineOptions?: {
-			capabilities?: import('./capabilities/capabilityTypes.js').GridCapabilitiesConfig<TRowData>;
-			dataIntegrity?: import('./features/dataIntegrity/integrityTypes.js').GridDataIntegrityConfig<TRowData>;
+			capabilities?: GridCapabilitiesConfig<TRowData>;
+			dataIntegrity?: GridDataIntegrityConfig<TRowData>;
 		}
 	) {
 		// The hierarchy column is part of the column set from the first frame.
@@ -268,6 +273,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			overscanAdaptive: initialState.overscanAdaptive,
 			getContainerElement: () => this.containerElement,
 		});
+		Object.assign(this, bindEngineForwards(this.engine, PUBLIC_ENGINE_FORWARDS), bindEngineForwards(this.engine, INTERNAL_ENGINE_FORWARDS));
 		this.viewportController = new ViewportController<TRowData>(this.engine);
 		this.pluginRuntime = createGridPluginRuntime(this as unknown as GridPluginRuntime<TRowData>);
 		this.pluginRegistry = new GridPluginRegistry<TRowData>(this.pluginRuntime, this.engine.runtimeFaults);
@@ -372,7 +378,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		});
 
 		// Wire up the lazy api ref so integrity modules can call GridApi methods in rules
-		this.engine.setApiRef(this as unknown as import('./api/GridApi.js').GridApi<TRowData>);
+		this.engine.setApiRef(this as unknown as GridApi<TRowData>);
 		this.integrity = this.engine.dataIntegrity?.buildApi() ?? makeNoopIntegrityApi<TRowData>();
 
 		// Apply persisted pin counts at construction time before any renders occur
@@ -393,7 +399,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	}
 
 	public getPluginController = (): GridPluginController<TRowData> => this.pluginRegistry;
-	public getState = (): InternalGridState<TRowData> => this.engine.getState();
 
 	public getStateSnapshot = (): GridStateSnapshot<TRowData> => {
 		const currentState = this.state;
@@ -406,40 +411,15 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return snapshot;
 	};
 
-	public getRowId = (row: TRowData): string => this.engine.getRowId(row);
-
-	public isRowLoading = (rowId: string): boolean => this.engine.isRowLoading(rowId);
-
-	public getCellValue = (rowId: string, colField: string): unknown => this.engine.getCellDisplayValue(rowId, colField);
-
-	public getFormula = (rowId: string, colField: string): string | undefined => this.engine.getFormula(rowId, colField);
-	public hasFormula = (rowId: string, colField: string): boolean => this.engine.hasFormula(rowId, colField);
 	public setFormula = (rowId: string, colField: string, formula: string): void => {
 		this.engine.setCellValue(rowId, colField, formula);
 	};
 	public clearFormula = (rowId: string, colField: string): void =>
 		this.engine.syncFormulaForCell(rowId, colField, this.engine.getRawCellValue(rowId, colField));
 
-	public getCachedDisplayValue = (rowId: string, colField: string): string | undefined => this.engine.getCachedDisplayValue(rowId, colField);
-
-	public getCheapDisplayValue = (rowId: string, colField: string): string => this.engine.getCheapDisplayValue(rowId, colField);
-
-	public getComputedCellValue = (rowId: string, colField: string): unknown => this.engine.getComputedCellValue(rowId, colField);
-
 	public getRowOverscanPx = (): number => {
 		return this.state.rowOverscanPx ?? 400;
 	};
-
-	public setRowOverscanPx = (px: number): void => {
-		this.engine.setRowOverscanPx(px);
-	};
-
-	/**
-	 * Writes one cell: shorthand for `transaction({ cells: [{ rowId, colField, value }] })`. Runs the
-	 * column's value setter, validation, formulas and undo. Several cells, or rows and cells together,
-	 * go in one `transaction` (one change, one undo entry).
-	 */
-	public setCellValue = (rowId: string, colField: string, value: unknown): GridWriteResult => this.engine.setCellValue(rowId, colField, value);
 
 	public getCellState = (rowId: string, colField: string): CellState => {
 		const column = this.engine.columns.getColumnDef(colField);
@@ -485,15 +465,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public getSelectedRowIds = (): string[] => readInteractionState(this.state).rowSelection.selectedRowIds.slice();
 
-	public setColumnWidth = (colField: string, width: number): void => this.engine.resizeColumn(colField, width);
-	public autoSizeColumn = (colField: string, options?: AutoSizeColumnOptions): void => this.engine.autoSizeColumn(colField, options);
-	public autoSizeAllColumns = (options?: AutoSizeAllColumnsOptions): void => this.engine.autoSizeAllColumns(options);
-	public getColumnDistinctValues = (colField: string): (string | number | null)[] => this.engine.getColumnDistinctValues(colField);
-	public getColumnDistinctValueSummary = (colField: string) => this.engine.getColumnDistinctValueSummary(colField);
 	public copySelectedRange = (): Promise<void> => this.interactionController.copySelectedRange();
 	public pasteFromClipboard = (): Promise<void> => this.interactionController.pasteFromClipboard();
-	public copyRange = (minRow: number, maxRow: number, minCol: number, maxCol: number): Promise<void> =>
-		this.engine.copyRange(minRow, maxRow, minCol, maxCol);
 	public setColumnVisible = (colField: string, visible: boolean): void => this.setColumnsVisible([colField], visible);
 
 	public setColumnsVisible = (colFields: string[], visible: boolean): void => {
@@ -528,21 +501,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return this.state.columns.slice();
 	};
 
-	public getDisplayedColumns = (): ColumnDef<TRowData>[] => this.engine.getDisplayedColumns();
 	public setPinnedColumns = (pins: { left?: number; right?: number }): void => this.setViewportPins(pins);
-	public getPinnedColumns = (): { left: number; right: number } => this.engine.getPinnedColumns();
-	public moveColumn = (colField: string, toIndex: number): void => this.engine.moveColumn(colField, toIndex);
-	public setColumnOrder = (colFields: string[]): void => this.engine.setColumnOrderByFields(colFields);
-	public setColumnReorderEnabled = (enabled: boolean): void => this.engine.setColumnReorderEnabled(enabled);
-	public setRowHeight = (rowId: string, height: number): void => this.engine.resizeRow(rowId, height);
-
-	public setSortModel = (sortModel: SortModel | null): void => {
-		this.engine.setSortModel(sortModel);
-	};
-
-	public setFilterModel = (filterModel: FilterModel | null): void => {
-		this.engine.setFilterModel(filterModel);
-	};
 
 	public getQuickFilter = (): QuickFilterModel | null => {
 		return this.state.quickFilterModel ?? null;
@@ -565,10 +524,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return this.state.queryModel ?? null;
 	};
 
-	public setQueryModel = (model: GridQueryModel | null): void => {
-		this.engine.setQueryModel(model);
-	};
-
 	public clearQueryModel = (): void => {
 		this.engine.setQueryModel(null);
 	};
@@ -582,107 +537,11 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return evaluateQueryModel(queryModel, node, ctx);
 	};
 
-	public getGrouping = (): GroupingConfig<TRowData> | undefined => this.engine.groupingFeature.getGrouping();
-
-	public setGrouping = (grouping: GroupingConfig<TRowData> | undefined): void => {
-		this.engine.groupingFeature.setGrouping(grouping);
-	};
-
-	public updateGrouping = (patch: Partial<GroupingConfig<TRowData>>): void => {
-		this.engine.groupingFeature.updateGrouping(patch);
-	};
-
-	public setGroupBy = (by: ReadonlyArray<string | GroupDef<TRowData>>): void => {
-		this.engine.setGroupBy(by);
-	};
-
-	public getGroupBy = (): string[] => this.engine.groupingFeature.getGroupBy();
-
-	public addGroupBy = (colId: string, atIndex?: number): void => {
-		this.engine.addGroupBy(colId, atIndex);
-	};
-
-	public removeGroupBy = (colId: string): void => {
-		this.engine.removeGroupBy(colId);
-	};
-
-	public moveGroupBy = (colId: string, toIndex: number): void => {
-		this.engine.moveGroupBy(colId, toIndex);
-	};
-
-	public getTreeData = (): TreeDataConfig<TRowData> | undefined => this.engine.groupingFeature.getTreeData();
-
-	public setTreeData = (treeData: TreeDataConfig<TRowData> | undefined): void => {
-		this.engine.groupingFeature.setTreeData(treeData);
-	};
-
-	public getAggregation = (): AggregationDef<TRowData>[] => this.engine.groupingFeature.getAggregation();
-
-	public setAggregation = (defs: AggregationDef<TRowData>[]): void => {
-		this.engine.groupingFeature.setAggregation(defs);
-	};
-
-	public getHierarchyColumn = (): HierarchyColumnConfig<TRowData> | false | undefined => this.engine.groupingFeature.getHierarchyColumn();
-
-	public setHierarchyColumn = (config: HierarchyColumnConfig<TRowData> | false | undefined): void => {
-		this.engine.groupingFeature.setHierarchyColumn(config);
-	};
-
-	public getDetail = (): DetailConfig<TRowData> | undefined => this.engine.groupingFeature.getDetail();
-
-	public setDetail = (detail: DetailConfig<TRowData> | undefined): void => {
-		this.engine.groupingFeature.setDetail(detail);
-	};
-
-	public setExpanded = (id: string, expanded: boolean): void => {
-		this.engine.groupingFeature.setExpanded(id, expanded);
-	};
-
-	public toggleExpanded = (id: string): void => {
-		this.engine.groupingFeature.toggleExpanded(id);
-	};
-
-	public isExpanded = (id: string): boolean => this.engine.groupingFeature.isExpanded(id);
-
-	public expandAll = (options?: ExpandAllOptions): void => {
-		this.engine.groupingFeature.expandAll(options);
-	};
-
-	public collapseAll = (): void => {
-		this.engine.groupingFeature.collapseAll();
-	};
-
-	public setDetailOpen = (rowId: string, open: boolean): void => {
-		this.engine.groupingFeature.setDetailOpen(rowId, open);
-	};
-
-	public toggleDetailOpen = (rowId: string): void => {
-		this.engine.groupingFeature.toggleDetailOpen(rowId);
-	};
-
-	public isDetailOpen = (rowId: string): boolean => this.engine.groupingFeature.isDetailOpen(rowId);
-
-	public getDescendantRowIds = (id: string): readonly string[] => this.engine.groupingFeature.getDescendantRowIds(id);
-
-	public getDescendantSelection = (id: string): DescendantSelection => this.engine.groupingFeature.getDescendantSelection(id);
-
 	public setDescendantsSelected = (id: string, selected: boolean): void => {
 		const rowIds = [...this.getDescendantRowIds(id)];
 		if (rowIds.length === 0) return;
 		if (selected) this.selectRows(rowIds);
 		else this.deselectRows(rowIds);
-	};
-
-	public setShowGroupPanel = (enabled: boolean): void => {
-		this.engine.setShowGroupPanel(enabled);
-	};
-
-	public setShowFloatingFilters = (enabled: boolean): void => {
-		this.engine.setShowFloatingFilters(enabled);
-	};
-
-	public setShowFilterChipBar = (enabled: boolean): void => {
-		this.engine.setShowFilterChipBar(enabled);
 	};
 
 	public exportCsv = (options?: CsvExportOptions): void => {
@@ -731,10 +590,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public renameView = (_id: string, _name: string): Promise<void> => Promise.resolve();
 	public setDefaultView = (_id: string | null): Promise<void> => Promise.resolve();
 
-	public openPanel = (panelId: string): void => {
-		this.engine.setSidebarOpenPanel(panelId);
-	};
-
 	public closePanel = (): void => {
 		this.engine.setSidebarOpenPanel(null);
 	};
@@ -762,10 +617,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public isChartOpen = (): boolean => {
 		return this.state.chartOpen ?? false;
-	};
-
-	public setStyleRules = (styleRules: GridStyleRule<TRowData>[] | undefined): void => {
-		this.engine.setStyleRules(styleRules);
 	};
 
 	public getVisualRow = (index: number): VisualRow<TRowData> | null => {
@@ -816,17 +667,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		return this.rowFacade.getRawRowById(rowId);
 	};
 
-	public addEventListener = <K extends keyof GridEventPayloadMap<TRowData>>(
-		type: K,
-		callback: GridEventListener<GridEventPayloadMap<TRowData>[K]>
-	): (() => void) => {
-		return this.engine.addEventListener(type, callback);
-	};
-
-	public dispatchEvent = <K extends keyof GridEventPayloadMap<TRowData>>(type: K, payload: GridEventPayloadMap<TRowData>[K]): void => {
-		this.engine.dispatchEvent(type, payload);
-	};
-
 	public startEditing = (rowId: string, colFieldOrInstanceId: string, source: 'keyboard' | 'mouse' | 'api' = 'api'): void => {
 		this.interactionController.startEdit(rowId, colFieldOrInstanceId, source);
 	};
@@ -844,12 +684,10 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	// ── Data Integrity API ─────────────────────────────────────────────────────
-	public integrity!: import('./features/dataIntegrity/integrityTypes.js').GridIntegrityApi<TRowData>;
+	public integrity!: GridIntegrityApi<TRowData>;
 
-	public can = (
-		action: import('./capabilities/capabilityTypes.js').GridCapabilityAction,
-		params: Partial<import('./capabilities/capabilityTypes.js').GridCapabilityParams<TRowData>> = {}
-	): import('./capabilities/capabilityTypes.js').GridCapabilityResult => this.engine.capabilityManager.can(action, params);
+	public can = (action: GridCapabilityAction, params: Partial<GridCapabilityParams<TRowData>> = {}): GridCapabilityResult =>
+		this.engine.capabilityManager.can(action, params);
 
 	public canEdit = (rowId: string, colField: string): boolean => this.engine.capabilityManager.can('edit', { rowId, colField }).allowed;
 
@@ -859,9 +697,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	public canExport = (colField?: string): boolean => this.engine.capabilityManager.can('export', { colField }).allowed;
 
-	public getColumnState = (): ColumnState[] => {
-		return this.engine.columnFeature.getColumnState();
-	};
 	public applyColumnState = (states: ColumnState[], opts?: { applyOrder?: boolean }): void => {
 		this.engine.columnFeature.applyColumnState(states, opts);
 
@@ -910,14 +745,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 				context: { persistedStateVersion: (state as { v?: unknown }).v },
 			});
 		}
-	};
-
-	public registerRowModel = (rowModel: RowModel<TRowData>): void => {
-		this.engine.registerRowModel(rowModel);
-	};
-
-	public getRowModel = (): RowModel<TRowData> | null => {
-		return this.engine.getRowModel();
 	};
 
 	private getClientStructuralRowModel(): ClientStructuralRowModel<TRowData> | null {
@@ -982,7 +809,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getRowOrder = (): string[] => this.getClientStructuralRowModel()?.getRowOrder() ?? [];
-	public setRowOrder = (rowIds: string[]): GridWriteResult => this.engine.setRowOrder(rowIds);
 
 	/**
 	 * The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)
@@ -1013,11 +839,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		});
 		return result!;
 	}) as GridStore<TRowData>['transaction'];
-
-	/** Commits queued async transactions now. */
-	public flushTransactions = (): void => {
-		this.engine.flushTransactions();
-	};
 
 	private applyTransactionState(transaction: GridTransaction<TRowData>): void {
 		if (transaction.columns) this.setColumns(transaction.columns);
@@ -1131,14 +952,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public subscribeToIntegrity = (listener: (integrity: InternalGridState<TRowData>['integrity']) => void): (() => void) =>
 		this.subscriptionsFacade.subscribeToIntegrity(listener);
 
-	public subscribeToDomainVersions = (listener: (v: GridDomainVersions) => void): (() => void) => {
-		return this.engine.subscribeToDomainVersions(listener);
-	};
-
-	public subscribeDomain = (domain: keyof GridDomainVersions, listener: (version: number) => void): (() => void) => {
-		return this.engine.subscribeDomain(domain, listener);
-	};
-
 	public subscribeToViewport = (listener: GridSnapshotListener<TRowData>): (() => void) => this.subscriptionsFacade.subscribeToViewport(listener);
 	public subscribeToSelection = (listener: GridSnapshotListener<TRowData>): (() => void) => this.subscriptionsFacade.subscribeToSelection(listener);
 	public subscribeToFocusedCell = (listener: GridSnapshotListener<TRowData>): (() => void) =>
@@ -1163,12 +976,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		validateColumns(columns);
 		this.engine.setColumns(columns);
 	};
-
-	public getColumnIndex = (colField: string): number => this.engine.getColumnIndex(colField);
-
-	public getColumnField = (colIndex: number): string | null => this.engine.getColumnField(colIndex);
-
-	public getColumnDef = (colField: string): ColumnDef<TRowData> | undefined => this.engine.getColumnDef(colField);
 
 	public getCellAccess = (rowId: string, colField: string): GridCellAccess<TRowData> | null => this.engine.cellAccess.getByPointer(rowId, colField);
 
@@ -1200,14 +1007,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		};
 	}
 
-	public registerCellSubscription = (sub: CellSubscription): void => this.engine.registerCellSubscription(sub);
-
-	public unregisterCellSubscription = (sub: CellSubscription): void => this.engine.unregisterCellSubscription(sub);
-
-	public updateCellSubscription = (sub: CellSubscription, oldRowId: string, oldColField: string, newRowId: string, newColField: string): void => {
-		this.engine.updateCellSubscription(sub, oldRowId, oldColField, newRowId, newColField);
-	};
-
 	public get batchedUpdates(): boolean {
 		return this.engine.batchedUpdates;
 	}
@@ -1216,16 +1015,9 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		this.engine.batchedUpdates = enabled;
 	}
 
-	public flushCellUpdatesSync = (): void => this.engine.flushCellUpdatesSync();
 	public registerPlugin = (plugin: GridPlugin<TRowData>): void => this.pluginRegistry.registerPlugin(plugin);
 	public unregisterPlugin = (name: string): void => this.pluginRegistry.unregisterPlugin(name);
 	public getPlugin = <T = unknown>(name: string): T | null => this.pluginRegistry.getPlugin<T>(name);
-	public undo = (): void => this.engine.undo();
-	public redo = (): void => this.engine.redo();
-
-	public canUndo = (): boolean => this.engine.commandHistory.canUndo();
-
-	public canRedo = (): boolean => this.engine.commandHistory.canRedo();
 
 	/** Bind live renderer and theme ports for an active host. Returns a binding token.
 	 *  Rejects concurrent bindings — only one active host is allowed at a time. */
@@ -1242,8 +1034,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public resetRenderStats = (): void => this.hostFacade.resetRenderStats();
 	public getRuntimeFaults = () => this.hostFacade.getRuntimeFaults();
 	public clearRuntimeFaults = (): void => this.hostFacade.clearRuntimeFaults();
-	public reportRuntimeFault = (fault: import('./diagnostics/RuntimeFaultReporter.js').RuntimeFaultInput) =>
-		this.hostFacade.reportRuntimeFault(fault);
+	public reportRuntimeFault = (fault: RuntimeFaultInput) => this.hostFacade.reportRuntimeFault(fault);
 	public getTheme = (): ThemeTokens => this.hostFacade.getTheme();
 	public getThemeName = (): BuiltInThemeName | null => this.hostFacade.getThemeName();
 	public getAvailableThemes = (): BuiltInThemeName[] => this.hostFacade.getAvailableThemes();

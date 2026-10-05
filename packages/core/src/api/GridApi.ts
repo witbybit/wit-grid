@@ -291,6 +291,10 @@ export interface CellState {
 
 export interface GridRowsAccessor<TRowData = unknown> {
 	forEach(callback: (row: TRowData, index: number) => void): void;
+	/**
+	 * The data rows currently displayed, in display order: sorted, and without rows that are filtered out or
+	 * inside collapsed groups. Not your full data set: to change rows, use `transaction({ rows: { update } })`.
+	 */
 	getAll(): TRowData[];
 	getSelected(): TRowData[];
 	getSelectedIds(): string[];

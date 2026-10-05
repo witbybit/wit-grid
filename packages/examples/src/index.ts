@@ -7,6 +7,7 @@ export { default as AdvancedFiltersShowcase } from './showcases/AdvancedFiltersD
 export { default as DataIntegrityShowcase } from './showcases/DataIntegrityLab';
 export { default as InfiniteServerScrollShowcase } from './showcases/InfiniteServerScroll';
 export { default as NativeCellTypesShowcase } from './showcases/NativeCellTypesDemo';
+export { default as GroupingStickyShowcase } from './showcases/GroupingStickyDemo';
 export { default as RowDragShowcase } from './showcases/RowDragDemo';
 export { default as KanbanBoardShowcase } from './showcases/KanbanBoardDemo';
 export { default as ClipboardShowcase } from './showcases/ClipboardDemo';

@@ -7,6 +7,7 @@ import {
 	type GridEventPayloadMap,
 	registerGridContextMenu,
 	VisualRow,
+	GroupRenderContext,
 } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GridAdapterContext } from './gridContext.js';
@@ -42,13 +43,13 @@ export interface GridViewProps<TRowData = unknown> {
 	};
 	/**
 	 * Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row
-	 * display — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence.
+	 * display — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`.
 	 */
-	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	groupRowRenderer?: (ctx: GroupRenderContext<TRowData>) => ReactNode;
 	/** Detail rows (master-detail). Without one the grid draws a placeholder; `detail.renderer` takes precedence. */
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
 	/** Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid. */
-	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => ReactNode;
+	totalRowRenderer?: (ctx: GroupRenderContext<TRowData>) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
 	enableChart?: boolean;
 	autoRowHeight?: boolean;
@@ -166,7 +167,7 @@ export function GridView<TRowData = unknown>({
 			rowContent: {
 				rendersRow: (row) => (userRowRenderersRef.current as Record<string, boolean>)[row.kind] ?? false,
 				mountRowContent: (mount) => {
-					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow, mount.renderer);
+					portalStore.mountRow(mount.rowKey, mount.container, mount.visualRow, mount.renderer, mount.context);
 				},
 				unmountRowContent: (unmount) => {
 					portalStore.unmountRow(unmount.rowKey, unmount.container);

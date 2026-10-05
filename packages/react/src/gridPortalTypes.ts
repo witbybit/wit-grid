@@ -1,4 +1,12 @@
-import type { ColumnDef, GridApi, VisualRow, CellRendererPhase, RowRendererSpec } from '@eregister/wit-grid-core';
+import type {
+	ColumnDef,
+	GridApi,
+	VisualRow,
+	CellRendererPhase,
+	RowRendererSpec,
+	GroupRendererSpec,
+	GroupRenderContext,
+} from '@eregister/wit-grid-core';
 
 export interface PortalRowNodeLike<TRowData = unknown> {
 	id: string;
@@ -62,8 +70,10 @@ export interface RowPortalData<TRowData = unknown> {
 	rowKey: string;
 	container: HTMLElement;
 	visualRow: VisualRow<TRowData>;
-	/** The row's configured renderer spec (`detail.renderer` / `grouping.rowRenderer`), when React. */
-	renderer?: RowRendererSpec<TRowData>;
+	/** The configured renderer spec (`detail.renderer` / `grouping.rowRenderer` / `hierarchyColumn.renderer`), when React. */
+	renderer?: RowRendererSpec<TRowData> | GroupRendererSpec<TRowData>;
+	/** Group, total and hierarchy-cell content: the props a component is rendered with. */
+	context?: GroupRenderContext<TRowData>;
 }
 
 export interface MenuPortalData<TRowData = unknown> {
@@ -103,8 +113,8 @@ export interface PortalStore<TRowData = unknown> {
 
 export interface PortalManagerProps<TRowData = unknown> {
 	api: GridApi<TRowData>;
-	groupRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
+	groupRowRenderer?: (ctx: GroupRenderContext<TRowData>) => React.ReactNode;
 	detailRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
-	totalRowRenderer?: (props: { visualRow: VisualRow<TRowData>; api: GridApi<TRowData> }) => React.ReactNode;
+	totalRowRenderer?: (ctx: GroupRenderContext<TRowData>) => React.ReactNode;
 	store?: PortalStore<TRowData>;
 }

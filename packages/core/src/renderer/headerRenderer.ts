@@ -7,6 +7,7 @@ import { readInteractionState } from '../interaction/interactionState.js';
 import { reportRendererFault } from './rendererFaults.js';
 import { compileStyleRules, evaluateHeaderCellStyleRules } from '../styling/styleRules.js';
 import { GridMetric } from '../diagnostics/GridInstrumentation.js';
+import type { RowSelectionScope } from '../api/GridApi.js';
 
 /** Writes an inline display value only when it differs, so an unchanged header re-sync restyles nothing. */
 function setDisplay(el: HTMLElement | SVGElement, display: string): void {
@@ -33,7 +34,7 @@ export class HeaderRenderer<TRowData = unknown> {
 	private headerLeftLayer: HTMLDivElement | null = null;
 	private headerRightLayer: HTMLDivElement | null = null;
 
-	private getSelectableDataRowIds(scope: import('../api/GridApi.js').RowSelectionScope): string[] {
+	private getSelectableDataRowIds(scope: RowSelectionScope): string[] {
 		const rowModel = this.engine.getRowModel();
 		if (!rowModel) return [];
 		const selectableRowModel = asSelectableDataRowModel(rowModel);

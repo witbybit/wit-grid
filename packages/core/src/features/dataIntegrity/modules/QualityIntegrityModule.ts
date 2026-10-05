@@ -12,6 +12,7 @@ import type {
 	GridIntegrityRowRef,
 	GridIntegrityScope,
 } from '../integrityTypes.js';
+import type { GridIntegritySeverity } from '../integrityTypes.js';
 
 let _seq = 0;
 function nextIssueId(): string {
@@ -220,7 +221,7 @@ export function missingRequiredRule<TRowData>(): GridDataQualityRule<TRowData> {
 	};
 }
 
-function _qualityClass(severity: import('../integrityTypes.js').GridIntegritySeverity): string {
+function _qualityClass(severity: GridIntegritySeverity): string {
 	if (severity === 'error') return 'og-cell-quality-error';
 	if (severity === 'warning') return 'og-cell-quality-warning';
 	return 'og-cell-quality-info';

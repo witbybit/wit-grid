@@ -139,6 +139,7 @@ describe('Public/internal boundary', () => {
 				'oneOf',
 				'regex',
 				'registerGridContextMenu',
+				'renderGroupToggle',
 				'required',
 				'resolveColumnFilterDef',
 				'resolveServerSideRowCountState',

@@ -131,12 +131,14 @@ export default function GanttSchedulingWorkspace({
 			return;
 		}
 		const rowIdSet = new Set(api.rows().inRange(range).getIds());
-		api.setRows(
-			api
-				.rows()
-				.getAll()
-				.map((row) => (rowIdSet.has(row.id) ? { ...row, progress: 100, status: 'Done' } : row))
-		);
+		api.transaction({
+			rows: {
+				update: api
+					.rows()
+					.getAll()
+					.map((row) => (rowIdSet.has(row.id) ? { ...row, progress: 100, status: 'Done' } : row)),
+			},
+		});
 		setRevision((value) => value + 1);
 	}, [api]);
 

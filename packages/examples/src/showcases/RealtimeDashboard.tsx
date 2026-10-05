@@ -29,6 +29,7 @@ import {
 	type CellRendererProps,
 	type StyleRule,
 	GridInitialState,
+	type RowAnimationOptions,
 } from '@eregister/wit-grid-react';
 import { Activity, BarChart3, Code2, RefreshCw, TrendingUp, Zap, ShieldCheck } from 'lucide-react';
 
@@ -551,6 +552,15 @@ interface RealtimeDashboardProps {
 	theme?: 'light' | 'dark';
 }
 
+/** Row animation styles to try on the live sort: each is a plain `rowAnimation` object. */
+export const ROW_ANIMATION_PRESETS = {
+	cascade: { label: 'Cascade', options: { style: 'slide', easing: 'snappy', duration: 360, stagger: 18 } },
+	spring: { label: 'Spring', options: { style: 'slide', easing: 'spring', duration: 520 } },
+	smooth: { label: 'Smooth', options: { style: 'slide', easing: 'smooth', duration: 280 } },
+	fade: { label: 'Fade', options: { style: 'fade', duration: 320, stagger: 12 } },
+	off: { label: 'Off', options: { style: 'none' } },
+} satisfies Record<string, { label: string; options: RowAnimationOptions }>;
+
 export default function RealtimeDashboard({
 	editTrigger = 'doubleClick',
 	arrowKeyNavigationEdit = true,
@@ -580,6 +590,9 @@ export default function RealtimeDashboard({
 	const [eventLogs, setEventLogs] = useState<Array<{ id: number; time: string; msg: string; type: string }>>([]);
 	const eventLogIdRef = useRef(0);
 	const [autoFire, setAutoFire] = useState(true);
+	// Row animation: how rows move when the live sort reorders them. Changes apply from the next tick.
+	const [animationPreset, setAnimationPreset] = useState<keyof typeof ROW_ANIMATION_PRESETS>('cascade');
+	const rowAnimation = ROW_ANIMATION_PRESETS[animationPreset].options;
 	const [autoFireIntervalMs, setAutoFireIntervalMs] = useState(2000);
 	const autoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const [clock, setClock] = useState<string | null>(null);
@@ -743,27 +756,29 @@ export default function RealtimeDashboard({
 
 	const triggerVolatility = useCallback(() => {
 		if (!api) return;
-		api.setRows(
-			api
-				.rows()
-				.getAll()
-				.map((row) => {
-					const priceNum = parseFloat(String(row.price)) || 100;
-					const volatility = (Math.random() - 0.5) * 8;
-					const nextPrice = Math.max(1, priceNum * (1 + volatility / 100));
-					const priceDiff = nextPrice - priceNum;
-					const changeNum = parseFloat(String(row.change)) || 0;
-					const nextChange = changeNum + (priceDiff / priceNum) * 100;
-					const volumeNum = parseFloat(String(row.volume)) || 0;
-					const nextVolume = Math.max(0.1, volumeNum * (1 + (Math.random() - 0.5) * 0.3));
-					return {
-						...row,
-						price: nextPrice.toFixed(2),
-						change: `${nextChange >= 0 ? '+' : ''}${nextChange.toFixed(1)}`,
-						volume: nextVolume.toFixed(1),
-					};
-				})
-		);
+		api.transaction({
+			rows: {
+				update: api
+					.rows()
+					.getAll()
+					.map((row) => {
+						const priceNum = parseFloat(String(row.price)) || 100;
+						const volatility = (Math.random() - 0.5) * 8;
+						const nextPrice = Math.max(1, priceNum * (1 + volatility / 100));
+						const priceDiff = nextPrice - priceNum;
+						const changeNum = parseFloat(String(row.change)) || 0;
+						const nextChange = changeNum + (priceDiff / priceNum) * 100;
+						const volumeNum = parseFloat(String(row.volume)) || 0;
+						const nextVolume = Math.max(0.1, volumeNum * (1 + (Math.random() - 0.5) * 0.3));
+						return {
+							...row,
+							price: nextPrice.toFixed(2),
+							change: `${nextChange >= 0 ? '+' : ''}${nextChange.toFixed(1)}`,
+							volume: nextVolume.toFixed(1),
+						};
+					}),
+			},
+		});
 	}, [api]);
 
 	const toggleAutoFire = useCallback(() => {
@@ -969,7 +984,7 @@ export default function RealtimeDashboard({
 							</span>
 						)}
 					</div>
-					<div className='flex items-center gap-2'>
+					<div className='flex items-center gap-2 flex-wrap'>
 						{!compact && (
 							<label
 								className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-[10px] font-bold ${
@@ -992,7 +1007,7 @@ export default function RealtimeDashboard({
 						)}
 						<button
 							onClick={toggleAutoFire}
-							className={`flex items-center gap-1.5 py-1.5 px-3 rounded-lg font-bold text-[10px] border shadow-lg transition-all cursor-pointer ${
+							className={`flex shrink-0 items-center gap-1.5 py-1.5 px-3 rounded-lg font-bold text-[10px] whitespace-nowrap border shadow-lg transition-all cursor-pointer ${
 								autoFire
 									? 'bg-rose-600 hover:bg-rose-700 text-white border-rose-500/20 shadow-rose-900/20'
 									: isLight
@@ -1003,12 +1018,44 @@ export default function RealtimeDashboard({
 							<Zap className={`w-3 h-3 ${autoFire ? 'animate-pulse' : ''}`} />
 							{autoFire ? `Auto ${autoFireHzLabel}hz ON` : `Auto ${autoFireHzLabel}hz`}
 						</button>
+						<div
+							role='radiogroup'
+							aria-label='Row motion'
+							title='How rows move when the live sort reorders them'
+							className={`flex shrink-0 items-center gap-0.5 p-0.5 rounded-lg border ${
+								isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-900/80 border-slate-700/60'
+							}`}
+						>
+							<span className='px-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500'>Motion</span>
+							{(Object.keys(ROW_ANIMATION_PRESETS) as Array<keyof typeof ROW_ANIMATION_PRESETS>).map((id) => {
+								const active = id === animationPreset;
+								return (
+									<button
+										key={id}
+										type='button'
+										role='radio'
+										aria-checked={active}
+										onClick={() => setAnimationPreset(id)}
+										className={`py-1 px-2 rounded-md text-[10px] font-bold transition-colors cursor-pointer ${
+											active
+												? 'bg-indigo-600 text-white shadow-sm shadow-indigo-900/30'
+												: isLight
+													? 'text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+													: 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+										}`}
+									>
+										{ROW_ANIMATION_PRESETS[id].label}
+									</button>
+								);
+							})}
+						</div>
 					</div>
 				</div>
 
 				<div className='flex-1 min-h-0 min-w-0'>
 					<Grid
 						rowModelType='client'
+						rowAnimation={rowAnimation}
 						rows={rows}
 						columns={columns}
 						styleRules={styleRules}

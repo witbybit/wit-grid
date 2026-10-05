@@ -11,6 +11,7 @@ import type {
 	GridValidateCellProposalParams,
 } from '../integrityTypes.js';
 import { GridEventName } from '../../../api/GridEvents.js';
+import type { GridIntegrityRuleResult, GridIntegritySeverity } from '../integrityTypes.js';
 
 function _stableCellIssueId(ruleId: string, rowId: string, field: string): string {
 	return `validation:${ruleId}:${rowId}:${field}`;
@@ -129,7 +130,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 			for (const rule of cellRules) {
 				if (!_fieldInColumns(rule.field, context.columns)) continue;
 				const rawValue = this.deps.data.getRawCellValue(rowId, rule.field);
-				let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+				let result: GridIntegrityRuleResult | null = null;
 				try {
 					result = await rule.validate({ rowId, row, field: rule.field, value: rawValue, api });
 				} catch {
@@ -141,7 +142,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 			}
 
 			for (const rule of rowRules) {
-				let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+				let result: GridIntegrityRuleResult | null = null;
 				try {
 					result = await rule.validate({ rowId, row, api });
 				} catch {
@@ -254,7 +255,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		for (const rule of this.options.cellRules ?? []) {
 			if (!_fieldInColumns(rule.field, state.columns)) continue;
 			const rawValue = this.deps.data.getRawCellValue(rowId, rule.field);
-			let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+			let result: GridIntegrityRuleResult | null = null;
 			try {
 				result = await rule.validate({ rowId, row, field: rule.field, value: rawValue, api });
 			} catch {
@@ -264,7 +265,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		}
 
 		for (const rule of this.options.rowRules ?? []) {
-			let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+			let result: GridIntegrityRuleResult | null = null;
 			try {
 				result = await rule.validate({ rowId, row, api });
 			} catch {
@@ -302,7 +303,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		const issues: GridIntegrityIssue[] = [];
 
 		for (const rule of cellRules) {
-			let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+			let result: GridIntegrityRuleResult | null = null;
 			try {
 				result = await rule.validate({ rowId, row, field: colField, value: proposedValue, api });
 			} catch {
@@ -318,7 +319,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 			const draftRow = { ...(row as Record<string, unknown>) };
 			draftRow[colField] = proposedValue;
 			for (const rule of rowRules) {
-				let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+				let result: GridIntegrityRuleResult | null = null;
 				try {
 					result = await rule.validate({ rowId, row: draftRow as TRowData, api });
 				} catch {
@@ -461,7 +462,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		const newIssues: GridIntegrityIssue[] = [];
 
 		for (const rule of cellRules) {
-			let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+			let result: GridIntegrityRuleResult | null = null;
 			try {
 				result = await rule.validate({ rowId, row, field: colField, value: rawValue, api });
 			} catch {
@@ -473,7 +474,7 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 		}
 
 		for (const rule of this.options.rowRules ?? []) {
-			let result: import('../integrityTypes.js').GridIntegrityRuleResult | null = null;
+			let result: GridIntegrityRuleResult | null = null;
 			try {
 				result = await rule.validate({ rowId, row, api });
 			} catch {
@@ -507,12 +508,9 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 	}
 
 	private _maybeRunSyncRule(
-		run: () =>
-			| import('../integrityTypes.js').GridIntegrityRuleResult
-			| null
-			| Promise<import('../integrityTypes.js').GridIntegrityRuleResult | null>,
+		run: () => GridIntegrityRuleResult | null | Promise<GridIntegrityRuleResult | null>,
 		ruleId: string
-	): import('../integrityTypes.js').GridIntegrityRuleResult | null {
+	): GridIntegrityRuleResult | null {
 		try {
 			const result = run();
 			if (_isPromiseLike(result)) return null;
@@ -524,11 +522,11 @@ export class ValidationIntegrityModule<TRowData> implements GridIntegrityModule<
 }
 
 function _makeCellIssue(
-	rule: { id: string; field: string; severity?: import('../integrityTypes.js').GridIntegritySeverity; blocking?: boolean },
+	rule: { id: string; field: string; severity?: GridIntegritySeverity; blocking?: boolean },
 	rowId: string,
 	colField: string,
 	value: unknown,
-	result: import('../integrityTypes.js').GridIntegrityRuleResult
+	result: GridIntegrityRuleResult
 ): GridIntegrityIssue {
 	const sev = rule.severity ?? 'error';
 	return {
@@ -547,10 +545,10 @@ function _makeCellIssue(
 }
 
 function _makeRowIssue(
-	rule: { id: string; severity?: import('../integrityTypes.js').GridIntegritySeverity; blocking?: boolean },
+	rule: { id: string; severity?: GridIntegritySeverity; blocking?: boolean },
 	rowId: string,
 	fields: readonly string[],
-	result: import('../integrityTypes.js').GridIntegrityRuleResult
+	result: GridIntegrityRuleResult
 ): GridIntegrityIssue {
 	const sev = rule.severity ?? 'error';
 	return {
