@@ -2322,6 +2322,8 @@ describe('explicit React entrypoints', () => {
 		const renamed = api!.getStateSnapshot().columns;
 		rerender(renderWith('Full name', ({ value }) => `#${String(value)}`));
 		await waitFor(() => expect(api!.getStateSnapshot().columns).not.toBe(renamed));
+		// Only the formatter changed: the column repaints with it (no full re-apply needed).
+		await waitFor(() => expect(document.querySelector('.og-cell[data-col-field="name"]')?.textContent).toBe('#Alice'));
 	});
 
 	it('does not warn when initial-only props are new objects or functions with the same content (inline props)', async () => {

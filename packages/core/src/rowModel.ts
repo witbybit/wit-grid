@@ -13,6 +13,7 @@ import { groupByColIds, isGroupingActive, normalizeGroupDefs } from './rows/hier
 import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
+import { samePipelineColumns } from './columns/columnDiff.js';
 import { FlatTotals } from './rows/flatTotals.js';
 import { IncrementalRowIndex } from './rows/incrementalRowIndex.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
@@ -1738,7 +1739,12 @@ export class ClientRowModelController<TData = unknown>
 		const seed = this._incrementalSeed;
 		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return null;
 		const now = this.captureIncrementalSeed(state);
-		for (const key of Object.keys(now)) if (now[key] !== seed[key]) return null;
+		for (const key of Object.keys(now)) {
+			if (now[key] === seed[key]) continue;
+			// A re-declared column list that reads the same values (new formatters, headers, widths) keeps the index.
+			if (key === 'columns' && samePipelineColumns(now[key] as ColumnDef<TData>[], seed[key] as ColumnDef<TData>[])) continue;
+			return null;
+		}
 		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return null;
 		if (state.queryModel && state.queryModel.root.children.length > 0) return null;
 		// A row may change group or enter / leave the filter only when those are decided by plain row data.
