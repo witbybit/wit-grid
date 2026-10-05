@@ -8,11 +8,11 @@ import { createCellCtrl } from '../controllers/CellCtrl.js';
 import { getColumnInstanceIdentity } from '../../columnDef.js';
 
 /**
- * Deterministic unit tests for the LiveFrameBudget mount/update/emergency-shell branching in
+ * Deterministic unit tests for the LiveFrameBudget mount/update/stand-in branching in
  * liveCellBinder.ts's 'live-mount' case — see liveFrameBudget.ts. These bypass a real virtualized
  * grid (where portal cellKeys recycle per physical CellSlot, so "fresh mount vs update" is hard to
  * force deterministically — see the caveat in liveFrameBudget.e2e.test.ts) and instead mock
- * portalMountManager.isCellMounted/tryConsumeLiveBudget/allowLiveEmergencyShell directly.
+ * portalMountManager.isCellMounted/tryConsumeLiveBudget directly.
  */
 
 function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: string }>> = {}): RowCellBinderDeps<{ id: string; name: string }> {
@@ -22,7 +22,6 @@ function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: strin
 			hasFormula: vi.fn(() => false),
 			getCellDisplaySnapshot: vi.fn(() => undefined),
 			getCheapDisplayValue: vi.fn(() => ''),
-			htmlScrollSnapshots: { get: vi.fn(() => undefined), set: vi.fn() },
 			geometry: { rowHeights: [40] },
 		} as any,
 		cellRenderer: { showPortalContent: vi.fn(), ensureLoadingSkeleton: vi.fn() } as any,
@@ -50,10 +49,7 @@ function makeDeps(overrides: Partial<RowCellBinderDeps<{ id: string; name: strin
 		incrementForceLiveMountsDuringScroll: vi.fn(),
 		incrementLiveReactMountsDuringScroll: vi.fn(),
 		incrementLiveReactUpdatesDuringScroll: vi.fn(),
-		incrementLiveReactEmergencyShellsDuringScroll: vi.fn(),
-		incrementHtmlSnapshotHitsDuringScroll: vi.fn(),
-		incrementHtmlSnapshotMissesDuringScroll: vi.fn(),
-		incrementTextImpostorUsesDuringScroll: vi.fn(),
+		incrementLiveReactStandInsDuringScroll: vi.fn(),
 		getSnapshotVisualVersions: () => ({ styleVersion: 0, loadingVersion: 0 }),
 		...overrides,
 	};
@@ -199,7 +195,7 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		expect(deps.tryConsumeLiveBudget).toHaveBeenCalledWith('mount');
 		expect(deps.incrementLiveReactMountsDuringScroll).toHaveBeenCalledTimes(1);
 		expect(deps.incrementLiveReactUpdatesDuringScroll).not.toHaveBeenCalled();
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactStandInsDuringScroll).not.toHaveBeenCalled();
 		expect(deps.portalMountManager.mountCellImmediately).toHaveBeenCalledTimes(1);
 	});
 
@@ -216,45 +212,61 @@ describe('liveCellBinder — LiveFrameBudget branching', () => {
 		expect(deps.portalMountManager.mountCellImmediately).toHaveBeenCalledTimes(1);
 	});
 
-	it('over budget + fresh mount + shells allowed: shows an emergency shell instead of mounting', () => {
+	it('over budget + fresh mount: shows an stand-in instead of mounting', () => {
 		const deps = makeDeps({
 			portalMountManager: { isCellMounted: vi.fn(() => false), mountCellImmediately: vi.fn() } as any,
 			tryConsumeLiveBudget: vi.fn(() => false),
-			allowLiveEmergencyShell: vi.fn(() => true),
 		});
 		const request = makeRequest();
 		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
 
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).toHaveBeenCalledTimes(1);
+		expect(deps.incrementLiveReactStandInsDuringScroll).toHaveBeenCalledTimes(1);
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactMountsDuringScroll).not.toHaveBeenCalled();
 		expect(request.cellSlot.lastContentMode).toBe('pending');
 	});
 
-	it('over budget + fresh mount + shells disabled: mounts anyway (never a blank cell)', () => {
-		const deps = makeDeps({
-			portalMountManager: { isCellMounted: vi.fn(() => false), mountCellImmediately: vi.fn() } as any,
-			tryConsumeLiveBudget: vi.fn(() => false),
-			allowLiveEmergencyShell: vi.fn(() => false),
-		});
-		applyLiveCellPresentation(makeDispatchInput(deps, makeRequest(), makeLiveMountPresentation(), 1));
-
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
-		expect(deps.portalMountManager.mountCellImmediately).toHaveBeenCalledTimes(1);
-		// Forced mount despite exhausted budget is still counted as a mount for visibility.
-		expect(deps.incrementLiveReactMountsDuringScroll).toHaveBeenCalledTimes(1);
-	});
-
-	it("over budget + already mounted: skips this frame's update, leaves DOM untouched", () => {
+	it("over budget + already mounted for this row: skips this frame's update, leaves DOM untouched", () => {
 		const deps = makeDeps({
 			portalMountManager: { isCellMounted: vi.fn(() => true), mountCellImmediately: vi.fn() } as any,
 			tryConsumeLiveBudget: vi.fn(() => false),
 		});
-		applyLiveCellPresentation(makeDispatchInput(deps, makeRequest(), makeLiveMountPresentation(), 1));
+		const request = makeRequest();
+		request.cellSlot.update(0, 'name', 0, 'r1', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'ck1');
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
 
 		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 		expect(deps.incrementLiveReactUpdatesDuringScroll).not.toHaveBeenCalled();
-		expect(deps.incrementLiveReactEmergencyShellsDuringScroll).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactStandInsDuringScroll).not.toHaveBeenCalled();
+		expect(request.cellSlot.lastContentMode).toBe('portal');
+	});
+
+	it("over budget in a slot recycled from another row: hides that row's content behind the cell's text", () => {
+		const deps = makeDeps({
+			engine: { ...(makeDeps().engine as any), getCheapDisplayValue: vi.fn(() => 'Name 1') } as any,
+			portalMountManager: { isCellMounted: vi.fn(() => true), mountCellImmediately: vi.fn() } as any,
+			tryConsumeLiveBudget: vi.fn(() => false),
+		});
+		const request = makeRequest();
+		request.cellSlot.update(0, 'name', 0, 'r0', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'ck1');
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
+
+		expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
+		expect(deps.incrementLiveReactStandInsDuringScroll).toHaveBeenCalledTimes(1);
+		expect(request.cellSlot.rowId).toBe('r1');
+		expect(request.cellSlot.lastContentMode).toBe('fallback');
+		expect(request.cellSlot.element.textContent).toContain('Name 1');
+	});
+
+	it('over budget for a fresh mount: shows the cell text, not a blank cell', () => {
+		const deps = makeDeps({
+			engine: { ...(makeDeps().engine as any), getCheapDisplayValue: vi.fn(() => 'Name 1') } as any,
+			tryConsumeLiveBudget: vi.fn(() => false),
+		});
+		const request = makeRequest();
+		applyLiveCellPresentation(makeDispatchInput(deps, request, makeLiveMountPresentation(), 1));
+		expect(request.cellSlot.lastContentMode).toBe('fallback');
+		expect(request.cellSlot.element.textContent).toContain('Name 1');
 	});
 
 	it('omitted tryConsumeLiveBudget (no scheduler wired) defaults to unlimited — behaves as before', () => {

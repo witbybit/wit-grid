@@ -1,10 +1,10 @@
 import type { DataModel } from '../models/DataModel.js';
 import type { ColumnModel } from '../models/ColumnModel.js';
 import type { FormulaCellCoordinate } from '../calculations/dagEngine.js';
-import type { BatchCellValueUpdate, GridCellPointer } from '../api/GridApi.js';
+import type { GridCellWrite, GridCellPointer } from '../api/GridApi.js';
 import { asAnyModelCellWritable, type RowModel, type RowModelWriteResult } from '../rowModel.js';
 
-export type { BatchCellValueUpdate };
+export type { GridCellWrite };
 
 export interface CellValueChangeOptions {
 	bypassValueSetter?: boolean;

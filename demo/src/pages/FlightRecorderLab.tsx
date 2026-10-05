@@ -79,7 +79,7 @@ export default function FlightRecorderLab() {
 				field: 'status',
 				header: 'Live state',
 				width: 140,
-				renderer: { kind: 'react' as const, component: StatusPulse, capabilities: { scrollPresentation: 'freeze' as const } },
+				renderer: { kind: 'react' as const, component: StatusPulse, capabilities: { scroll: 'text' as const } },
 			},
 		],
 		[]
@@ -130,13 +130,13 @@ export default function FlightRecorderLab() {
 					onClick={() =>
 						api &&
 						action('Batch and formula-dependent cells invalidated', () =>
-							api.batchCellValues(
-								[
+							api.transaction({
+								cells: [
 									{ rowId: 'svc-1', colField: 'requests', value: 2400 },
 									{ rowId: 'svc-3', colField: 'latency', value: 312 },
 								],
-								'paste'
-							)
+								source: 'paste',
+							})
 						)
 					}
 				>

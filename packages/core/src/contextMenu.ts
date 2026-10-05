@@ -411,7 +411,7 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 				updates.push({ rowId, colField: col.field, value: '' });
 			}
 		}
-		if (updates.length > 0) this.runtime.batchCellValues(updates, 'api');
+		if (updates.length > 0) this.runtime.transaction({ cells: updates });
 	}
 
 	private selectAll(params: ContextMenuParams<TRowData>): void {

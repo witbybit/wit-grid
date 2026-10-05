@@ -159,7 +159,7 @@ const columns: ColumnDef<Person>[] = [
 ```
 
 Renderer specs support text, DOM, React, and imperative React modes. A DOM renderer's `mount()` and `update()`
-receive the cell's `value`, `node`, `col`, state flags and the grid `api` — the same api React renderers get. For high-frequency cells, renderer capabilities control scroll behavior with `primitive`, `live`, `freeze`, `text-impostor`, or `html-snapshot` presentation — see [Renderer Capabilities](/docs/next/renderer-capabilities) for the full tradeoff and when to use each.
+receive the cell's `value`, `node`, `col`, state flags and the grid `api` — the same api React renderers get. For high-frequency cells, `capabilities.scroll` chooses between `'text'` (stand-in text while scrolling) and `'live'` (the real renderer, within a per-frame budget) — see [Renderer Capabilities](/docs/next/renderer-capabilities) for the tradeoff and when to use each.
 
 ## Filtering And Sorting
 

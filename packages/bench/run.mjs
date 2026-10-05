@@ -5,6 +5,8 @@
 //   pnpm bench:browser --headed                 # watch it
 //   pnpm bench:browser --only=vertical-text --runs=9 --grid=wit
 //   pnpm bench:browser --publish                # also update the docs comparison page's data
+//   pnpm bench:browser --fidelity               # what visible cells show each frame (flicker), not timing
+//   pnpm bench:gate                             # fidelity gate: Wit only, exits 1 on any regression
 //
 // Method: each round runs both grids back to back on the same scenario, alternating which goes
 // first, so machine drift (thermals, background load) hits both equally. Per metric we report the
@@ -27,18 +29,25 @@ const args = Object.fromEntries(
 		return [key, value ?? true];
 	})
 );
-const runs = Number(args.runs ?? 5);
+// --gate: the fidelity regression gate run before renderer commits (Wit grids only, 2 rounds).
+const gate = Boolean(args.gate);
+if (gate) args.fidelity = true;
+const runs = Number(args.runs ?? (gate ? 2 : 5));
 // --css=<variant> forwards an experimental CSS override to the Wit Grid page (see src/wit.ts).
 const cssVariant = args.css;
-const grids = args.grid ? [args.grid] : ['wit', 'ag'];
+const grids = args.grid ? [args.grid] : gate ? ['wit'] : ['wit', 'ag'];
 // --trace records Chrome's devtools.timeline trace and reports what each layout touched
 // (layout objects dirtied, objects in the tree, forced layouts) and why elements were restyled
 // or re-laid out. Counts, not time: tracing itself costs main-thread time, so trace runs are for
 // diagnosis, never for the ratio. The counts are only deterministic where the grid's behaviour
-// does not depend on time: the DOM-update budget (rendererOptions.domUpdate.maxMsPerFrame) is
+// does not depend on time: the DOM-update budget (rendererOptions.live.maxMsPerFrame) is
 // time-based, so under tracing it defers far more DOM-renderer cells than in a normal run and
 // the DOM-renderer scenario's counts describe a slower grid, not the real one.
 const traceLayouts = Boolean(args.trace);
+// --fidelity compares every visible cell with its final content after every frame: placeholders,
+// blanks, another row's content, and content changing while in view (flicker). It forces layout
+// each frame, so its timings are meaningless; results go to results/fidelity-*.json, never latest.json.
+const fidelity = Boolean(args.fidelity);
 
 const SCENARIOS = [
 	{
@@ -69,21 +78,117 @@ const SCENARIOS = [
 		query: { rows: 100_000, cols: 50, domCols: 0 },
 		wheel: { dy: 2400, events: 90 },
 	},
-].filter((s) => !args.only || s.name === args.only);
+	{
+		name: 'setrows-one-change',
+		title: 'setRows, one changed row of 100,000',
+		description: 'Every 16 ms the app passes a new rows array with one visible row replaced by an edited copy (immutable-state updates).',
+		query: { rows: 100_000, cols: 50, domCols: 0 },
+		ticks: 120,
+		noFidelity: true,
+	},
+	{
+		name: 'vertical-react-live',
+		title: 'Vertical scroll, live React cell renderers',
+		description:
+			"The React cell grid with scroll: 'live' on its renderer columns: every visible cell must be final on every frame. Wit only: fidelity runs.",
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		reactMode: 'live',
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-styled',
+		title: 'Vertical scroll, decorated cells',
+		description:
+			'The plain-text grid with a cell style rule on every numeric cell above 500; fidelity judges the class too. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 0, styled: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-react-styled',
+		title: 'Vertical scroll, decorated React cells',
+		description: 'The React cell grid with the same cell style rule; fidelity judges the class too. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10, styled: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'react-edits-at-rest',
+		title: 'React cells edited at rest',
+		description:
+			'The React cell grid, not scrolling; every 16 ms the app passes new rows with one visible renderer cell edited. Every edit must show on the next frame. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		ticks: 120,
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'react-edits-during-scroll',
+		title: 'React cells edited during scroll',
+		description:
+			'The React cell grid scrolling, with one visible renderer cell edited on every wheel event (new rows prop). Edited cells must never show a stale value. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		ticks: 150,
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-formatted',
+		title: 'Vertical scroll, formatted numbers',
+		description: 'The plain-text grid with a valueFormatter on every numeric column ($<value>).',
+		query: { rows: 100_000, cols: 50, domCols: 0, fmt: 1 },
+		wheel: { dy: 360, events: 150 },
+	},
+	{
+		name: 'vertical-react-renderers',
+		title: 'Vertical scroll, React cell renderers',
+		description:
+			'The DOM-renderer grid through the React adapter, with React component cells (default scroll presentation). Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+	{
+		name: 'vertical-react-getters',
+		title: 'Vertical scroll, React cells over valueGetters',
+		description: 'The React cell grid with every renderer column read through a valueGetter. Wit only: fidelity runs.',
+		query: { rows: 100_000, cols: 50, domCols: 10, getters: 1 },
+		wheel: { dy: 360, events: 150 },
+		grids: ['wit-react'],
+		fidelityOnly: true,
+	},
+]
+	.filter((s) => !args.only || s.name === args.only)
+	// Fidelity-only scenarios have no AG counterpart; they still time on request (--only=<name>), Wit alone.
+	.filter((s) => fidelity || !s.fidelityOnly || args.only === s.name)
+	.filter((s) => !fidelity || !s.noFidelity);
 
 async function bundle() {
 	mkdirSync(out, { recursive: true });
 	await build({
-		entryPoints: { wit: join(here, 'src/wit.ts'), ag: join(here, 'src/ag.ts') },
+		entryPoints: { wit: join(here, 'src/wit.ts'), ag: join(here, 'src/ag.ts'), 'wit-react': join(here, 'src/witReact.tsx') },
 		outdir: out,
 		bundle: true,
 		format: 'iife',
 		minify: true,
 		target: 'es2022',
 		define: { 'process.env.NODE_ENV': '"production"' },
+		jsx: 'automatic',
+		// One React (the adapter's), and the core from source like the plain Wit page.
+		alias: {
+			react: join(here, '../react/node_modules/react'),
+			'react-dom': join(here, '../react/node_modules/react-dom'),
+			'@eregister/wit-grid-core': join(here, '../core/src'),
+		},
 		logLevel: 'warning',
 	});
-	for (const grid of ['wit', 'ag']) {
+	for (const grid of ['wit', 'ag', 'wit-react']) {
 		writeFileSync(
 			join(out, `${grid}.html`),
 			`<!doctype html><html><head><meta charset="utf-8"><title>${grid}</title>
@@ -119,6 +224,11 @@ async function runOnce(browser, grid, scenario) {
 	const url = pathToFileURL(join(out, `${grid}.html`));
 	for (const [key, value] of Object.entries(scenario.query)) url.searchParams.set(key, String(value));
 	if (cssVariant && grid === 'wit') url.searchParams.set('css', cssVariant);
+	if (fidelity) url.searchParams.set('fidelity', '1');
+	// --react-mode=<live|text> sets the React cells' scroll presentation (wit-react page).
+	const reactMode = scenario.reactMode ?? args['react-mode'];
+	if (reactMode && grid === 'wit-react') url.searchParams.set('reactMode', reactMode);
+	if (args['react-mounts'] && grid === 'wit-react') url.searchParams.set('reactMounts', args['react-mounts']);
 	await page.goto(url.href);
 	await page.waitForFunction(() => window.benchReady === true, null, { timeout: 60_000 });
 	await page.mouse.move(600, 360);
@@ -138,20 +248,38 @@ async function runOnce(browser, grid, scenario) {
 	const before = await readMetrics();
 	if (traceLayouts) await page.evaluate(() => window.witHost?.resetRenderStats());
 	await page.evaluate(() => window.bench.start());
-	const { dx = 0, dy = 0, events } = scenario.wheel;
+	const { dx = 0, dy = 0, events } = scenario.wheel ?? { events: scenario.ticks };
 	const inputStart = performance.now();
-	// Forward then back, like a user flinging through data and returning.
-	for (let i = 0; i < events; i++) {
-		const sign = i < events / 2 ? 1 : -1;
-		await page.mouse.wheel(dx * sign, dy * sign);
-		await page.waitForTimeout(16);
+	if (scenario.ticks && scenario.wheel) {
+		// Data updates during input: one wheel event and one setRows-style replace per step.
+		for (let i = 0; i < events; i++) {
+			const sign = i < events / 2 ? 1 : -1;
+			await page.mouse.wheel(dx * sign, dy * sign);
+			await page.evaluate((i) => window.benchTick(i), i);
+			await page.waitForTimeout(16);
+		}
+	} else if (scenario.ticks) {
+		// Data updates instead of input: one setRows-style replace per tick.
+		for (let i = 0; i < events; i++) {
+			await page.evaluate((i) => window.benchTick(i), i);
+			await page.waitForTimeout(16);
+		}
+	} else {
+		// Forward then back, like a user flinging through data and returning.
+		for (let i = 0; i < events; i++) {
+			const sign = i < events / 2 ? 1 : -1;
+			await page.mouse.wheel(dx * sign, dy * sign);
+			await page.waitForTimeout(16);
+		}
 	}
-	// page.mouse.wheel resolves once the page has handled the event, so time beyond the fixed
-	// 16ms pacing is main-thread work spent handling that input.
+	// The input call resolves once the page has handled it, so time beyond the fixed 16ms pacing
+	// is main-thread work spent handling that input (or that tick).
 	const inputOverheadMs = (performance.now() - inputStart) / events - 16;
-	await page.waitForTimeout(400);
+	if (fidelity) await page.evaluate(() => window.bench.markInputEnd());
+	await page.waitForTimeout(fidelity ? 1500 : 400);
 	const raw = await page.evaluate(() => window.bench.stop());
 	const after = await readMetrics();
+	const rest = fidelity ? await page.evaluate(() => window.bench.restFidelity()) : null;
 	if (traceLayouts) {
 		const done = new Promise((resolve) => cdp.once('Tracing.tracingComplete', resolve));
 		await cdp.send('Tracing.end');
@@ -176,7 +304,6 @@ async function runOnce(browser, grid, scenario) {
 					'cellSlotRebinds',
 					'domUpdatesDuringScroll',
 					'domUpdatesDeferredDuringScroll',
-					'textImpostorUsesDuringScroll',
 					'motionCellsDecoratedAfterScroll',
 					'fidelityCellsDecoratedAfterScroll',
 				];
@@ -204,6 +331,7 @@ async function runOnce(browser, grid, scenario) {
 			})
 		: {};
 	await page.close();
+	if (fidelity) return summarizeFidelity(raw.fidelity, rest, grid);
 	const deltaMs = (name) => ((after[name] ?? 0) - (before[name] ?? 0)) * 1000;
 	const delta = (name) => (after[name] ?? 0) - (before[name] ?? 0);
 	return {
@@ -221,6 +349,37 @@ async function runOnce(browser, grid, scenario) {
 		updates: calls.updates,
 		...(traceLayouts ? summarizeLayoutTrace(traceEvents) : {}),
 		...census,
+	};
+}
+
+function summarizeFidelity(stats, rest, grid) {
+	if (stats.otherExamples?.length)
+		process.stdout.write(`  ${grid} STALE/OTHER, e.g. ${stats.otherExamples.slice(0, 4).join('; ')}
+`);
+	if (stats.wrongExamples.length)
+		process.stdout.write(`  ${grid} wrong cells, e.g. ${stats.wrongExamples.slice(0, 3).join('; ')}
+`);
+	if (rest.wrongCells > 0)
+		process.stdout.write(`  ${grid} WRONG AT REST: ${rest.wrongExamples.slice(0, 3).join('; ')}
+`);
+	return {
+		fidelityFrames: stats.frames,
+		cellFrames: stats.cellFrames,
+		// Share of visible cell-frames not showing their final content.
+		wrongCellPct: (100 * stats.wrongCells) / Math.max(1, stats.cellFrames),
+		framesWithWrongPct: (100 * stats.framesWithWrong) / Math.max(1, stats.frames),
+		// Content changes of a cell that stayed in view, per 1,000 visible cell-frames.
+		changesPer1k: (1000 * stats.changes) / Math.max(1, stats.cellFrames),
+		changes: stats.changes,
+		// Wrong cells by kind, as % of visible cell-frames.
+		blankPct: (100 * stats.blank) / Math.max(1, stats.cellFrames),
+		incompletePct: (100 * stats.incomplete) / Math.max(1, stats.cellFrames),
+		otherContentPct: (100 * stats.otherContent) / Math.max(1, stats.cellFrames),
+		// After the last input, until every visible cell is final (-1: not within the 1.5 s tail).
+		settleMs: stats.settleMs,
+		// Must be 0: once scrolling settles every visible cell is right (validates the measure).
+		wrongAtRest: rest.wrongCells,
+		restCells: rest.cellFrames,
 	};
 }
 
@@ -311,13 +470,14 @@ const environment = {
 const results = [];
 try {
 	for (const scenario of SCENARIOS) {
-		const samples = Object.fromEntries(grids.map((grid) => [grid, []]));
+		const scenarioGrids = gate ? (scenario.grids ?? grids).filter((grid) => grid !== 'ag') : (scenario.grids ?? grids);
+		const samples = Object.fromEntries(scenarioGrids.map((grid) => [grid, []]));
 		for (let r = 0; r < runs; r++) {
 			// Paired round: both grids back to back, alternating which goes first.
-			const order = r % 2 === 0 ? grids : [...grids].reverse();
+			const order = r % 2 === 0 ? scenarioGrids : [...scenarioGrids].reverse();
 			for (const grid of order) samples[grid].push(await runOnce(browser, grid, scenario));
 		}
-		for (const grid of grids) {
+		for (const grid of scenarioGrids) {
 			const list = samples[grid];
 			const metrics = Object.fromEntries(Object.keys(list[0]).map((key) => [key, spread(list.map((s) => s[key]))]));
 			results.push({
@@ -327,7 +487,7 @@ try {
 				spread: metrics,
 			});
 		}
-		if (grids.length === 2) {
+		if (!fidelity && scenarioGrids.length === 2) {
 			const ratios = samples.wit.map((w, i) => w.taskMs / samples.ag[i].taskMs);
 			results.push({ scenario: scenario.name, grid: 'ratio', witOverAgTaskMs: spread(ratios), rounds: runs });
 		}
@@ -338,33 +498,47 @@ try {
 }
 
 const fmt = (n, digits = 1) => (typeof n === 'number' ? n.toFixed(digits) : String(n));
-const table = results
-	.filter((r) => r.grid !== 'ratio')
-	.map((r) => ({
+const fidelityTable = () =>
+	results.map((r) => ({
 		scenario: r.scenario,
 		grid: r.grid,
-		'main thread ms (min-max)': `${fmt(r.taskMs, 0)} (${fmt(r.spread.taskMs.min, 0)}-${fmt(r.spread.taskMs.max, 0)})`,
-		'script ms': fmt(r.scriptMs, 0),
-		'layout ms': fmt(r.layoutMs, 0),
-		'style ms': fmt(r.styleMs, 0),
-		'layouts/frame': fmt(r.layoutCount / Math.max(1, r.frames), 2),
-		'ms/layout': fmt(r.layoutMs / Math.max(1, r.layoutCount), 2),
-		...(traceLayouts
-			? {
-					'trace layouts (forced)': `${fmt(r.traceLayouts, 0)} (${fmt(r.traceForcedLayouts, 0)})`,
-					'dirty objs/layout': fmt(r.traceDirtyPerLayout, 0),
-					'tree objs/layout': fmt(r.traceTreeObjectsPerLayout, 0),
-					'styled elements': fmt(r.traceStyledElements, 0),
-					'DOM rows/cells/els-per-cell': `${fmt(r.domRows, 0)}/${fmt(r.domCells, 0)}/${fmt(r.domElementsPerCell, 1)}`,
-					'DOM elements': fmt(r.domElements, 0),
-				}
-			: {}),
-		'input +ms/evt': fmt(r.inputOverheadMs, 2),
-		'p99 frame ms': fmt(r.p99Ms),
-		'dropped %': fmt(r.droppedPct),
-		'blank %': fmt(r.blankSamplesPct),
-		'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+		'wrong cells % (min-max)': `${fmt(r.wrongCellPct, 2)} (${fmt(r.spread.wrongCellPct.min, 2)}-${fmt(r.spread.wrongCellPct.max, 2)})`,
+		'frames with wrong %': fmt(r.framesWithWrongPct),
+		'changes in view /1k': fmt(r.changesPer1k, 2),
+		'blank / incomplete / other %': `${fmt(r.blankPct, 2)} / ${fmt(r.incompletePct, 2)} / ${fmt(r.otherContentPct, 2)}`,
+		'settle ms': fmt(r.settleMs, 0),
+		'wrong at rest': fmt(r.wrongAtRest, 0),
+		'cell-frames': fmt(r.cellFrames, 0),
 	}));
+const table = fidelity
+	? fidelityTable()
+	: results
+			.filter((r) => r.grid !== 'ratio')
+			.map((r) => ({
+				scenario: r.scenario,
+				grid: r.grid,
+				'main thread ms (min-max)': `${fmt(r.taskMs, 0)} (${fmt(r.spread.taskMs.min, 0)}-${fmt(r.spread.taskMs.max, 0)})`,
+				'script ms': fmt(r.scriptMs, 0),
+				'layout ms': fmt(r.layoutMs, 0),
+				'style ms': fmt(r.styleMs, 0),
+				'layouts/frame': fmt(r.layoutCount / Math.max(1, r.frames), 2),
+				'ms/layout': fmt(r.layoutMs / Math.max(1, r.layoutCount), 2),
+				...(traceLayouts
+					? {
+							'trace layouts (forced)': `${fmt(r.traceLayouts, 0)} (${fmt(r.traceForcedLayouts, 0)})`,
+							'dirty objs/layout': fmt(r.traceDirtyPerLayout, 0),
+							'tree objs/layout': fmt(r.traceTreeObjectsPerLayout, 0),
+							'styled elements': fmt(r.traceStyledElements, 0),
+							'DOM rows/cells/els-per-cell': `${fmt(r.domRows, 0)}/${fmt(r.domCells, 0)}/${fmt(r.domElementsPerCell, 1)}`,
+							'DOM elements': fmt(r.domElements, 0),
+						}
+					: {}),
+				'input +ms/evt': fmt(r.inputOverheadMs, 2),
+				'p99 frame ms': fmt(r.p99Ms),
+				'dropped %': fmt(r.droppedPct),
+				'blank %': fmt(r.blankSamplesPct),
+				'renderer mounts/updates': `${r.mounts}/${r.updates}`,
+			}));
 console.log();
 console.table(table);
 for (const r of results.filter((x) => x.grid === 'ratio')) {
@@ -383,16 +557,20 @@ const report = {
 			'Chrome main-thread counters (CDP Performance.getMetrics), frame intervals from rAF, long tasks, and blank area sampled after each frame.',
 	},
 	environment,
-	scenarios: SCENARIOS.map(({ name, title, description, query, wheel }) => ({ name, title, description, query, wheel })),
+	scenarios: SCENARIOS.map(({ name, title, description, query, wheel, ticks }) => ({ name, title, description, query, wheel, ticks })),
 	results,
 };
 const resultsDir = join(here, 'results');
 mkdirSync(resultsDir, { recursive: true });
-const file = join(resultsDir, `${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+const prefix = fidelity ? 'fidelity-' : '';
+if (fidelity)
+	report.method.metrics =
+		'Fidelity: after every frame, each fully visible cell is compared with its final content (text, plus bar width for renderer columns). Timings are not recorded: the sampling forces layout each frame.';
+const file = join(resultsDir, `${prefix}${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
 writeFileSync(file, JSON.stringify(report, null, 2));
-writeFileSync(join(resultsDir, 'latest.json'), JSON.stringify(report, null, 2));
+writeFileSync(join(resultsDir, `${prefix}latest.json`), JSON.stringify(report, null, 2));
 console.log(`\nwrote ${file}`);
-if (args.publish) {
+if (args.publish && !fidelity) {
 	const dataDir = join(here, '../../site/data/benchmarks');
 	mkdirSync(dataDir, { recursive: true });
 	writeFileSync(join(dataDir, 'wit-vs-ag.json'), JSON.stringify(report, null, 2) + '\n');
@@ -414,4 +592,31 @@ if (args.publish) {
 	});
 	writeFileSync(historyFile, JSON.stringify(history, null, 2) + '\n');
 	console.log(`published ${join(dataDir, 'wit-vs-ag.json')} (history: ${history.length} runs)`);
+}
+
+if (gate) {
+	// Every Wit cell is judged on what a viewer sees. Never allowed: a blank cell, another row's or a
+	// stale value, a wrong cell at rest, a grid that never settles. Stand-in text (shown during scroll
+	// by 'text' React cells by design) is allowed only there; every other mode must be exact.
+	const failures = [];
+	for (const r of results) {
+		if (r.grid === 'ratio') continue;
+		const scenario = SCENARIOS.find((s) => s.name === r.scenario);
+		const exact = r.grid !== 'wit-react' || scenario?.reactMode === 'live';
+		const fail = (why) => failures.push(`${r.scenario} (${r.grid}): ${why}`);
+		if (r.spread.blankPct.max > 0) fail(`blank cells ${fmt(r.spread.blankPct.max, 3)}%`);
+		// Edits at rest: an edited cell may be one sample behind (the sampler's frame callback can run
+		// before the grid's), but never more than that.
+		const staleLimit = r.scenario === 'react-edits-at-rest' ? 0.5 : 0.05;
+		if (r.spread.otherContentPct.max > staleLimit) fail(`stale or other-row content ${fmt(r.spread.otherContentPct.max, 3)}%`);
+		if (r.spread.wrongAtRest.max > 0) fail(`${r.spread.wrongAtRest.max} wrong cells at rest`);
+		if (r.spread.settleMs.max < 0 || r.spread.settleMs.max > 1000) fail(`settle ${fmt(r.spread.settleMs.max, 0)} ms`);
+		if (exact && !r.scenario.startsWith('react-edits') && r.spread.wrongCellPct.max > 0.25)
+			fail(`wrong cells ${fmt(r.spread.wrongCellPct.max, 2)}% in an exact mode`);
+	}
+	if (failures.length > 0) {
+		console.error(`\nFIDELITY GATE FAILED\n  ${failures.join('\n  ')}`);
+		process.exit(1);
+	}
+	console.log('\nfidelity gate passed');
 }

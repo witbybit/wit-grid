@@ -563,9 +563,9 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('setSortModel(null');
 	});
 
-	it('GridEngine.applyTransaction routes through a typed row-transaction domain mutation', () => {
+	it('GridEngine.transaction routes rows through a typed row-transaction domain mutation', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'engine', 'GridEngine.ts'), 'utf-8');
-		expect(content).toContain("domainMutations: [{ kind: 'row-transaction', transaction }]");
+		expect(content).toContain("domainMutations.push({ kind: 'row-transaction', transaction: rows! })");
 	});
 
 	it('row-transaction executor owns lifecycle through the structural client capability', () => {
@@ -595,7 +595,7 @@ describe('Architecture guardrails', () => {
 	it('GridEngine cell mutations route through typed domain mutations', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'engine', 'GridEngine.ts'), 'utf-8');
 		expect(content).toContain("domainMutations: [{ kind: 'cell-value', rowId, colField, value, undoable, source: 'api' }]");
-		expect(content).toContain("domainMutations: [{ kind: 'batch-cell', updates, undoable: true, source }]");
+		expect(content).toContain("domainMutations.push({ kind: 'batch-cell', updates: [...cells], undoable: true, source })");
 	});
 
 	it('cell mutation history helpers are owned by the executor layer, not DataMutationController', () => {
@@ -647,7 +647,7 @@ describe('Architecture guardrails', () => {
 		expect(rowModelContent).not.toContain('public setCellValue =');
 		// Structural replacements are present.
 		expect(rowModelContent).toContain('public replaceRowsStructurally(');
-		expect(rowModelContent).toContain('public updateRowsStructurally(');
+		expect(rowModelContent).not.toContain('public updateRowsStructurally(');
 		expect(rowModelContent).toContain('public writeCellValueStructurally(');
 		expect(rowModelContent).toContain('public reconcileAfterDataWrite(');
 		// Unified cell write interface: all three row model types expose writeCellValueStructurally.
@@ -1846,9 +1846,9 @@ describe('Architecture guardrails', () => {
 		expect(indexContent).not.toContain('rows/stages/');
 	});
 
-	it('BatchCellValueUpdate is defined in api/GridApi.ts (public API location) not features/ (Plan 101)', () => {
+	it('GridCellWrite is defined in api/GridApi.ts (public API location) not features/ (Plan 101)', () => {
 		const gridApiContent = readFileSync(resolve(CORE_ROOT, 'src', 'api', 'GridApi.ts'), 'utf-8');
-		expect(gridApiContent).toContain('BatchCellValueUpdate');
+		expect(gridApiContent).toContain('GridCellWrite');
 	});
 
 	// ── Plan 102: adversarial correctness, fuzzing, and lifecycle hardening ──
@@ -2658,23 +2658,23 @@ describe('Architecture guardrails', () => {
 			const surfacesContent = readFileSync(resolve(CORE_ROOT, 'src', 'api', 'GridApiSurfaces.ts'), 'utf-8');
 			expect(apiContent).toContain('GridDataApi');
 			expect(surfacesContent).toContain('setRows(rows: TRowData[]): GridWriteResult;');
-			expect(surfacesContent).toContain('updateRows(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult;');
+			expect(surfacesContent).not.toContain('updateRows(');
 			expect(surfacesContent).toContain('setCellValue(rowId: string, colField: string, value: unknown): GridWriteResult;');
-			expect(surfacesContent).toContain(
-				"batchCellValues(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): GridWriteResult;"
-			);
+			expect(surfacesContent).toContain('transaction(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>;');
+			expect(surfacesContent).toContain('flushTransactions(): void;');
+			expect(surfacesContent).not.toContain('batchCellValues(');
+			expect(surfacesContent).not.toContain('applyTransaction(');
 			expect(surfacesContent).not.toContain('setRows(rows: TRowData[]): void;');
-			expect(surfacesContent).not.toContain('updateRows(updater: (rows: TRowData[]) => TRowData[]): void;');
 			expect(surfacesContent).not.toContain('setCellValue(rowId: string, colField: string, value: unknown): void;');
-			expect(surfacesContent).not.toContain("batchCellValues(updates: BatchCellValueUpdate[], source?: 'paste' | 'api' | 'fill'): void;");
 		});
 
 		it('GridEngine advanced write methods map kernel commits to GridWriteResult', () => {
 			const content = readFileSync(resolve(CORE_ROOT, 'src', 'engine', 'GridEngine.ts'), 'utf-8');
 			expect(content).toContain('public replaceRows(rows: readonly TRowData[]): GridWriteResult');
-			expect(content).toContain('public updateRows(updater: (rows: TRowData[]) => TRowData[]): GridWriteResult');
+			expect(content).not.toContain('public updateRows(');
 			expect(content).toContain('public setCellValue(rowId: string, colField: string, value: unknown, undoable = true): GridWriteResult');
-			expect(content).toContain('public batchCellValues(');
+			expect(content).toContain('public transaction(transaction: GridEngineTransaction<TRowData>): GridTransactionResult<TRowData>');
+			expect(content).not.toContain('public batchCellValues(');
 			expect(content).toContain('return this.toGridWriteResult(');
 			expect(content).toContain("status: 'applied'");
 		});

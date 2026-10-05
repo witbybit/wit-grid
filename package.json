@@ -22,6 +22,7 @@
 		"test:adversarial": "pnpm --filter @eregister/wit-grid-core exec vitest run src/rowModel.adversarial.test.ts src/lifecycle.adversarial.test.ts src/serverRowModel.adversarial.test.ts src/gridHost.adversarial.test.ts && pnpm --filter @eregister/wit-grid-react exec vitest run src/gridPortalStore.adversarial.test.ts",
 		"bench": "pnpm --filter @eregister/wit-grid-core exec vitest run src/perf/instrumentedBudgets.test.ts",
 		"bench:browser": "pnpm --filter @eregister/wit-grid-bench run bench --",
+		"bench:gate": "pnpm --filter @eregister/wit-grid-bench run bench -- --gate",
 		"bench:long-session": "pnpm --filter @eregister/wit-grid-core exec vitest run src/perf/longSessionResilience.test.ts && pnpm --filter @eregister/wit-grid-react exec vitest run src/gridPortalStore.adversarial.test.ts",
 		"typecheck:core": "pnpm --filter @eregister/wit-grid-core run typecheck",
 		"lint:core": "pnpm --filter @eregister/wit-grid-core run lint",

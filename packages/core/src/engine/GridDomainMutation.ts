@@ -1,5 +1,5 @@
 import { GridEventName } from '../api/GridEvents.js';
-import type { BatchCellValueUpdate, GridCellPointer, RowDataTransaction } from '../api/GridApi.js';
+import type { GridCellWrite, GridCellPointer, RowDataTransaction } from '../api/GridApi.js';
 import { getCellPointerColumnKey } from '../interaction/cellPointer.js';
 import {
 	asAnyModelCellWritable,
@@ -46,7 +46,7 @@ export interface CellValueMutation {
 
 export interface BatchCellMutation {
 	kind: 'batch-cell';
-	updates: ReadonlyArray<BatchCellValueUpdate>;
+	updates: ReadonlyArray<GridCellWrite>;
 	atomic?: boolean;
 	undoable?: boolean;
 	bypassValueSetter?: boolean;
@@ -75,12 +75,6 @@ export interface RowOrderMutation {
 export interface ReplaceRowsMutation<TRowData = unknown> {
 	kind: 'replace-rows';
 	rows: readonly TRowData[];
-	undoable?: boolean;
-}
-
-export interface BatchRowUpdateMutation<TRowData = unknown> {
-	kind: 'batch-row-update';
-	updater: (rows: TRowData[]) => TRowData[];
 	undoable?: boolean;
 }
 
@@ -158,7 +152,6 @@ export type GridDomainMutation<TRowData = unknown> =
 	| RowTransactionMutation<TRowData>
 	| RowOrderMutation
 	| ReplaceRowsMutation<TRowData>
-	| BatchRowUpdateMutation<TRowData>
 	| IntegritySetValidationIssuesMutation
 	| IntegritySetQualityIssuesMutation
 	| IntegritySetDiffStateMutation<TRowData>
@@ -257,7 +250,7 @@ interface PreparedBatchCellMutation<TRowData = unknown> extends PreparedDomainMu
 interface BatchCellMutationExecutionResult {
 	results: CellValueChangeResult[];
 	committed: CellValueChangeResult[];
-	rejected: Array<{ index: number; update: BatchCellValueUpdate; reason: string }>;
+	rejected: Array<{ index: number; update: GridCellWrite; reason: string }>;
 }
 
 function areRowOrdersEqual(left: readonly string[], right: readonly string[]): boolean {
@@ -373,7 +366,7 @@ function createRowsUpdatedEvents<TRowData>(params: {
 	const addedNodes = params.addedNodes ?? [];
 	const removedNodes = params.removedNodes ?? [];
 	const changedValuesByRow = params.changedValuesByRow;
-	if (!changedValuesByRow && changedNodes.length === 0 && addedNodes.length === 0 && removedNodes.length === 0) {
+	if ((!changedValuesByRow || changedValuesByRow.size === 0) && changedNodes.length === 0 && addedNodes.length === 0 && removedNodes.length === 0) {
 		return [];
 	}
 	return [
@@ -785,7 +778,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 					if (!commitContext.applyCellValueChange) return { noop: true, rejections };
 					const committed: CellValueChangeResult[] = [];
 					const results: CellValueChangeResult[] = [];
-					const rejected: Array<{ index: number; update: BatchCellValueUpdate; reason: string }> = [];
+					const rejected: Array<{ index: number; update: GridCellWrite; reason: string }> = [];
 
 					for (let index = 0; index < previews.length; index++) {
 						const preview = previews[index]!;
@@ -1027,56 +1020,21 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 				apply(commitContext) {
 					const rowModel = asClientStructuralRowModel<TRowData>(commitContext.getRowModel())!;
 					const writeResult = rowModel.replaceRowsStructurally(mutation.rows as TRowData[]);
-					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, 'value-only');
-					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
-					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
-					return {
-						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),
-						invalidations,
-						events: createRowsUpdatedEvents<TRowData>({
-							changedValuesByRow: writeResult.changedValuesByRow,
-							changedNodes: writeResult.updatedNodes,
-							addedNodes: writeResult.addedNodes,
-							removedNodes: writeResult.removedNodes,
-						}),
-						requestRender: changed,
-					};
-				},
-			};
-		},
-	};
-
-	const batchRowUpdateExecutor: GridDomainMutationExecutor<TRowData, BatchRowUpdateMutation<TRowData>> = {
-		validate(_mutation, context) {
-			if (!asClientStructuralRowModel(context.getRowModel())) {
-				return {
-					ok: false,
-					reason: 'batch-row-update requires client row model',
-					rejection: { mutationKind: 'batch-row-update', reason: 'batch-row-update requires client row model' },
-				};
-			}
-			return { ok: true };
-		},
-		prepare(mutation, _context) {
-			return {
-				mutation,
-				domains: ['rows', 'geometry'],
-				events: [],
-				requestRender: true,
-				apply(commitContext) {
-					const rowModel = asClientStructuralRowModel<TRowData>(commitContext.getRowModel())!;
-					const writeResult = rowModel.updateRowsStructurally(mutation.updater);
+					// Field-level effects for changed rows (getter caches, getter/formula dependents, row
+					// versions) exactly as a row update; a full replace rebuilds the projection on top.
 					const writeEffects = commitContext.applyStructuralWriteEffects?.(writeResult);
+					const isFull = writeResult.visualChange === 'full';
 					const allFields = new Set<string>();
-					if (writeResult.changedFieldsByRow) {
-						for (const fields of writeResult.changedFieldsByRow.values()) {
-							for (const f of fields) allFields.add(f);
-						}
+					if (!isFull && writeResult.changedFieldsByRow) {
+						for (const fields of writeResult.changedFieldsByRow.values()) for (const f of fields) allFields.add(f);
 					}
-					const impact: RowWriteImpact = allFields.size > 0 ? rowModel.classifyFieldMutation(allFields) : 'value-only';
-					requestLayoutTransitionCaptureForImpact(commitContext, impact);
-					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, impact);
+					const impact: RowWriteImpact = isFull ? 'insert' : allFields.size > 0 ? rowModel.classifyFieldMutation(allFields) : 'value-only';
+					if (!isFull) requestLayoutTransitionCaptureForImpact(commitContext, impact);
+					const reconcileResult = rowModel.reconcileAfterDataWrite(writeResult, isFull ? 'value-only' : impact);
 					const invalidations = reconcileResult.changed ? createInvalidationsFromRefreshResult(reconcileResult, commitContext) : [];
+					// Rows added, removed or reordered: the reconcile may still see "no change" when only the
+					// order moved, so the data invalidation guarantees the visible cells are rebuilt.
+					if (isFull) invalidations.push({ kind: 'full', reason: 'data' });
 					const changed = writeResult.visualChange !== 'none' || invalidations.length > 0;
 					return {
 						domains: changed ? (['rows', 'geometry'] as const) : ([] as const),
@@ -1379,9 +1337,6 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 			}
 			if (mutation.kind === 'replace-rows') {
 				return replaceRowsExecutor as GridDomainMutationExecutor<TRowData, typeof mutation>;
-			}
-			if (mutation.kind === 'batch-row-update') {
-				return batchRowUpdateExecutor as GridDomainMutationExecutor<TRowData, typeof mutation>;
 			}
 			if (mutation.kind === 'integrity-set-validation-issues') {
 				return validationIssuesExecutor as GridDomainMutationExecutor<TRowData, typeof mutation>;

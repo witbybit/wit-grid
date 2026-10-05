@@ -370,7 +370,7 @@ function ImperativePortalCellWrapperInner<TRowData = unknown>({ cellKey, store }
 	// Register imperative updater — called by the grid view instead of mountCell on data-only updates
 	useEffect(() => {
 		if (!store.registerImperativeUpdater) return;
-		store.registerImperativeUpdater(cellKey, (value, node, col, isEditing, _isLoading, phase, isScrolling, isFocused, isSelected) => {
+		store.registerImperativeUpdater(cellKey, ({ value, node, col, isEditing, phase, isScrolling, isFocused, isSelected }) => {
 			const handle = imperativeRef.current;
 			if (!handle) return false;
 			const { colId, columnInstanceId } = getRendererColumnIds(col);

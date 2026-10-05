@@ -13,6 +13,8 @@ function setDisplay(el: HTMLElement | SVGElement, display: string): void {
 	if (el.style.display !== display) el.style.display = display;
 }
 
+const MAX_FREE_LEAF_HEADER_CELLS = 64;
+
 export class HeaderRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
 	private readonly columnInteractionsGetter: () => ColumnInteractionController<TRowData>;
@@ -23,6 +25,10 @@ export class HeaderRenderer<TRowData = unknown> {
 	// group: "grp:depth:firstField:lastField". Stable identity so the DOM element is relocated
 	// rather than destroyed+recreated.
 	private headerCells = new Map<string, HTMLDivElement>();
+	/** Detached leaf header cells, reused when columns enter the window during horizontal scroll
+	 *  instead of building a new cell (with its icons) per column. Every per-column detail is
+	 *  rewritten by renderCell; cells that grew a select-all checkbox are never pooled. */
+	private readonly freeLeafHeaderCells: HTMLDivElement[] = [];
 	private headerLayer: HTMLDivElement | null = null;
 	private headerLeftLayer: HTMLDivElement | null = null;
 	private headerRightLayer: HTMLDivElement | null = null;
@@ -74,6 +80,7 @@ export class HeaderRenderer<TRowData = unknown> {
 			cell.remove();
 		}
 		this.headerCells.clear();
+		this.freeLeafHeaderCells.length = 0;
 		this.lastHeaderVisibleRange = { startIdx: -1, endIdx: -1, pinLeft: -1, pinRight: -1, colCount: -1, topologyVersion: -1 };
 		this.lastTopologyVersion = -1;
 	}
@@ -161,7 +168,7 @@ export class HeaderRenderer<TRowData = unknown> {
 
 			let headerCell = this.headerCells.get(cellKey);
 			if (!headerCell) {
-				headerCell = this.createHeaderCellElement(cell.isLeaf);
+				headerCell = (cell.isLeaf ? this.freeLeafHeaderCells.pop() : undefined) ?? this.createHeaderCellElement(cell.isLeaf);
 				this.headerCells.set(cellKey, headerCell);
 			}
 			rendered.add(cellKey);
@@ -338,6 +345,14 @@ export class HeaderRenderer<TRowData = unknown> {
 			if (!rendered.has(cellKey)) {
 				cell.remove();
 				this.headerCells.delete(cellKey);
+				if (
+					this.freeLeafHeaderCells.length < MAX_FREE_LEAF_HEADER_CELLS &&
+					!cell.classList.contains('og-header-group-cell') &&
+					cell.querySelector('.og-header-sort-indicator') !== null &&
+					cell.querySelector('.og-header-checkbox') === null
+				) {
+					this.freeLeafHeaderCells.push(cell);
+				}
 			}
 		}
 

@@ -142,7 +142,7 @@ const SKATER_COLUMNS: ColumnDef<SkaterRow>[] = [
 		renderer: {
 			kind: 'react',
 			component: ({ value }: any) => <MediaCell value={value} />,
-			capabilities: { scrollPresentation: 'freeze' },
+			capabilities: { scroll: 'text' },
 		},
 	},
 ];
@@ -341,7 +341,7 @@ const columns: ColumnDef<Row>[] = [
   {
     field: 'isActive',
     renderer: { kind: 'react', component: CheckboxCellRenderer,
-      capabilities: { scrollPresentation: 'freeze' } },
+      capabilities: { scroll: 'text' } },
   },
   {
     field: 'tricks',
@@ -493,7 +493,7 @@ function NativeCellTypesDemoInner({
 							{ dot: 'bg-amber-500', t: 'Theme via CSS vars: override --og-ct-* on any ancestor element' },
 							{
 								dot: 'bg-rose-500',
-								t: "scrollPresentation: 'freeze' freezes the portal during scroll — re-renders only when data version changes",
+								t: "scroll: 'text' shows stand-in text for cells entering view during scroll — the renderer mounts once scrolling settles",
 							},
 						].map((n, i) => (
 							<div key={i} className='flex items-start gap-2 text-[10px] text-slate-500 leading-relaxed'>

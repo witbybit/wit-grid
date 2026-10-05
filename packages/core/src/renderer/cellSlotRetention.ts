@@ -22,6 +22,10 @@ export const CELL_SLOT_RETENTION_CONFIG = {
 	/** Among equally-old eviction candidates, release portal-mode cells (heavier: portal host,
 	 *  possible React-owned content) before plain text/empty cells. */
 	preferEvictPortalCells: true,
+	/** Evicted plain cells kept detached per row slot for reuse by the next entering column. */
+	maxRecycledCellsPerRowSlot: 16,
+	/** Extra cells evicted once over budget, so the policy runs its sort only every few frames. */
+	evictionSlackPerRowSlot: 8,
 };
 
 /** Monotonic recency counter shared by all row slots — a larger stamp means touched more recently. */
@@ -67,7 +71,9 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 
 	let evicted = 0;
 	if (cells.size > totalBudget) {
-		const overBudget = cells.size - totalBudget;
+		// Trim below the budget by a little slack so a steady horizontal scroll (a few columns
+		// entering per frame) doesn't sort the evictable set again on every frame.
+		const overBudget = Math.min(cells.size - keepInstanceIds.size, cells.size - totalBudget + CELL_SLOT_RETENTION_CONFIG.evictionSlackPerRowSlot);
 		const evictable: ColumnInstanceId[] = [];
 		for (const instanceId of cells.keys()) {
 			if (!keepInstanceIds.has(instanceId)) evictable.push(instanceId);
@@ -83,15 +89,35 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 			const instanceId = ordered[i];
 			const cell = cells.get(instanceId);
 			if (!cell) continue;
+			// Only plain cells are recycled: nothing portal- or renderer-backed carries over.
+			const recyclable =
+				slot.recycledCells.length < CELL_SLOT_RETENTION_CONFIG.maxRecycledCellsPerRowSlot &&
+				(cell.lastContentMode === 'text' || cell.lastContentMode === 'empty' || cell.lastContentMode === 'fallback') &&
+				!cell.lastPortalKey &&
+				(cell.portalHostElement === null || cell.portalHostElement.childElementCount === 0);
 			releaseFn(cell);
 			if (cell.element.parentNode) cell.element.remove();
 			cells.delete(instanceId);
-			instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);
+			if (recyclable) slot.recycledCells.push(cell);
+			else instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);
 			evicted++;
 		}
 	}
 
 	return { retainedAfter: cells.size, evicted };
+}
+
+/** A recycled cell for a column entering `slot`, matching the column's text-node layout. */
+export function takeRecycledCell<TRowData>(slot: RowSlot<TRowData>, directText: boolean): CellSlot<TRowData> | undefined {
+	const cells = slot.recycledCells;
+	for (let i = cells.length - 1; i >= 0; i--) {
+		if (cells[i].directText !== directText) continue;
+		const cell = cells[i];
+		cells[i] = cells[cells.length - 1];
+		cells.pop();
+		return cell;
+	}
+	return undefined;
 }
 
 /** Stamps a newly created cell slot as the most recently touched — the equivalent of its Map

@@ -28,13 +28,8 @@ export interface ViewportPlan {
 	readonly liveCenterColumnWindow: ColumnInstanceId[];
 	readonly pinnedLeftColumns: ColumnInstanceId[];
 	readonly pinnedRightColumns: ColumnInstanceId[];
-	readonly liveCells: {
-		visible: CellAddress[];
-		overscan: CellAddress[];
-		exited: CellAddress[];
-		mountPriority: CellAddress[];
-		updatePriority: CellAddress[];
-	};
+	/** Live-column cells in the overscan band (outside the visible area), kept live during scroll. */
+	readonly liveCells: { overscan: CellAddress[] };
 	readonly retainedFocusEditRowIndices: ReadonlySet<number>;
 	readonly reasons: {
 		verticalRangeChanged: boolean;
@@ -84,6 +79,17 @@ export class ViewportPlanner<TRowData = unknown> {
 	private prevTopology: CompiledColumnTopology | null = null;
 	private prevRenderedCenterColumns: ColumnInstanceId[] | null = null;
 	private rendererModeClassification: RendererModeClassification | null = null;
+	private columnIdsCache: {
+		topology: CompiledColumnTopology;
+		visibleStart: number;
+		visibleEnd: number;
+		renderedStart: number;
+		renderedEnd: number;
+		visible: ColumnInstanceId[];
+		rendered: ColumnInstanceId[];
+		pinnedLeft: ColumnInstanceId[];
+		pinnedRight: ColumnInstanceId[];
+	} | null = null;
 
 	private getRendererModeClassification(
 		compiledPlan: CompiledGridPlan<TRowData> | undefined,
@@ -102,7 +108,7 @@ export class ViewportPlanner<TRowData = unknown> {
 
 		const liveColumns = new Set<ColumnInstanceId>();
 		for (const column of (compiledPlan?.displayedColumns ?? []) as InternalColumnDef<TRowData>[]) {
-			if (column.cellRendererCapabilities?.scrollPresentation === 'live') liveColumns.add(column.instanceId);
+			if (column.cellRendererCapabilities?.scroll === 'live') liveColumns.add(column.instanceId);
 		}
 
 		const classification = { compiledPlanVersion, topologyVersion: topology.version, hasCompiledPlan: !!compiledPlan, liveColumns };
@@ -115,20 +121,28 @@ export class ViewportPlanner<TRowData = unknown> {
 		topology: CompiledColumnTopology,
 		retainedFocusEditRowIndices: ReadonlySet<number> = new Set(),
 		compiledPlan?: CompiledGridPlan<TRowData>,
-		rendererOptions?: { liveReact?: { rowOverscan?: number; columnOverscan?: number } }
+		rendererOptions?: { live?: { rowOverscan?: number; columnOverscan?: number } }
 	): ViewportPlan {
 		const viewportDelta = diffRenderWindow(this.prevWindow, window);
 		const visibleRows = makeRange(window.visibleRowStart ?? window.rowStart, window.visibleRowEnd ?? window.rowEnd);
 		const renderedRows = makeRange(window.rowStart, window.rowEnd);
 		const liveRowRange = intersectRange(
-			expandRange(visibleRows, rendererOptions?.liveReact?.rowOverscan ?? 0, Math.max(0, window.rowCount - 1)),
+			expandRange(visibleRows, rendererOptions?.live?.rowOverscan ?? 0, Math.max(0, window.rowCount - 1)),
 			renderedRows
 		);
 
 		const visibleColStart = window.visibleColStart ?? window.colStart;
 		const visibleColEnd = window.visibleColEnd ?? window.colEnd;
-		const visibleCenterColumns = columnIdsInRange(topology.center, visibleColStart, visibleColEnd);
-		const renderedCenterColumns = columnIdsInRange(topology.center, window.colStart, window.colEnd);
+		const cachedIds = this.columnIdsCache;
+		const sameTopology = cachedIds?.topology === topology;
+		const visibleCenterColumns =
+			sameTopology && cachedIds.visibleStart === visibleColStart && cachedIds.visibleEnd === visibleColEnd
+				? cachedIds.visible
+				: columnIdsInRange(topology.center, visibleColStart, visibleColEnd);
+		const renderedCenterColumns =
+			sameTopology && cachedIds.renderedStart === window.colStart && cachedIds.renderedEnd === window.colEnd
+				? cachedIds.rendered
+				: columnIdsInRange(topology.center, window.colStart, window.colEnd);
 		const prevRenderedCenterColumns = this.prevRenderedCenterColumns;
 		const columnWindowDelta =
 			this.prevTopology && prevRenderedCenterColumns
@@ -136,50 +150,61 @@ export class ViewportPlanner<TRowData = unknown> {
 					? computeColumnWindowDelta(this.prevTopology, topology)
 					: computeRoutineColumnWindowDelta(prevRenderedCenterColumns, renderedCenterColumns)
 				: undefined;
-		const pinnedLeftColumns = topology.left.map((placement) => placement.columnId);
-		const pinnedRightColumns = topology.right.map((placement) => placement.columnId);
+		const pinnedLeftColumns = sameTopology ? cachedIds.pinnedLeft : topology.left.map((placement) => placement.columnId);
+		const pinnedRightColumns = sameTopology ? cachedIds.pinnedRight : topology.right.map((placement) => placement.columnId);
+		// Updated in place: the planner runs every scroll frame.
+		if (cachedIds) {
+			cachedIds.topology = topology;
+			cachedIds.visibleStart = visibleColStart;
+			cachedIds.visibleEnd = visibleColEnd;
+			cachedIds.renderedStart = window.colStart;
+			cachedIds.renderedEnd = window.colEnd;
+			cachedIds.visible = visibleCenterColumns;
+			cachedIds.rendered = renderedCenterColumns;
+			cachedIds.pinnedLeft = pinnedLeftColumns;
+			cachedIds.pinnedRight = pinnedRightColumns;
+		} else {
+			this.columnIdsCache = {
+				topology,
+				visibleStart: visibleColStart,
+				visibleEnd: visibleColEnd,
+				renderedStart: window.colStart,
+				renderedEnd: window.colEnd,
+				visible: visibleCenterColumns,
+				rendered: renderedCenterColumns,
+				pinnedLeft: pinnedLeftColumns,
+				pinnedRight: pinnedRightColumns,
+			};
+		}
 
-		const liveColumnOverscan = rendererOptions?.liveReact?.columnOverscan ?? 0;
-		const liveCenterColumnWindow = columnIdsInRange(
-			topology.center,
-			Math.max(window.colStart, visibleColStart - liveColumnOverscan),
-			Math.min(window.colEnd, visibleColEnd + liveColumnOverscan)
-		);
+		const liveColumnOverscan = rendererOptions?.live?.columnOverscan ?? 0;
+		const liveCenterColumnWindow =
+			liveColumnOverscan === 0 && visibleColStart >= window.colStart && visibleColEnd <= window.colEnd
+				? visibleCenterColumns
+				: columnIdsInRange(
+						topology.center,
+						Math.max(window.colStart, visibleColStart - liveColumnOverscan),
+						Math.min(window.colEnd, visibleColEnd + liveColumnOverscan)
+					);
 		const { liveColumns } = this.getRendererModeClassification(compiledPlan, topology);
 
-		const liveVisibleCells: CellAddress[] = [];
 		const liveOverscanCells: CellAddress[] = [];
-		// No live-presentation columns (the common case): there are no live cells to classify, so
-		// skip the O(rows x columns) probe loop entirely.
-		if (liveColumns.size > 0) {
-			// Only live columns can produce cells; filter once instead of probing per row. Order is
-			// preserved: pinned-left, live center window, pinned-right.
-			const executableLiveColumns: ColumnInstanceId[] = [];
-			const visibleExecutableColumns = new Set<ColumnInstanceId>();
-			for (const id of pinnedLeftColumns) {
-				if (liveColumns.has(id)) executableLiveColumns.push(id);
-				visibleExecutableColumns.add(id);
-			}
-			for (const id of liveCenterColumnWindow) if (liveColumns.has(id)) executableLiveColumns.push(id);
-			for (const id of visibleCenterColumns) visibleExecutableColumns.add(id);
-			for (const id of pinnedRightColumns) {
-				if (liveColumns.has(id)) executableLiveColumns.push(id);
-				visibleExecutableColumns.add(id);
-			}
+		// Live cells only need planning in the overscan band (visible cells are bound anyway), so with
+		// no live columns or no overscan (the defaults) skip the O(rows x columns) loop entirely.
+		const hasLiveOverscan =
+			liveRowRange.end - liveRowRange.start > visibleRows.end - visibleRows.start || liveCenterColumnWindow !== visibleCenterColumns;
+		if (liveColumns.size > 0 && hasLiveOverscan) {
+			const visibleCenter = new Set(visibleCenterColumns);
 			for (let rowIndex = liveRowRange.start; rowIndex <= liveRowRange.end; rowIndex++) {
 				const isVisibleRow = rowIndex >= visibleRows.start && rowIndex <= visibleRows.end;
-				for (const columnInstanceId of executableLiveColumns) {
-					const address = { rowIndex, columnInstanceId };
-					if (isVisibleRow && visibleExecutableColumns.has(columnInstanceId)) {
-						liveVisibleCells.push(address);
-					} else {
-						liveOverscanCells.push(address);
-					}
-				}
+				const add = (columnInstanceId: ColumnInstanceId, visibleColumn: boolean) => {
+					if (liveColumns.has(columnInstanceId) && !(isVisibleRow && visibleColumn)) liveOverscanCells.push({ rowIndex, columnInstanceId });
+				};
+				for (const id of pinnedLeftColumns) add(id, true);
+				for (const id of liveCenterColumnWindow) add(id, visibleCenter.has(id));
+				for (const id of pinnedRightColumns) add(id, true);
 			}
 		}
-		// Mount and update priority share one read-only ordering (visible first, then overscan).
-		const livePriority = liveOverscanCells.length === 0 ? liveVisibleCells : liveVisibleCells.concat(liveOverscanCells);
 
 		const plan: ViewportPlan = {
 			epoch: ++this.frameCounter,
@@ -197,13 +222,7 @@ export class ViewportPlanner<TRowData = unknown> {
 			liveCenterColumnWindow,
 			pinnedLeftColumns,
 			pinnedRightColumns,
-			liveCells: {
-				visible: liveVisibleCells,
-				overscan: liveOverscanCells,
-				exited: [],
-				mountPriority: livePriority,
-				updatePriority: livePriority,
-			},
+			liveCells: { overscan: liveOverscanCells },
 			retainedFocusEditRowIndices,
 			reasons: {
 				verticalRangeChanged: !this.prevWindow || this.prevWindow.rowStart !== window.rowStart || this.prevWindow.rowEnd !== window.rowEnd,

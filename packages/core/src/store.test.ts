@@ -453,7 +453,7 @@ describe('GridStore generic row-store functionality', () => {
 		store.destroy();
 	});
 
-	it('setCellValueAsync awaits async proposal validation before committing', async () => {
+	it('async cell transaction awaits async proposal validation before committing', async () => {
 		const store = new GridStore<TestRow>(
 			{
 				columns: [{ field: 'name', header: 'Name', width: 150 }],
@@ -479,11 +479,11 @@ describe('GridStore generic row-store functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		const blocked = await store.setCellValueAsync('1', 'name', 'Blocked');
+		const blocked = await store.transaction({ cells: [{ rowId: '1', colField: 'name', value: 'Blocked' }] }, { async: true });
 		expect(blocked.status).toBe('validationFailed');
 		expect(store.getCellValue('1', 'name')).toBe('Product A');
 
-		const allowed = await store.setCellValueAsync('1', 'name', 'Allowed');
+		const allowed = await store.transaction({ cells: [{ rowId: '1', colField: 'name', value: 'Allowed' }] }, { async: true });
 		expect(allowed.status).toBe('applied');
 		expect(store.getCellValue('1', 'name')).toBe('Allowed');
 
@@ -491,7 +491,7 @@ describe('GridStore generic row-store functionality', () => {
 		store.destroy();
 	});
 
-	it('batchCellValuesAsync rejects atomically when async proposal validation blocks one update', async () => {
+	it('async cell transaction rejects atomically when async proposal validation blocks one update', async () => {
 		const store = new GridStore<TestRow>(
 			{
 				columns: [
@@ -520,10 +520,15 @@ describe('GridStore generic row-store functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		const result = await store.batchCellValuesAsync([
-			{ rowId: '1', colField: 'name', value: 'Blocked' },
-			{ rowId: '1', colField: 'price', value: 25 },
-		]);
+		const result = await store.transaction(
+			{
+				cells: [
+					{ rowId: '1', colField: 'name', value: 'Blocked' },
+					{ rowId: '1', colField: 'price', value: 25 },
+				],
+			},
+			{ async: true }
+		);
 
 		expect(result.status).toBe('validationFailed');
 		expect(store.getCellValue('1', 'name')).toBe('Product A');
@@ -1418,8 +1423,10 @@ describe('GridStore generic row-store functionality', () => {
 		const listener = vi.fn();
 		store.addEventListener(GridEventName.rowsUpdated, listener);
 
-		store.applyTransaction({
-			update: [{ id: '1', name: 'Product A+', price: 10 }],
+		store.transaction({
+			rows: {
+				update: [{ id: '1', name: 'Product A+', price: 10 }],
+			},
 		});
 
 		const payload = listener.mock.calls.at(-1)?.[0]?.payload;
@@ -1435,7 +1442,7 @@ describe('GridStore generic row-store functionality', () => {
 		controller.dispose();
 	});
 
-	it('applyTransaction returns public row-node facades instead of internal mutable row nodes', () => {
+	it('transaction returns public row-node facades instead of internal mutable row nodes', () => {
 		const store = new GridStore<TestRow>({
 			columns: [{ field: 'name', header: 'Name', width: 150 }],
 		});
@@ -1447,19 +1454,21 @@ describe('GridStore generic row-store functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		const result = store.applyTransaction({
-			update: [{ id: '1', name: 'Product A+', price: 10 }],
+		const result = store.transaction({
+			rows: {
+				update: [{ id: '1', name: 'Product A+', price: 10 }],
+			},
 		});
 
-		expect(result?.update).toHaveLength(1);
-		expect(result?.update[0]).toMatchObject({
+		expect(result.rows.update).toHaveLength(1);
+		expect(result.rows.update[0]).toMatchObject({
 			id: '1',
 			kind: 'data',
 			rowIndex: 0,
 		});
-		expect(result?.update[0]).not.toBe(store.getRowNodeById('1'));
-		expect(result?.update[0].getValue('name')).toBe('Product A+');
-		expect('setCellValue' in (result?.update[0] as Record<string, unknown>)).toBe(false);
+		expect(result.rows.update[0]).not.toBe(store.getRowNodeById('1'));
+		expect(result.rows.update[0].getValue('name')).toBe('Product A+');
+		expect('setCellValue' in (result.rows.update[0] as Record<string, unknown>)).toBe(false);
 
 		controller.dispose();
 	});
@@ -1548,7 +1557,7 @@ describe('GridStore generic row-store functionality', () => {
 		controller.dispose();
 	});
 
-	it('applyTransaction keeps formula registration and recomputes dependent cells', () => {
+	it('transaction keeps formula registration and recomputes dependent cells', () => {
 		const store = new GridStore<{ id: string; val: number; formula: unknown }>({
 			columns: [
 				{ field: 'val', header: 'Val' },
@@ -1560,17 +1569,17 @@ describe('GridStore generic row-store functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		store.applyTransaction({ update: [{ id: 'r1', val: 10, formula: '=[r1:val]*2' }] });
+		store.transaction({ rows: { update: [{ id: 'r1', val: 10, formula: '=[r1:val]*2' }] } });
 		expect(store.getCellState('r1', 'formula').value).toBe('=[r1:val]*2');
 		expect(store.getCellValue('r1', 'formula')).toBe(20);
 
-		store.applyTransaction({ update: [{ id: 'r1', val: 30, formula: '=[r1:val]*2' }] });
+		store.transaction({ rows: { update: [{ id: 'r1', val: 30, formula: '=[r1:val]*2' }] } });
 		expect(store.getCellValue('r1', 'formula')).toBe(60);
 
 		controller.dispose();
 	});
 
-	it('updateRows invalidates declared valueGetter dependencies through the same write pipeline', () => {
+	it('setRows invalidates declared valueGetter dependencies through the same write pipeline', () => {
 		let getterCalls = 0;
 		const store = new GridStore<{ id: string; price: number; name: string }>({
 			columns: [
@@ -1596,7 +1605,12 @@ describe('GridStore generic row-store functionality', () => {
 		expect(store.getCellValue('r1', 'price_display')).toBe('$10.00');
 		expect(getterCalls).toBe(1);
 
-		store.updateRows((rows) => rows.map((row) => (row.id === 'r1' ? { ...row, price: 25 } : row)));
+		store.setRows(
+			store
+				.rows()
+				.getAll()
+				.map((row) => (row.id === 'r1' ? { ...row, price: 25 } : row))
+		);
 		expect(store.getCellValue('r1', 'price_display')).toBe('$25.00');
 		expect(getterCalls).toBe(2);
 
@@ -2327,8 +2341,8 @@ describe('Fix 6 regression — setCellValue on sort-key field triggers visual re
 	});
 });
 
-describe('Fix 7 regression — applyTransaction update path uses sort/filter reconciliation', () => {
-	it('api.applyTransaction({ update }) on a sort-key field relocates the row', () => {
+describe('Fix 7 regression — transaction update path uses sort/filter reconciliation', () => {
+	it('api.transaction({ rows: { update } }) on a sort-key field relocates the row', () => {
 		const store = new GridStore<TestRow>({
 			getRowId: (r) => r.id,
 			columns: [
@@ -2349,8 +2363,8 @@ describe('Fix 7 regression — applyTransaction update path uses sort/filter rec
 		// Initial order: 1 (10), 2 (20), 3 (30)
 		expect(ctrl.getVisualIndexByRowId('1')).toBe(0);
 
-		// Update via applyTransaction — must go through same sort reconciliation as updateRows
-		store.applyTransaction({ update: [{ id: '1', name: 'A', price: 25 }] });
+		// Update via transaction — must go through same sort reconciliation as setRows
+		store.transaction({ rows: { update: [{ id: '1', name: 'A', price: 25 }] } });
 		ctrl.refresh();
 
 		expect(ctrl.getVisualIndexByRowId('2')).toBe(0); // 20
@@ -2381,7 +2395,7 @@ describe('Plan 141 regression â€” targeted invalidations for canonical row 
 		});
 
 		void store.engine.invalidation.consume();
-		store.applyTransaction({ update: [{ id: '1', name: 'A', price: 25 }] });
+		store.transaction({ rows: { update: [{ id: '1', name: 'A', price: 25 }] } });
 		const frame = store.engine.invalidation.consume();
 
 		expect(frame.full).toBe(false);
@@ -3055,9 +3069,10 @@ describe('GridStore undo and redo functionality', () => {
 		const plan = store.engine.columns.getCompiledPlan();
 		expect(plan.columnPlans.map((columnPlan) => columnPlan.mode)).toEqual(['primitive', 'custom-dom', 'custom', 'custom-imperative']);
 		expect(plan.displayedColumns[1].cellRenderer).toBe(domRenderer);
-		expect(plan.displayedColumns[2].cellRendererCapabilities?.scrollPresentation).toBe('freeze');
-		expect(plan.displayedColumns[3].cellRendererCapabilities?.scrollPresentation).toBe('live');
-		expect(plan.displayedColumns[3].cellRendererCapabilities?.live?.update).toBe('imperative');
+		expect(plan.displayedColumns[1].cellRendererCapabilities?.scroll).toBe('live');
+		expect(plan.displayedColumns[2].cellRendererCapabilities?.scroll).toBe('text');
+		expect(plan.displayedColumns[3].cellRendererCapabilities?.scroll).toBe('live');
+		expect(plan.displayedColumns[3].cellRendererCapabilities?.imperative).toBe(true);
 		expect(plan.hasCustomRenderers).toBe(true);
 		expect(plan.hasDomRenderers).toBe(true);
 	});
@@ -3087,7 +3102,7 @@ describe('GridStore undo and redo functionality', () => {
 				{ field: 'name', header: 'Name', width: 180 },
 				{ field: 'price', header: 'Price', width: 100 },
 			],
-			rowTransaction: { update: [{ id: '2', name: 'Product B+', price: 22 }] },
+			rows: { update: [{ id: '2', name: 'Product B+', price: 22 }] },
 			filterModel: { name: { type: 'text', operator: 'contains', value: 'Product' } },
 			pins: { left: 1, right: 1 },
 		});
@@ -3516,7 +3531,7 @@ describe('GridStore undo and redo functionality', () => {
 		controller.dispose();
 	});
 
-	it('batchCellValues — single undo entry restores all cells atomically', () => {
+	it('cell transaction — single undo entry restores all cells atomically', () => {
 		const store = new GridStore<TestRow>({
 			columns: [
 				{ field: 'name', header: 'Name' },
@@ -3531,11 +3546,13 @@ describe('GridStore undo and redo functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		store.batchCellValues([
-			{ rowId: '1', colField: 'name', value: 'Alpha Updated' },
-			{ rowId: '1', colField: 'price', value: 99 },
-			{ rowId: '2', colField: 'name', value: 'Beta Updated' },
-		]);
+		store.transaction({
+			cells: [
+				{ rowId: '1', colField: 'name', value: 'Alpha Updated' },
+				{ rowId: '1', colField: 'price', value: 99 },
+				{ rowId: '2', colField: 'name', value: 'Beta Updated' },
+			],
+		});
 
 		expect(store.getCellValue('1', 'name')).toBe('Alpha Updated');
 		expect(store.getCellValue('1', 'price')).toBe(99);
@@ -3558,7 +3575,7 @@ describe('GridStore undo and redo functionality', () => {
 		controller.dispose();
 	});
 
-	it('batchCellValues — no-ops when no values change', () => {
+	it('cell transaction — no-ops when no values change', () => {
 		const store = new GridStore<TestRow>({
 			columns: [{ field: 'name', header: 'Name' }],
 		});
@@ -3567,7 +3584,7 @@ describe('GridStore undo and redo functionality', () => {
 			columns: store.getState().columns,
 		});
 
-		store.batchCellValues([{ rowId: '1', colField: 'name', value: 'Alpha' }]);
+		store.transaction({ cells: [{ rowId: '1', colField: 'name', value: 'Alpha' }] });
 		expect(store.canUndo()).toBe(false);
 
 		controller.dispose();

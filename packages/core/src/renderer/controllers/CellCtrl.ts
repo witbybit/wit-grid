@@ -1,4 +1,4 @@
-import type { CellScrollPresentation, ColumnInstanceId } from '../../columnDef.js';
+import type { ColumnInstanceId } from '../../columnDef.js';
 import type { CellDisplaySnapshot } from '../cellDisplaySnapshot.js';
 import type { CellContentMode } from '../cellSlot.js';
 import type { VisualFreshness } from '../visualFreshness.js';
@@ -18,33 +18,19 @@ export interface ControllerWorkToken {
 }
 
 export interface CellCtrlPresentationState {
-	kind:
-		| 'buffered'
-		| 'primitive'
-		| 'loading'
-		| 'checkbox-selector'
-		| 'live-renderer'
-		| 'dom-update'
-		| 'frozen-portal'
-		| 'shell'
-		| 'text-impostor'
-		| 'html-snapshot'
-		| 'html-pending';
+	kind: 'buffered' | 'primitive' | 'loading' | 'checkbox-selector' | 'live-renderer' | 'dom-update' | 'frozen-portal' | 'stand-in';
 	className: string;
 	title?: string | null;
 	validationError?: string;
 	contentMode?: CellContentMode;
 	formattedValue?: string;
 	portalKey?: string;
-	html?: string;
 	requiresFidelity: boolean;
 	markDirty?: boolean;
 	isEditing?: boolean;
 	isFocused?: boolean;
 	forceLiveInteractive?: boolean;
 	keepVersionFresh?: boolean;
-	captureFrozenHtml?: boolean;
-	textImpostorSource?: 'explicit' | 'fallback';
 	recordVersions?: VisualFreshness | CellDisplaySnapshot;
 	freshness: VisualFreshness;
 }
@@ -79,7 +65,6 @@ export interface CellCtrl {
 	readonly field: string;
 	readonly colField: string;
 	colIndex: number;
-	scrollPresentation: CellScrollPresentation;
 	freshness: VisualFreshness | undefined;
 
 	valueState: {
@@ -130,7 +115,6 @@ export interface CreateCellCtrlInput {
 	colId?: string;
 	colField: string;
 	colIndex?: number;
-	scrollPresentation?: CellScrollPresentation;
 	freshness?: VisualFreshness;
 }
 
@@ -167,7 +151,6 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 		field: input.colField,
 		colField: input.colField,
 		colIndex: input.colIndex ?? -1,
-		scrollPresentation: input.scrollPresentation ?? 'primitive',
 		freshness: input.freshness,
 		valueState: {
 			value: undefined,
@@ -197,5 +180,41 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			formattedValue: '',
 			contentMode: 'empty',
 		},
+	};
+}
+
+/**
+ * Re-points a detached controller at another row of the same column, leaving it exactly as
+ * createCellCtrl(input) would build it (only the physical attachment is kept). Used when a slot is
+ * recycled to a new row, instead of releasing one controller and allocating another. The key and
+ * row id change, so a work token issued for the previous row stays invalid.
+ */
+export function rekeyCellCtrl(cellCtrl: CellCtrl, input: CreateCellCtrlInput): void {
+	const target = cellCtrl as { -readonly [K in keyof CellCtrl]: CellCtrl[K] };
+	target.key = createCellControllerKey(input.rowId, input.columnInstanceId);
+	target.rowId = input.rowId;
+	target.rowIndex = input.rowIndex ?? -1;
+	target.rowCtrlKey = input.rowCtrlKey ?? input.rowId;
+	target.colIndex = input.colIndex ?? -1;
+	target.freshness = input.freshness;
+	const value = target.valueState;
+	value.value = undefined;
+	value.formattedValue = '';
+	value.displayText = '';
+	value.loading = false;
+	value.empty = true;
+	target.visualState = { className: '', title: null, selected: false, focused: false, editing: false, readOnly: false };
+	const lifecycle = target.lifecycle;
+	lifecycle.destroyed = false;
+	lifecycle.stale = false;
+	lifecycle.retainedBecause = undefined;
+	target.presentationState = {
+		kind: 'primitive',
+		className: '',
+		title: null,
+		requiresFidelity: false,
+		freshness: input.freshness ?? createDefaultFreshness(),
+		formattedValue: '',
+		contentMode: 'empty',
 	};
 }

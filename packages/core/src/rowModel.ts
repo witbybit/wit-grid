@@ -305,6 +305,8 @@ export interface GroupMetaCapableRowModel {
 
 export interface RowOrderCapableModel {
 	getRowOrder(): string[];
+	/** Number of source rows, without copying the order. */
+	getSourceRowCount(): number;
 	setRowOrder(rowIds: string[]): void;
 }
 
@@ -338,7 +340,6 @@ export interface ClientStructuralRowModel<TRowData = unknown> extends RowOrderCa
 	): RowModelTransactionSnapshot<TRowData>;
 	restoreTransactionSnapshot(snapshot: RowModelTransactionSnapshot<TRowData>): void;
 	replaceRowsStructurally(rows: readonly TRowData[]): RowModelWriteResult<TRowData>;
-	updateRowsStructurally(updater: (rows: TRowData[]) => TRowData[]): RowModelWriteResult<TRowData>;
 	applyTransactionStructurally(
 		transaction: import('./api/GridApi.js').RowDataTransaction<TRowData>
 	): RowModelWriteResult<TRowData> & InternalRowNodeTransaction<TRowData>;
@@ -374,7 +375,6 @@ export function asClientStructuralRowModel<TRowData = unknown>(rowModel: RowMode
 		'captureTransactionSnapshot',
 		'restoreTransactionSnapshot',
 		'replaceRowsStructurally',
-		'updateRowsStructurally',
 		'applyTransactionStructurally',
 		'writeCellValueStructurally',
 		'reconcileAfterDataWrite',
@@ -1337,22 +1337,16 @@ export class ClientRowModelController<TData = unknown>
 	}
 
 	public replaceRowsStructurally(rows: readonly TData[]): RowModelWriteResult<TData> {
-		this.dataStore.setRows(rows as TData[]);
-		return { visualChange: 'full' };
-	}
-
-	public updateRowsStructurally(updater: (rows: TData[]) => TData[]): RowModelWriteResult<TData> {
-		const result = this.dataStore.updateRows(updater);
-		if (result.mismatch) {
-			const current = this.dataStore.getAllNodes().map((n) => n.data);
-			this.dataStore.setRows(updater(current));
-			return { visualChange: 'full' };
-		}
+		const result = this.dataStore.replaceRows(rows as TData[]);
 		return {
+			addedNodes: result.added,
+			removedNodes: result.removed,
 			updatedNodes: result.changedNodes,
 			changedFieldsByRow: result.changedFieldsByRow,
 			changedValuesByRow: result.changedValuesByRow,
-			visualChange: result.changedNodes.length > 0 ? 'partial' : 'none',
+			// Same ids in the same order: only the changed rows' fields changed (targeted, like a
+			// row update). Anything else moved rows, so the projection is rebuilt.
+			visualChange: !result.sameOrder ? 'full' : result.changedNodes.length > 0 ? 'partial' : 'none',
 		};
 	}
 
@@ -1736,6 +1730,7 @@ export class ClientRowModelController<TData = unknown>
 	public getCurrentPageDataNodes = (): RowNode<TData>[] => this.getFilteredDataNodes();
 
 	public getRowOrder = (): string[] => this.dataStore.getSourceOrder();
+	public getSourceRowCount = (): number => this.dataStore.getRowCount();
 
 	public setRowOrder = (rowIds: string[]): void => {
 		this.dataStore.setRowOrder(rowIds);

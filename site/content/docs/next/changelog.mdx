@@ -11,10 +11,53 @@ icon: Clock
 
 ## `next` (unreleased)
 
-### Added — `applyTransactionAsync`
+### Changed — two scroll choices for custom renderers: `text` and `live`
 
-Queues row transactions and applies them together before the next frame, in call order. See
-[Row Transactions](/docs/next/transactions).
+A custom renderer now picks one of two behaviors during scroll with `capabilities.scroll`. `'text'` (the React
+default) shows stand-in text for cells entering view and mounts the renderer once scrolling settles. `'live'` (the
+DOM default) mounts and updates the renderer during scroll within a per-frame budget; a cell over budget shows
+stand-in text for that frame and is completed right after, so it is never blank. `scrollText` sets the stand-in
+text. Grid-level tuning moves to one option, `rendererOptions.live`. HTML snapshots are removed. See
+[Renderer Capabilities](/docs/next/renderer-capabilities).
+
+**Breaking:** the old options are removed, with no deprecation period.
+
+| Removed                                                                                                          | Use instead                                                |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `scrollPresentation: 'freeze'`                                                                                   | `scroll: 'text'` (the React default, so usually delete it) |
+| `scrollPresentation: 'update'`                                                                                   | `scroll: 'live'` (the DOM default, so usually delete it)   |
+| `scrollPresentation: 'live'`                                                                                     | `scroll: 'live'`                                           |
+| `scrollPresentation: 'text-impostor'` + `textImpostor.render`                                                    | `scroll: 'text'` + `scrollText`                            |
+| `scrollPresentation: 'html-snapshot'` + `htmlSnapshot`                                                           | `scroll: 'text'`; HTML snapshots no longer exist           |
+| `live.update: 'imperative'`                                                                                      | renderer `kind: 'imperativeReact'`                         |
+| `live.priority`, `live.allowEmergencyShell`                                                                      | none; over-budget cells always show stand-in text          |
+| `rendererOptions.domUpdate.maxMsPerFrame`                                                                        | `rendererOptions.live.maxMsPerFrame`                       |
+| `rendererOptions.liveReact` (overscan, mount and update limits)                                                  | `rendererOptions.live` (same names)                        |
+| `rendererOptions.htmlSnapshot`, `rendererOptions.textImpostor`                                                   | none                                                       |
+| render counters `htmlSnapshotHitsDuringScroll`, `htmlSnapshotMissesDuringScroll`, `textImpostorUsesDuringScroll` | none                                                       |
+
+### Changed — one data-write API: `transaction`
+
+`api.transaction({ rows, cells })` writes rows and cells together as one atomic change with one undo entry, and
+`api.transaction(tx, { async: true })` queues it with other high-frequency writes and returns a promise.
+`setRows` now diffs against the current rows, so only changed rows update. Row-level writes re-validate changed
+and added rows after they commit, and removed rows drop their issues (`validation.validateOnTransaction`). See
+[Transactions](/docs/next/transactions).
+
+**Breaking:** the old write methods are removed, with no deprecation period.
+
+| Removed                                  | Use instead                                                                    |
+| ---------------------------------------- | ------------------------------------------------------------------------------ |
+| `applyTransaction(tx)`                   | `transaction({ rows: tx })`; the row nodes are at `result.rows`                |
+| `applyTransactionAsync(tx, callback)`    | `transaction({ rows: tx }, { async: true }).then(callback)`                    |
+| `flushAsyncTransactions()`               | `flushTransactions()`                                                          |
+| `batchCellValues(updates, source)`       | `transaction({ cells: updates, source })`                                      |
+| `batchCellValuesAsync(updates, source)`  | `transaction({ cells: updates, source }, { async: true })`                     |
+| `setCellValueAsync(rowId, field, value)` | `transaction({ cells: [{ rowId, colField: field, value }] }, { async: true })` |
+| `updateRows(fn)`                         | `setRows(fn(api.rows().getAll()))`                                             |
+| `transaction({ rowTransaction })`        | `transaction({ rows })`                                                        |
+| `transaction({ rows: allRows })`         | `setRows(allRows)`                                                             |
+| type `BatchCellValueUpdate`              | `GridCellWrite`                                                                |
 
 ### Added — DOM cell renderers receive the grid `api`
 

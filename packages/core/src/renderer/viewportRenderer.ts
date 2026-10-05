@@ -193,10 +193,36 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.hasAppliedLayout = false;
 	}
 
+	private lastScrolledLeft = false;
+	private lastScrolledRight = false;
+
 	public syncViewportScrollFromDom(): void {
 		if (!this.scrollViewport) return;
-		this.engine.viewport.setScrollViewportClientWidth(this.scrollViewport.clientWidth || this.engine.viewport.viewportWidth);
-		this.engine.viewport.setScrollPosition(this.scrollViewport.scrollTop, this.scrollViewport.scrollLeft);
+		const clientWidth = this.scrollViewport.clientWidth || this.engine.viewport.viewportWidth;
+		const scrollLeft = this.scrollViewport.scrollLeft;
+		this.engine.viewport.setScrollViewportClientWidth(clientWidth);
+		this.engine.viewport.setScrollPosition(this.scrollViewport.scrollTop, scrollLeft);
+		this.syncHorizontalScrollEdges(scrollLeft, clientWidth);
+	}
+
+	/**
+	 * Pinned lanes cast their edge shadow only while content is scrolled under them: og-scrolled-left
+	 * when content has scrolled under the left lane, og-scrolled-right while more lies under the right
+	 * one. From values already read this frame; classes written only on change.
+	 */
+	private syncHorizontalScrollEdges(scrollLeft: number, clientWidth: number): void {
+		if (!this.container) return;
+		const scrolledLeft = scrollLeft > 0;
+		const totalWidth = this.engine.geometry.getTotalWidth(this.engine.stateManager.getState().defaultColWidth);
+		const scrolledRight = scrollLeft + clientWidth < totalWidth - 1;
+		if (scrolledLeft !== this.lastScrolledLeft) {
+			this.lastScrolledLeft = scrolledLeft;
+			this.container.classList.toggle('og-scrolled-left', scrolledLeft);
+		}
+		if (scrolledRight !== this.lastScrolledRight) {
+			this.lastScrolledRight = scrolledRight;
+			this.container.classList.toggle('og-scrolled-right', scrolledRight);
+		}
 	}
 
 	/**

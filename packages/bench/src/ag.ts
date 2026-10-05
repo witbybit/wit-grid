@@ -1,5 +1,17 @@
 import { AllCommunityModule, ModuleRegistry, createGrid, type ColDef, type ICellRendererComp, type ICellRendererParams } from 'ag-grid-community';
-import { createBarElements, rendererCalls, installMeasurement, makeRows, markReady, paintBar, readScenario, type BenchRow } from './common.js';
+import {
+	createBarElements,
+	formatBenchValue,
+	formatNumbers,
+	rendererCalls,
+	installMeasurement,
+	installTicker,
+	makeRows,
+	markReady,
+	paintBar,
+	readScenario,
+	type BenchRow,
+} from './common.js';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -31,17 +43,24 @@ const columnDefs: ColDef<BenchRow>[] = Array.from({ length: scenario.cols }, (_,
 	headerName: `Col ${c}`,
 	width: 110,
 	...(c < scenario.domCols ? { cellRenderer: BarRenderer } : {}),
+	...(c >= scenario.domCols && formatNumbers && c % 3 !== 0 ? { valueFormatter: (p: { value: unknown }) => formatBenchValue(p.value) } : {}),
 }));
 
-createGrid(container, {
+const initialRows = makeRows(scenario);
+const gridApi = createGrid(container, {
 	columnDefs,
-	rowData: makeRows(scenario),
+	rowData: initialRows,
 	getRowId: (p) => p.data.id,
 	onFirstDataRendered: () => requestAnimationFrame(() => requestAnimationFrame(markReady)),
 });
+
+// AG Grid diffs a new rowData by getRowId and refreshes only the changed rows.
+installTicker(initialRows, (rows) => gridApi.setGridOption('rowData', rows));
 
 installMeasurement({
 	viewport: () => container.querySelector<HTMLElement>('.ag-grid-viewport'),
 	header: () => container.querySelector<HTMLElement>('.ag-header'),
 	rows: () => container.querySelectorAll<HTMLElement>('.ag-grid-scrolling-rows .ag-row'),
+	cells: (row) => row.querySelectorAll<HTMLElement>('.ag-cell'),
+	cellIds: (cell, row) => ({ rowId: row.getAttribute('row-id'), colId: cell.getAttribute('col-id') }),
 });

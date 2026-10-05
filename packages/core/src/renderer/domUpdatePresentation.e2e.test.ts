@@ -5,7 +5,7 @@ import { GridStore, type ColumnDef } from '../store.js';
 import type { GridRendererOptions } from '../columnDef.js';
 import { RenderEngine } from './renderEngine.js';
 
-// Contract for DOM renderers during scroll (scrollPresentation: 'update', their default): a cell
+// Contract for DOM renderers during scroll (scroll: 'live', their default): a cell
 // entering during scroll is drawn with its own row's content inside the scroll frame (the
 // renderer's update() in place, or mount() for a slot's first use), within the frame's DOM-update
 // budget, and is final as drawn. React portals keep the no-mount-during-scroll rule.
@@ -22,7 +22,7 @@ async function nextFrame(): Promise<void> {
 	await Promise.resolve();
 }
 
-function mountGrid(options: { capabilities?: { scrollPresentation?: 'update' | 'freeze' }; rendererOptions?: GridRendererOptions } = {}) {
+function mountGrid(options: { capabilities?: { scroll?: 'live' | 'text' }; rendererOptions?: GridRendererOptions } = {}) {
 	const updates: Array<{ value: string; isScrolling: boolean }> = [];
 	const columns: ColumnDef<Row>[] = [
 		{
@@ -92,11 +92,11 @@ afterEach(() => {
 	document.body.textContent = '';
 });
 
-describe('DOM renderers during scroll (update presentation)', () => {
+describe('DOM renderers during scroll (live presentation)', () => {
 	it('draws cells entering during scroll with their own row, inside the scroll frame', async () => {
 		// An ample budget isolates this property from budget refusals, which a loaded test run could
 		// otherwise trigger (covered by the stand-in test below).
-		const grid = mountGrid({ rendererOptions: { domUpdate: { maxMsPerFrame: 10_000 } } });
+		const grid = mountGrid({ rendererOptions: { live: { maxMsPerFrame: 10_000 } } });
 		await nextFrame();
 		grid.renderer.resetRenderStats();
 		grid.updates.length = 0;
@@ -122,7 +122,7 @@ describe('DOM renderers during scroll (update presentation)', () => {
 	it('does not redo in-frame updates when scrolling settles', async () => {
 		// An ample budget isolates this property from budget refusals, which a loaded test run could
 		// otherwise trigger (covered by the stand-in test below).
-		const grid = mountGrid({ rendererOptions: { domUpdate: { maxMsPerFrame: 10_000 } } });
+		const grid = mountGrid({ rendererOptions: { live: { maxMsPerFrame: 10_000 } } });
 		await nextFrame();
 		grid.viewport.scrollTop = 400_000;
 		grid.viewport.dispatchEvent(new Event('scroll'));
@@ -141,7 +141,7 @@ describe('DOM renderers during scroll (update presentation)', () => {
 	});
 
 	it('shows a stand-in only for cells the frame budget refuses, then repairs them after scroll', async () => {
-		const grid = mountGrid({ rendererOptions: { domUpdate: { maxMsPerFrame: 0 } } });
+		const grid = mountGrid({ rendererOptions: { live: { maxMsPerFrame: 0 } } });
 		await nextFrame();
 		grid.renderer.resetRenderStats();
 		grid.viewport.scrollTop = 400_000;
@@ -162,8 +162,8 @@ describe('DOM renderers during scroll (update presentation)', () => {
 		grid.store.destroy();
 	});
 
-	it("keeps the no-mount-during-scroll guarantee for an explicit scrollPresentation: 'freeze'", async () => {
-		const grid = mountGrid({ capabilities: { scrollPresentation: 'freeze' } });
+	it("keeps the no-mount-during-scroll guarantee for an explicit scroll: 'text'", async () => {
+		const grid = mountGrid({ capabilities: { scroll: 'text' } });
 		await nextFrame();
 		grid.renderer.resetRenderStats();
 		grid.updates.length = 0;
@@ -178,21 +178,5 @@ describe('DOM renderers during scroll (update presentation)', () => {
 		grid.renderer.unmount();
 		grid.controller.dispose();
 		grid.store.destroy();
-	});
-
-	it('rejects the update presentation on a React renderer', () => {
-		expect(
-			() =>
-				new GridStore<Row>({
-					columns: [
-						{
-							field: 'value',
-							header: 'V',
-							renderer: { kind: 'react', component: () => null, capabilities: { scrollPresentation: 'update' } },
-						},
-					],
-					getRowId: (r) => r.id,
-				})
-		).toThrow(/only valid for DOM renderers/);
 	});
 });

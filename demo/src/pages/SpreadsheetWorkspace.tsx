@@ -139,16 +139,19 @@ export default function SpreadsheetWorkspace({
 				.rows()
 				.inRange(range as any)
 				.getIds();
-			api.updateRows((currentRows) =>
-				currentRows.map((row) => {
-					if (!rowIds.includes(row.id)) return row;
-					const nextRow = { ...row };
-					for (const field of fields) {
-						if (field === 'id') continue;
-						(nextRow as any)[field] = emptyValue !== undefined ? emptyValue : mapValue(parseFloat(String((row as any)[field])) || 0);
-					}
-					return nextRow;
-				})
+			api.setRows(
+				api
+					.rows()
+					.getAll()
+					.map((row) => {
+						if (!rowIds.includes(row.id)) return row;
+						const nextRow = { ...row };
+						for (const field of fields) {
+							if (field === 'id') continue;
+							(nextRow as any)[field] = emptyValue !== undefined ? emptyValue : mapValue(parseFloat(String((row as any)[field])) || 0);
+						}
+						return nextRow;
+					})
 			);
 		},
 		[api]
@@ -166,17 +169,20 @@ export default function SpreadsheetWorkspace({
 			.rows()
 			.inRange(range as any)
 			.getIds();
-		api.updateRows((currentRows) =>
-			currentRows.map((row) => {
-				if (!rowIds.includes(row.id)) return row;
-				const nextRow = { ...row };
-				for (const field of fields) {
-					if (field === 'id') continue;
-					const idx = rowIds.indexOf(row.id);
-					(nextRow as any)[field] = (compoundInputs.principal * Math.pow(1 + compoundInputs.rate / 100, idx + 1)).toFixed(1);
-				}
-				return nextRow;
-			})
+		api.setRows(
+			api
+				.rows()
+				.getAll()
+				.map((row) => {
+					if (!rowIds.includes(row.id)) return row;
+					const nextRow = { ...row };
+					for (const field of fields) {
+						if (field === 'id') continue;
+						const idx = rowIds.indexOf(row.id);
+						(nextRow as any)[field] = (compoundInputs.principal * Math.pow(1 + compoundInputs.rate / 100, idx + 1)).toFixed(1);
+					}
+					return nextRow;
+				})
 		);
 	}, [api, compoundInputs.principal, compoundInputs.rate]);
 
@@ -283,7 +289,7 @@ export default function SpreadsheetWorkspace({
 								Range Sum
 							</button>
 							<button
-								onClick={() => api?.updateRows((currentRows) => currentRows)}
+								onClick={() => api?.refreshRows()}
 								className='px-2.5 py-1.5 text-[9px] font-extrabold uppercase tracking-wider text-slate-400 border border-slate-800 hover:border-slate-750 bg-slate-950 hover:bg-slate-900 rounded transition-all flex items-center justify-center'
 								title='Recalculate Formulas'
 							>

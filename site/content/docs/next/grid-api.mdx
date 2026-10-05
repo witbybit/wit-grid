@@ -28,17 +28,17 @@ function Toolbar() {
 
 ## Batching writes
 
-Use `batchCellValues` to apply several cell writes as a single undo entry, instead of calling `setCellValue`
-in a loop:
+Use `transaction` to write several cells, or rows and cells together, as a single undo entry, instead of calling
+`setCellValue` in a loop. Pass `{ async: true }` to queue it with other high-frequency writes and get a promise
+back. See [Transactions](/docs/next/transactions).
 
 ```typescript
-api.batchCellValues(
-	[
+api.transaction({
+	cells: [
 		{ rowId: 'S-1001', colField: 'revenue', value: 150000 },
 		{ rowId: 'S-1001', colField: 'opex', value: 80000 },
 	],
-	'api'
-);
+});
 ```
 
 ## Clipboard

@@ -28,7 +28,7 @@ export class CellAccessModel<TRowData = unknown> {
 				deselectRows: this.runtime.deselectRows,
 				scrollToRow: this.runtime.scrollToRow,
 				setCellValue: this.runtime.setCellValue,
-				batchCellValues: (updates) =>
+				writeCells: (updates) =>
 					updates.reduce<import('../api/GridApi.js').GridWriteResult>(
 						(result, update) =>
 							result.status === 'applied' || result.status === 'noop'

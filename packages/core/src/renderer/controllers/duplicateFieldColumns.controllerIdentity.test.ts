@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GridStore, type ColumnDef } from '../../store.js';
 import { createCellDisplaySnapshot, CellDisplaySnapshotStore } from '../cellDisplaySnapshot.js';
-import { HtmlScrollSnapshotStore } from '../htmlScrollSnapshotStore.js';
 import { createCellInstanceRendererKey } from '../identityKeys.js';
 import { getOrCreateCellCtrl } from './RowCtrl.js';
 
@@ -15,7 +14,7 @@ function freshness() {
 }
 
 describe('duplicate field columns - controller identity', () => {
-	it('keeps CellCtrl, renderer, HTML, and display snapshot identity split by columnInstanceId', () => {
+	it('keeps CellCtrl, renderer, and display snapshot identity split by columnInstanceId', () => {
 		const RawRenderer = () => null;
 		const BadgeRenderer = () => null;
 		const TextRenderer = () => null;
@@ -24,13 +23,13 @@ describe('duplicate field columns - controller identity', () => {
 				field: 'price',
 				colId: 'priceRaw',
 				header: 'Raw',
-				renderer: { kind: 'react', component: RawRenderer, capabilities: { scrollPresentation: 'live' } },
+				renderer: { kind: 'react', component: RawRenderer, capabilities: { scroll: 'live' } },
 			},
 			{
 				field: 'price',
 				colId: 'priceBadge',
 				header: 'Badge',
-				renderer: { kind: 'react', component: BadgeRenderer, capabilities: { scrollPresentation: 'html-snapshot' } },
+				renderer: { kind: 'react', component: BadgeRenderer, capabilities: { scroll: 'text' } },
 			},
 			{
 				field: 'price',
@@ -39,7 +38,7 @@ describe('duplicate field columns - controller identity', () => {
 				renderer: {
 					kind: 'react',
 					component: TextRenderer,
-					capabilities: { scrollPresentation: 'text-impostor', textImpostor: { render: ({ formattedValue }) => formattedValue } },
+					capabilities: { scroll: 'text', scrollText: ({ formattedValue }) => formattedValue },
 				},
 			},
 		];
@@ -58,7 +57,6 @@ describe('duplicate field columns - controller identity', () => {
 				colId: col.colId,
 				colField: col.field,
 				colIndex,
-				scrollPresentation: col.cellRendererCapabilities?.scrollPresentation,
 			}).cellCtrl;
 		});
 
@@ -72,25 +70,6 @@ describe('duplicate field columns - controller identity', () => {
 
 		const rendererKeys = instanceIds.map((instanceId) => createCellInstanceRendererKey('slot-1', instanceId));
 		expect(new Set(rendererKeys).size).toBe(3);
-
-		const htmlSnapshots = new HtmlScrollSnapshotStore();
-		instanceIds.forEach((columnInstanceId, index) => {
-			htmlSnapshots.set({
-				rowId: 'row-1',
-				columnInstanceId,
-				colField: 'price',
-				html: `<span>${index}</span>`,
-				freshness: freshness(),
-				rowHeight: 40,
-				colWidth: 100,
-				estimatedBytes: 14,
-				capturedAtEpoch: index + 1,
-				lastUsedEpoch: index + 1,
-			});
-		});
-		expect(htmlSnapshots.get('row-1', instanceIds[0]!, freshness())?.html).toBe('<span>0</span>');
-		expect(htmlSnapshots.get('row-1', instanceIds[1]!, freshness())?.html).toBe('<span>1</span>');
-		expect(htmlSnapshots.get('row-1', instanceIds[2]!, freshness())?.html).toBe('<span>2</span>');
 
 		const displaySnapshots = new CellDisplaySnapshotStore();
 		instanceIds.forEach((columnInstanceId, index) => {

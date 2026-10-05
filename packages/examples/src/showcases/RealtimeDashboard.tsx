@@ -495,8 +495,8 @@ function createDashboardColumns(isLight: boolean): ColumnDef<DashboardStockRow>[
 			headerGroup: 'Market Data',
 			renderer: {
 				kind: 'dom',
-				// DOM renderers default to scrollPresentation 'update': cells entering during scroll are
-				// redrawn in place within the frame budget, so the sparkline never shows a stand-in.
+				// DOM renderers default to scroll: 'live': cells entering during scroll are
+				// redrawn in place within the frame budget, so the sparkline rarely shows a stand-in.
 				renderer: createSparklineRenderer(isLight),
 			},
 		},
@@ -743,23 +743,26 @@ export default function RealtimeDashboard({
 
 	const triggerVolatility = useCallback(() => {
 		if (!api) return;
-		api.updateRows((rows) =>
-			rows.map((row) => {
-				const priceNum = parseFloat(String(row.price)) || 100;
-				const volatility = (Math.random() - 0.5) * 8;
-				const nextPrice = Math.max(1, priceNum * (1 + volatility / 100));
-				const priceDiff = nextPrice - priceNum;
-				const changeNum = parseFloat(String(row.change)) || 0;
-				const nextChange = changeNum + (priceDiff / priceNum) * 100;
-				const volumeNum = parseFloat(String(row.volume)) || 0;
-				const nextVolume = Math.max(0.1, volumeNum * (1 + (Math.random() - 0.5) * 0.3));
-				return {
-					...row,
-					price: nextPrice.toFixed(2),
-					change: `${nextChange >= 0 ? '+' : ''}${nextChange.toFixed(1)}`,
-					volume: nextVolume.toFixed(1),
-				};
-			})
+		api.setRows(
+			api
+				.rows()
+				.getAll()
+				.map((row) => {
+					const priceNum = parseFloat(String(row.price)) || 100;
+					const volatility = (Math.random() - 0.5) * 8;
+					const nextPrice = Math.max(1, priceNum * (1 + volatility / 100));
+					const priceDiff = nextPrice - priceNum;
+					const changeNum = parseFloat(String(row.change)) || 0;
+					const nextChange = changeNum + (priceDiff / priceNum) * 100;
+					const volumeNum = parseFloat(String(row.volume)) || 0;
+					const nextVolume = Math.max(0.1, volumeNum * (1 + (Math.random() - 0.5) * 0.3));
+					return {
+						...row,
+						price: nextPrice.toFixed(2),
+						change: `${nextChange >= 0 ? '+' : ''}${nextChange.toFixed(1)}`,
+						volume: nextVolume.toFixed(1),
+					};
+				})
 		);
 	}, [api]);
 

@@ -124,7 +124,7 @@ describe('CellDisplaySnapshotStore', () => {
 			baseClassName: 'og-cell  og-cell-pinned-left',
 			stateClassName: ' og-cell-selected og-cell-readonly ',
 			decorationClassName: 'og-cell-validation-error og-cell-selected',
-			contentKind: 'portal-frozen',
+			contentKind: 'portal-live',
 			contentMode: 'portal',
 			formattedValue: '',
 			title: 'Frozen',
@@ -132,7 +132,7 @@ describe('CellDisplaySnapshotStore', () => {
 
 		expect(snapshot.className).toBe('og-cell og-cell-pinned-left og-cell-selected og-cell-readonly og-cell-validation-error');
 		expect(snapshot.classTokens).toEqual(['og-cell', 'og-cell-pinned-left', 'og-cell-selected', 'og-cell-readonly', 'og-cell-validation-error']);
-		expect(snapshot.contentKind).toBe('portal-frozen');
+		expect(snapshot.contentKind).toBe('portal-live');
 	});
 
 	it('joins class-name parts without duplicating tokens', () => {

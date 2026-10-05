@@ -20,8 +20,6 @@ import { resolveRowPresentation } from './rowPresentationResolver.js';
 import {
 	applyRenderWindowRuntimeLimits,
 	computeRenderWindow,
-	diffRenderWindow,
-	createEmptyViewportDelta,
 	getRowIndices,
 	sameVisibleContentWindow,
 	sameRenderedWindow,
@@ -145,8 +143,6 @@ export class RowRenderer<TRowData = unknown> {
 	private readonly _dirtyBuckets: [HTMLDivElement[], HTMLDivElement[], HTMLDivElement[], HTMLDivElement[]] = [[], [], [], []];
 	// Reusable scratch for getRowIndices() — avoids an O(visibleRows) array per frame.
 	private readonly _rowIndicesScratch: number[] = [];
-	// Reusable scratch for diffRenderWindow() — avoids six array allocations per frame.
-	private readonly _deltaScratch = createEmptyViewportDelta();
 	// Per-frame scratch sets (cleared, never reallocated) for entered visible columns / live overscan rows.
 	private readonly _enteredVisibleColsScratch = new Set<number>();
 	private readonly _liveOverscanRowsScratch = new Set<number>();
@@ -180,8 +176,8 @@ export class RowRenderer<TRowData = unknown> {
 	 *  scroll execution. Null before the first recycleViewport call. */
 	public currentViewportPlan: ViewportPlan | null = null;
 	/** Per-frame live-mode mount/update budget (see liveFrameBudget.ts), read by
-	 *  RowCellBinderDeps.tryConsumeLiveBudget/allowLiveEmergencyShell via stateHost: this. Reset each
-	 *  recycleViewport call; reconfigured whenever GridRendererOptions.liveReact may have changed. */
+	 *  RowCellBinderDeps.tryConsumeLiveBudget via stateHost: this. Reset each
+	 *  recycleViewport call; reconfigured whenever GridRendererOptions.live may have changed. */
 	public readonly liveFrameBudget = new LiveFrameBudget();
 	/** Live column-reorder preview source, wired by RenderEngine to the
 	 *  ColumnInteractionController. Returns 0 outside an active header drag. */
@@ -360,19 +356,6 @@ export class RowRenderer<TRowData = unknown> {
 			return;
 		}
 
-		// Compute delta — needed for column layout change detection and stats.
-		// Uses the reusable scratch delta (valid until the next recycleViewport call).
-		const delta = diffRenderWindow(this.currentWindow, nextWindow, this._deltaScratch);
-
-		if (isScrollFrameActive && this.renderStats) {
-			this.renderStats.rowsEnteredDuringScroll = (this.renderStats.rowsEnteredDuringScroll || 0) + delta.rowsEntered.length;
-			this.renderStats.rowsExitedDuringScroll = (this.renderStats.rowsExitedDuringScroll || 0) + delta.rowsExited.length;
-			this.renderStats.rowsStayedDuringScroll = (this.renderStats.rowsStayedDuringScroll || 0) + delta.rowsStayed.length;
-			this.renderStats.colsEnteredDuringScroll = (this.renderStats.colsEnteredDuringScroll || 0) + delta.colsEntered.length;
-			this.renderStats.colsExitedDuringScroll = (this.renderStats.colsExitedDuringScroll || 0) + delta.colsExited.length;
-			this.renderStats.colsStayedDuringScroll = (this.renderStats.colsStayedDuringScroll || 0) + delta.colsStayed.length;
-		}
-
 		// Row loading goes through the shared viewport/load contract, never row-model-specific APIs.
 		this.engine.getRowModel()?.ensureRange(nextWindow.rowStart, nextWindow.rowEnd, 'viewport-render');
 		// Renderer-facing visual row access uses the stable VisualRowModel contract.
@@ -408,11 +391,20 @@ export class RowRenderer<TRowData = unknown> {
 			plan,
 			this.engine.rendererOptions
 		);
+		if (isScrollFrameActive && this.renderStats) {
+			const delta = this.currentViewportPlan.viewportDelta;
+			this.renderStats.rowsEnteredDuringScroll = (this.renderStats.rowsEnteredDuringScroll || 0) + delta.rowsEntered.length;
+			this.renderStats.rowsExitedDuringScroll = (this.renderStats.rowsExitedDuringScroll || 0) + delta.rowsExited.length;
+			this.renderStats.rowsStayedDuringScroll = (this.renderStats.rowsStayedDuringScroll || 0) + delta.rowsStayed.length;
+			this.renderStats.colsEnteredDuringScroll = (this.renderStats.colsEnteredDuringScroll || 0) + delta.colsEntered.length;
+			this.renderStats.colsExitedDuringScroll = (this.renderStats.colsExitedDuringScroll || 0) + delta.colsExited.length;
+			this.renderStats.colsStayedDuringScroll = (this.renderStats.colsStayedDuringScroll || 0) + delta.colsStayed.length;
+		}
 		const columnWindowDelta = this.currentViewportPlan.columnWindowDelta;
 
 		// ── Live-mode frame budget ────────────────────────────────────────────────────
 		// rendererOptions is immutable; reconfiguring every frame is redundant but cheap.
-		this.liveFrameBudget.configure(this.engine.rendererOptions?.liveReact, this.engine.rendererOptions?.domUpdate);
+		this.liveFrameBudget.configure(this.engine.rendererOptions?.live);
 		this.liveFrameBudget.resetFrame();
 
 		// ── Slot count management ─────────────────────────────────────────────────────

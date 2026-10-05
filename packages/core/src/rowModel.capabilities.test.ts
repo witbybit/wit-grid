@@ -340,13 +340,13 @@ describe('Unsupported row model operations — infinite grid', () => {
 		api.destroy();
 	});
 
-	it('updateRows throws', () => {
+	it('row transactions throw', () => {
 		const api = createInfiniteGrid({
 			columns: COLUMNS,
 			getRowId: (r) => r.id,
 			datasource: { getRows: vi.fn().mockResolvedValue({ rows: [], totalCount: 0 }) },
 		});
-		expect(() => api.updateRows((r) => r)).toThrowError(UnsupportedRowModelOperationError);
+		expect(() => api.transaction({ rows: { add: [{ id: '1', name: 'x', amount: 0 }] } })).toThrowError(UnsupportedRowModelOperationError);
 		api.destroy();
 	});
 });
@@ -585,11 +585,13 @@ describe('UnsupportedRowModelOperationError shape', () => {
 				rejections: [{ mutationKind: 'cell-value', reason: 'row unavailable', index: undefined }],
 			});
 
-			const batch = store.batchCellValues([
-				{ rowId: 'A', colField: 'name', value: 'Gone' },
-				{ rowId: 'B', colField: 'amount', value: 2 },
-			]);
-			expect(batch).toEqual({
+			const batch = store.transaction({
+				cells: [
+					{ rowId: 'A', colField: 'name', value: 'Gone' },
+					{ rowId: 'B', colField: 'amount', value: 2 },
+				],
+			});
+			expect(batch).toMatchObject({
 				status: 'rejected',
 				reason: 'row unavailable',
 				rejections: [{ mutationKind: 'batch-cell', reason: 'row unavailable', index: 0 }],

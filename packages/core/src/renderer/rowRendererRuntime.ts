@@ -102,7 +102,7 @@ export interface RowRendererRuntimeStateHost<TRowData = unknown> {
 	 *  before the bind loop runs. Null before the first frame. */
 	currentViewportPlan?: ViewportPlan | null;
 	/** Per-frame live-mode mount/update budget (see liveFrameBudget.ts), configured from
-	 *  GridRendererOptions.liveReact and reset by RowRenderer.recycleViewport each frame. */
+	 *  GridRendererOptions.live and reset by RowRenderer.recycleViewport each frame. */
 	liveFrameBudget?: LiveFrameBudget | null;
 }
 
@@ -239,10 +239,10 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 					this.deps.stateHost.renderStats.liveReactOverscanMounts = (this.deps.stateHost.renderStats.liveReactOverscanMounts || 0) + 1;
 				}
 			},
-			incrementLiveReactEmergencyShellsDuringScroll: () => {
+			incrementLiveReactStandInsDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.liveReactEmergencyShellsDuringScroll =
-						(this.deps.stateHost.renderStats.liveReactEmergencyShellsDuringScroll || 0) + 1;
+					this.deps.stateHost.renderStats.liveReactStandInsDuringScroll =
+						(this.deps.stateHost.renderStats.liveReactStandInsDuringScroll || 0) + 1;
 				}
 			},
 			tryConsumeLiveBudget: (kind: 'mount' | 'update') => {
@@ -256,6 +256,17 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			endDomUpdate: () => {
 				this.deps.stateHost.liveFrameBudget?.endDomUpdate();
 			},
+			primeDisplayValueInFrame: (rowId: string, colField: string) => {
+				const budget = this.deps.stateHost.liveFrameBudget;
+				if (budget && !budget.beginGetterPrime()) return undefined;
+				try {
+					return this.deps.engine.data.primeDisplayValue(rowId, colField);
+				} catch {
+					return undefined;
+				} finally {
+					budget?.endGetterPrime();
+				}
+			},
 			incrementDomUpdatesDuringScroll: () => {
 				if (this.deps.stateHost.renderStats) {
 					this.deps.stateHost.renderStats.domUpdatesDuringScroll = (this.deps.stateHost.renderStats.domUpdatesDuringScroll || 0) + 1;
@@ -266,35 +277,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 					this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll =
 						(this.deps.stateHost.renderStats.domUpdatesDeferredDuringScroll || 0) + 1;
 				}
-			},
-			allowLiveEmergencyShell: () => {
-				const budget = this.deps.stateHost.liveFrameBudget;
-				return budget ? budget.allowEmergencyShell : true;
-			},
-			incrementHtmlSnapshotHitsDuringScroll: () => {
-				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.htmlSnapshotHitsDuringScroll =
-						(this.deps.stateHost.renderStats.htmlSnapshotHitsDuringScroll || 0) + 1;
-				}
-			},
-			incrementHtmlSnapshotMissesDuringScroll: () => {
-				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.htmlSnapshotMissesDuringScroll =
-						(this.deps.stateHost.renderStats.htmlSnapshotMissesDuringScroll || 0) + 1;
-				}
-			},
-			incrementTextImpostorUsesDuringScroll: () => {
-				if (this.deps.stateHost.renderStats) {
-					this.deps.stateHost.renderStats.textImpostorUsesDuringScroll =
-						(this.deps.stateHost.renderStats.textImpostorUsesDuringScroll || 0) + 1;
-				}
-			},
-			getHtmlSnapshotDefaults: () => {
-				const opts = this.deps.engine.rendererOptions?.htmlSnapshot;
-				return {
-					allowShellWhenMissing: opts?.allowShellWhenMissing ?? true,
-					allowTextFallbackWhenMissing: opts?.allowTextFallbackWhenMissing ?? false,
-				};
 			},
 			getSnapshotVisualVersions: () => ({
 				styleVersion: (this.deps.stateHost as unknown as { styleVersion?: number }).styleVersion ?? 0,

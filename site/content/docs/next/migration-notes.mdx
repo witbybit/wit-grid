@@ -19,6 +19,32 @@ edited afterward. For a plain list of what shipped in each release (not just bre
 
 Tracks work that will ship in the release after [1.4](/docs/1.4).
 
+### Renderer scroll options: `text` or `live`
+
+**Why:** six scroll presentation modes, each with its own sub-options, were more than anyone needed. Every
+custom renderer now picks between stand-in text and the real renderer during scroll.
+
+**What changed:** `capabilities.scrollPresentation`, `live`, `textImpostor` and `htmlSnapshot` are replaced by
+`scroll: 'text' | 'live'` and `scrollText`. `rendererOptions.domUpdate`, `liveReact`, `htmlSnapshot` and
+`textImpostor` are replaced by `rendererOptions.live`. Imperative React updates are declared with
+`kind: 'imperativeReact'` instead of `live.update: 'imperative'`. HTML snapshots are removed.
+
+**Fix:** use the replacements listed in the [Changelog](/docs/next/changelog) and
+[Renderer Capabilities](/docs/next/renderer-capabilities).
+
+### One data-write API: `transaction`
+
+**Why:** rows and cells used to be written through separate methods, each with its own undo entry, result shape
+and async variant. `api.transaction()` covers them all, atomically.
+
+**What changed:** `applyTransaction`, `applyTransactionAsync`, `flushAsyncTransactions`, `batchCellValues`,
+`batchCellValuesAsync`, `setCellValueAsync` and `updateRows` are removed, as are the `rowTransaction` and full
+`rows` fields of `transaction()`. The type `BatchCellValueUpdate` is now `GridCellWrite`.
+
+**Fix:** use the replacements listed in the [Changelog](/docs/next/changelog) and
+[Transactions](/docs/next/transactions). The row nodes of a transaction are now at `result.rows`, and `result`
+is never `null`.
+
 ### Text-only cells no longer contain `.og-cell-content`
 
 **Why:** a cell of a column with no custom renderer only ever shows text, so its content wrapper was one more

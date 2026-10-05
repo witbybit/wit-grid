@@ -88,8 +88,17 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		});
 		expect(screen.getByTestId('focused-cell').textContent).toBe('1:name');
 
+		// globalVersion tracks the row projection: an edited value is a targeted update (the cell
+		// repaints, the projection stays), adding a row rebuilds it.
 		act(() => {
 			grid.api.setRows([{ id: '1', name: 'Product B' }]);
+		});
+		expect(screen.getByTestId('data-version').textContent).toBe('2');
+		act(() => {
+			grid.api.setRows([
+				{ id: '1', name: 'Product B' },
+				{ id: '2', name: 'Product C' },
+			]);
 		});
 		expect(screen.getByTestId('data-version').textContent).toBe('3');
 
@@ -482,9 +491,20 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		const node = makeInternalNode('1', { id: '1', name: 'Product A' });
 
 		const store = createPortalStore<TestRow>();
-		store.mountCell('1:name', container, 'Product A', node, colDef, false, false, undefined, undefined, undefined, undefined, {
-			rowSlotId: 'slot-1',
-			slotGeneration: 1,
+		store.mountCell('1:name', container, {
+			value: 'Product A',
+			node,
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
+				rowSlotId: 'slot-1',
+				slotGeneration: 1,
+			},
 		});
 
 		render(<PortalManager store={store} api={grid.api} />);
@@ -515,40 +535,36 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		const colDef = grid.api.getColumnDef('name')!;
 
 		const store = createPortalStore<TestRow>();
-		store.mountCell(
-			'1:name',
-			container,
-			'Old',
-			makeInternalNode('1', { id: '1', name: 'Old' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+		store.mountCell('1:name', container, {
+			value: 'Old',
+			node: makeInternalNode('1', { id: '1', name: 'Old' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 1,
-			}
-		);
-		store.mountCell(
-			'2:name',
-			container,
-			'New',
-			makeInternalNode('2', { id: '2', name: 'New' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+			},
+		});
+		store.mountCell('2:name', container, {
+			value: 'New',
+			node: makeInternalNode('2', { id: '2', name: 'New' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 2,
-			}
-		);
+			},
+		});
 
 		render(<PortalManager store={store} api={grid.api} />);
 
@@ -571,40 +587,36 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		const container = document.createElement('div');
 		const colDef = grid.api.getColumnDef('name')!;
 
-		store.mountCell(
-			'1:name',
-			container,
-			'Old',
-			makeInternalNode('1', { id: '1', name: 'Old' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+		store.mountCell('1:name', container, {
+			value: 'Old',
+			node: makeInternalNode('1', { id: '1', name: 'Old' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 1,
-			}
-		);
-		store.mountCell(
-			'2:name',
-			container,
-			'New',
-			makeInternalNode('2', { id: '2', name: 'New' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+			},
+		});
+		store.mountCell('2:name', container, {
+			value: 'New',
+			node: makeInternalNode('2', { id: '2', name: 'New' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 2,
-			}
-		);
+			},
+		});
 		await act(async () => {
 			await Promise.resolve();
 		});
@@ -635,23 +647,21 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		const colDef = grid.api.getColumnDef('name')!;
 
 		// Mount cell first (structural change)
-		store.mountCell(
-			cellKey,
-			container,
-			'Old',
-			makeInternalNode('1', { id: '1', name: 'Product A' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+		store.mountCell(cellKey, container, {
+			value: 'Old',
+			node: makeInternalNode('1', { id: '1', name: 'Product A' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 1,
-			}
-		);
+			},
+		});
 		await act(async () => {
 			await Promise.resolve();
 		});
@@ -661,24 +671,26 @@ describe('React Adapter (v2 API and Architecture)', () => {
 		const unsubscribeCell = store.subscribeToCell!(cellKey, cellListener);
 
 		// Update cell data only (non-structural change)
-		store.mountCell(
-			cellKey,
-			container,
-			'New',
-			makeInternalNode('1', { id: '1', name: 'Product A' }),
-			colDef,
-			false,
-			false,
-			undefined,
-			undefined,
-			undefined,
-			undefined,
-			{
+		store.mountCell(cellKey, container, {
+			value: 'New',
+			node: makeInternalNode('1', { id: '1', name: 'Product A' }),
+			col: colDef,
+			isEditing: false,
+			isLoading: false,
+			phase: undefined,
+			isScrolling: undefined,
+			isFocused: undefined,
+			isSelected: undefined,
+			physicalIdentity: {
 				rowSlotId: 'slot-1',
 				slotGeneration: 2,
-			}
-		);
+			},
+		});
 
+		// Data updates commit in the store's pre-paint microtask flush.
+		await act(async () => {
+			await Promise.resolve();
+		});
 		// The structural listener should NOT have fired again (remains 1)
 		expect(structuralListener).toHaveBeenCalledTimes(1);
 		// But the cell-specific listener SHOULD have been called

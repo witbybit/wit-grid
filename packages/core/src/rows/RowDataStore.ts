@@ -15,6 +15,17 @@ export interface RowTransactionResult<T> {
 	mismatch: boolean;
 }
 
+/** What replaceRows changed: rows kept in the same order are diffed field by field. */
+export interface RowReplaceResult<T> {
+	/** Same ids in the same order: only `changedNodes` (and their fields) changed. */
+	sameOrder: boolean;
+	changedNodes: RowNode<T>[];
+	changedFieldsByRow: Map<string, Set<string>>;
+	changedValuesByRow: Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>;
+	added: RowNode<T>[];
+	removed: RowNode<T>[];
+}
+
 export interface StoreTransactionResult<T> {
 	added: RowNode<T>[];
 	removed: RowNode<T>[];
@@ -92,94 +103,90 @@ export class RowDataStore<T> {
 	}
 
 	public setRows(rows: T[]): void {
-		// Validate before mutating any state so a bad input is a no-op.
-		const ids = rows.map((row, index) => {
-			if (row == null) {
-				throw new Error(`Wit Grid: row at index ${index} is null or undefined.`);
-			}
-			const id = this.getRowId(row);
-			if (typeof id !== 'string' || id.length === 0) {
-				throw new Error(`Wit Grid: getRowId() returned an invalid id for row at index ${index}.`);
-			}
-			return id;
-		});
-		validateRowIds(ids, 'setRows');
-
-		const nextNodeMap = new Map<string, RowNode<T>>();
-		for (let i = 0; i < rows.length; i++) {
-			const row = rows[i];
-			const id = ids[i];
-			let node = this.rowsById.get(id);
-			if (node) {
-				node.setData(row);
-			} else {
-				node = new RowNode<T>(id, row);
-			}
-			nextNodeMap.set(id, node);
-		}
-		this.sourceOrder = ids;
-		this.sourceIndexById = null;
-		this.rowsById = nextNodeMap;
+		this.replaceRows(rows);
 	}
 
-	public updateRows(updater: RowUpdate<T>): RowTransactionResult<T> {
-		const currentRows = this.sourceOrder.map((id) => this.rowsById.get(id)!.data);
-		const nextRows = updater(currentRows);
-
-		if (nextRows.length !== this.sourceOrder.length) {
-			return {
-				changedNodes: [],
-				changedFieldsByRow: new Map(),
-				changedValuesByRow: new Map(),
-				mismatch: true,
-			};
-		}
-
+	/**
+	 * Replaces the rows, reporting exactly what changed: rows are matched by id, a row passed as the
+	 * same object is untouched, a new object for a known id is diffed field by field, and ids that
+	 * appear or disappear are reported as added / removed.
+	 */
+	public replaceRows(rows: T[]): RowReplaceResult<T> {
 		const changedNodes: RowNode<T>[] = [];
 		const changedFieldsByRow = new Map<string, Set<string>>();
 		const changedValuesByRow = new Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>();
-
-		for (let i = 0; i < this.sourceOrder.length; i++) {
-			const currentId = this.sourceOrder[i];
-			const node = this.rowsById.get(currentId)!;
-			const nextRow = nextRows[i];
-			if (nextRow == null) {
-				return {
-					changedNodes: [],
-					changedFieldsByRow: new Map(),
-					changedValuesByRow: new Map(),
-					mismatch: true,
-				};
+		const previousOrder = this.sourceOrder;
+		// Immutable-state updates pass mostly the same objects: a row that is the same object at the
+		// same position keeps its id without calling getRowId, and while every id matches the previous
+		// (unique) order nothing needs revalidating or re-indexing.
+		const ids: string[] = new Array(rows.length);
+		let sameOrder = rows.length === previousOrder.length;
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const previousId = sameOrder ? previousOrder[i] : undefined;
+			const previousNode = previousId === undefined ? undefined : this.rowsById.get(previousId);
+			if (previousNode && previousNode.data === row) {
+				ids[i] = previousId!;
+				continue;
 			}
-
-			const nextId = this.getRowId(nextRow);
-			if (node.id !== nextId) {
-				return {
-					changedNodes: [],
-					changedFieldsByRow: new Map(),
-					changedValuesByRow: new Map(),
-					mismatch: true,
-				};
-			}
-
-			const prevRow = node.data;
-			if (prevRow !== nextRow) {
-				const diff = diffRows(prevRow, nextRow);
+			const id = this.readRowId(row, i);
+			ids[i] = id;
+			if (sameOrder && id !== previousId) sameOrder = false;
+		}
+		if (sameOrder) {
+			for (let i = 0; i < rows.length; i++) {
+				const node = this.rowsById.get(ids[i])!;
+				const row = rows[i];
+				if (node.data === row) continue;
+				const diff = diffRows(node.data, row);
+				node.setData(row);
 				if (diff) {
-					node.setData(nextRow);
 					changedNodes.push(node);
 					changedFieldsByRow.set(node.id, diff.changedFields);
 					changedValuesByRow.set(node.id, diff.changedValues);
 				}
 			}
+			return { sameOrder, changedNodes, changedFieldsByRow, changedValuesByRow, added: [], removed: [] };
 		}
 
-		return {
-			changedNodes,
-			changedFieldsByRow,
-			changedValuesByRow,
-			mismatch: false,
-		};
+		validateRowIds(ids, 'setRows');
+		const added: RowNode<T>[] = [];
+		const nextNodeMap = new Map<string, RowNode<T>>();
+		for (let i = 0; i < rows.length; i++) {
+			const row = rows[i];
+			const id = ids[i];
+			let node = this.rowsById.get(id);
+			if (!node) {
+				node = new RowNode<T>(id, row);
+				added.push(node);
+			} else if (node.data !== row) {
+				const diff = diffRows(node.data, row);
+				node.setData(row);
+				if (diff) {
+					changedNodes.push(node);
+					changedFieldsByRow.set(id, diff.changedFields);
+					changedValuesByRow.set(id, diff.changedValues);
+				}
+			}
+			nextNodeMap.set(id, node);
+		}
+		const removed: RowNode<T>[] = [];
+		for (const [id, node] of this.rowsById) if (!nextNodeMap.has(id)) removed.push(node);
+		this.sourceOrder = ids;
+		this.sourceIndexById = null;
+		this.rowsById = nextNodeMap;
+		return { sameOrder, changedNodes, changedFieldsByRow, changedValuesByRow, added, removed };
+	}
+
+	private readRowId(row: T, index: number): string {
+		if (row == null) {
+			throw new Error(`Wit Grid: row at index ${index} is null or undefined.`);
+		}
+		const id = this.getRowId(row);
+		if (typeof id !== 'string' || id.length === 0) {
+			throw new Error(`Wit Grid: getRowId() returned an invalid id for row at index ${index}.`);
+		}
+		return id;
 	}
 
 	public applyTransaction(transaction: { add?: T[]; addIndex?: number; remove?: T[]; update?: T[] }): StoreTransactionResult<T> {
@@ -264,6 +271,11 @@ export class RowDataStore<T> {
 
 	public getAllNodes(): RowNode<T>[] {
 		return this.sourceOrder.map((id) => this.rowsById.get(id)!);
+	}
+
+	/** Number of rows in the store, without copying the order. */
+	public getRowCount(): number {
+		return this.sourceOrder.length;
 	}
 
 	public getSourceOrder(): string[] {

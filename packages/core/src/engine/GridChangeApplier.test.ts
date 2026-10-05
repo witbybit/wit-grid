@@ -384,7 +384,6 @@ describe('GridChangeApplier', () => {
 		const rowModel = {
 			captureTransactionSnapshot: vi.fn(() => ({ modelType: 'test', snapshot: {} })),
 			replaceRowsStructurally: vi.fn(),
-			updateRowsStructurally: vi.fn(),
 			applyTransactionStructurally: vi.fn(() => resultPayload),
 			writeCellValueStructurally: vi.fn(),
 			reconcileAfterDataWrite: vi.fn(() => ({ changed: false })),
@@ -445,7 +444,6 @@ describe('GridChangeApplier', () => {
 				},
 			})),
 			replaceRowsStructurally: vi.fn(),
-			updateRowsStructurally: vi.fn(),
 			applyTransactionStructurally: vi.fn((transaction: { add?: TestRow[] }) => {
 				if (transaction.add) {
 					rows = rows.concat(transaction.add);

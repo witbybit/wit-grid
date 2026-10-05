@@ -451,7 +451,7 @@ export class RenderScrollPipeline<TRowData = unknown> {
 			}
 			if (result.remainingFidelity > 0) {
 				// Run the first fidelity batch in this same idle slice so visible rich cells
-				// do not remain as impostors for an extra idle-to-idle gap.
+				// do not remain as stand-ins for an extra idle-to-idle gap.
 				this.deps.renderStats.postScrollFidelityChunks++;
 				const fidelityResult = this.decorateLaneWithinDeadline('fidelity', this.postScrollFidelityBudget, deadline);
 				if (fidelityResult.processed > this.deps.renderStats.maxFidelityCellsDecoratedInOneChunk) {

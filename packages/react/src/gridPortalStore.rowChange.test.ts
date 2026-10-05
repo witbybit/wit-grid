@@ -1,0 +1,130 @@
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from 'vitest';
+import { createPortalStore } from './GridPortal.js';
+import type { CellPortalPhysicalIdentity } from './gridPortalTypes.js';
+
+const IDENTITY: CellPortalPhysicalIdentity = {
+	cellInstanceId: 'ci-1',
+	rowSlotId: 'slot-0',
+	slotGeneration: 1,
+	rowBindingGeneration: 1,
+	portalHostId: 'ph',
+};
+const col = { field: 'name' } as never;
+const rowA = { id: 'a', data: { name: 'A' } } as never;
+const rowB = { id: 'b', data: { name: 'B' } } as never;
+
+describe('portal store: a recycled cell showing another row', () => {
+	it('commits the new row in one flushSync batch before paint, not in a later render', async () => {
+		const store = createPortalStore<{ name: string }>();
+		const container = document.createElement('div');
+		store.mountCell('k1', container, {
+			value: 'A',
+			node: rowA,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		const second = document.createElement('div');
+		store.mountCell('k2', second, {
+			value: 'A',
+			node: rowA,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		const listener = vi.fn();
+		store.subscribeToCell!('k1', listener);
+		store.subscribeToCell!('k2', listener);
+
+		store.mountCell('k1', container, {
+			value: 'B',
+			node: rowB,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		store.mountCell('k2', second, {
+			value: 'B',
+			node: rowB,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		// Not inside the grid's frame work: queued for the microtask that runs before paint.
+		expect(listener).not.toHaveBeenCalled();
+		await Promise.resolve();
+		expect(listener).toHaveBeenCalledTimes(2);
+		expect(store.getDebugStats!().cellSyncCommits).toBe(1);
+		expect(store.getCellData!('k1')?.node).toBe(rowB);
+	});
+
+	it('commits same-row data updates in the same batched flush before paint', async () => {
+		const store = createPortalStore<{ name: string }>();
+		const container = document.createElement('div');
+		store.mountCell('k1', container, {
+			value: 'A',
+			node: rowA,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		const listener = vi.fn();
+		store.subscribeToCell!('k1', listener);
+		store.mountCell('k1', container, {
+			value: 'A2',
+			node: rowA,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		store.mountCell('k1', container, {
+			value: 'A3',
+			node: rowA,
+			col,
+			isEditing: false,
+			isLoading: false,
+			phase: 'scroll-live',
+			isScrolling: true,
+			isFocused: false,
+			isSelected: false,
+			physicalIdentity: IDENTITY,
+		});
+		expect(listener).not.toHaveBeenCalled();
+		await Promise.resolve();
+		// Two updates in one frame: one notification, one flush, the latest data.
+		expect(listener).toHaveBeenCalledTimes(1);
+		expect(store.getDebugStats!().cellSyncCommits).toBe(1);
+		expect(store.getCellData!('k1')?.value).toBe('A3');
+	});
+});

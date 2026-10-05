@@ -28,7 +28,8 @@ export interface GridStoreRowFacadeDeps<TRowData = unknown> {
 	deselectRows(rowIds: string[]): void;
 	scrollToRow(rowId: string, options?: { select?: boolean }): void;
 	setCellValue(rowId: string, colField: string, value: unknown): GridWriteResult;
-	batchCellValues(updates: Array<{ rowId: string; colField: string; value: unknown }>, source: 'api'): GridWriteResult;
+	/** Several cells as one transaction (row node data writes). */
+	writeCells(updates: Array<{ rowId: string; colField: string; value: unknown }>): GridWriteResult;
 	setExpanded(id: string, expanded: boolean): void;
 	setDetailOpen(rowId: string, open: boolean): void;
 	refreshRows(): void;
@@ -85,7 +86,7 @@ export function createGridStoreRowFacade<TRowData>(deps: GridStoreRowFacadeDeps<
 		deselectRows: deps.deselectRows,
 		scrollToRow: deps.scrollToRow,
 		setCellValue: deps.setCellValue,
-		batchCellValues: (updates) => deps.batchCellValues([...updates], 'api'),
+		writeCells: (updates) => deps.writeCells([...updates]),
 		setExpanded: deps.setExpanded,
 		setDetailOpen: deps.setDetailOpen,
 		refreshRows: deps.refreshRows,

@@ -1,18 +1,19 @@
-import type { RowDataTransaction } from '../api/GridApi.js';
+import type { GridTransactionResult } from '../api/GridApi.js';
 import type { RowNodeTransaction } from '../rowTransactions.js';
+import type { GridEngineTransaction } from './GridEngine.js';
 
-export type AsyncTransactionCallback<TRowData> = (result: RowNodeTransaction<TRowData> | null) => void;
+export type AsyncTransactionCallback<TRowData> = (result: GridTransactionResult<TRowData>) => void;
 
 export interface AsyncTransactionQueueDeps<TRowData> {
 	/** Applies one (possibly combined) transaction synchronously. */
-	apply: (transaction: RowDataTransaction<TRowData>) => RowNodeTransaction<TRowData> | null;
+	apply: (transaction: GridEngineTransaction<TRowData>) => GridTransactionResult<TRowData>;
 	getRowId: (row: TRowData) => string;
 	/** Schedules `flush` once; returns a cancel function. */
 	schedule: (flush: () => void) => () => void;
 }
 
 interface QueuedTransaction<TRowData> {
-	transaction: RowDataTransaction<TRowData>;
+	transaction: GridEngineTransaction<TRowData>;
 	callback?: AsyncTransactionCallback<TRowData>;
 }
 
@@ -38,7 +39,7 @@ export class AsyncTransactionQueue<TRowData> {
 		return this.queue.length;
 	}
 
-	public enqueue(transaction: RowDataTransaction<TRowData>, callback?: AsyncTransactionCallback<TRowData>): void {
+	public enqueue(transaction: GridEngineTransaction<TRowData>, callback?: AsyncTransactionCallback<TRowData>): void {
 		if (this.destroyed) return;
 		this.queue.push({ transaction, callback });
 		if (!this.cancelScheduled) this.cancelScheduled = this.deps.schedule(() => this.flush());
@@ -63,9 +64,11 @@ export class AsyncTransactionQueue<TRowData> {
 		this.queue = [];
 	}
 
-	private rowIdsOf(transaction: RowDataTransaction<TRowData>): string[] {
+	private rowIdsOf(transaction: GridEngineTransaction<TRowData>): string[] {
 		const ids: string[] = [];
-		for (const list of [transaction.add, transaction.update, transaction.remove]) {
+		const rows = transaction.rows;
+		if (!rows) return ids;
+		for (const list of [rows.add, rows.update, rows.remove]) {
 			if (list) for (const row of list) ids.push(this.deps.getRowId(row));
 		}
 		return ids;
@@ -77,7 +80,10 @@ export class AsyncTransactionQueue<TRowData> {
 		let touched = new Set<string>();
 		for (const entry of queued) {
 			const ids = this.rowIdsOf(entry.transaction);
-			const positional = entry.transaction.addIndex !== undefined;
+			// Only row-only transactions merge: cell writes and grid state apply on their own, as do
+			// positional inserts (combined, every add would land at the index).
+			const positional =
+				entry.transaction.rows?.addIndex !== undefined || (entry.transaction.cells?.length ?? 0) > 0 || !!entry.transaction.applyState;
 			const conflicts = positional || ids.some((id) => touched.has(id)) || new Set(ids).size !== ids.length;
 			if (current.length > 0 && conflicts) {
 				groups.push(current);
@@ -87,7 +93,6 @@ export class AsyncTransactionQueue<TRowData> {
 			current.push(entry);
 			for (const id of ids) touched.add(id);
 			if (positional) {
-				// An addIndex insert is applied on its own: combined, every add would land at its index.
 				groups.push(current);
 				current = [];
 				touched = new Set();
@@ -105,28 +110,26 @@ export class AsyncTransactionQueue<TRowData> {
 			only.callback?.(result);
 			return;
 		}
-		const combined: RowDataTransaction<TRowData> = { add: [], update: [], remove: [] };
+		const combined = { add: [] as TRowData[], update: [] as TRowData[], remove: [] as TRowData[] };
 		for (const { transaction } of group) {
-			if (transaction.add) combined.add!.push(...transaction.add);
-			if (transaction.update) combined.update!.push(...transaction.update);
-			if (transaction.remove) combined.remove!.push(...transaction.remove);
+			const rows = transaction.rows!;
+			if (rows.add) combined.add.push(...rows.add);
+			if (rows.update) combined.update.push(...rows.update);
+			if (rows.remove) combined.remove.push(...rows.remove);
 		}
-		const result = this.deps.apply(combined);
+		const result = this.deps.apply({ rows: combined });
 		if (!group.some((entry) => entry.callback)) return;
 		// Hand each transaction its own part of the combined result (row ids are disjoint).
-		const byId = (nodes: RowNodeTransaction<TRowData>['add'] | undefined) => new Map((nodes ?? []).map((node) => [node.id, node]));
-		const added = byId(result?.add);
-		const updated = byId(result?.update);
-		const removed = byId(result?.remove);
+		const byId = (nodes: RowNodeTransaction<TRowData>['add']) => new Map(nodes.map((node) => [node.id, node]));
+		const added = byId(result.rows.add);
+		const updated = byId(result.rows.update);
+		const removed = byId(result.rows.remove);
 		const pick = (rows: TRowData[] | undefined, index: Map<string, RowNodeTransaction<TRowData>['add'][number]>) =>
 			(rows ?? []).map((row) => index.get(this.deps.getRowId(row))).filter((node): node is NonNullable<typeof node> => node !== undefined);
 		for (const { transaction, callback } of group) {
 			if (!callback) continue;
-			callback(
-				result
-					? { add: pick(transaction.add, added), update: pick(transaction.update, updated), remove: pick(transaction.remove, removed) }
-					: null
-			);
+			const rows = transaction.rows!;
+			callback({ ...result, rows: { add: pick(rows.add, added), update: pick(rows.update, updated), remove: pick(rows.remove, removed) } });
 		}
 	}
 }
