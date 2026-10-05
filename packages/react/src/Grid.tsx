@@ -214,7 +214,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	const api = useMemo(() => {
 		// Normalize string persistence key to a GridPersistenceAdapter so core always receives the adapter type.
 		const resolvedPersistence = typeof persistence === 'string' ? createLocalStorageAdapter(persistence) : persistence;
-		const stableGetRowId: typeof getRowId = getRowId ? ((row: TRowData) => getRowIdRef.current!(row)) as typeof getRowId : undefined;
+		const stableGetRowId: typeof getRowId = getRowId ? (((row: TRowData) => getRowIdRef.current!(row)) as typeof getRowId) : undefined;
 		const initial = createInitialState(
 			{
 				columns,

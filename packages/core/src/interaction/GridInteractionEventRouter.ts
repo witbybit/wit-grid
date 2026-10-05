@@ -108,7 +108,8 @@ export function createGridInteractionEventRouter<TRowData>(deps: GridInteraction
 			const withinGrid = deps.isEventWithinGrid(activeEl);
 			if (!withinGrid && !isGridActive) return;
 			// Text fields outside the grid keep their own copy/paste, even right after a grid click.
-			if (!withinGrid && activeEl instanceof HTMLElement && (activeEl.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(activeEl.tagName))) return;
+			if (!withinGrid && activeEl instanceof HTMLElement && (activeEl.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(activeEl.tagName)))
+				return;
 			interaction.dispatchInput({ kind: 'clipboard', event });
 		},
 

@@ -948,8 +948,7 @@ export class IncrementalRowIndex<TData> {
 		// Splices are native memmoves (cheap for a few leaves); a merge reads every row's cached key.
 		// k splices move ~k·n elements, a merge compares ~n cached keys: the break-even k is about
 		// constant, whatever the group size (an n/16 term let 10k-leaf groups splice hundreds of times).
-		if (Math.max(remove.length, insert.length) > MERGE_REINSERT_MIN)
-			return this.mergeReinsert(children, remove, entries);
+		if (Math.max(remove.length, insert.length) > MERGE_REINSERT_MIN) return this.mergeReinsert(children, remove, entries);
 		if (oldPositions && oldPositions.every((at, i) => children[at] === remove[i])) {
 			// Known positions (the group is on screen): splice them out, highest first.
 			for (const at of [...oldPositions].sort((a, b) => b - a)) children.splice(at, 1);

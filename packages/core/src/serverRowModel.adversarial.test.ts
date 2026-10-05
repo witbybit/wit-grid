@@ -138,7 +138,11 @@ describe('InfiniteRowModelController — adversarial generation invariants', () 
 			if (op === 1) {
 				bump('filter');
 				// As for sort: the same filter again is a no-op, so churn always picks a different one.
-				const filters = [null, { name: { type: 'text', operator: 'contains', value: 'B' } }, { name: { type: 'text', operator: 'contains', value: 'A' } }] as const;
+				const filters = [
+					null,
+					{ name: { type: 'text', operator: 'contains', value: 'B' } },
+					{ name: { type: 'text', operator: 'contains', value: 'A' } },
+				] as const;
 				let pick = sequence % 2 === 0 ? 0 : sequence % 4 === 0 ? 2 : 1;
 				const current = JSON.stringify(store.getState().filterModel ?? null);
 				if (JSON.stringify(filters[pick]) === current) pick = (pick + 1) % filters.length;
