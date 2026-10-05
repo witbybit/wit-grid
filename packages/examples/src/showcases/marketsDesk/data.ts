@@ -243,7 +243,39 @@ export function generateMarket(count: number, seed = 2026): MarketRow[] {
 	const rand = mulberry32(seed);
 	const now = Date.now();
 	const rows = new Array<MarketRow>(count);
-	for (let i = 0; i < count; i++) {
+	for (let i = 0; i < count; i++) rows[i] = makeRow(i, rand, now);
+	return rows;
+}
+
+/**
+ * generateMarket in slices of about `sliceMs`, yielding to the browser between them so a large universe
+ * builds without freezing the page (the same rows: one random stream, in order). Rejects with an
+ * AbortError when `signal` aborts.
+ */
+export async function generateMarketAsync(
+	count: number,
+	options: { seed?: number; signal?: AbortSignal; onProgress?: (done: number) => void; sliceMs?: number } = {}
+): Promise<MarketRow[]> {
+	const rand = mulberry32(options.seed ?? 2026);
+	const now = Date.now();
+	const rows = new Array<MarketRow>(count);
+	const sliceMs = options.sliceMs ?? 8;
+	let i = 0;
+	while (i < count) {
+		const sliceEnd = performance.now() + sliceMs;
+		do rows[i] = makeRow(i, rand, now);
+		while (++i < count && (i & 255 || performance.now() < sliceEnd));
+		options.onProgress?.(i);
+		if (i < count) {
+			await new Promise((resolve) => setTimeout(resolve, 0));
+			if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+		}
+	}
+	return rows;
+}
+
+function makeRow(i: number, rand: () => number, now: number): MarketRow {
+	{
 		const assetClass = pickClass(rand());
 		const cfg = CLASSES[assetClass];
 		const sector = cfg.sectors[Math.floor(rand() * cfg.sectors.length)];
@@ -307,7 +339,7 @@ export function generateMarket(count: number, seed = 2026): MarketRow[] {
 		const roll = rand();
 		const status: InstrumentStatus = roll < 0.004 ? 'halted' : roll < 0.012 ? 'auction' : 'active';
 
-		rows[i] = {
+		return {
 			id: `i${i}`,
 			symbol,
 			name,
@@ -346,5 +378,4 @@ export function generateMarket(count: number, seed = 2026): MarketRow[] {
 			spreadFrac,
 		};
 	}
-	return rows;
 }

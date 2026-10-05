@@ -155,6 +155,8 @@ function DeskGridImpl({
 
 	return (
 		<Grid<MarketRow>
+			// A new universe mounts a fresh grid (cheaper than diffing every row of the old one through setRows);
+			// the dashboard keeps the old grid on screen until the new universe is built.
 			key={`${engine.count}-${display}-${compact}`}
 			rowModelType='client'
 			rows={rows}
