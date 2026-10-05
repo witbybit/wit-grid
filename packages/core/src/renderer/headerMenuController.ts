@@ -1,5 +1,6 @@
 import { groupByColIds } from '../rows/hierarchyConfig.js';
-import { defaultGridScheduler } from './gridScheduler.js';
+import { afterNextPaint, defaultGridScheduler } from './gridScheduler.js';
+import { paintSortIndicator } from './headerRenderer.js';
 import type { PortalMountManager } from './portalMountManager.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GridApi } from '../api/GridApi.js';
@@ -170,10 +171,7 @@ export class HeaderMenuController<TRowData = unknown> {
 				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
 				<span>Sort Ascending</span>
 			`;
-			sortAsc.addEventListener('click', () => {
-				this.engine.setSortModel([{ colId: colField, sort: 'asc' }]);
-				this.hide();
-			});
+			sortAsc.addEventListener('click', () => this.sortAfterPaint(colField, 'asc'));
 			this._makeActivatable(sortAsc);
 			sortContainer.appendChild(sortAsc);
 
@@ -183,10 +181,7 @@ export class HeaderMenuController<TRowData = unknown> {
 				<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19V5M5 12l7 7 7-7"/></svg>
 				<span>Sort Descending</span>
 			`;
-			sortDesc.addEventListener('click', () => {
-				this.engine.setSortModel([{ colId: colField, sort: 'desc' }]);
-				this.hide();
-			});
+			sortDesc.addEventListener('click', () => this.sortAfterPaint(colField, 'desc'));
 			this._makeActivatable(sortDesc);
 			sortContainer.appendChild(sortDesc);
 
@@ -197,10 +192,7 @@ export class HeaderMenuController<TRowData = unknown> {
 					<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
 					<span>Clear Sorting</span>
 				`;
-				clearSort.addEventListener('click', () => {
-					this.engine.setSortModel(null);
-					this.hide();
-				});
+				clearSort.addEventListener('click', () => this.sortAfterPaint(colField, null));
 				this._makeActivatable(clearSort);
 				sortContainer.appendChild(clearSort);
 			}
@@ -389,6 +381,21 @@ export class HeaderMenuController<TRowData = unknown> {
 		if (firstFocusable) {
 			firstFocusable.focus({ preventScroll: true });
 		}
+	}
+
+	/**
+	 * Closes the menu and shows the header's new sort at once; the sort itself (a full rebuild on large
+	 * grids) runs after the browser paints that, so the choice answers immediately.
+	 */
+	private sortAfterPaint(colField: string, sort: 'asc' | 'desc' | null): void {
+		const headerCell = this.activeHeaderCell;
+		const before = this.engine.stateManager.getState().sortModel;
+		this.hide();
+		if (headerCell) paintSortIndicator(headerCell, sort, true);
+		afterNextPaint(() => {
+			if (this.engine.stateManager.getState().sortModel !== before) return; // a later sort wins
+			this.engine.setSortModel(sort ? [{ colId: colField, sort }] : null);
+		});
 	}
 
 	public hide = (): void => {
