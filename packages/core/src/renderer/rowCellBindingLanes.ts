@@ -174,6 +174,7 @@ function reconcileTopology<TRowData>(
 	for (const [instanceId, cell] of slot.cellsByColumnInstanceId) {
 		if (!newInstanceIds.has(instanceId)) {
 			releaseFn(cell);
+			cell.destroy();
 			if (cell.element.parentNode) cell.element.remove();
 			slot.cellsByColumnInstanceId.delete(instanceId);
 			instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);

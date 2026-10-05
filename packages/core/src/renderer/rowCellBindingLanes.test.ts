@@ -129,17 +129,14 @@ describe('CellSlot.cellInstanceId', () => {
 		expect(a.cellInstanceId).not.toBe(b.cellInstanceId);
 	});
 
-	it('is stable across unbindHot() / unbindCold() / reset()', () => {
+	it('is stable across hot release and cold destruction', () => {
 		const cell = new CellSlot(document.createElement('div'));
 		const id = cell.cellInstanceId;
 
 		cell.unbindHot();
 		expect(cell.cellInstanceId).toBe(id);
 
-		cell.unbindCold();
-		expect(cell.cellInstanceId).toBe(id);
-
-		cell.reset();
+		cell.destroy();
 		expect(cell.cellInstanceId).toBe(id);
 	});
 
@@ -510,7 +507,7 @@ describe('reconcileTopology — Plan 118 core invariants', () => {
 			slot.centerCells.push(driftCell);
 			// cellsByColumnInstanceId does NOT contain driftCell
 
-			const unbindSpy = vi.spyOn(driftCell, 'unbindCold');
+			const unbindSpy = vi.spyOn(driftCell, 'releaseCold');
 
 			slot.destroyCold();
 

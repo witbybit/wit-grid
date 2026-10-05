@@ -208,6 +208,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			};
 			dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 			expect(request.cellSlot.lastContentMode).toBe('text');
+			expect(request.cellSlot.binding).toMatchObject({ rowSlotId: 'slot-1', rowId: 'r1', rowIndex: 0, colId: 'name', colIndex: 0 });
 			expect(request.cellSlot.lastFormattedValue).toBe('hello');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);

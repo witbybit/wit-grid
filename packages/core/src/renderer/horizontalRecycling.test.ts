@@ -108,7 +108,7 @@ describe('scroll-time cell retention recycles evicted plain cells', () => {
 		const topology = compileColumnTopology(plan(cols));
 		const slot = new RowSlot<unknown>('slot-1', document.createElement('div'));
 		const initCell = (el: HTMLDivElement) => void CellSlot.fromElement(el);
-		const release = (cell: CellSlot<unknown>) => cell.unbindCold();
+		const release = (cell: CellSlot<unknown>) => cell.releaseCold();
 		reconcileTopology(slot, topology, null, 0, 10, null, cols, initCell, release);
 		const bind = () =>
 			slot.centerCells.forEach((cell, i) =>

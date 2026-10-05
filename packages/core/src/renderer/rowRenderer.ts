@@ -213,7 +213,7 @@ export class RowRenderer<TRowData = unknown> {
 			},
 			releaseCellFn: (cell) => {
 				if (cell.lastPortalKey) this.runtime.releaseCellPortal(cell.element, false, 'destroyed');
-				cell.unbindCold();
+				cell.releaseCold();
 			},
 			ensurePinnedContainer: (slot, side, width) => this.ensurePinnedContainer(slot, side, width),
 			releaseRowPortal: (slot) => this.releaseRowPortal(slot),

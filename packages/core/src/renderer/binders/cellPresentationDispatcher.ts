@@ -95,12 +95,25 @@ export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentati
 
 	switch (nextRoute) {
 		case 'text':
-			return applyTextCellPresentation(input);
+			applyTextCellPresentation(input);
+			break;
 		case 'live':
-			return applyLiveCellPresentation(input);
+			applyLiveCellPresentation(input);
+			break;
 		case 'snapshot':
-			return applySnapshotCellPresentation(input);
+			applySnapshotCellPresentation(input);
+			break;
 		case 'checkbox':
-			return applyCheckboxCellPresentation(input);
+			applyCheckboxCellPresentation(input);
+			break;
 	}
+	cellSlot.commitBinding(
+		input.runtime.rowSlotId,
+		cellCtrl.rowId,
+		input.geometry.rowIndex,
+		cellCtrl.colId,
+		input.geometry.colIndex,
+		cellCtrl.key,
+		cellSlot.lastContentMode
+	);
 }

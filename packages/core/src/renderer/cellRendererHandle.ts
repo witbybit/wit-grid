@@ -55,7 +55,7 @@ export class TextRendererHandle<TRowData = unknown> implements CellRendererHandl
 	constructor(public formattedValue: string) {}
 
 	public destroy(): void {
-		// Text content is cleared by CellSlot.unbindCold() — no external resources.
+		// Text content is cleared by CellSlot.releaseCold() — no external resources.
 	}
 }
 
