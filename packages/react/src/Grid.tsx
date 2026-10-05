@@ -3,7 +3,7 @@ import type { RowAnimationOptions } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
 import { GridProvider } from './gridContext.js';
 import { GridView, type GridViewProps } from './GridView.js';
-import { isProductionBuild, sameInitialValue } from './initialProps.js';
+import { isProductionBuild, sameColumnDefs, sameInitialValue } from './initialProps.js';
 import { resolveColumnTypes } from './resolveColumnTypes.js';
 import type {
 	ColumnDef,
@@ -320,9 +320,12 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	}, [api, rowModelType, datasource]);
 
 	useEffect(() => {
-		if (columns === lastColumnsRef.current && columnTypes === lastColumnTypesRef.current) return;
+		// An inline columns array is new every render: re-applying it repaints every cell and resets the
+		// incremental row index, so only a change in content (or in a function's identity) applies.
+		const unchanged = sameColumnDefs(columns, lastColumnsRef.current) && sameColumnDefs(columnTypes, lastColumnTypesRef.current);
 		lastColumnsRef.current = columns;
 		lastColumnTypesRef.current = columnTypes;
+		if (unchanged) return;
 		api.setColumns(resolveColumnTypes(columns, columnTypes));
 	}, [api, columns, columnTypes]);
 
