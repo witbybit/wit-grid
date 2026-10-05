@@ -406,6 +406,90 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 	});
 });
 
+describe('cellPresentationDispatcher — seeded physical transition sequences', () => {
+	it('keeps DOM mode, portal ownership, and repair intent aligned through rebinds', () => {
+		const kinds = ['primitive', 'stand-in', 'frozen-portal', 'live-renderer'] as const;
+		for (let seed = 1; seed <= 16; seed++) {
+			const deps = makeDeps();
+			const request = makeRequest('center');
+			let random = seed;
+			let heldPortalKey: string | undefined;
+			let expectedReleaseCount = 0;
+			let expectedRepair: 'motion' | 'fidelity' = 'motion';
+
+			for (let step = 0; step < 32; step++) {
+				random = (random * 1103515245 + 12345) >>> 0;
+				const kind = kinds[random % kinds.length];
+				const portalKey = kind === 'live-renderer' || kind === 'frozen-portal' ? `portal-${(random >>> 9) % 3}` : undefined;
+				if ((random & 8) !== 0) {
+					request.cellSlot.unbindHot();
+					request.rowIndex = step;
+					request.node = { id: `r${step}`, data: { id: `r${step}`, name: `Name ${step}` } } as any;
+				}
+
+				let state: ScrollCellPresentation;
+				if (kind === 'primitive') {
+					state = {
+						kind,
+						className: 'og-cell',
+						contentMode: 'text',
+						formattedValue: `value-${step}`,
+						markDirty: true,
+						title: null,
+						validationError: undefined,
+						recordVersionsFrom: undefined,
+					};
+				} else if (kind === 'stand-in') {
+					state = {
+						kind,
+						className: 'og-cell',
+						contentMode: 'fallback',
+						formattedValue: `fallback-${step}`,
+						recordVersions: undefined,
+						title: null,
+						validationError: undefined,
+					};
+				} else if (kind === 'frozen-portal') {
+					state = {
+						kind,
+						className: 'og-cell',
+						portalCellKey: portalKey!,
+						title: null,
+						validationError: undefined,
+						markDirty: true,
+						keepVersionFresh: false,
+						recordVersionsFrom: undefined,
+					};
+				} else {
+					state = {
+						kind,
+						className: 'og-cell',
+						portalCellKey: portalKey!,
+						isEditing: (random & 16) !== 0,
+						isFocused: (random & 32) !== 0,
+						forceLiveInteractive: false,
+						recordVersionsFrom: undefined,
+						title: null,
+						validationError: undefined,
+					};
+				}
+
+				if (heldPortalKey && heldPortalKey !== portalKey) expectedReleaseCount++;
+				dispatchCellPresentation(makeDispatchInput(deps, request, state, step + 1));
+
+				expect(request.cellSlot.lastContentMode, `seed ${seed}, step ${step}`).toBe(
+					portalKey ? 'portal' : kind === 'stand-in' ? 'fallback' : 'text'
+				);
+				expect(request.cellSlot.lastPortalKey, `seed ${seed}, step ${step}`).toBe(portalKey);
+				expect(deps.releaseCellPortal, `seed ${seed}, step ${step}`).toHaveBeenCalledTimes(expectedReleaseCount);
+				if (kind !== 'primitive') expectedRepair = 'fidelity';
+				expect(request.cellSlot.postScrollRepair).toBe(expectedRepair);
+				heldPortalKey = portalKey;
+			}
+		}
+	});
+});
+
 describe('cellPresentationDispatcher — the one portal transition rule', () => {
 	// A cell holding portal 'held' moves to each presentation. The held portal is released exactly
 	// once (across repeated binds) unless the next presentation keeps that same portal.

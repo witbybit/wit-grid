@@ -119,4 +119,62 @@ describe('cell presentation state machine', () => {
 		expect(isPostScrollRepairCurrent(7, 7)).toBe(true);
 		expect(isPostScrollRepairCurrent(8, 7)).toBe(false);
 	});
+
+	it('matches an independent portal-ownership oracle across seeded transition sequences', () => {
+		const kinds: CellPresentationState['kind'][] = [
+			'buffered',
+			'primitive',
+			'loading',
+			'checkbox-selector',
+			'live-renderer',
+			'dom-update',
+			'frozen-portal',
+			'stand-in',
+		];
+		const routeOracle: Record<CellPresentationState['kind'], 'text' | 'live' | 'snapshot' | 'checkbox'> = {
+			buffered: 'text',
+			primitive: 'text',
+			loading: 'text',
+			'checkbox-selector': 'checkbox',
+			'live-renderer': 'live',
+			'dom-update': 'live',
+			'frozen-portal': 'snapshot',
+			'stand-in': 'text',
+		};
+
+		for (let seed = 1; seed <= 32; seed++) {
+			let random = seed;
+			let heldPortalKey: string | undefined;
+			for (let step = 0; step < 64; step++) {
+				random = (random * 1664525 + 1013904223) >>> 0;
+				const kind = kinds[random % kinds.length];
+				const ownsPortal = kind === 'live-renderer' || kind === 'dom-update' || kind === 'frozen-portal' || kind === 'buffered';
+				const nextPortalKey = ownsPortal ? `portal-${(random >>> 8) % 4}` : undefined;
+				const next = presentation(kind, {
+					contentMode: kind === 'buffered' ? 'portal' : undefined,
+					portalKey: nextPortalKey,
+				});
+
+				const result = plan(heldPortalKey, next);
+				const expectedOwnership =
+					heldPortalKey === nextPortalKey
+						? heldPortalKey
+							? 'preserve'
+							: 'none'
+						: heldPortalKey && nextPortalKey
+							? 'replace'
+							: heldPortalKey
+								? 'release'
+								: 'acquire';
+
+				expect(result.nextRoute, `seed ${seed}, step ${step}`).toBe(routeOracle[kind]);
+				expect(result.nextPortalKey, `seed ${seed}, step ${step}`).toBe(nextPortalKey);
+				expect(result.releasePortalKey, `seed ${seed}, step ${step}`).toBe(
+					heldPortalKey && heldPortalKey !== nextPortalKey ? heldPortalKey : undefined
+				);
+				expect(result.portalOwnership, `seed ${seed}, step ${step}`).toBe(expectedOwnership);
+				heldPortalKey = nextPortalKey;
+			}
+		}
+	});
 });
