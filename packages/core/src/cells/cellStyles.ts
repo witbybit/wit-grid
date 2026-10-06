@@ -136,6 +136,24 @@ export const CELL_STYLES = `
 .og-ct-option[data-multiple] .og-ct-checkbox { cursor: inherit; }
 .og-ct-option-icon { display: inline-flex; flex: none; color: var(--og-ct-muted); }
 .og-ct-list-empty { padding: 18px 8px; text-align: center; color: var(--og-ct-muted); }
+.og-ct-list-status {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 4px 8px;
+  font-size: 12px; color: var(--og-ct-muted);
+}
+.og-ct-list-status[data-meta] { min-height: 28px; font-size: 11.5px; color: var(--og-ct-subtle); font-variant-numeric: tabular-nums; }
+.og-ct-spinner {
+  width: 14px; height: 14px; border-radius: 999px; flex: none;
+  border: 2px solid var(--og-ct-track); border-top-color: var(--og-ct-accent);
+  animation: og-ct-spin .7s linear infinite;
+}
+@keyframes og-ct-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .og-ct-spinner { animation-duration: 2s; } }
+/* A value whose label is still being looked up. */
+.og-ct-skeleton {
+  display: inline-block; height: 10px; width: 64%; max-width: 120px; border-radius: 999px;
+  background: var(--og-ct-track); animation: og-ct-pulse 1.2s ease-in-out infinite;
+}
+@keyframes og-ct-pulse { 50% { opacity: .45; } }
 .og-ct-separator { height: 1px; margin: 4px -4px; background: var(--og-popover-divider, var(--og-popover-border)); }
 
 .og-ct-calendar { width: 252px; padding: 6px; user-select: none; }

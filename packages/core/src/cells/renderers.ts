@@ -6,6 +6,7 @@
 import type { DomCellRenderer, DomCellRendererParams } from '../columnDef.js';
 import { cellIconSvg, createCellIcon } from './icons.js';
 import { createOptionMarker, optionLabel, type CellOption } from './listbox.js';
+import { createCellOptionsStore, isCellOptionsStore, type CellOptionsStore } from './optionsStore.js';
 import { hashCellColor, resolveCellColor, type CellColor } from './palette.js';
 import {
 	formatCellDate,
@@ -173,8 +174,47 @@ export function createCheckboxRenderer(): DomCellRenderer<any> {
 
 export type BadgeVariant = 'soft' | 'dot' | 'outline' | 'plain';
 
-export function optionIndex(options: readonly CellOption[]): Map<string, CellOption> {
-	return new Map(options.map((option) => [option.value, option]));
+/** Options given as a list or a store: a list becomes a store of static options. */
+export type CellOptionsInput = readonly CellOption[] | CellOptionsStore;
+
+export function toOptionsStore(source: CellOptionsInput): CellOptionsStore {
+	return isCellOptionsStore(source) ? source : createCellOptionsStore(source);
+}
+
+/** A placeholder for a value whose option is still being looked up. */
+function createPendingValue(): HTMLElement {
+	const bar = document.createElement('span');
+	bar.className = 'og-ct-skeleton';
+	bar.setAttribute('aria-label', 'Loading');
+	return bar;
+}
+
+/**
+ * A renderer of values looked up in a store. Values the store is still resolving draw as
+ * placeholders, and the cell redraws once they are known, if it still shows the same value.
+ */
+function storeRenderer(
+	store: CellOptionsStore,
+	keysOf: (value: unknown) => string[],
+	draw: (root: HTMLElement, value: unknown) => void,
+	setup?: (root: HTMLElement) => void
+): DomCellRenderer<any> {
+	return valueRenderer((root) => {
+		setup?.(root);
+		let current: unknown;
+		return (value) => {
+			current = value;
+			const waiting = store.ensure(keysOf(value));
+			draw(root, value);
+			waiting?.then(() => {
+				if (Object.is(current, value)) draw(root, value);
+			});
+		};
+	});
+}
+
+function singleKey(value: unknown): string[] {
+	return value == null || value === '' ? [] : [String(value)];
 }
 
 /** A badge for an option (or an unknown value: a neutral badge, or hashed colour with `autoColor`). */
@@ -213,14 +253,15 @@ export interface SelectRendererOptions {
 	variant?: BadgeVariant;
 }
 
-export function createSelectRenderer(options: readonly CellOption[], config: SelectRendererOptions = {}): DomCellRenderer<any> {
-	const index = optionIndex(options);
+export function createSelectRenderer(options: CellOptionsInput, config: SelectRendererOptions = {}): DomCellRenderer<any> {
+	const store = toOptionsStore(options);
 	const variant = config.variant ?? 'soft';
-	return valueRenderer((root) => (value) => {
+	return storeRenderer(store, singleKey, (root, value) => {
 		root.textContent = '';
 		if (value == null || value === '') return;
 		const key = String(value);
-		root.appendChild(createOptionBadge(index.get(key), key, variant));
+		const option = store.get(key);
+		root.appendChild(!option && store.isPending(key) ? createPendingValue() : createOptionBadge(option, key, variant));
 	});
 }
 
@@ -232,30 +273,38 @@ export interface MultiSelectRendererOptions {
 	autoColor?: boolean;
 }
 
-export function createMultiSelectRenderer(options: readonly CellOption[], config: MultiSelectRendererOptions = {}): DomCellRenderer<any> {
-	const index = optionIndex(options);
+export function createMultiSelectRenderer(options: CellOptionsInput, config: MultiSelectRendererOptions = {}): DomCellRenderer<any> {
+	const store = toOptionsStore(options);
 	const variant = config.variant ?? 'soft';
 	const autoColor = config.autoColor ?? true;
 	const maxVisible = config.maxVisible ?? 3;
-	return valueRenderer((root) => {
-		root.classList.add('og-ct-chips');
-		return (value) => {
+	return storeRenderer(
+		store,
+		parseMultiValue,
+		(root, value) => {
 			root.textContent = '';
 			const values = parseMultiValue(value);
 			const shown = values.slice(0, maxVisible);
-			for (const v of shown) root.appendChild(createOptionBadge(index.get(v), v, variant, autoColor));
+			for (const v of shown) {
+				const option = store.get(v);
+				root.appendChild(!option && store.isPending(v) ? createPendingValue() : createOptionBadge(option, v, variant, autoColor));
+			}
 			if (values.length > shown.length) {
 				const more = document.createElement('span');
 				more.className = 'og-ct-more';
 				more.textContent = `+${values.length - shown.length}`;
 				more.title = values
 					.slice(shown.length)
-					.map((v) => (index.get(v) ? optionLabel(index.get(v)!) : v))
+					.map((v) => {
+						const option = store.get(v);
+						return option ? optionLabel(option) : v;
+					})
 					.join(', ');
 				root.appendChild(more);
 			}
-		};
-	});
+		},
+		(root) => root.classList.add('og-ct-chips')
+	);
 }
 
 // ─── Rating, progress ────────────────────────────────────────────────────────
@@ -354,19 +403,14 @@ export function createProgressRenderer(config: ProgressCellOptions = {}): DomCel
 
 // ─── Person ───────────────────────────────────────────────────────────────────
 
-export interface PersonOption {
-	value: string;
-	/** Display name; defaults to the value. */
-	label?: string;
-	/** Secondary text in the picker (role, e-mail). */
-	description?: string;
+/** A person: an option (label is the name, description the role or e-mail) with an avatar. */
+export interface PersonOption extends CellOption {
 	avatarUrl?: string;
-	color?: CellColor;
-	group?: string;
 }
 
 export interface PersonCellOptions {
-	people?: readonly PersonOption[];
+	/** The people, or a store that loads them (see `createCellOptionsStore`). */
+	people?: readonly PersonOption[] | CellOptionsStore;
 	/** A cell may hold several people (array or comma-separated). */
 	multiple?: boolean;
 	/** Avatars shown before “+N” in a multiple cell. Default 3. */
@@ -392,23 +436,29 @@ export function createAvatar(person: PersonOption | undefined, value: string): H
 }
 
 export function createPersonRenderer(config: PersonCellOptions = {}): DomCellRenderer<any> {
-	const index = new Map((config.people ?? []).map((person) => [person.value, person]));
+	const store = toOptionsStore(config.people ?? []);
+	const person = (value: string) => store.get(value) as PersonOption | undefined;
 	const maxVisible = config.maxVisible ?? 3;
-	return valueRenderer((root) => (value) => {
+	const keysOf = config.multiple ? parseMultiValue : singleKey;
+	return storeRenderer(store, keysOf, (root, value) => {
 		root.textContent = '';
-		const values = config.multiple ? parseMultiValue(value) : value == null || value === '' ? [] : [String(value)];
+		const values = keysOf(value);
 		if (values.length === 0) return;
 		if (values.length === 1) {
-			root.appendChild(createAvatar(index.get(values[0]), values[0]));
+			if (!person(values[0]) && store.isPending(values[0])) {
+				root.appendChild(createPendingValue());
+				return;
+			}
+			root.appendChild(createAvatar(person(values[0]), values[0]));
 			const name = document.createElement('span');
 			name.className = 'og-ct-text';
-			name.textContent = index.get(values[0])?.label ?? values[0];
+			name.textContent = person(values[0])?.label ?? values[0];
 			root.appendChild(name);
 			return;
 		}
 		const stack = document.createElement('span');
 		stack.className = 'og-ct-avatars';
-		for (const v of values.slice(0, maxVisible)) stack.appendChild(createAvatar(index.get(v), v));
+		for (const v of values.slice(0, maxVisible)) stack.appendChild(createAvatar(person(v), v));
 		root.appendChild(stack);
 		if (values.length > maxVisible) {
 			const more = document.createElement('span');

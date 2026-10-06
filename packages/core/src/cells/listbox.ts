@@ -1,5 +1,6 @@
 import { resolveCellColor, type CellColor } from './palette.js';
 import { cellIconSvg, createCellIcon, type CellIconName } from './icons.js';
+import type { CellOptionsPage } from './optionsStore.js';
 
 /** One choice of a select, multi-select or combobox column. */
 export interface CellOption {
@@ -38,11 +39,21 @@ export interface CellListboxOptions {
 	leading?: (option: CellOption) => HTMLElement | null;
 	/** Tab pressed (editors commit on it). */
 	onTab?: (shift: boolean) => void;
+	/**
+	 * Options from a server, a page at a time. The list then searches there instead of filtering
+	 * `options` (shown only while browsing, ahead of the loaded pages), loads the next page as the
+	 * list scrolls near its end, and aborts a page that a newer search makes stale.
+	 */
+	load?: (search: string, offset: number, signal: AbortSignal) => Promise<CellOptionsPage>;
+	loadingText?: string;
+	errorText?: string;
 }
 
 export interface CellListbox {
 	readonly element: HTMLDivElement;
 	focus(): void;
+	/** Aborts a page still loading. */
+	destroy(): void;
 }
 
 type Item =
@@ -87,7 +98,8 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 	if (multiple) list.setAttribute('aria-multiselectable', 'true');
 
 	let input: HTMLInputElement | null = null;
-	if (config.searchable ?? config.options.length > 7) {
+	const load = config.load;
+	if (config.searchable ?? (!!load || config.options.length > 7)) {
 		const search = document.createElement('div');
 		search.className = 'og-ct-search';
 		search.innerHTML = cellIconSvg('search', 15);
@@ -102,7 +114,10 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		input.spellcheck = false;
 		search.appendChild(input);
 		element.appendChild(search);
-		input.addEventListener('input', () => render(input!.value));
+		input.addEventListener('input', () => {
+			if (load) fetchPage(true);
+			render(input!.value);
+		});
 	} else {
 		list.tabIndex = 0;
 	}
@@ -111,6 +126,92 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 
 	let items: Item[] = [];
 	let active = -1;
+
+	// Async source state: the pages loaded for the current search.
+	let loaded: CellOption[] = [];
+	let hasMore = false;
+	let total: number | undefined;
+	let loading = false;
+	let failed = false;
+	let request = 0;
+	let controller: AbortController | null = null;
+	const query = () => input?.value ?? '';
+
+	function fetchPage(reset: boolean) {
+		if (!load) return;
+		if (reset) {
+			loaded = [];
+			hasMore = false;
+			total = undefined;
+		}
+		controller?.abort();
+		controller = new AbortController();
+		const id = ++request;
+		loading = true;
+		failed = false;
+		list.setAttribute('aria-busy', 'true');
+		load(query(), loaded.length, controller.signal).then(
+			(page) => {
+				if (id !== request) return;
+				const appended = loaded.length > 0;
+				const seen = new Set(loaded.map((option) => option.value));
+				for (const option of page.options) if (!seen.has(option.value)) loaded.push(option);
+				hasMore = !!page.hasMore && page.options.length > 0;
+				total = page.total;
+				finish(appended);
+			},
+			() => {
+				if (id !== request) return;
+				failed = true;
+				finish(true);
+			}
+		);
+		if (!reset) renderStatus();
+	}
+
+	function finish(preserve: boolean) {
+		loading = false;
+		list.removeAttribute('aria-busy');
+		render(query(), preserve);
+		maybeLoadMore();
+	}
+
+	/** Loads the next page when the list is scrolled near its end (or does not fill its height). */
+	function maybeLoadMore(force = false) {
+		if (!load || !hasMore || loading || failed) return;
+		if (!force && (list.clientHeight === 0 || list.scrollTop + list.clientHeight < list.scrollHeight - 64)) return;
+		fetchPage(false);
+	}
+
+	let status: HTMLDivElement | null = null;
+	/** The row after the options: loading, a failed page with Retry, or how many of how many. */
+	function renderStatus() {
+		status?.remove();
+		status = null;
+		if (!load) return;
+		const row = document.createElement('div');
+		row.className = 'og-ct-list-status';
+		if (loading) {
+			row.innerHTML = '<span class="og-ct-spinner" aria-hidden="true"></span>';
+			row.append(config.loadingText ?? 'Loading…');
+		} else if (failed) {
+			row.append(config.errorText ?? 'Couldn’t load options.');
+			const retry = document.createElement('button');
+			retry.type = 'button';
+			retry.className = 'og-ct-btn';
+			retry.textContent = 'Retry';
+			retry.addEventListener('mousedown', (event) => event.preventDefault());
+			retry.addEventListener('click', () => fetchPage(loaded.length === 0));
+			row.appendChild(retry);
+		} else if (total !== undefined && loaded.length > 0) {
+			row.setAttribute('data-meta', '');
+			row.textContent = `${loaded.length.toLocaleString()} of ${total.toLocaleString()}`;
+		} else {
+			return;
+		}
+		status = row;
+		list.appendChild(row);
+	}
 	let typeahead = '';
 	let typeaheadAt = 0;
 
@@ -180,18 +281,33 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		row.appendChild(wrap);
 	}
 
-	function render(query: string) {
+	function render(query: string, preserve = false) {
 		const q = query.trim().toLowerCase();
+		const keepValue = preserve ? activeKey() : null;
+		const keepScroll = list.scrollTop;
 		list.textContent = '';
+		status = null;
 		items = [];
-		const matches = config.options.filter((option) => {
-			if (!q) return true;
-			return (
-				optionLabel(option).toLowerCase().includes(q) ||
-				!!option.description?.toLowerCase().includes(q) ||
-				!!option.group?.toLowerCase().includes(q)
-			);
-		});
+		let matches: CellOption[];
+		if (load) {
+			// The server searched: show its pages, after the given options while browsing.
+			const seen = new Set<string>();
+			matches = [];
+			for (const option of q ? loaded : [...config.options, ...loaded]) {
+				if (seen.has(option.value)) continue;
+				seen.add(option.value);
+				matches.push(option);
+			}
+		} else {
+			matches = config.options.filter((option) => {
+				if (!q) return true;
+				return (
+					optionLabel(option).toLowerCase().includes(q) ||
+					!!option.description?.toLowerCase().includes(q) ||
+					!!option.group?.toLowerCase().includes(q)
+				);
+			});
+		}
 
 		if (!multiple && config.noneLabel && !q) {
 			const index = items.length;
@@ -242,7 +358,9 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		}
 
 		const typed = query.trim();
-		if (config.creatable && typed && !config.options.some((option) => optionLabel(option).toLowerCase() === typed.toLowerCase())) {
+		const lower = typed.toLowerCase();
+		const exists = (option: CellOption) => optionLabel(option).toLowerCase() === lower;
+		if (config.creatable && typed && !loading && !matches.some(exists) && !config.options.some(exists)) {
 			if (items.length > 0) {
 				const separator = document.createElement('div');
 				separator.className = 'og-ct-separator';
@@ -261,18 +379,36 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 			list.appendChild(el);
 		}
 
-		if (items.length === 0) {
+		if (items.length === 0 && !loading && !failed) {
 			const empty = document.createElement('div');
 			empty.className = 'og-ct-list-empty';
 			empty.textContent = config.emptyText ?? 'No results found.';
 			list.appendChild(empty);
 		}
+		renderStatus();
 
+		if (preserve) {
+			// A page arrived: keep the place the user was at.
+			list.scrollTop = keepScroll;
+			const keep = keepValue === null ? -1 : items.findIndex((item) => itemKey(item) === keepValue);
+			if (keep >= 0) {
+				setActive(keep, false);
+				return;
+			}
+		}
 		// Start on the (first) selected option when browsing, on the first match when searching.
 		let start = -1;
 		if (!q) start = items.findIndex((item) => item.el.getAttribute('aria-selected') === 'true' && isEnabled(item));
 		if (start < 0) start = items.findIndex((item) => isEnabled(item));
 		setActive(start);
+	}
+
+	function itemKey(item: Item): string {
+		return item.kind === 'option' ? `o:${item.option.value}` : item.kind;
+	}
+
+	function activeKey(): string | null {
+		return items[active] ? itemKey(items[active]) : null;
 	}
 
 	function choose(index: number) {
@@ -304,10 +440,14 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 
 	focusTarget.addEventListener('keydown', (event) => {
 		switch (event.key) {
-			case 'ArrowDown':
+			case 'ArrowDown': {
 				event.preventDefault();
-				setActive(active < 0 ? step(-1, 1) : step(active, 1));
+				const next = active < 0 ? step(-1, 1) : step(active, 1);
+				// Already on the last loaded option: fetch the next page.
+				if (next === active) maybeLoadMore(true);
+				setActive(next);
 				return;
+			}
 			case 'ArrowUp':
 				event.preventDefault();
 				setActive(active < 0 ? step(items.length, -1) : step(active, -1));
@@ -344,9 +484,15 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		}
 	});
 
+	list.addEventListener('scroll', () => maybeLoadMore());
+	if (load) fetchPage(true);
 	render('');
 	return {
 		element,
 		focus: () => focusTarget.focus({ preventScroll: true }),
+		destroy() {
+			request++;
+			controller?.abort();
+		},
 	};
 }

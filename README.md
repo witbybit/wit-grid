@@ -539,6 +539,36 @@ A type fills in `renderer`, `cellEditor`, `valueFormatter` (export, tooltips) an
 
 Options are `{ value, label?, color?, icon?, description?, group?, disabled? }`; `color` is a palette name (`gray`, `red`, `amber`, `emerald`, `blue`, `violet`, `rose`…) or any CSS colour. To restyle cells alone, set `--og-ct-accent`, `--og-ct-radius` or `--og-ct-rating` on the grid.
 
+#### Options from a server
+
+`selectColumnType`, `comboboxColumnType`, `multiSelectColumnType`, `tagsColumnType` and `personColumnType`
+can load their options instead of listing them:
+
+```tsx
+const columnTypes = {
+	account: comboboxColumnType([], {
+		// One page of matches. Return `hasMore: false` (or a plain array) on the last page.
+		loadOptions: async ({ search, offset, limit, signal, rowId }) => {
+			const res = await fetch(`/api/accounts?q=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`, { signal });
+			const { items, total } = await res.json();
+			return { options: items.map((a) => ({ value: a.id, label: a.name, description: a.region })), hasMore: offset + limit < total, total };
+		},
+		// Labels for the values cells show before any list has loaded them (one batched call).
+		resolveOptions: async (ids) => (await fetch(`/api/accounts?ids=${ids.join(',')}`).then((r) => r.json())).map(toOption),
+		pageSize: 50,
+	}),
+};
+```
+
+- The editor searches on the server. A new search aborts the page still loading (`signal`), and a stale
+  response is dropped. Debounce in the loader if your API needs it.
+- The next page loads when the list is scrolled near its end, or when arrowing past the last option. The list
+  shows a loading row, a Retry row when a page fails, and "50 of 1,204" when the loader returns `total`.
+- Cells show a placeholder while `resolveOptions` looks a value up. Every option a page or lookup returns is
+  remembered, so its label appears in cells, exports and filters.
+- `rowId` and `colField` let options depend on the row (cities of the row's country, say).
+- The column's filter uses the same loader, as an infinite multi-select list.
+
 ---
 
 ### 6. Declarative Style Rules

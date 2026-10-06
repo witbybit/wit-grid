@@ -20,6 +20,7 @@ import {
 } from './editors.js';
 import { formatCellDate, formatCellNumber, parseMultiValue, type DateCellOptions, type NumberCellOptions } from './format.js';
 import { optionLabel, type CellOption } from './listbox.js';
+import { createCellOptionsStore, type CellOptionsSourceConfig, type CellOptionsStore } from './optionsStore.js';
 import {
 	createCheckboxRenderer,
 	createDateRenderer,
@@ -30,10 +31,10 @@ import {
 	createProgressRenderer,
 	createRatingRenderer,
 	createSelectRenderer,
-	optionIndex,
 	type LinkCellOptions,
 	type MultiSelectRendererOptions,
 	type PersonCellOptions,
+	type PersonOption,
 	type ProgressCellOptions,
 	type RatingCellOptions,
 	type SelectRendererOptions,
@@ -49,11 +50,39 @@ function toOptions(input: readonly CellOptionInput[]): CellOption[] {
 	return input.map((option) => (typeof option === 'string' ? { value: option } : option));
 }
 
-function selectFilter(options: CellOption[]): ColumnTypeDefinition['filterDef'] {
+function filterOption(option: CellOption) {
+	return { value: option.value, label: optionLabel(option), group: option.group, description: option.description };
+}
+
+/** The column's filter list: the options, or pages from the same loader the editor uses. */
+function selectFilter(store: CellOptionsStore): ColumnTypeDefinition['filterDef'] {
+	const fetch = store.fetch;
+	if (!fetch) return { type: 'multi-select', options: store.options.map(filterOption) };
 	return {
-		type: 'multi-select',
-		options: options.map((option) => ({ value: option.value, label: optionLabel(option), group: option.group, description: option.description })),
+		type: 'infinite-multi-select',
+		pageSize: store.pageSize,
+		getOptionLabel: (value) => {
+			const option = store.get(String(value));
+			return option ? optionLabel(option) : String(value);
+		},
+		fetchPage: async (params, signal) => {
+			const page = await fetch({ search: params.query, offset: params.page * params.pageSize, limit: params.pageSize, signal });
+			return { options: page.options.map(filterOption), hasMore: !!page.hasMore, totalCount: page.total };
+		},
 	};
+}
+
+function labelOf(store: CellOptionsStore, value: string): string {
+	const option = store.get(value);
+	return option ? optionLabel(option) : value;
+}
+
+/**
+ * Options for a column: the given ones, plus `loadOptions` / `resolveOptions` for options that live
+ * on a server (paged and searched there, labels looked up for values drawn before any list opened).
+ */
+function optionsStoreFor(input: readonly CellOptionInput[], config: CellOptionsSourceConfig): CellOptionsStore {
+	return createCellOptionsStore(toOptions(input), config);
 }
 
 export function checkboxColumnType(): ColumnTypeDefinition<any> {
@@ -95,18 +124,21 @@ export function dateTimeColumnType(options: DateCellOptions = {}): ColumnTypeDef
 	return dateColumnType({ withTime: true, dateStyle: 'medium', ...options });
 }
 
-/** One option per cell, drawn as a badge; the editor is a searchable, grouped list. */
+/**
+ * One option per cell, drawn as a badge; the editor is a searchable, grouped list. For options on
+ * a server pass `loadOptions` (pages, searched there) and `resolveOptions` (labels for values in
+ * cells): `selectColumnType([], { loadOptions, resolveOptions })`.
+ */
 export function selectColumnType(
 	input: readonly CellOptionInput[],
-	config: SelectRendererOptions & SelectEditorOptions = {}
+	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
 ): ColumnTypeDefinition<any> {
-	const options = toOptions(input);
-	const index = optionIndex(options);
+	const store = optionsStoreFor(input, config);
 	return {
-		renderer: { kind: 'dom', renderer: createSelectRenderer(options, config) },
-		cellEditor: { kind: 'dom', editor: createSelectEditor(options, config) },
-		valueFormatter: ({ value }) => (value == null ? '' : (index.get(String(value))?.label ?? String(value))),
-		filterDef: selectFilter(options),
+		renderer: { kind: 'dom', renderer: createSelectRenderer(store, config) },
+		cellEditor: { kind: 'dom', editor: createSelectEditor(store, config) },
+		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
+		filterDef: selectFilter(store),
 	};
 }
 
@@ -116,7 +148,7 @@ export function selectColumnType(
  */
 export function comboboxColumnType(
 	input: readonly CellOptionInput[],
-	config: SelectRendererOptions & SelectEditorOptions = {}
+	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
 ): ColumnTypeDefinition<any> {
 	return selectColumnType(input, { variant: 'plain', searchable: true, ...config });
 }
@@ -124,16 +156,15 @@ export function comboboxColumnType(
 /** Several options (or free tags with `creatable`) per cell: chips, with “+N” past `maxVisible`. */
 export function multiSelectColumnType(
 	input: readonly CellOptionInput[],
-	config: MultiSelectRendererOptions & SelectEditorOptions = {}
+	config: MultiSelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
 ): ColumnTypeDefinition<any> {
-	const options = toOptions(input);
-	const index = optionIndex(options);
+	const store = optionsStoreFor(input, config);
 	return {
-		renderer: { kind: 'dom', renderer: createMultiSelectRenderer(options, config) },
-		cellEditor: { kind: 'dom', editor: createMultiSelectEditor(options, config) },
+		renderer: { kind: 'dom', renderer: createMultiSelectRenderer(store, config) },
+		cellEditor: { kind: 'dom', editor: createMultiSelectEditor(store, config) },
 		valueFormatter: ({ value }) =>
 			parseMultiValue(value)
-				.map((v) => index.get(v)?.label ?? v)
+				.map((v) => labelOf(store, v))
 				.join(', '),
 	};
 }
@@ -141,7 +172,7 @@ export function multiSelectColumnType(
 /** Free-form tags: any text, coloured from the palette, new ones created by typing. */
 export function tagsColumnType(
 	input: readonly CellOptionInput[] = [],
-	config: MultiSelectRendererOptions & SelectEditorOptions = {}
+	config: MultiSelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
 ): ColumnTypeDefinition<any> {
 	return multiSelectColumnType(input, { creatable: true, searchable: true, searchPlaceholder: 'Search or create…', ...config });
 }
@@ -171,16 +202,21 @@ export function emailColumnType(options: Omit<LinkCellOptions, 'kind'> = {}): Co
 	return { renderer: { kind: 'dom', renderer: createLinkRenderer({ ...options, kind: 'email' }) } };
 }
 
-/** People: avatar + name (stacked avatars with `multiple`), picked from a searchable list. */
-export function personColumnType(config: PersonCellOptions & SelectEditorOptions = {}): ColumnTypeDefinition<any> {
-	const people = config.people ?? [];
-	const byValue = new Map(people.map((person) => [person.value, person]));
+/**
+ * People: avatar + name (stacked avatars with `multiple`), picked from a searchable list. For a
+ * directory on a server, pass `loadOptions` / `resolveOptions` returning `PersonOption`s.
+ */
+export function personColumnType(
+	config: Omit<PersonCellOptions, 'people'> & { people?: readonly PersonOption[] } & SelectEditorOptions & CellOptionsSourceConfig = {}
+): ColumnTypeDefinition<any> {
+	const store = createCellOptionsStore(config.people ?? [], config);
+	const editable = store.options.length > 0 || !!store.fetch;
 	return {
-		renderer: { kind: 'dom', renderer: createPersonRenderer(config) },
-		cellEditor: people.length > 0 ? { kind: 'dom', editor: createPersonEditor(people, config) } : undefined,
+		renderer: { kind: 'dom', renderer: createPersonRenderer({ ...config, people: store }) },
+		cellEditor: editable ? { kind: 'dom', editor: createPersonEditor(store, config) } : undefined,
 		valueFormatter: ({ value }) =>
 			parseMultiValue(value)
-				.map((v) => byValue.get(v)?.label ?? v)
+				.map((v) => labelOf(store, v))
 				.join(', '),
 	};
 }

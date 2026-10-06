@@ -6,6 +6,15 @@ export { openCellPopover } from './popover.js';
 export type { CellPopover, CellPopoverOptions, CellPopoverDismissReason } from './popover.js';
 export { createCellListbox } from './listbox.js';
 export type { CellOption, CellListbox, CellListboxOptions } from './listbox.js';
+export { createCellOptionsStore } from './optionsStore.js';
+export type {
+	CellOptionsStore,
+	CellOptionsQuery,
+	CellOptionsPage,
+	CellOptionsLoader,
+	CellOptionsResolver,
+	CellOptionsSourceConfig,
+} from './optionsStore.js';
 export { createCellCalendar } from './calendar.js';
 export type { CellCalendar, CellCalendarOptions } from './calendar.js';
 export { parseMultiValue } from './format.js';
@@ -23,6 +32,7 @@ export {
 } from './renderers.js';
 export type {
 	BadgeVariant,
+	CellOptionsInput,
 	SelectRendererOptions,
 	MultiSelectRendererOptions,
 	RatingCellOptions,

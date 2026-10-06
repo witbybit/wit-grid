@@ -24,6 +24,7 @@ describe('React public boundary', () => {
 			'GroupToggle',
 			'checkboxColumnType',
 			'comboboxColumnType',
+			'createCellOptionsStore',
 			'createCheckboxRenderer',
 			'createDateEditor',
 			'createDateRenderer',

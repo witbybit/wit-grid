@@ -49,6 +49,7 @@ export {
 	createSelectEditor,
 	createMultiSelectEditor,
 	parseMultiValue,
+	createCellOptionsStore,
 } from '@eregister/wit-grid-core';
 export type {
 	CellOption,
@@ -66,6 +67,11 @@ export type {
 	PersonCellOptions,
 	DomCellEditor,
 	DomCellEditorParams,
+	CellOptionsStore,
+	CellOptionsQuery,
+	CellOptionsPage,
+	CellOptionsLoader,
+	CellOptionsResolver,
 } from '@eregister/wit-grid-core';
 
 // ─── Advanced filter API ──────────────────────────────────────────────────────

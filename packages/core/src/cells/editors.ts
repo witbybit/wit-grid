@@ -7,7 +7,8 @@ import { createCellCalendar } from './calendar.js';
 import { cellIconSvg, createCellIcon } from './icons.js';
 import { createCellListbox, type CellOption } from './listbox.js';
 import { openCellPopover, type CellPopover } from './popover.js';
-import { createAvatar, createOptionBadge, optionIndex, type BadgeVariant, type PersonOption } from './renderers.js';
+import { createAvatar, createOptionBadge, toOptionsStore, type BadgeVariant, type CellOptionsInput, type PersonOption } from './renderers.js';
+import type { CellOptionsStore } from './optionsStore.js';
 import {
 	parseCellDate,
 	parseCellNumber,
@@ -251,33 +252,34 @@ export interface SelectEditorOptions {
 	/** How the current value shows in the cell while editing. */
 	variant?: BadgeVariant;
 	placeholder?: string;
+	/** Status texts for options loaded from a server. */
+	loadingText?: string;
+	errorText?: string;
 }
 
 interface ListEditorSetup {
-	options: readonly CellOption[];
+	store: CellOptionsStore;
 	config: SelectEditorOptions;
 	multiple: boolean;
 	leading?: (option: CellOption) => HTMLElement | null;
 	/** Draws the value in the cell behind the popover. */
-	drawValue: (target: HTMLElement, values: string[], index: Map<string, CellOption>) => void;
+	drawValue: (target: HTMLElement, values: string[], store: CellOptionsStore) => void;
 }
 
 function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
+	const { store } = setup;
 	return {
 		mount(container, params) {
 			const root = editorShell(container);
 			const end = editSession(params, container);
-			// Values the cell holds that are not options (free tags, created values) stay listed and checked.
 			const values = parseMultiValue(params.value);
-			const options = [...setup.options];
-			const index = optionIndex(options);
-			for (const value of values) {
-				if (!index.has(value)) {
-					const option = { value };
-					options.push(option);
-					index.set(value, option);
-				}
-			}
+			// Values the cell holds that the list may not show (free tags, created values, options on a
+			// page not loaded yet) stay listed and checked: after the given options, or first when the
+			// rest comes from a server.
+			const extras: CellOption[] = values
+				.filter((value) => !store.options.some((o) => o.value === value))
+				.map((value) => store.get(value) ?? { value });
+			const options = store.fetch ? [...extras, ...store.options] : [...store.options, ...extras];
 			let selected = setup.multiple ? values : values.slice(0, 1);
 
 			const trigger = document.createElement('div');
@@ -295,10 +297,18 @@ function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
 					placeholder.textContent = setup.config.placeholder ?? (setup.multiple ? 'Select…' : 'Select an option');
 					view.appendChild(placeholder);
 				} else {
-					setup.drawValue(view, selected, index);
+					setup.drawValue(view, selected, store);
 				}
 			};
 			draw();
+			// Labels for values the store had not seen arrive later.
+			store.ensure(values)?.then(() => {
+				for (let i = 0; i < extras.length; i++) {
+					const known = store.get(extras[i].value);
+					if (known) options[options.indexOf(extras[i])] = extras[i] = known;
+				}
+				draw();
+			});
 
 			const write = () => (setup.multiple ? writeMultiValue(params.value, selected) : (selected[0] ?? null));
 			let popover: CellPopover | null = null;
@@ -311,12 +321,18 @@ function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
 				creatable: setup.config.creatable,
 				noneLabel: setup.config.noneLabel,
 				emptyText: setup.config.emptyText,
+				loadingText: setup.config.loadingText,
+				errorText: setup.config.errorText,
 				leading: setup.leading,
+				load: store.fetch
+					? (search, offset, signal) =>
+							store.fetch!({ search, offset, limit: store.pageSize, signal, rowId: params.rowId, colField: params.colField })
+					: undefined,
 				onCreate: (label) => {
-					if (!index.has(label)) {
+					if (!store.get(label)) {
 						const option = { value: label };
+						store.remember([option]);
 						options.push(option);
-						index.set(label, option);
 					}
 					return label;
 				},
@@ -352,6 +368,7 @@ function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
 			return {
 				destroy() {
 					end.release();
+					listbox.destroy();
 					popover?.close();
 				},
 			};
@@ -361,41 +378,42 @@ function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
 
 /** Same badges as the renderers: free values in a multi-select get palette colours, in a select none. */
 function drawBadges(variant: BadgeVariant, autoColor: boolean) {
-	return (target: HTMLElement, values: string[], index: Map<string, CellOption>) => {
-		for (const value of values) target.appendChild(createOptionBadge(index.get(value), value, variant, autoColor));
+	return (target: HTMLElement, values: string[], store: CellOptionsStore) => {
+		for (const value of values) target.appendChild(createOptionBadge(store.get(value), value, variant, autoColor));
 	};
 }
 
-/** Single choice: badge in the cell, searchable grouped list (a combobox) in the popover. */
-export function createSelectEditor(options: readonly CellOption[], config: SelectEditorOptions = {}): DomCellEditor<any> {
-	return createListEditor({ options, config, multiple: false, drawValue: drawBadges(config.variant ?? 'soft', false) });
+/**
+ * Single choice: badge in the cell, searchable grouped list (a combobox) in the popover. Give a
+ * store with `loadOptions` (see `createCellOptionsStore`) for options paged in from a server.
+ */
+export function createSelectEditor(options: CellOptionsInput, config: SelectEditorOptions = {}): DomCellEditor<any> {
+	return createListEditor({ store: toOptionsStore(options), config, multiple: false, drawValue: drawBadges(config.variant ?? 'soft', false) });
 }
 
 /** Many choices: chips in the cell, checkbox list in the popover. */
-export function createMultiSelectEditor(options: readonly CellOption[], config: SelectEditorOptions = {}): DomCellEditor<any> {
-	return createListEditor({ options, config, multiple: true, drawValue: drawBadges(config.variant ?? 'soft', true) });
+export function createMultiSelectEditor(options: CellOptionsInput, config: SelectEditorOptions = {}): DomCellEditor<any> {
+	return createListEditor({ store: toOptionsStore(options), config, multiple: true, drawValue: drawBadges(config.variant ?? 'soft', true) });
 }
 
 /** People picker: avatars in the list and the cell. */
-export function createPersonEditor(people: readonly PersonOption[], config: SelectEditorOptions & { multiple?: boolean } = {}): DomCellEditor<any> {
-	const byValue = new Map(people.map((person) => [person.value, person]));
-	const options: CellOption[] = people.map((person) => ({
-		value: person.value,
-		label: person.label,
-		description: person.description,
-		group: person.group,
-	}));
+export function createPersonEditor(
+	people: readonly PersonOption[] | CellOptionsStore,
+	config: SelectEditorOptions & { multiple?: boolean } = {}
+): DomCellEditor<any> {
+	const store = toOptionsStore(people);
+	const person = (value: string) => store.get(value) as PersonOption | undefined;
 	return createListEditor({
-		options,
+		store,
 		config: { searchable: true, searchPlaceholder: 'Search people…', ...config },
 		multiple: !!config.multiple,
-		leading: (option) => createAvatar(byValue.get(option.value), option.value),
+		leading: (option) => createAvatar(option as PersonOption, option.value),
 		drawValue: (target, values) => {
-			for (const value of values) target.appendChild(createAvatar(byValue.get(value), value));
+			for (const value of values) target.appendChild(createAvatar(person(value), value));
 			if (values.length === 1) {
 				const name = document.createElement('span');
 				name.className = 'og-ct-text';
-				name.textContent = byValue.get(values[0])?.label ?? values[0];
+				name.textContent = person(values[0])?.label ?? values[0];
 				target.appendChild(name);
 			}
 		},

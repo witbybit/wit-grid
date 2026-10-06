@@ -20,6 +20,7 @@ import {
 } from '@eregister/wit-grid-react';
 import type { BuiltInThemeName, CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } from '@eregister/wit-grid-react';
 import { Box, Code2, ChevronRight, Palette } from 'lucide-react';
+import { ACCOUNTS, DIRECTORY, accountsServer, directoryServer } from './nativeCellTypesServer';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
 
@@ -31,6 +32,8 @@ interface TaskRow {
 	priority: string;
 	labels: string[];
 	team: string;
+	account: string;
+	watchers: string[];
 	owner: string;
 	reviewers: string;
 	due: string;
@@ -117,6 +120,18 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 	priority: selectColumnType(PRIORITY, { variant: 'dot' }),
 	labels: multiSelectColumnType(LABELS, { maxVisible: 2, searchable: true }),
 	team: comboboxColumnType(TEAMS, { searchPlaceholder: 'Search teams…' }),
+	// Options on a server: paged and searched there, labels looked up for the values in cells.
+	account: comboboxColumnType([], {
+		loadOptions: accountsServer.load,
+		resolveOptions: accountsServer.resolve,
+		searchPlaceholder: 'Search 10,000 accounts…',
+	}),
+	watchers: personColumnType({
+		multiple: true,
+		loadOptions: directoryServer.load,
+		resolveOptions: directoryServer.resolve,
+		searchPlaceholder: 'Search 2,000 people…',
+	}),
 	owner: personColumnType({ people: PEOPLE }),
 	reviewers: personColumnType({ people: PEOPLE, multiple: true }),
 	budget: currencyColumnType({ currency: 'USD', decimals: 0, step: 500, colorNegative: true }),
@@ -132,6 +147,8 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },
 	{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },
 	{ field: 'team', header: 'Team', width: 150, type: 'team' },
+	{ field: 'account', header: 'Account', width: 200, type: 'account' },
+	{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },
 	{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },
 	{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },
 	{ field: 'due', header: 'Due', width: 140, type: 'date' },
@@ -162,6 +179,8 @@ function generateTasks(count: number): TaskRow[] {
 				(v, k, all) => all.indexOf(v) === k
 			),
 			team: pick(TEAMS, i * 7).value,
+			account: pick(ACCOUNTS, i * 37).value,
+			watchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],
 			owner: owner.value,
 			reviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),
 			due: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,
@@ -184,6 +203,10 @@ const TYPE_REFERENCE: { name: string; text: string }[] = [
 	{ name: 'comboboxColumnType', text: 'Searchable, grouped list for long option sets.' },
 	{ name: 'tagsColumnType', text: 'Free tags: type to create, colours from the palette.' },
 	{ name: 'personColumnType', text: 'Avatar and name, or stacked avatars; people picker.' },
+	{
+		name: 'loadOptions · resolveOptions',
+		text: 'Options from a server: searched there, paged in as the list scrolls, labels looked up for cells (Account, Watchers).',
+	},
 	{ name: "'date' · 'datetime'", text: 'Intl formatting; calendar popover with keyboard navigation.' },
 	{ name: "'number' · 'currency' · 'percent'", text: 'Intl number formats, stepper editor with bounds.' },
 	{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },
@@ -268,6 +291,7 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			navigationOptions={{ editTrigger: 'doubleClick' }}
 			pinLeftColumns={2}
 			onGridReady={handleReady}
+			rendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}
 		/>
 	);
 	if (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;

@@ -103,6 +103,7 @@ describe('Public/internal boundary', () => {
 				'countQueryNodes',
 				'createCellCalendar',
 				'createCellListbox',
+				'createCellOptionsStore',
 				'createCheckboxRenderer',
 				'createClientGrid',
 				'createDateEditor',
