@@ -8,9 +8,9 @@ import { createGridRowDataRef } from './publicRowRef.js';
 import type { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
-import { RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
+import { computeGroupMeta, RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
 import { groupByColIds, isGroupingActive, normalizeGroupDefs } from './rows/hierarchyConfig.js';
-import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
+import { findTreeNode, flattenSubtree, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
 import { samePipelineColumns } from './columns/columnDiff.js';
@@ -1114,6 +1114,8 @@ export class ClientRowModelController<TData = unknown>
 	 * else needs them.
 	 */
 	private rowIndexStale = false;
+	/** While stale, rows before this index still carry correct positions (an expansion splice). */
+	private rowIndexStaleFrom = 0;
 	private rowIdToVisualRowIds: Map<string, string[]> | undefined;
 	private dataRowCount = 0;
 	private unsubscribers: Array<() => void> = [];
@@ -1171,7 +1173,12 @@ export class ClientRowModelController<TData = unknown>
 	private ensureRowPositions(): void {
 		if (!this.rowIndexStale) return;
 		this.rowIndexStale = false;
-		this.stampRowPositions(0);
+		this.stampRowPositions(this.rowIndexStaleFrom);
+	}
+
+	private markRowPositionsStale(from: number): void {
+		this.rowIndexStaleFrom = this.rowIndexStale ? Math.min(this.rowIndexStaleFrom, from) : from;
+		this.rowIndexStale = true;
 	}
 
 	/**
@@ -1232,8 +1239,123 @@ export class ClientRowModelController<TData = unknown>
 		}
 		if (this.isExpanded(id) === expanded) return { changed: false };
 		this.runtime.updateExpansion((expansion) => ({ ...expansion, rows: { ...expansion.rows, [id]: expanded } }));
-		return this.refresh('expansion', id);
+		return this.trySpliceGroupExpansion(id) ?? this.refresh('expansion', id);
 	};
+
+	/** Group tree nodes by id, built once per row tree, walking group levels only. */
+	private groupNodesFor: { roots: RowTreeNode<TData>[]; byId: Map<string, Extract<RowTreeNode<TData>, { kind: 'group' }>> } | null = null;
+
+	private findGroupNode(id: string): Extract<RowTreeNode<TData>, { kind: 'group' }> | undefined {
+		const roots = this._roots;
+		if (!roots) return undefined;
+		if (this.groupNodesFor?.roots !== roots) {
+			const byId = new Map<string, Extract<RowTreeNode<TData>, { kind: 'group' }>>();
+			const stack: RowTreeNode<TData>[] = [...roots];
+			while (stack.length > 0) {
+				const node = stack.pop()!;
+				if (node.kind !== 'group') continue;
+				byId.set(node.id, node);
+				if (node.children[0]?.kind === 'group') for (const child of node.children) stack.push(child);
+			}
+			this.groupNodesFor = { roots, byId };
+		}
+		return this.groupNodesFor.byId.get(id);
+	}
+
+	/**
+	 * One group opened or closed: replace that group's rows (its row, children and totals) in place
+	 * instead of flattening every row. Valid only while the row tree is exactly what the pipeline
+	 * would reuse; otherwise (data changed since, pagination, detail rows, tree data) returns null and
+	 * the caller refreshes.
+	 */
+	private trySpliceGroupExpansion(id: string): RowModelRefreshResult | null {
+		const state = this.runtime.getState();
+		if (this._pageWindow !== null || state.pagination || state.detail || state.treeData || !isGroupingActive(state.grouping)) return null;
+		if (!this.pipeline.isTreeCurrent(this.buildPipelineInput(state, true), this._roots)) return null;
+		const index = this.visualRowIdToIndex.get(id);
+		const previousRows = this.visualRows;
+		const groupRow = index === undefined ? undefined : previousRows[index];
+		if (index === undefined || groupRow?.kind !== 'group') return null;
+		const node = this.findGroupNode(id);
+		if (!node) return null;
+
+		// Everything the group shows sits after it at a deeper level (its totals included).
+		const level = groupRow.hierarchy.level;
+		let end = index + 1;
+		while (end < previousRows.length && previousRows[end].hierarchy.level > level) end++;
+		const removedCount = end - index;
+
+		const subtreeSticky = new Map<number, number>();
+		const inserted = flattenSubtree(
+			node,
+			{
+				expansion: state.expansion,
+				groupDefaultExpanded: state.grouping?.defaultExpanded,
+				defaultRowHeight: state.defaultRowHeight,
+				rowHeightsRecord: state.rowHeights,
+				getRowHeight: this.getRowHeight,
+				groupRowHeight: state.grouping?.rowHeight,
+				totals: state.grouping?.totals,
+			},
+			{ parentId: groupRow.hierarchy.parentId, level, posInSet: groupRow.hierarchy.posInSet, setSize: groupRow.hierarchy.setSize },
+			subtreeSticky
+		);
+		const delta = inserted.length - removedCount;
+
+		const nextRows: VisualRow<TData>[] = new Array(previousRows.length + delta);
+		for (let i = 0; i < index; i++) nextRows[i] = previousRows[i];
+		for (let i = 0; i < inserted.length; i++) nextRows[index + i] = inserted[i];
+		for (let i = end; i < previousRows.length; i++) nextRows[i + delta] = previousRows[i];
+
+		// Group / total ids: removed ones leave the index, later ones shift, inserted ones are added.
+		// O(group rows); data-row positions are stamped lazily from `index` on first read.
+		const idIndex = this.visualRowIdToIndex;
+		for (let i = index; i < end; i++) {
+			const row = previousRows[i];
+			if (row.kind !== 'data') idIndex.delete(row.id);
+		}
+		if (delta !== 0) for (const [rowId, at] of idIndex) if (at >= end) idIndex.set(rowId, at + delta);
+		for (let i = 0; i < inserted.length; i++) if (inserted[i].kind !== 'data') idIndex.set(inserted[i].id, index + i);
+
+		// Sticky ranges: groups before the splice keep their key (an ancestor's end moves by delta),
+		// the subtree brings its own, and everything after shifts. Kept in row order.
+		const sticky = new Map<number, number>();
+		for (const [start, last] of this._stickyGroupMeta) {
+			if (start >= index) break;
+			sticky.set(start, last >= end - 1 ? last + delta : last);
+		}
+		for (const [start, last] of subtreeSticky) sticky.set(start + index, last + index);
+		for (const [start, last] of this._stickyGroupMeta) if (start >= end) sticky.set(start + delta, last + delta);
+
+		this.visualRows = nextRows;
+		this._stickyGroupMeta = sticky;
+		const meta = computeGroupMeta(nextRows);
+		this._groupMeta = meta.byId;
+		this._groupMetaByVisualIndex = meta.byVisualIndex;
+		this.markRowPositionsStale(index);
+		this._incremental = undefined;
+		this._flatTotals = undefined;
+		if (this._uniformHeight != null && inserted.some((row) => row.height !== this._uniformHeight)) this._uniformHeight = undefined;
+		this._incrementalSeed = this.captureIncrementalSeed(state);
+		this.runtime.bumpGlobalVersion();
+
+		// What describeVisualRowDiff reports for this change, without walking every row: the group row
+		// keeps its identity and its aggregates, rows outside the splice are the same objects, so the
+		// change spans from the first row after the group to the end of the spliced region.
+		if (removedCount === 1 && inserted.length === 1) {
+			return { changed: false, reason: 'expansion', previousRowCount: previousRows.length, nextRowCount: nextRows.length, groupId: id };
+		}
+		const suffix = previousRows.length - end;
+		return {
+			changed: true,
+			reason: 'expansion',
+			previousRowCount: previousRows.length,
+			nextRowCount: nextRows.length,
+			changedStartIndex: index + 1,
+			changedEndIndex: Math.max(previousRows.length, nextRows.length) - suffix - 1,
+			groupId: id,
+		};
+	}
 
 	/** `base` replaces every explicit choice, so this is O(1) however many rows the tree holds. */
 	public expandAll = (options?: ExpandAllOptions): RowModelRefreshResult => {
@@ -1791,7 +1913,7 @@ export class ClientRowModelController<TData = unknown>
 			return null;
 		}
 		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
-		if (result.moved || result.listChanged) this.rowIndexStale = true;
+		if (result.moved || result.listChanged) this.markRowPositionsStale(0);
 		if (result.membershipChanged) this._hierarchyIndex = null;
 		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
 		const hasRange = result.changedStartIndex !== undefined;

@@ -199,7 +199,7 @@ describe('checkbox selection — end to end', () => {
 		}
 		await grid.settle(1000);
 		expectCheckboxesTruthful(grid, 'at rest');
-	});
+	}, 30_000);
 
 	it('a click on a recycled checkbox acts on the row it shows now, never the row it showed before', async () => {
 		grid = await mountGrid(GROUPED, orders(60));

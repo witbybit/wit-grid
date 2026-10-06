@@ -62,6 +62,29 @@ export function flattenStage<TData>(
 	return result;
 }
 
+/**
+ * Flattens one node and everything it shows (a group row with its children and totals), exactly as
+ * flattenStage would at this position. `stickyGroupMeta` receives indexes relative to the returned
+ * array. Used to splice a single group's expansion change into existing visual rows.
+ */
+export function flattenSubtree<TData>(
+	node: RowTreeNode<TData>,
+	config: FlattenConfig<TData>,
+	position: { parentId: string | null; level: number; posInSet: number; setSize: number },
+	stickyGroupMeta?: Map<number, number>
+): VisualRow<TData>[] {
+	const result: VisualRow<TData>[] = [];
+	const state: FlattenState<TData> = {
+		config,
+		result,
+		stickyGroupMeta,
+		totalsHeight: config.groupRowHeight || config.defaultRowHeight,
+		recordedHeights: hasKeys(config.rowHeightsRecord) ? config.rowHeightsRecord : null,
+	};
+	flattenNode(node, state, position.parentId, position.level, position.posInSet, position.setSize);
+	return result;
+}
+
 type ExpansionConfig<TData> = Pick<FlattenConfig<TData>, 'expansion' | 'groupDefaultExpanded' | 'treeDefaultExpanded'>;
 
 /** A group's or tree row's expansion: its explicit override, else `expansion.base`, else the configured default. */

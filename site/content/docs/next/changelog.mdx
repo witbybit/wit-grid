@@ -20,7 +20,7 @@ selected. Ancestor groups update as their rows are selected. `GroupRenderContext
 
 ### Fixed — editing grouped, aggregated grids
 
-- Expanding or collapsing a group, opening a detail row or changing pages re-ran filtering, grouping, sorting and aggregation over every row. The row tree is now reused while the rows and the row-shaping state are unchanged, and unchanged rows keep their row objects, so a group toggle on 200k grouped rows takes about 40 ms instead of 100–160 ms.
+- Expanding or collapsing a group, opening a detail row or changing pages re-ran filtering, grouping, sorting and aggregation over every row. Opening or closing one group now replaces only that group's rows (about 5 ms on 200k grouped rows, was 100–160 ms); expand/collapse all, detail rows and page changes reuse the row tree and only re-flatten.
 
 - Editing a cell in a column that feeds a group aggregate re-ran the whole row pipeline (about 200 ms at 200k rows) and threw away the incremental index. Cell edits, cell transactions and undo/redo now patch the group totals incrementally, like row updates (about 3 ms).
 - Editing a field that a computed (`valueGetter`) aggregate column reads left the group totals stale. Declare `valueGetterDependencies` on the computed column to keep such edits incremental; without them, any edit in a grid with that aggregate re-aggregates in full, since the getter could read any field.

@@ -104,6 +104,22 @@ interface TreeStageKey<TData> {
 	hasDetail: boolean;
 }
 
+function treeStageKeyOf<TData>(input: RowPipelineInput<TData>): TreeStageKey<TData> {
+	return {
+		dataVersion: input.dataVersion ?? -1,
+		nodes: input.nodes,
+		columns: input.columns,
+		sortModel: input.sortModel,
+		filterModel: input.filterModel,
+		quickFilterModel: input.quickFilterModel,
+		queryModel: input.queryModel,
+		groupBy: input.grouping?.by,
+		treeData: input.treeData,
+		aggregationDefs: input.aggregation?.defs,
+		hasDetail: !!input.detail,
+	};
+}
+
 function sameTreeStageKey<TData>(a: TreeStageKey<TData>, b: TreeStageKey<TData>): boolean {
 	return (
 		a.dataVersion === b.dataVersion &&
@@ -126,6 +142,13 @@ export class RowPipeline<TData = unknown> {
 	private treeCache: { key: TreeStageKey<TData>; roots: RowTreeNode<TData>[]; grandAggregates: Record<string, unknown> | undefined } | null = null;
 	/** Runs that reused the cached tree (diagnostics and tests). */
 	public treeCacheHits = 0;
+
+	/** Whether a run with this input would reuse `roots` as built: the tree is current for it. */
+	public isTreeCurrent(input: RowPipelineInput<TData>, roots: RowTreeNode<TData>[] | null): boolean {
+		const cache = this.treeCache;
+		if (!cache || !roots || cache.roots !== roots || input.dataVersion === undefined) return false;
+		return sameTreeStageKey(cache.key, treeStageKeyOf(input));
+	}
 
 	public run(input: RowPipelineInput<TData>): RowPipelineOutput<TData> {
 		const {
@@ -154,22 +177,7 @@ export class RowPipeline<TData = unknown> {
 		let visualRows: VisualRow<TData>[] | null = null;
 		let grandAggregates: Record<string, unknown> | undefined;
 
-		const treeKey: TreeStageKey<TData> | null =
-			input.dataVersion === undefined
-				? null
-				: {
-						dataVersion: input.dataVersion,
-						nodes,
-						columns,
-						sortModel,
-						filterModel,
-						quickFilterModel,
-						queryModel,
-						groupBy: grouping?.by,
-						treeData,
-						aggregationDefs: aggregation?.defs,
-						hasDetail: !!detail,
-					};
+		const treeKey = input.dataVersion === undefined ? null : treeStageKeyOf(input);
 		const cached = treeKey && this.treeCache && sameTreeStageKey(this.treeCache.key, treeKey) ? this.treeCache : null;
 
 		if (cached) {
@@ -414,7 +422,7 @@ function rebuildStickyGroupMeta<TData>(visualRows: VisualRow<TData>[], out: Map<
 	while (stack.length > 0) close(stack.pop()!, visualRows.length - 1);
 }
 
-function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
+export function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 	byId: Map<string, GroupRowMeta>;
 	byVisualIndex: Map<number, GroupRowMeta>;
 } {
@@ -422,14 +430,22 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 	const byVisualIndex = new Map<number, GroupRowMeta>();
 	const stack: GroupRowMeta[] = [];
 
+	// A data row only updates the innermost open group; a closing group hands its leaf range to its
+	// parent. One write per data row instead of one per ancestor.
+	const close = (closing: GroupRowMeta, lastIndex: number) => {
+		if (closing.firstChildIndex !== -1) closing.lastChildIndex = lastIndex;
+		const parent = stack[stack.length - 1];
+		if (parent && closing.firstLeafIndex !== -1) {
+			if (parent.firstLeafIndex === -1) parent.firstLeafIndex = closing.firstLeafIndex;
+			parent.lastLeafIndex = closing.lastLeafIndex;
+		}
+	};
+
 	for (let i = 0; i < visualRows.length; i++) {
 		const row = visualRows[i];
 		if (row.kind === 'group') {
 			// Close groups on the stack that are at same or deeper depth than this new group.
-			while (stack.length > 0 && stack[stack.length - 1].level >= row.hierarchy.level) {
-				const closing = stack.pop()!;
-				if (closing.firstChildIndex !== -1) closing.lastChildIndex = i - 1;
-			}
+			while (stack.length > 0 && stack[stack.length - 1].level >= row.hierarchy.level) close(stack.pop()!, i - 1);
 			const parentGroupId = stack.length > 0 ? stack[stack.length - 1].groupId : null;
 			const meta: GroupRowMeta = {
 				groupId: row.groupId,
@@ -450,18 +466,14 @@ function computeGroupMeta<TData>(visualRows: VisualRow<TData>[]): {
 			byId.set(row.groupId, meta);
 			byVisualIndex.set(i, meta);
 			if (row.hierarchy.expanded) stack.push(meta);
-		} else if (row.kind === 'data') {
-			for (const group of stack) {
-				if (group.firstLeafIndex === -1) group.firstLeafIndex = i;
-				group.lastLeafIndex = i;
-			}
+		} else if (row.kind === 'data' && stack.length > 0) {
+			const group = stack[stack.length - 1];
+			if (group.firstLeafIndex === -1) group.firstLeafIndex = i;
+			group.lastLeafIndex = i;
 		}
 	}
 	// Close any groups still open at end of list.
-	while (stack.length > 0) {
-		const closing = stack.pop()!;
-		if (closing.firstChildIndex !== -1) closing.lastChildIndex = visualRows.length - 1;
-	}
+	while (stack.length > 0) close(stack.pop()!, visualRows.length - 1);
 
 	return { byId, byVisualIndex };
 }
