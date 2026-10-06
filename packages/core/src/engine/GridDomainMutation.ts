@@ -11,7 +11,7 @@ import {
 	type RowModelWriteResult,
 	type RowWriteImpact,
 } from '../rowModel.js';
-import type { ColumnDef } from '../columnDef.js';
+import { getValueByPath, type ColumnDef } from '../columnDef.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
 import type { InternalGridState, GridStateUpdater } from '../state/GridState.js';
 import type {
@@ -677,6 +677,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 								{
 									updatedNodes: node ? [node] : [],
 									changedFieldsByRow,
+									changedValuesByRow: node ? collectCommittedCellValues([result], [node], commitContext) : undefined,
 									visualChange: 'none',
 								},
 								impact
@@ -852,6 +853,7 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 									{
 										updatedNodes: nodes,
 										changedFieldsByRow,
+										changedValuesByRow: collectCommittedCellValues(committed, nodes, commitContext),
 										visualChange: 'none',
 									},
 									impact
@@ -1080,4 +1082,36 @@ export function createDefaultGridDomainMutationExecutorRegistry<TRowData = unkno
 			> | null;
 		},
 	};
+}
+
+/**
+ * The old and new stored field values of committed cell writes, which the client row model's
+ * incremental index needs to patch group aggregates by delta instead of re-running the pipeline.
+ * The new value is read back from the row after the write, so a valueSetter that transforms or
+ * redirects the value never feeds the index a value the row does not hold. Several writes to one
+ * cell collapse to the first old value and the final stored value. A column with a valueGetter
+ * computes its value from other fields, so its old stored value is unknown here: no values are
+ * returned and the row model takes its full path.
+ */
+function collectCommittedCellValues<TRowData>(
+	committed: readonly Pick<CellValueChangeResult, 'rowId' | 'colField' | 'oldRawValue'>[],
+	nodes: readonly { id: string; data: unknown }[],
+	columns: { getColumnDef?(colField: string): ColumnDef<TRowData> | undefined }
+): Map<string, Map<string, { oldValue: unknown; newValue: unknown }>> | undefined {
+	if (!columns.getColumnDef) return undefined;
+	for (const write of committed) if (columns.getColumnDef(write.colField)?.valueGetter) return undefined;
+	const dataById = new Map<string, unknown>();
+	for (const node of nodes) dataById.set(node.id, node.data);
+	const byRow = new Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>();
+	for (const write of committed) {
+		if (!dataById.has(write.rowId)) continue;
+		let fields = byRow.get(write.rowId);
+		if (!fields) byRow.set(write.rowId, (fields = new Map()));
+		const previous = fields.get(write.colField);
+		fields.set(write.colField, {
+			oldValue: previous ? previous.oldValue : write.oldRawValue,
+			newValue: getValueByPath(dataById.get(write.rowId), write.colField),
+		});
+	}
+	return byRow;
 }

@@ -18,6 +18,11 @@ every order beneath the group, nested and collapsed groups included, and shows a
 selected. Ancestor groups update as their rows are selected. `GroupRenderContext.selection` (`'all'`, `'some'`,
 `'none'`) lets a custom group renderer draw the same state.
 
+### Fixed — editing grouped, aggregated grids
+
+- Editing a cell in a column that feeds a group aggregate re-ran the whole row pipeline (about 200 ms at 200k rows) and threw away the incremental index. Cell edits, cell transactions and undo/redo now patch the group totals incrementally, like row updates (about 3 ms).
+- Editing a field that a computed (`valueGetter`) aggregate column reads left the group totals stale. Declare `valueGetterDependencies` on the computed column to keep such edits incremental; without them, any edit in a grid with that aggregate re-aggregates in full, since the getter could read any field.
+
 ### Fixed — checkbox selection
 
 - Ctrl/Cmd+click toggled a row twice, selecting and immediately deselecting it. It now toggles once and leaves the cell cursor where it is.
