@@ -4,9 +4,12 @@
  * Every built-in cell type: renderers and editors come from the grid core (DOM, no React per cell),
  * styled from the grid theme, so switching theme restyles cells, badges and editor popovers alike.
  */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+	BUILT_IN_THEME_METADATA,
+	BUILT_IN_THEME_ORDER,
 	Grid,
+	getBuiltInTheme,
 	comboboxColumnType,
 	currencyColumnType,
 	multiSelectColumnType,
@@ -15,7 +18,7 @@ import {
 	ratingColumnType,
 	selectColumnType,
 } from '@eregister/wit-grid-react';
-import type { CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } from '@eregister/wit-grid-react';
+import type { BuiltInThemeName, CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } from '@eregister/wit-grid-react';
 import { Box, Code2, ChevronRight, Palette } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -211,44 +214,63 @@ const columns = [
 // Colours follow the grid theme. To adjust cells alone, set
 // --og-ct-accent, --og-ct-radius, --og-ct-rating… on the grid.`;
 
-const THEMES: { name: string; label: string; swatch: string }[] = [
-	{ name: 'dark', label: 'Dark', swatch: '#0b1220' },
-	{ name: 'light', label: 'Light', swatch: '#ffffff' },
-	{ name: 'cool-blue', label: 'Cool blue', swatch: '#1e3a8a' },
-	{ name: 'warm-orange', label: 'Warm', swatch: '#c2410c' },
-	{ name: 'minimal-monochrome', label: 'Mono', swatch: '#737373' },
-	{ name: 'spreadsheet', label: 'Sheet', swatch: '#16a34a' },
-];
+/** Every built-in theme, with its background and accent for the swatch. */
+const THEMES = BUILT_IN_THEME_ORDER.map((name) => {
+	const tokens = getBuiltInTheme(name);
+	return { name, label: BUILT_IN_THEME_METADATA[name].label, bg: tokens.bgColor, accent: tokens.focusRing };
+});
 
 // ─── Page component ───────────────────────────────────────────────────────────
 
 interface NativeCellTypesDemoProps {
 	onGridReady?: (event: GridReadyEvent<TaskRow>) => void;
-	/** Hides the reference sidebar, keeping just the grid. */
+	/** Hides the reference sidebar and the toolbar frame, keeping just the grid (for embedding). */
 	compact?: boolean;
+	/**
+	 * The grid theme, when the host picks it (the docs hero). Hides the built-in theme picker; the
+	 * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.
+	 */
+	theme?: BuiltInThemeName;
 }
 
-export default function NativeCellTypesDemo({ onGridReady, compact = false }: NativeCellTypesDemoProps) {
+export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
-	const [theme, setTheme] = useState('dark');
+	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');
+	const theme = controlledTheme ?? ownTheme;
 	const themeRef = useRef(theme);
 	const [showSnippet, setShowSnippet] = useState(false);
+	// The theme the grid is created with (no flash of the default theme); later changes switch it.
+	const initialState = useMemo(() => ({ themeName: themeRef.current }), []);
 
 	const handleReady = useCallback(
 		(event: GridReadyEvent<TaskRow>) => {
 			apiRef.current = event.api;
-			// A remounted grid starts on its default theme: give it the one picked here.
-			if (themeRef.current !== 'dark') event.api.switchTheme(themeRef.current);
+			// A remounted grid starts on the theme it was created with: bring it to the current one.
+			if (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);
 			onGridReady?.(event);
 		},
 		[onGridReady]
 	);
-	const applyTheme = (name: string) => {
-		themeRef.current = name;
-		setTheme(name);
-		apiRef.current?.switchTheme(name);
-	};
+	useEffect(() => {
+		themeRef.current = theme;
+		const api = apiRef.current;
+		if (api && api.getThemeName() !== theme) api.switchTheme(theme);
+	}, [theme]);
+
+	const grid = (
+		<Grid
+			rowModelType='client'
+			rows={rows}
+			columns={COLUMNS}
+			columnTypes={TASK_COLUMN_TYPES}
+			initialState={initialState}
+			navigationOptions={{ editTrigger: 'doubleClick' }}
+			pinLeftColumns={2}
+			onGridReady={handleReady}
+		/>
+	);
+	if (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;
 
 	return (
 		<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>
@@ -259,75 +281,68 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false }: Na
 						Native cell types
 						<span className='text-slate-500 font-normal'>· double-click or press Enter on a cell to edit</span>
 					</div>
-					<div className='flex items-center gap-1' role='radiogroup' aria-label='Grid theme'>
-						<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />
-						{THEMES.map((t) => (
-							<button
-								key={t.name}
-								role='radio'
-								aria-checked={theme === t.name}
-								onClick={() => applyTheme(t.name)}
-								className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${
-									theme === t.name
-										? 'border-slate-500 bg-slate-800 text-slate-100'
-										: 'border-transparent text-slate-400 hover:bg-slate-800/60'
-								}`}
-							>
-								<span className='w-2.5 h-2.5 rounded-full border border-slate-600' style={{ background: t.swatch }} />
-								{t.label}
-							</button>
-						))}
-					</div>
+					{!controlledTheme && (
+						<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>
+							<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />
+							{THEMES.map((t) => (
+								<button
+									key={t.name}
+									role='radio'
+									aria-checked={theme === t.name}
+									onClick={() => setOwnTheme(t.name)}
+									className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${
+										theme === t.name
+											? 'border-slate-500 bg-slate-800 text-slate-100'
+											: 'border-transparent text-slate-400 hover:bg-slate-800/60'
+									}`}
+								>
+									<span
+										className='w-2.5 h-2.5 rounded-full border border-slate-600'
+										style={{ background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)` }}
+									/>
+									{t.label}
+								</button>
+							))}
+						</div>
+					)}
 				</div>
 
-				<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>
-					<Grid
-						rowModelType='client'
-						rows={rows}
-						columns={COLUMNS}
-						columnTypes={TASK_COLUMN_TYPES}
-						navigationOptions={{ editTrigger: 'doubleClick' }}
-						pinLeftColumns={2}
-						onGridReady={handleReady}
-					/>
-				</div>
+				<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>{grid}</div>
 			</div>
 
-			{!compact && (
-				<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>
-					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
-						<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>
-						{TYPE_REFERENCE.map((t) => (
-							<div key={t.name} className='flex flex-col gap-0.5'>
-								<code className='text-[11px] text-violet-300'>{t.name}</code>
-								<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>
-							</div>
-						))}
-						<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>
-							All cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come
-							from the grid theme, so popovers and badges follow the theme switch above.
-						</p>
-					</div>
-
-					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>
-						<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>
-							<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>
-								<Code2 className='w-3.5 h-3.5 text-emerald-400' />
-								Usage
-							</h3>
-							<ChevronRight
-								className='w-3 h-3 text-slate-500 transition-transform duration-150'
-								style={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}
-							/>
-						</button>
-						{showSnippet && (
-							<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>
-								{SNIPPET}
-							</pre>
-						)}
-					</div>
+			<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>
+				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
+					<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>
+					{TYPE_REFERENCE.map((t) => (
+						<div key={t.name} className='flex flex-col gap-0.5'>
+							<code className='text-[11px] text-violet-300'>{t.name}</code>
+							<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>
+						</div>
+					))}
+					<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>
+						All cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come from
+						the grid theme, so popovers and badges follow the theme switch above.
+					</p>
 				</div>
-			)}
+
+				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>
+					<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>
+						<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>
+							<Code2 className='w-3.5 h-3.5 text-emerald-400' />
+							Usage
+						</h3>
+						<ChevronRight
+							className='w-3 h-3 text-slate-500 transition-transform duration-150'
+							style={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}
+						/>
+					</button>
+					{showSnippet && (
+						<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>
+							{SNIPPET}
+						</pre>
+					)}
+				</div>
+			</div>
 		</div>
 	);
 }

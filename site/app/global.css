@@ -73,6 +73,106 @@ body {
 	}
 }
 
+/* Demo switcher above the hero grid: tabs, a hint, and (for the cell demo) the grid theme swatches. */
+.wg-hero-switcher {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 14px;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--color-fd-border);
+	background: var(--color-fd-muted);
+}
+
+.wg-hero-tabs {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border-radius: 9px;
+	border: 1px solid var(--color-fd-border);
+	background: var(--color-fd-background);
+}
+
+.wg-hero-tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	padding: 0 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	color: color-mix(in srgb, var(--color-fd-foreground) 72%, transparent);
+	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		color 0.15s ease;
+}
+
+.wg-hero-tab:hover {
+	color: var(--color-fd-foreground);
+}
+
+.wg-hero-tab[aria-selected='true'] {
+	background: var(--color-fd-primary);
+	color: var(--color-fd-primary-foreground);
+}
+
+.wg-hero-hint {
+	font-size: 12px;
+	color: var(--color-fd-muted-foreground);
+}
+
+.wg-hero-themes {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.wg-hero-swatch {
+	width: 20px;
+	height: 20px;
+	border-radius: 999px;
+	border: 1px solid var(--color-fd-border);
+	cursor: pointer;
+	transition:
+		transform 0.12s ease,
+		box-shadow 0.12s ease;
+}
+
+.wg-hero-swatch:hover {
+	transform: scale(1.1);
+}
+
+.wg-hero-swatch[aria-checked='true'] {
+	box-shadow:
+		0 0 0 2px var(--color-fd-background),
+		0 0 0 4px var(--color-fd-foreground);
+}
+
+.wg-hero-swatch:focus-visible,
+.wg-hero-tab:focus-visible {
+	outline: 2px solid var(--color-fd-ring, #38bdf8);
+	outline-offset: 2px;
+}
+
+.wg-hero-theme-label {
+	min-width: 84px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--color-fd-foreground);
+}
+
+@media (max-width: 640px) {
+	.wg-hero-hint {
+		display: none;
+	}
+	.wg-hero-themes {
+		margin-left: 0;
+	}
+}
+
 /* ─── Landing page ──────────────────────────────────────────────────────────── */
 
 .wg-landing-bg {

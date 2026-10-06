@@ -335,6 +335,14 @@ export const COOL_BLUE_THEME: ThemeTokens = {
 	groupBadgeBorder: 'rgba(33, 150, 243, 0.4)',
 	groupBadgeText: '#64b5f6',
 	error: '#f87171',
+	popoverBg: 'rgba(11, 31, 51, 0.98)',
+	popoverBorder: 'rgba(144, 202, 249, 0.16)',
+	popoverText: '#e3f2fd',
+	popoverItemHoverBg: 'rgba(33, 150, 243, 0.16)',
+	popoverItemActiveBg: '#2196f3',
+	popoverDivider: 'rgba(144, 202, 249, 0.12)',
+	popoverInputBg: 'rgba(5, 24, 39, 0.9)',
+	popoverInputBorder: 'rgba(144, 202, 249, 0.18)',
 };
 
 /**
@@ -353,6 +361,14 @@ export const WARM_ORANGE_THEME: ThemeTokens = {
 	groupBadgeBorder: 'rgba(255, 152, 0, 0.4)',
 	groupBadgeText: '#ffb74d',
 	error: '#fb923c',
+	popoverBg: 'rgba(36, 21, 4, 0.98)',
+	popoverBorder: 'rgba(255, 179, 153, 0.16)',
+	popoverText: '#ffe4d6',
+	popoverItemHoverBg: 'rgba(255, 152, 0, 0.14)',
+	popoverItemActiveBg: '#ff9800',
+	popoverDivider: 'rgba(255, 179, 153, 0.12)',
+	popoverInputBg: 'rgba(13, 6, 0, 0.9)',
+	popoverInputBorder: 'rgba(255, 179, 153, 0.18)',
 };
 
 /**
@@ -443,6 +459,14 @@ export const MINIMAL_MONOCHROME_THEME: ThemeTokens = {
 	groupBadgeBorder: 'rgba(128, 128, 128, 0.3)',
 	groupBadgeText: '#b0b0b0',
 	error: '#c0504d',
+	popoverBg: 'rgba(30, 30, 30, 0.98)',
+	popoverBorder: 'rgba(255, 255, 255, 0.1)',
+	popoverText: '#e8e8e8',
+	popoverItemHoverBg: 'rgba(255, 255, 255, 0.08)',
+	popoverItemActiveBg: '#808080',
+	popoverDivider: 'rgba(255, 255, 255, 0.08)',
+	popoverInputBg: 'rgba(15, 15, 15, 0.9)',
+	popoverInputBorder: 'rgba(255, 255, 255, 0.12)',
 };
 
 /**
