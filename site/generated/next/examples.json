@@ -52277,7 +52277,7 @@
 			"title": "Native cell types",
 			"description": "Every built-in cell type (select, multi-select, combobox, person, date, number, progress, rating) with themed editors.",
 			"sourcePath": "packages/examples/src/showcases/NativeCellTypesDemo.tsx",
-			"source": "/**\n * Native Cell Types Showcase\n *\n * Every built-in cell type: renderers and editors come from the grid core (DOM, no React per cell),\n * styled from the grid theme, so switching theme restyles cells, badges and editor popovers alike.\n */\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\nimport {\n\tBUILT_IN_THEME_METADATA,\n\tBUILT_IN_THEME_ORDER,\n\tGrid,\n\tgetBuiltInTheme,\n\tcomboboxColumnType,\n\tcurrencyColumnType,\n\tmultiSelectColumnType,\n\tpersonColumnType,\n\tprogressColumnType,\n\tratingColumnType,\n\tselectColumnType,\n} from '@eregister/wit-grid-react';\nimport type { BuiltInThemeName, CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } from '@eregister/wit-grid-react';\nimport { Box, Code2, ChevronRight, Palette } from 'lucide-react';\nimport { ACCOUNTS, DIRECTORY, accountsServer, directoryServer } from './nativeCellTypesServer';\n\n// ─── Data model ───────────────────────────────────────────────────────────────\n\ninterface TaskRow {\n\tid: string;\n\tdone: boolean;\n\ttask: string;\n\tstatus: string;\n\tpriority: string;\n\tlabels: string[];\n\tteam: string;\n\taccount: string;\n\twatchers: string[];\n\towner: string;\n\treviewers: string;\n\tdue: string;\n\tbudget: number;\n\tprogress: number;\n\tconfidence: number;\n\trating: number;\n\tspec: string;\n\tcontact: string;\n\tupdated: string;\n}\n\n// ─── Options ──────────────────────────────────────────────────────────────────\n\nconst STATUS: CellOption[] = [\n\t{ value: 'backlog', label: 'Backlog', color: 'gray' },\n\t{ value: 'todo', label: 'To do', color: 'sky' },\n\t{ value: 'progress', label: 'In progress', color: 'amber' },\n\t{ value: 'review', label: 'In review', color: 'violet' },\n\t{ value: 'done', label: 'Done', color: 'emerald' },\n\t{ value: 'blocked', label: 'Blocked', color: 'rose' },\n];\n\nconst PRIORITY: CellOption[] = [\n\t{ value: 'urgent', label: 'Urgent', color: 'red', description: 'Drop everything' },\n\t{ value: 'high', label: 'High', color: 'orange', description: 'This sprint' },\n\t{ value: 'medium', label: 'Medium', color: 'yellow', description: 'Next sprint' },\n\t{ value: 'low', label: 'Low', color: 'gray', description: 'When there is time' },\n];\n\nconst LABELS: CellOption[] = [\n\t{ value: 'bug', label: 'Bug', color: 'red' },\n\t{ value: 'feature', label: 'Feature', color: 'blue' },\n\t{ value: 'perf', label: 'Performance', color: 'amber' },\n\t{ value: 'a11y', label: 'Accessibility', color: 'teal' },\n\t{ value: 'docs', label: 'Docs', color: 'gray' },\n\t{ value: 'security', label: 'Security', color: 'fuchsia' },\n];\n\nconst TEAMS: CellOption[] = [\n\t{ value: 'ui', label: 'UI Design', group: 'Design', color: 'pink' },\n\t{ value: 'ux', label: 'UX Research', group: 'Design', color: 'rose' },\n\t{ value: 'brand', label: 'Brand', group: 'Design', color: 'fuchsia' },\n\t{ value: 'fe', label: 'Frontend', group: 'Engineering', color: 'blue' },\n\t{ value: 'be', label: 'Backend', group: 'Engineering', color: 'indigo' },\n\t{ value: 'infra', label: 'Infrastructure', group: 'Engineering', color: 'cyan' },\n\t{ value: 'qa', label: 'Quality', group: 'Engineering', color: 'teal' },\n\t{ value: 'growth', label: 'Growth', group: 'Business', color: 'emerald' },\n\t{ value: 'sales', label: 'Sales', group: 'Business', color: 'lime' },\n\t{ value: 'support', label: 'Support', group: 'Business', color: 'amber' },\n];\n\nconst PEOPLE: PersonOption[] = [\n\t{ value: 'ava', label: 'Ava Chen', description: 'Engineering manager', group: 'Engineering' },\n\t{ value: 'liam', label: 'Liam Novak', description: 'Frontend', group: 'Engineering' },\n\t{ value: 'noah', label: 'Noah Patel', description: 'Backend', group: 'Engineering' },\n\t{ value: 'mia', label: 'Mia Rossi', description: 'Product design', group: 'Design' },\n\t{ value: 'zoe', label: 'Zoe Okafor', description: 'Research', group: 'Design' },\n\t{ value: 'ethan', label: 'Ethan Brooks', description: 'QA lead', group: 'Engineering' },\n\t{ value: 'sofia', label: 'Sofia Lind', description: 'Growth', group: 'Business' },\n\t{ value: 'kai', label: 'Kai Tanaka', description: 'Infrastructure', group: 'Engineering' },\n];\n\nconst TASKS = [\n\t'Redesign onboarding flow',\n\t'Fix flaky checkout test',\n\t'Migrate auth to OAuth 2.1',\n\t'Dark mode for settings',\n\t'Audit color contrast',\n\t'Speed up search index',\n\t'Quarterly pricing review',\n\t'Write API rate-limit docs',\n\t'Kubernetes node upgrade',\n\t'Customer interview round',\n\t'Rebuild CSV importer',\n\t'Harden file uploads',\n];\n\n// ─── Column types ─────────────────────────────────────────────────────────────\n// Built-in names (checkbox, date, datetime, percent, url, email) need no registration; these add options.\n\nconst TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {\n\tstatus: selectColumnType(STATUS, { noneLabel: 'No status' }),\n\tpriority: selectColumnType(PRIORITY, { variant: 'dot' }),\n\tlabels: multiSelectColumnType(LABELS, { maxVisible: 2, searchable: true }),\n\tteam: comboboxColumnType(TEAMS, { searchPlaceholder: 'Search teams…' }),\n\t// Options on a server: paged and searched there, labels looked up for the values in cells.\n\taccount: comboboxColumnType([], {\n\t\tloadOptions: accountsServer.load,\n\t\tresolveOptions: accountsServer.resolve,\n\t\tsearchPlaceholder: 'Search 10,000 accounts…',\n\t}),\n\twatchers: personColumnType({\n\t\tmultiple: true,\n\t\tloadOptions: directoryServer.load,\n\t\tresolveOptions: directoryServer.resolve,\n\t\tsearchPlaceholder: 'Search 2,000 people…',\n\t}),\n\towner: personColumnType({ people: PEOPLE }),\n\treviewers: personColumnType({ people: PEOPLE, multiple: true }),\n\tbudget: currencyColumnType({ currency: 'USD', decimals: 0, step: 500, colorNegative: true }),\n\tprogress: progressColumnType(),\n\tconfidence: progressColumnType({ max: 1, traffic: true }),\n\trating: ratingColumnType(),\n};\n\nconst COLUMNS: ColumnDef<TaskRow>[] = [\n\t{ field: 'done', header: '', width: 48, type: 'checkbox' },\n\t{ field: 'task', header: 'Task', width: 220 },\n\t{ field: 'status', header: 'Status', width: 140, type: 'status' },\n\t{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },\n\t{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },\n\t{ field: 'team', header: 'Team', width: 150, type: 'team' },\n\t{ field: 'account', header: 'Account', width: 200, type: 'account' },\n\t{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },\n\t{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },\n\t{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },\n\t{ field: 'due', header: 'Due', width: 140, type: 'date' },\n\t{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },\n\t{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },\n\t{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },\n\t{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },\n\t{ field: 'spec', header: 'Spec', width: 190, type: 'url' },\n\t{ field: 'contact', header: 'Contact', width: 200, type: 'email' },\n\t{ field: 'updated', header: 'Updated', width: 190, type: 'datetime' },\n];\n\nfunction pick<T>(list: readonly T[], n: number): T {\n\treturn list[n % list.length];\n}\n\nfunction generateTasks(count: number): TaskRow[] {\n\treturn Array.from({ length: count }, (_, i) => {\n\t\tconst owner = pick(PEOPLE, i * 3);\n\t\tconst progress = (i * 37) % 101;\n\t\treturn {\n\t\t\tid: `T-${1001 + i}`,\n\t\t\tdone: progress >= 90,\n\t\t\ttask: pick(TASKS, i) + (i >= TASKS.length ? ` #${Math.floor(i / TASKS.length) + 1}` : ''),\n\t\t\tstatus: i % 11 === 5 ? '' : pick(STATUS, i * 5).value,\n\t\t\tpriority: pick(PRIORITY, i * 3 + 1).value,\n\t\t\tlabels: [pick(LABELS, i).value, pick(LABELS, i * 2 + 3).value, ...(i % 4 === 0 ? [pick(LABELS, i + 4).value] : [])].filter(\n\t\t\t\t(v, k, all) => all.indexOf(v) === k\n\t\t\t),\n\t\t\tteam: pick(TEAMS, i * 7).value,\n\t\t\taccount: pick(ACCOUNTS, i * 37).value,\n\t\t\twatchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],\n\t\t\towner: owner.value,\n\t\t\treviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),\n\t\t\tdue: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,\n\t\t\tbudget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),\n\t\t\tprogress,\n\t\t\tconfidence: ((i * 29) % 100) / 100,\n\t\t\trating: (i * 3) % 6,\n\t\t\tspec: `docs.example.com/specs/${1001 + i}`,\n\t\t\tcontact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,\n\t\t\tupdated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,\n\t\t};\n\t});\n}\n\n// ─── Reference ────────────────────────────────────────────────────────────────\n\nconst TYPE_REFERENCE: { name: string; text: string }[] = [\n\t{ name: 'selectColumnType', text: 'One option, tinted badge. Variants: soft, dot, outline, plain. Optional “none” entry.' },\n\t{ name: 'multiSelectColumnType', text: 'Chips with +N overflow; checkbox list editor.' },\n\t{ name: 'comboboxColumnType', text: 'Searchable, grouped list for long option sets.' },\n\t{ name: 'tagsColumnType', text: 'Free tags: type to create, colours from the palette.' },\n\t{ name: 'personColumnType', text: 'Avatar and name, or stacked avatars; people picker.' },\n\t{\n\t\tname: 'loadOptions · resolveOptions',\n\t\ttext: 'Options from a server: searched there, paged in as the list scrolls, labels looked up for cells (Account, Watchers).',\n\t},\n\t{ name: \"'date' · 'datetime'\", text: 'Intl formatting; calendar popover with keyboard navigation.' },\n\t{ name: \"'number' · 'currency' · 'percent'\", text: 'Intl number formats, stepper editor with bounds.' },\n\t{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },\n\t{ name: 'ratingColumnType', text: 'Stars, click to rate.' },\n\t{ name: \"'checkbox'\", text: 'Toggles on press, keeps the value’s own shape.' },\n\t{ name: \"'url' · 'email'\", text: 'Safe links (http, https, mailto only).' },\n];\n\nconst SNIPPET = `import { selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';\n\nconst columnTypes = {\n  status: selectColumnType([\n    { value: 'todo', label: 'To do', color: 'sky' },\n    { value: 'done', label: 'Done',  color: 'emerald' },\n  ], { noneLabel: 'No status' }),\n  team: comboboxColumnType([\n    { value: 'fe', label: 'Frontend', group: 'Engineering' },\n    { value: 'ui', label: 'UI Design', group: 'Design' },\n  ]),\n};\n\nconst columns = [\n  { field: 'status', header: 'Status', type: 'status' },\n  { field: 'due',    header: 'Due',    type: 'date' },\n  { field: 'price',  header: 'Price',  type: 'currency' },\n];\n\n// Colours follow the grid theme. To adjust cells alone, set\n// --og-ct-accent, --og-ct-radius, --og-ct-rating… on the grid.`;\n\n/** Every built-in theme, with its background and accent for the swatch. */\nconst THEMES = BUILT_IN_THEME_ORDER.map((name) => {\n\tconst tokens = getBuiltInTheme(name);\n\treturn { name, label: BUILT_IN_THEME_METADATA[name].label, bg: tokens.bgColor, accent: tokens.focusRing };\n});\n\n// ─── Page component ───────────────────────────────────────────────────────────\n\ninterface NativeCellTypesDemoProps {\n\tonGridReady?: (event: GridReadyEvent<TaskRow>) => void;\n\t/** Hides the reference sidebar and the toolbar frame, keeping just the grid (for embedding). */\n\tcompact?: boolean;\n\t/**\n\t * The grid theme, when the host picks it (the docs hero). Hides the built-in theme picker; the\n\t * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.\n\t */\n\ttheme?: BuiltInThemeName;\n}\n\nexport default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {\n\tconst rows = useMemo(() => generateTasks(200), []);\n\tconst apiRef = useRef<GridApi<TaskRow> | null>(null);\n\tconst [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');\n\tconst theme = controlledTheme ?? ownTheme;\n\tconst themeRef = useRef(theme);\n\tconst [showSnippet, setShowSnippet] = useState(false);\n\t// The theme the grid is created with (no flash of the default theme); later changes switch it.\n\tconst initialState = useMemo(() => ({ themeName: themeRef.current }), []);\n\n\tconst handleReady = useCallback(\n\t\t(event: GridReadyEvent<TaskRow>) => {\n\t\t\tapiRef.current = event.api;\n\t\t\t// A remounted grid starts on the theme it was created with: bring it to the current one.\n\t\t\tif (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);\n\t\t\tonGridReady?.(event);\n\t\t},\n\t\t[onGridReady]\n\t);\n\tuseEffect(() => {\n\t\tthemeRef.current = theme;\n\t\tconst api = apiRef.current;\n\t\tif (api && api.getThemeName() !== theme) api.switchTheme(theme);\n\t}, [theme]);\n\n\tconst grid = (\n\t\t<Grid\n\t\t\trowModelType='client'\n\t\t\trows={rows}\n\t\t\tcolumns={COLUMNS}\n\t\t\tcolumnTypes={TASK_COLUMN_TYPES}\n\t\t\tinitialState={initialState}\n\t\t\tnavigationOptions={{ editTrigger: 'doubleClick' }}\n\t\t\tpinLeftColumns={2}\n\t\t\tonGridReady={handleReady}\n\t\t\trendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}\n\t\t/>\n\t);\n\tif (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;\n\n\treturn (\n\t\t<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>\n\t\t\t<div className='flex-1 flex flex-col gap-3 min-h-[360px] lg:min-h-0 min-w-0'>\n\t\t\t\t<div className='border border-slate-800 rounded-xl px-3 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-slate-900/30'>\n\t\t\t\t\t<div className='flex items-center gap-2 text-[11px] text-slate-300 font-semibold'>\n\t\t\t\t\t\t<Box className='w-4 h-4 text-violet-400' />\n\t\t\t\t\t\tNative cell types\n\t\t\t\t\t\t<span className='text-slate-500 font-normal'>· double-click or press Enter on a cell to edit</span>\n\t\t\t\t\t</div>\n\t\t\t\t\t{!controlledTheme && (\n\t\t\t\t\t\t<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>\n\t\t\t\t\t\t\t<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />\n\t\t\t\t\t\t\t{THEMES.map((t) => (\n\t\t\t\t\t\t\t\t<button\n\t\t\t\t\t\t\t\t\tkey={t.name}\n\t\t\t\t\t\t\t\t\trole='radio'\n\t\t\t\t\t\t\t\t\taria-checked={theme === t.name}\n\t\t\t\t\t\t\t\t\tonClick={() => setOwnTheme(t.name)}\n\t\t\t\t\t\t\t\t\tclassName={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${\n\t\t\t\t\t\t\t\t\t\ttheme === t.name\n\t\t\t\t\t\t\t\t\t\t\t? 'border-slate-500 bg-slate-800 text-slate-100'\n\t\t\t\t\t\t\t\t\t\t\t: 'border-transparent text-slate-400 hover:bg-slate-800/60'\n\t\t\t\t\t\t\t\t\t}`}\n\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\t\t\tclassName='w-2.5 h-2.5 rounded-full border border-slate-600'\n\t\t\t\t\t\t\t\t\t\tstyle={{ background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)` }}\n\t\t\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t\t\t{t.label}\n\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t))}\n\t\t\t\t\t\t</div>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\n\t\t\t\t<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>{grid}</div>\n\t\t\t</div>\n\n\t\t\t<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>\n\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>\n\t\t\t\t\t{TYPE_REFERENCE.map((t) => (\n\t\t\t\t\t\t<div key={t.name} className='flex flex-col gap-0.5'>\n\t\t\t\t\t\t\t<code className='text-[11px] text-violet-300'>{t.name}</code>\n\t\t\t\t\t\t\t<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t))}\n\t\t\t\t\t<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>\n\t\t\t\t\t\tAll cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come from\n\t\t\t\t\t\tthe grid theme, so popovers and badges follow the theme switch above.\n\t\t\t\t\t</p>\n\t\t\t\t</div>\n\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>\n\t\t\t\t\t<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>\n\t\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>\n\t\t\t\t\t\t\t<Code2 className='w-3.5 h-3.5 text-emerald-400' />\n\t\t\t\t\t\t\tUsage\n\t\t\t\t\t\t</h3>\n\t\t\t\t\t\t<ChevronRight\n\t\t\t\t\t\t\tclassName='w-3 h-3 text-slate-500 transition-transform duration-150'\n\t\t\t\t\t\t\tstyle={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}\n\t\t\t\t\t\t/>\n\t\t\t\t\t</button>\n\t\t\t\t\t{showSnippet && (\n\t\t\t\t\t\t<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>\n\t\t\t\t\t\t\t{SNIPPET}\n\t\t\t\t\t\t</pre>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t</div>\n\t);\n}\n",
+			"source": "/**\r\n * Native Cell Types Showcase\r\n *\r\n * Every built-in cell type: renderers and editors come from the grid core (DOM, no React per cell),\r\n * styled from the grid theme, so switching theme restyles cells, badges and editor popovers alike.\r\n */\r\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\r\nimport {\r\n\tBUILT_IN_THEME_METADATA,\r\n\tBUILT_IN_THEME_ORDER,\r\n\tGrid,\r\n\tgetBuiltInTheme,\r\n\tcomboboxColumnType,\r\n\tcurrencyColumnType,\r\n\tmultiSelectColumnType,\r\n\tpersonColumnType,\r\n\tprogressColumnType,\r\n\tratingColumnType,\r\n\tselectColumnType,\r\n\tsegmentedColumnType,\r\n\tswitchColumnType,\r\n\tcolorColumnType,\r\n\tlongTextColumnType,\r\n\tdateRangeColumnType,\r\n\tcascadeColumnType,\r\n\tlinkedRecordColumnType,\r\n\tsparklineColumnType,\r\n} from '@eregister/wit-grid-react';\r\nimport type {\r\n\tBuiltInThemeName,\r\n\tCascadeOption,\r\n\tCellOption,\r\n\tColumnDef,\r\n\tColumnTypeDefinition,\r\n\tGridApi,\r\n\tGridReadyEvent,\r\n\tPersonOption,\r\n} from '@eregister/wit-grid-react';\r\nimport { Box, Code2, ChevronRight, Palette } from 'lucide-react';\r\nimport { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';\r\n\r\n// ─── Data model ───────────────────────────────────────────────────────────────\r\n\r\ninterface TaskRow {\r\n\tid: string;\r\n\tdone: boolean;\r\n\ttask: string;\r\n\tstatus: string;\r\n\tpriority: string;\r\n\tlabels: string[];\r\n\teffort: string;\r\n\tteam: string;\r\n\taccount: string;\r\n\tprojects: string[];\r\n\tlocation: string[];\r\n\tsprint: { start: string; end: string };\r\n\tbillable: boolean;\r\n\ttrend: number[];\r\n\tcommits: number[];\r\n\tcolor: string;\r\n\tnotes: string;\r\n\twatchers: string[];\r\n\towner: string;\r\n\treviewers: string;\r\n\tdue: string;\r\n\tbudget: number;\r\n\tprogress: number;\r\n\tconfidence: number;\r\n\trating: number;\r\n\tspec: string;\r\n\tcontact: string;\r\n\tupdated: string;\r\n}\r\n\r\n// ─── Options ──────────────────────────────────────────────────────────────────\r\n\r\nconst STATUS: CellOption[] = [\r\n\t{ value: 'backlog', label: 'Backlog', color: 'gray' },\r\n\t{ value: 'todo', label: 'To do', color: 'sky' },\r\n\t{ value: 'progress', label: 'In progress', color: 'amber' },\r\n\t{ value: 'review', label: 'In review', color: 'violet' },\r\n\t{ value: 'done', label: 'Done', color: 'emerald' },\r\n\t{ value: 'blocked', label: 'Blocked', color: 'rose' },\r\n];\r\n\r\nconst PRIORITY: CellOption[] = [\r\n\t{ value: 'urgent', label: 'Urgent', color: 'red', description: 'Drop everything' },\r\n\t{ value: 'high', label: 'High', color: 'orange', description: 'This sprint' },\r\n\t{ value: 'medium', label: 'Medium', color: 'yellow', description: 'Next sprint' },\r\n\t{ value: 'low', label: 'Low', color: 'gray', description: 'When there is time' },\r\n];\r\n\r\nconst LABELS: CellOption[] = [\r\n\t{ value: 'bug', label: 'Bug', color: 'red' },\r\n\t{ value: 'feature', label: 'Feature', color: 'blue' },\r\n\t{ value: 'perf', label: 'Performance', color: 'amber' },\r\n\t{ value: 'a11y', label: 'Accessibility', color: 'teal' },\r\n\t{ value: 'docs', label: 'Docs', color: 'gray' },\r\n\t{ value: 'security', label: 'Security', color: 'fuchsia' },\r\n];\r\n\r\nconst TEAMS: CellOption[] = [\r\n\t{ value: 'ui', label: 'UI Design', group: 'Design', color: 'pink' },\r\n\t{ value: 'ux', label: 'UX Research', group: 'Design', color: 'rose' },\r\n\t{ value: 'brand', label: 'Brand', group: 'Design', color: 'fuchsia' },\r\n\t{ value: 'fe', label: 'Frontend', group: 'Engineering', color: 'blue' },\r\n\t{ value: 'be', label: 'Backend', group: 'Engineering', color: 'indigo' },\r\n\t{ value: 'infra', label: 'Infrastructure', group: 'Engineering', color: 'cyan' },\r\n\t{ value: 'qa', label: 'Quality', group: 'Engineering', color: 'teal' },\r\n\t{ value: 'growth', label: 'Growth', group: 'Business', color: 'emerald' },\r\n\t{ value: 'sales', label: 'Sales', group: 'Business', color: 'lime' },\r\n\t{ value: 'support', label: 'Support', group: 'Business', color: 'amber' },\r\n];\r\n\r\nconst PEOPLE: PersonOption[] = [\r\n\t{ value: 'ava', label: 'Ava Chen', description: 'Engineering manager', group: 'Engineering' },\r\n\t{ value: 'liam', label: 'Liam Novak', description: 'Frontend', group: 'Engineering' },\r\n\t{ value: 'noah', label: 'Noah Patel', description: 'Backend', group: 'Engineering' },\r\n\t{ value: 'mia', label: 'Mia Rossi', description: 'Product design', group: 'Design' },\r\n\t{ value: 'zoe', label: 'Zoe Okafor', description: 'Research', group: 'Design' },\r\n\t{ value: 'ethan', label: 'Ethan Brooks', description: 'QA lead', group: 'Engineering' },\r\n\t{ value: 'sofia', label: 'Sofia Lind', description: 'Growth', group: 'Business' },\r\n\t{ value: 'kai', label: 'Kai Tanaka', description: 'Infrastructure', group: 'Engineering' },\r\n];\r\n\r\nconst EFFORT: CellOption[] = [\r\n\t{ value: 's', label: 'S', color: 'emerald' },\r\n\t{ value: 'm', label: 'M', color: 'amber' },\r\n\t{ value: 'l', label: 'L', color: 'rose' },\r\n];\r\n\r\n/** Office locations: country → state → city. */\r\nconst LOCATIONS: CascadeOption[] = [\r\n\t{\r\n\t\tvalue: 'in',\r\n\t\tlabel: 'India',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'ka',\r\n\t\t\t\tlabel: 'Karnataka',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'blr', label: 'Bengaluru' },\r\n\t\t\t\t\t{ value: 'mys', label: 'Mysuru' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{\r\n\t\t\t\tvalue: 'mh',\r\n\t\t\t\tlabel: 'Maharashtra',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'bom', label: 'Mumbai' },\r\n\t\t\t\t\t{ value: 'pnq', label: 'Pune' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{ value: 'dl', label: 'Delhi', children: [{ value: 'del', label: 'New Delhi' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'us',\r\n\t\tlabel: 'United States',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'ca',\r\n\t\t\t\tlabel: 'California',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'sf', label: 'San Francisco' },\r\n\t\t\t\t\t{ value: 'la', label: 'Los Angeles' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{ value: 'ny', label: 'New York', children: [{ value: 'nyc', label: 'New York City' }] },\r\n\t\t\t{ value: 'wa', label: 'Washington', children: [{ value: 'sea', label: 'Seattle' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'de',\r\n\t\tlabel: 'Germany',\r\n\t\tchildren: [\r\n\t\t\t{ value: 'be', label: 'Berlin', children: [{ value: 'ber', label: 'Berlin' }] },\r\n\t\t\t{ value: 'by', label: 'Bavaria', children: [{ value: 'muc', label: 'Munich' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'jp',\r\n\t\tlabel: 'Japan',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'tk',\r\n\t\t\t\tlabel: 'Tokyo',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'shb', label: 'Shibuya' },\r\n\t\t\t\t\t{ value: 'mnt', label: 'Minato' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t],\r\n\t},\r\n];\r\nconst LOCATION_PATHS: string[][] = LOCATIONS.flatMap((c) =>\r\n\t(c.children ?? []).flatMap((s) => (s.children ?? []).map((city) => [c.value, s.value, city.value]))\r\n);\r\n\r\nconst NOTES = [\r\n\t'Waiting on legal review before the copy changes go out.',\r\n\t'Repro only on Safari 17.\\nAttach the HAR file from the support ticket.',\r\n\t'Pair with design on the empty states; spec is in the linked doc.',\r\n\t'',\r\n\t'Customer asked for a CSV export as well — scope it separately.',\r\n\t'Blocked until the staging cluster is upgraded.',\r\n];\r\n\r\n/** Opening a linked record: a demo stand-in for navigating to it. */\r\nfunction showToast(text: string) {\r\n\tconst toast = document.createElement('div');\r\n\ttoast.textContent = text;\r\n\ttoast.style.cssText =\r\n\t\t'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;' +\r\n\t\t'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s';\r\n\tdocument.body.appendChild(toast);\r\n\tsetTimeout(() => (toast.style.opacity = '0'), 1600);\r\n\tsetTimeout(() => toast.remove(), 2000);\r\n}\r\n\r\nconst TASKS = [\r\n\t'Redesign onboarding flow',\r\n\t'Fix flaky checkout test',\r\n\t'Migrate auth to OAuth 2.1',\r\n\t'Dark mode for settings',\r\n\t'Audit color contrast',\r\n\t'Speed up search index',\r\n\t'Quarterly pricing review',\r\n\t'Write API rate-limit docs',\r\n\t'Kubernetes node upgrade',\r\n\t'Customer interview round',\r\n\t'Rebuild CSV importer',\r\n\t'Harden file uploads',\r\n];\r\n\r\n// ─── Column types ─────────────────────────────────────────────────────────────\r\n// Built-in names (checkbox, date, datetime, percent, url, email) need no registration; these add options.\r\n\r\nconst TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {\r\n\tstatus: selectColumnType(STATUS, { noneLabel: 'No status' }),\r\n\tpriority: selectColumnType(PRIORITY, { variant: 'dot' }),\r\n\tlabels: multiSelectColumnType(LABELS, { maxVisible: 2, searchable: true }),\r\n\tteam: comboboxColumnType(TEAMS, { searchPlaceholder: 'Search teams…' }),\r\n\t// Options on a server: paged and searched there, labels looked up for the values in cells.\r\n\taccount: comboboxColumnType([], {\r\n\t\tloadOptions: accountsServer.load,\r\n\t\tresolveOptions: accountsServer.resolve,\r\n\t\tsearchPlaceholder: 'Search 10,000 accounts…',\r\n\t}),\r\n\twatchers: personColumnType({\r\n\t\tmultiple: true,\r\n\t\tloadOptions: directoryServer.load,\r\n\t\tresolveOptions: directoryServer.resolve,\r\n\t\tsearchPlaceholder: 'Search 2,000 people…',\r\n\t}),\r\n\towner: personColumnType({ people: PEOPLE }),\r\n\treviewers: personColumnType({ people: PEOPLE, multiple: true }),\r\n\tbudget: currencyColumnType({ currency: 'USD', decimals: 0, step: 500, colorNegative: true }),\r\n\tprogress: progressColumnType(),\r\n\tconfidence: progressColumnType({ max: 1, traffic: true }),\r\n\trating: ratingColumnType(),\r\n\teffort: segmentedColumnType(EFFORT),\r\n\t// Links to another table: record chips, a record picker paged from its API, chips open the record.\r\n\tprojects: linkedRecordColumnType([], {\r\n\t\tloadOptions: projectsServer.load,\r\n\t\tresolveOptions: projectsServer.resolve,\r\n\t\tsearchPlaceholder: 'Find a project…',\r\n\t\tonOpen: (value) => showToast(`Open project ${PROJECTS.find((p) => p.value === value)?.label ?? value}`),\r\n\t}),\r\n\tlocation: cascadeColumnType({ options: LOCATIONS, searchPlaceholder: 'Search cities…' }),\r\n\tsprint: dateRangeColumnType(),\r\n\tbillable: switchColumnType({ onLabel: 'Billable', offLabel: 'Internal' }),\r\n\ttrend: sparklineColumnType({ type: 'area', colorBy: 'trend', curve: 'smooth', label: 'change' }),\r\n\tcommits: sparklineColumnType({ type: 'bar', color: 'violet', label: 'last', reference: 'average', format: { decimals: 0 } }),\r\n\tcolor: colorColumnType(),\r\n\tnotes: longTextColumnType({ maxLength: 500, placeholder: 'Add a note…' }),\r\n};\r\n\r\nconst COLUMNS: ColumnDef<TaskRow>[] = [\r\n\t{ field: 'done', header: '', width: 48, type: 'checkbox' },\r\n\t{ field: 'task', header: 'Task', width: 220 },\r\n\t{ field: 'status', header: 'Status', width: 140, type: 'status' },\r\n\t{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },\r\n\t{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },\r\n\t{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },\r\n\t{ field: 'team', header: 'Team', width: 150, type: 'team' },\r\n\t{ field: 'account', header: 'Account', width: 200, type: 'account' },\r\n\t{ field: 'projects', header: 'Projects', width: 240, type: 'projects' },\r\n\t{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },\r\n\t{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },\r\n\t{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },\r\n\t{ field: 'location', header: 'Office', width: 240, type: 'location' },\r\n\t{ field: 'due', header: 'Due', width: 140, type: 'date' },\r\n\t{ field: 'sprint', header: 'Sprint', width: 200, type: 'sprint' },\r\n\t{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },\r\n\t{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },\r\n\t{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },\r\n\t{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },\r\n\t{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },\r\n\t{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },\r\n\t{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },\r\n\t{ field: 'color', header: 'Colour', width: 130, type: 'color' },\r\n\t{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },\r\n\t{ field: 'spec', header: 'Spec', width: 190, type: 'url' },\r\n\t{ field: 'contact', header: 'Contact', width: 200, type: 'email' },\r\n\t{ field: 'updated', header: 'Updated', width: 190, type: 'datetime' },\r\n];\r\n\r\nfunction pick<T>(list: readonly T[], n: number): T {\r\n\treturn list[n % list.length];\r\n}\r\n\r\nfunction generateTasks(count: number): TaskRow[] {\r\n\treturn Array.from({ length: count }, (_, i) => {\r\n\t\tconst owner = pick(PEOPLE, i * 3);\r\n\t\tconst progress = (i * 37) % 101;\r\n\t\treturn {\r\n\t\t\tid: `T-${1001 + i}`,\r\n\t\t\tdone: progress >= 90,\r\n\t\t\ttask: pick(TASKS, i) + (i >= TASKS.length ? ` #${Math.floor(i / TASKS.length) + 1}` : ''),\r\n\t\t\tstatus: i % 11 === 5 ? '' : pick(STATUS, i * 5).value,\r\n\t\t\tpriority: pick(PRIORITY, i * 3 + 1).value,\r\n\t\t\tlabels: [pick(LABELS, i).value, pick(LABELS, i * 2 + 3).value, ...(i % 4 === 0 ? [pick(LABELS, i + 4).value] : [])].filter(\r\n\t\t\t\t(v, k, all) => all.indexOf(v) === k\r\n\t\t\t),\r\n\t\t\teffort: pick(EFFORT, i * 2).value,\r\n\t\t\tteam: pick(TEAMS, i * 7).value,\r\n\t\t\taccount: pick(ACCOUNTS, i * 37).value,\r\n\t\t\tprojects:\r\n\t\t\t\ti % 5 === 3\r\n\t\t\t\t\t? []\r\n\t\t\t\t\t: [\r\n\t\t\t\t\t\t\tpick(PROJECTS, i * 11).value,\r\n\t\t\t\t\t\t\t...(i % 2 === 0 ? [pick(PROJECTS, i * 17 + 5).value] : []),\r\n\t\t\t\t\t\t\t...(i % 6 === 0 ? [pick(PROJECTS, i + 40).value] : []),\r\n\t\t\t\t\t\t],\r\n\t\t\tlocation: pick(LOCATION_PATHS, i * 3),\r\n\t\t\tsprint: (() => {\r\n\t\t\t\tconst start = new Date(2026, 8, 1 + (i % 6) * 14);\r\n\t\t\t\tconst end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 13);\r\n\t\t\t\tconst iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;\r\n\t\t\t\treturn { start: iso(start), end: iso(end) };\r\n\t\t\t})(),\r\n\t\t\tbillable: i % 3 !== 1,\r\n\t\t\ttrend: Array.from({ length: 12 }, (_, w) =>\r\n\t\t\t\tMath.round(40 + 25 * Math.sin((w + i) / 2.2) + ((i * 7 + w * 13) % 17) + (i % 2 ? w * 2 : -w))\r\n\t\t\t),\r\n\t\t\tcommits: Array.from({ length: 10 }, (_, d) => ((i * 31 + d * 17) % 23) - (d % 4 === 3 ? 4 : 0)),\r\n\t\t\tcolor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#64748b'][i % 8],\r\n\t\t\tnotes: pick(NOTES, i),\r\n\t\t\twatchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],\r\n\t\t\towner: owner.value,\r\n\t\t\treviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),\r\n\t\t\tdue: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,\r\n\t\t\tbudget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),\r\n\t\t\tprogress,\r\n\t\t\tconfidence: ((i * 29) % 100) / 100,\r\n\t\t\trating: (i * 3) % 6,\r\n\t\t\tspec: `docs.example.com/specs/${1001 + i}`,\r\n\t\t\tcontact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,\r\n\t\t\tupdated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,\r\n\t\t};\r\n\t});\r\n}\r\n\r\n// ─── Reference ────────────────────────────────────────────────────────────────\r\n\r\nconst TYPE_REFERENCE: { name: string; text: string }[] = [\r\n\t{ name: 'selectColumnType', text: 'One option, tinted badge. Variants: soft, dot, outline, plain. Optional “none” entry.' },\r\n\t{ name: 'multiSelectColumnType', text: 'Chips with +N overflow; checkbox list editor.' },\r\n\t{ name: 'comboboxColumnType', text: 'Searchable, grouped list for long option sets.' },\r\n\t{ name: 'tagsColumnType', text: 'Free tags: type to create, colours from the palette.' },\r\n\t{ name: 'personColumnType', text: 'Avatar and name, or stacked avatars; people picker.' },\r\n\t{\r\n\t\tname: 'loadOptions · resolveOptions',\r\n\t\ttext: 'Options from a server: searched there, paged in as the list scrolls, labels looked up for cells (Account, Watchers).',\r\n\t},\r\n\t{ name: \"'date' · 'datetime'\", text: 'Intl formatting; calendar popover with keyboard navigation.' },\r\n\t{ name: \"'number' · 'currency' · 'percent'\", text: 'Intl number formats, stepper editor with bounds.' },\r\n\t{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },\r\n\t{ name: 'ratingColumnType', text: 'Stars, click to rate.' },\r\n\t{ name: 'segmentedColumnType', text: 'Two to four options inline; one press picks (Effort).' },\r\n\t{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; chips open the record (Projects).' },\r\n\t{ name: 'cascadeColumnType', text: 'A path through a tree, one column per level, search across paths (Office).' },\r\n\t{ name: 'dateRangeColumnType', text: 'Two-month range calendar with presets (Sprint).' },\r\n\t{ name: 'sparklineColumnType', text: 'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).' },\r\n\t{ name: 'longTextColumnType', text: 'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).' },\r\n\t{ name: 'colorColumnType', text: 'Palette, hex field and the system picker (Colour).' },\r\n\t{ name: \"'checkbox' · switchColumnType\", text: 'Toggle on press or Enter, keeping the value’s own shape (Billing).' },\r\n\t{ name: \"'url' · 'email'\", text: 'Safe links (http, https, mailto only).' },\r\n];\r\n\r\nconst SNIPPET = `import { selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';\r\n\r\nconst columnTypes = {\r\n  status: selectColumnType([\r\n    { value: 'todo', label: 'To do', color: 'sky' },\r\n    { value: 'done', label: 'Done',  color: 'emerald' },\r\n  ], { noneLabel: 'No status' }),\r\n  team: comboboxColumnType([\r\n    { value: 'fe', label: 'Frontend', group: 'Engineering' },\r\n    { value: 'ui', label: 'UI Design', group: 'Design' },\r\n  ]),\r\n};\r\n\r\nconst columns = [\r\n  { field: 'status', header: 'Status', type: 'status' },\r\n  { field: 'due',    header: 'Due',    type: 'date' },\r\n  { field: 'price',  header: 'Price',  type: 'currency' },\r\n];\r\n\r\n// Colours follow the grid theme. To adjust cells alone, set\r\n// --og-ct-accent, --og-ct-radius, --og-ct-rating… on the grid.`;\r\n\r\n/** Every built-in theme, with its background and accent for the swatch. */\r\nconst THEMES = BUILT_IN_THEME_ORDER.map((name) => {\r\n\tconst tokens = getBuiltInTheme(name);\r\n\treturn { name, label: BUILT_IN_THEME_METADATA[name].label, bg: tokens.bgColor, accent: tokens.focusRing };\r\n});\r\n\r\n// ─── Page component ───────────────────────────────────────────────────────────\r\n\r\ninterface NativeCellTypesDemoProps {\r\n\tonGridReady?: (event: GridReadyEvent<TaskRow>) => void;\r\n\t/** Hides the reference sidebar and the toolbar frame, keeping just the grid (for embedding). */\r\n\tcompact?: boolean;\r\n\t/**\r\n\t * The grid theme, when the host picks it (the docs hero). Hides the built-in theme picker; the\r\n\t * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.\r\n\t */\r\n\ttheme?: BuiltInThemeName;\r\n}\r\n\r\nexport default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {\r\n\tconst rows = useMemo(() => generateTasks(200), []);\r\n\tconst apiRef = useRef<GridApi<TaskRow> | null>(null);\r\n\tconst [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');\r\n\tconst theme = controlledTheme ?? ownTheme;\r\n\tconst themeRef = useRef(theme);\r\n\tconst [showSnippet, setShowSnippet] = useState(false);\r\n\t// The theme the grid is created with (no flash of the default theme); later changes switch it.\r\n\tconst initialState = useMemo(() => ({ themeName: themeRef.current }), []);\r\n\r\n\tconst handleReady = useCallback(\r\n\t\t(event: GridReadyEvent<TaskRow>) => {\r\n\t\t\tapiRef.current = event.api;\r\n\t\t\t// A remounted grid starts on the theme it was created with: bring it to the current one.\r\n\t\t\tif (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);\r\n\t\t\tonGridReady?.(event);\r\n\t\t},\r\n\t\t[onGridReady]\r\n\t);\r\n\tuseEffect(() => {\r\n\t\tthemeRef.current = theme;\r\n\t\tconst api = apiRef.current;\r\n\t\tif (api && api.getThemeName() !== theme) api.switchTheme(theme);\r\n\t}, [theme]);\r\n\r\n\tconst grid = (\r\n\t\t<Grid\r\n\t\t\trowModelType='client'\r\n\t\t\trows={rows}\r\n\t\t\tcolumns={COLUMNS}\r\n\t\t\tcolumnTypes={TASK_COLUMN_TYPES}\r\n\t\t\tinitialState={initialState}\r\n\t\t\tnavigationOptions={{ editTrigger: 'doubleClick' }}\r\n\t\t\tpinLeftColumns={2}\r\n\t\t\tonGridReady={handleReady}\r\n\t\t\trendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}\r\n\t\t/>\r\n\t);\r\n\tif (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;\r\n\r\n\treturn (\r\n\t\t<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>\r\n\t\t\t<div className='flex-1 flex flex-col gap-3 min-h-[360px] lg:min-h-0 min-w-0'>\r\n\t\t\t\t<div className='border border-slate-800 rounded-xl px-3 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-slate-900/30'>\r\n\t\t\t\t\t<div className='flex items-center gap-2 text-[11px] text-slate-300 font-semibold'>\r\n\t\t\t\t\t\t<Box className='w-4 h-4 text-violet-400' />\r\n\t\t\t\t\t\tNative cell types\r\n\t\t\t\t\t\t<span className='text-slate-500 font-normal'>· double-click or press Enter on a cell to edit</span>\r\n\t\t\t\t\t</div>\r\n\t\t\t\t\t{!controlledTheme && (\r\n\t\t\t\t\t\t<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>\r\n\t\t\t\t\t\t\t<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />\r\n\t\t\t\t\t\t\t{THEMES.map((t) => (\r\n\t\t\t\t\t\t\t\t<button\r\n\t\t\t\t\t\t\t\t\tkey={t.name}\r\n\t\t\t\t\t\t\t\t\trole='radio'\r\n\t\t\t\t\t\t\t\t\taria-checked={theme === t.name}\r\n\t\t\t\t\t\t\t\t\tonClick={() => setOwnTheme(t.name)}\r\n\t\t\t\t\t\t\t\t\tclassName={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${\r\n\t\t\t\t\t\t\t\t\t\ttheme === t.name\r\n\t\t\t\t\t\t\t\t\t\t\t? 'border-slate-500 bg-slate-800 text-slate-100'\r\n\t\t\t\t\t\t\t\t\t\t\t: 'border-transparent text-slate-400 hover:bg-slate-800/60'\r\n\t\t\t\t\t\t\t\t\t}`}\r\n\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\t\t\tclassName='w-2.5 h-2.5 rounded-full border border-slate-600'\r\n\t\t\t\t\t\t\t\t\t\tstyle={{ background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)` }}\r\n\t\t\t\t\t\t\t\t\t/>\r\n\t\t\t\t\t\t\t\t\t{t.label}\r\n\t\t\t\t\t\t\t\t</button>\r\n\t\t\t\t\t\t\t))}\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t)}\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>{grid}</div>\r\n\t\t\t</div>\r\n\r\n\t\t\t<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>\r\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>\r\n\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>\r\n\t\t\t\t\t{TYPE_REFERENCE.map((t) => (\r\n\t\t\t\t\t\t<div key={t.name} className='flex flex-col gap-0.5'>\r\n\t\t\t\t\t\t\t<code className='text-[11px] text-violet-300'>{t.name}</code>\r\n\t\t\t\t\t\t\t<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t))}\r\n\t\t\t\t\t<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>\r\n\t\t\t\t\t\tAll cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come from\r\n\t\t\t\t\t\tthe grid theme, so popovers and badges follow the theme switch above.\r\n\t\t\t\t\t</p>\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>\r\n\t\t\t\t\t<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>\r\n\t\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>\r\n\t\t\t\t\t\t\t<Code2 className='w-3.5 h-3.5 text-emerald-400' />\r\n\t\t\t\t\t\t\tUsage\r\n\t\t\t\t\t\t</h3>\r\n\t\t\t\t\t\t<ChevronRight\r\n\t\t\t\t\t\t\tclassName='w-3 h-3 text-slate-500 transition-transform duration-150'\r\n\t\t\t\t\t\t\tstyle={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}\r\n\t\t\t\t\t\t/>\r\n\t\t\t\t\t</button>\r\n\t\t\t\t\t{showSnippet && (\r\n\t\t\t\t\t\t<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>\r\n\t\t\t\t\t\t\t{SNIPPET}\r\n\t\t\t\t\t\t</pre>\r\n\t\t\t\t\t)}\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t);\r\n}\r\n",
 			"tokens": [
 				[
 					{
@@ -52419,6 +52419,54 @@
 				],
 				[
 					{
+						"content": "\tsegmentedColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tswitchColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tcolorColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tlongTextColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tdateRangeColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tcascadeColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tlinkedRecordColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tsparklineColumnType,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
 						"content": "} ",
 						"color": "#E1E4E8"
 					},
@@ -52453,7 +52501,61 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { BuiltInThemeName, CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } ",
+						"content": " {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tBuiltInThemeName,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tCascadeOption,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tCellOption,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tColumnDef,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tColumnTypeDefinition,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tGridApi,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tGridReadyEvent,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tPersonOption,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "} ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -52505,7 +52607,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { ACCOUNTS, DIRECTORY, accountsServer, directoryServer } ",
+						"content": " { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -52713,6 +52815,32 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "effort",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "team",
 						"color": "#FFAB70"
 					},
@@ -52740,6 +52868,246 @@
 					},
 					{
 						"content": "account",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "projects",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[];",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "location",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[];",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "sprint",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " { ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "start",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "; ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "end",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " };",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "billable",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "boolean",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "trend",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[];",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "commits",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "number",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[];",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "color",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "notes",
 						"color": "#FFAB70"
 					},
 					{
@@ -54490,6 +54858,1492 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "EFFORT",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CellOption",
+						"color": "#B392F0"
+					},
+					{
+						"content": "[] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'s'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'S'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", color: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'emerald'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'m'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'M'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", color: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'amber'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'l'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'L'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", color: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'rose'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "];",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "/** Office locations: country → state → city. */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "LOCATIONS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CascadeOption",
+						"color": "#B392F0"
+					},
+					{
+						"content": "[] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'in'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'India'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'ka'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Karnataka'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'blr'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Bengaluru'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'mys'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Mysuru'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'mh'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Maharashtra'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'bom'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Mumbai'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'pnq'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Pune'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'dl'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Delhi'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", children: [{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'del'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'New Delhi'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }] },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'us'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'United States'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'ca'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'California'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'sf'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'San Francisco'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'la'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Los Angeles'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'ny'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'New York'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", children: [{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'nyc'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'New York City'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }] },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'wa'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Washington'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", children: [{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'sea'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Seattle'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }] },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'de'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Germany'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'be'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Berlin'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", children: [{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'ber'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Berlin'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }] },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'by'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Bavaria'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", children: [{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'muc'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Munich'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }] },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'jp'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Japan'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tvalue: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'tk'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tlabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Tokyo'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tchildren: [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'shb'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Shibuya'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t{ value: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'mnt'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Minato'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t},",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "];",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "LOCATION_PATHS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[][] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "LOCATIONS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ".",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "flatMap",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "c",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					}
+				],
+				[
+					{
+						"content": "\t(c.children ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "??",
+						"color": "#F97583"
+					},
+					{
+						"content": " []).",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "flatMap",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "s",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " (s.children ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "??",
+						"color": "#F97583"
+					},
+					{
+						"content": " []).",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "map",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "city",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " [c.value, s.value, city.value]))",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "NOTES",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Waiting on legal review before the copy changes go out.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Repro only on Safari 17.",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "\\n",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "Attach the HAR file from the support ticket.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Pair with design on the empty states; spec is in the linked doc.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Customer asked for a CSV export as well — scope it separately.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Blocked until the staging cluster is upgraded.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "];",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "/** Opening a linked record: a demo stand-in for navigating to it. */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "function",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "showToast",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "text",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "string",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "toast",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " document.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "createElement",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'div'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\ttoast.textContent ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " text;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\ttoast.style.cssText ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tdocument.body.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "appendChild",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(toast);",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setTimeout",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " (toast.style.opacity ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'0'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "), ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "1600",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setTimeout",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " toast.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "remove",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(), ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2000",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "}",
+						"color": "#E1E4E8"
+					}
+				],
+				[],
+				[
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "TASKS",
 						"color": "#79B8FF"
 					},
@@ -55158,6 +57012,436 @@
 				],
 				[
 					{
+						"content": "\teffort: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "segmentedColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "EFFORT",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// Links to another table: record chips, a record picker paged from its API, chips open the record.",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "\tprojects: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "linkedRecordColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "([], {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tloadOptions: projectsServer.load,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tresolveOptions: projectsServer.resolve,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tsearchPlaceholder: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Find a project…'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "onOpen",
+						"color": "#B392F0"
+					},
+					{
+						"content": ": (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "value",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "showToast",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`Open project ${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "PROJECTS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "find",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "p",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "p",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ")?.",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "label",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "??",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t}),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tlocation: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "cascadeColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ options: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "LOCATIONS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", searchPlaceholder: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Search cities…'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tsprint: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "dateRangeColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tbillable: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "switchColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ onLabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Billable'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", offLabel: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Internal'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\ttrend: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "sparklineColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'area'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", colorBy: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'trend'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", curve: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'smooth'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'change'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tcommits: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "sparklineColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'bar'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", color: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'violet'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", label: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'last'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", reference: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'average'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", format: { decimals: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " } }),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tcolor: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "colorColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tnotes: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "longTextColumnType",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ maxLength: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "500",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", placeholder: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Add a note…'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " }),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
 						"content": "};",
 						"color": "#E1E4E8"
 					}
@@ -55359,6 +57643,44 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "'effort'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Effort'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "120",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'effort'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "'labels'",
 						"color": "#9ECBFF"
 					},
@@ -55460,6 +57782,44 @@
 					},
 					{
 						"content": "'account'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'projects'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Projects'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "240",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'projects'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -55587,6 +57947,44 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "'location'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Office'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "240",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'location'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "'due'",
 						"color": "#9ECBFF"
 					},
@@ -55612,6 +58010,44 @@
 					},
 					{
 						"content": "'date'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'sprint'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Sprint'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "200",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'sprint'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -55663,6 +58099,44 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "'billable'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Billing'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "130",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'billable'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "'progress'",
 						"color": "#9ECBFF"
 					},
@@ -55688,6 +58162,82 @@
 					},
 					{
 						"content": "'progress'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'trend'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Trend (12 wk)'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "170",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'trend'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'commits'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Commits'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "150",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'commits'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -55764,6 +58314,82 @@
 					},
 					{
 						"content": "'rating'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'color'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Colour'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "130",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'color'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ field: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'notes'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", header: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Notes'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", width: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "260",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", type: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'notes'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -56843,6 +59469,44 @@
 				],
 				[
 					{
+						"content": "\t\t\teffort: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "EFFORT",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ").value,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
 						"content": "\t\t\tteam: ",
 						"color": "#E1E4E8"
 					},
@@ -56914,6 +59578,1386 @@
 					},
 					{
 						"content": ").value,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tprojects:",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\ti ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "5",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "3",
+						"color": "#79B8FF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " []",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "PROJECTS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "11",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ").value,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "...",
+						"color": "#F97583"
+					},
+					{
+						"content": "(i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "PROJECTS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "17",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "5",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ").value] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " []),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "...",
+						"color": "#F97583"
+					},
+					{
+						"content": "(i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "6",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "PROJECTS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "40",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ").value] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " []),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tlocation: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "LOCATION_PATHS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "3",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tsprint: (() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "start",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "new",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Date",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2026",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "8",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "1",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " (i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "6",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "14",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "end",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "new",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Date",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(start.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "getFullYear",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(), start.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "getMonth",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(), start.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "getDate",
+						"color": "#B392F0"
+					},
+					{
+						"content": "() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "13",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "iso",
+						"color": "#B392F0"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "d",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Date",
+						"color": "#B392F0"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "d",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "getFullYear",
+						"color": "#B392F0"
+					},
+					{
+						"content": "()",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}-${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "String",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "d",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "getMonth",
+						"color": "#B392F0"
+					},
+					{
+						"content": "() ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "1",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ").",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "padStart",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'0'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ")",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}-${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "String",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "d",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "getDate",
+						"color": "#B392F0"
+					},
+					{
+						"content": "()).",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "padStart",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'0'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ")",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "return",
+						"color": "#F97583"
+					},
+					{
+						"content": " { start: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "iso",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(start), end: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "iso",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(end) };",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t})(),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tbillable: i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "3",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!==",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "1",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\ttrend: Array.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "from",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ length: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "12",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " }, (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "_",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "w",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\tMath.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "round",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "40",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "25",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " Math.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "sin",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((w ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " i) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "/",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2.2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ((i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "7",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " w ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "13",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "17",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " (i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " w ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "-",
+						"color": "#F97583"
+					},
+					{
+						"content": "w))",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tcommits: Array.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "from",
+						"color": "#B392F0"
+					},
+					{
+						"content": "({ length: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "10",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " }, (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "_",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "d",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ((i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "31",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " d ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "*",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "17",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "23",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "-",
+						"color": "#F97583"
+					},
+					{
+						"content": " (d ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "4",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "3",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "4",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ")),",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tcolor: [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#3b82f6'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#22c55e'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#f59e0b'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#ef4444'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#8b5cf6'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#14b8a6'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#ec4899'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'#64748b'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "][i ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "8",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "],",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\tnotes: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "pick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "NOTES",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", i),",
 						"color": "#E1E4E8"
 					}
 				],
@@ -58267,7 +62311,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "\"'checkbox'\"",
+						"content": "'segmentedColumnType'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -58275,7 +62319,161 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'Toggles on press, keeps the value’s own shape.'",
+						"content": "'Two to four options inline; one press picks (Effort).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'linkedRecordColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Record chips from another table, a paged record picker; chips open the record (Projects).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'cascadeColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'A path through a tree, one column per level, search across paths (Office).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'dateRangeColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Two-month range calendar with presets (Sprint).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'sparklineColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'longTextColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'colorColumnType'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Palette, hex field and the system picker (Colour).'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{ name: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "\"'checkbox' · switchColumnType\"",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", text: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Toggle on press or Enter, keeping the value’s own shape (Billing).'",
 						"color": "#9ECBFF"
 					},
 					{

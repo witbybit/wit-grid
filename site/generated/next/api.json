@@ -59,6 +59,21 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "CascadeCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "cascadeColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CascadeOption",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "CELL_HUES",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -130,6 +145,16 @@
 		},
 		{
 			"name": "checkboxColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ColorCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "colorColumnType",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -224,6 +249,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "createSparklineRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "CsvExportOptions",
 			"kind": "type",
 			"source": "./types.js"
@@ -264,7 +294,32 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "DateRange",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangeCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "dateRangeColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangePreset",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "dateTimeColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "defaultDateRangePresets",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -724,9 +779,29 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "linkedRecordColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "LinkedRecordOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "LoadingVisualRow",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "LongTextCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "longTextColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "max",
@@ -904,6 +979,16 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "SegmentedCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "segmentedColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "SelectAllRowsOptions",
 			"kind": "type",
 			"source": "./types.js"
@@ -969,6 +1054,16 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "SparklineCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "sparklineColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "StickyHeadersOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -977,6 +1072,16 @@
 			"name": "StyleRule",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "SwitchCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "switchColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "tagsColumnType",
