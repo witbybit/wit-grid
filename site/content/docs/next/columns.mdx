@@ -106,42 +106,61 @@ Return `false` to reject a commit. Return a promise when validation depends on a
 
 ## Column Types
 
-Wit Grid ships built-in type registry entries for:
+Wit Grid ships these types in the grid core, usable by name with no registration:
 
-| Type       | Behavior                                                           |
-| ---------- | ------------------------------------------------------------------ |
-| `checkbox` | Checkbox; a click selects the cell and toggles the value.          |
-| `date`     | Calendar icon and `DD/MM/YYYY` display, with a date-picker editor. |
-| `number`   | Monospace number display, with a number editor.                    |
+| Type                            | Behavior                                                      |
+| ------------------------------- | ------------------------------------------------------------- |
+| `checkbox`                      | Checkbox; a press selects the cell and toggles the value.     |
+| `date`, `datetime`              | Intl date (and time) display, with a calendar popover editor. |
+| `number`, `currency`, `percent` | Intl number formats, right-aligned, with a stepper editor.    |
+| `progress`, `rating`            | Progress bar with label; stars, click to rate.                |
+| `url`, `email`                  | Links; only http, https and mailto become links.              |
+| `tags`                          | Palette-coloured chips; type in the editor to create a tag.   |
 
-The built-in cells are DOM renderers: they draw without React, so they cost no more than plain text during
-scroll. `numberColumnType` uses the same renderer. The React versions (`CheckboxCellRenderer`,
-`DateCellRenderer`, `createNumberCellRenderer`) are still exported and look identical, if you want to wrap one
-in your own component; the DOM versions are exported as `CheckboxDomCellRenderer`, `DateDomCellRenderer` and
-`createNumberDomCellRenderer`.
+The cells are DOM renderers and editors: no React work per cell, so they cost no more than plain text during
+scroll. Their colours come from the grid theme (text, accent, popover tokens), so badges, chips and editor
+popovers follow built-in and custom themes. Set `--og-ct-accent`, `--og-ct-radius` or `--og-ct-rating` on the
+grid to adjust the cells alone.
 
-Register custom types with the `columnTypes` grid prop.
+Register types with options through the `columnTypes` grid prop.
 
 ```tsx
-import { Grid, numberColumnType, dropdownColumnType } from '@eregister/wit-grid-react';
+import { Grid, currencyColumnType, selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';
 
 const columnTypes = {
-	usd: numberColumnType({ prefix: '$', decimals: 2, locale: true }),
-	status: dropdownColumnType([
-		{ value: 'Active', color: 'emerald' },
-		{ value: 'Paused', color: 'amber' },
+	usd: currencyColumnType({ currency: 'USD' }),
+	status: selectColumnType(
+		[
+			{ value: 'active', label: 'Active', color: 'emerald' },
+			{ value: 'paused', label: 'Paused', color: 'amber' },
+		],
+		{ noneLabel: 'No status' }
+	),
+	team: comboboxColumnType([
+		{ value: 'fe', label: 'Frontend', group: 'Engineering' },
+		{ value: 'ui', label: 'UI Design', group: 'Design' },
 	]),
 };
 
 const columns = [
 	{ field: 'revenue', header: 'Revenue', type: 'usd' },
 	{ field: 'status', header: 'Status', type: 'status' },
+	{ field: 'team', header: 'Team', type: 'team' },
 ];
 
 <Grid rows={rows} columns={columns} columnTypes={columnTypes} />;
 ```
 
-Helper exports include `numberColumnType`, `multiSelectColumnType`, and `dropdownColumnType`.
+Factories: `selectColumnType`, `multiSelectColumnType`, `comboboxColumnType`, `tagsColumnType`,
+`personColumnType`, `numberColumnType`, `currencyColumnType`, `percentColumnType`, `dateColumnType`,
+`dateTimeColumnType`, `progressColumnType`, `ratingColumnType`, `checkboxColumnType`, `urlColumnType` and
+`emailColumnType`. Options are `{ value, label?, color?, icon?, description?, group?, disabled? }`, where
+`color` is a palette name (`gray`, `red`, `amber`, `emerald`, `blue`, `violet`, `rose`…) or any CSS colour.
+A type supplies `renderer`, `cellEditor`, `valueFormatter` and `filterDef`; whatever the column sets itself wins.
+
+The renderers and editors are also exported on their own (`createSelectRenderer`, `createSelectEditor`,
+`createDateEditor`…) for use on a column directly: `renderer: { kind: 'dom', renderer }` and
+`cellEditor: { kind: 'dom', editor }`. A `DomCellEditor` you write works the same way.
 
 ## Renderers And Editors
 

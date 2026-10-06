@@ -188,6 +188,36 @@ export interface DomCellRenderer<TRowData = unknown> {
 	capabilities?: CellRendererCapabilities;
 }
 
+// ─── DOM cell editor ──────────────────────────────────────────────────────────
+
+/** What a DOM cell editor is given: the editor props plus the column. */
+export interface DomCellEditorParams<TRowData = unknown> extends CellEditorProps<TRowData> {
+	col: ColumnDef<TRowData>;
+}
+
+export interface DomCellEditorHandle {
+	/** Called when editing ends, however it ends: close popovers, drop listeners. */
+	destroy?(): void;
+}
+
+/**
+ * A cell editor written against the DOM, mounted into the editing cell by any adapter. It reports
+ * drafts through `onChange`, and ends the edit with `onCommit(value)` or `onCancel()`. A key event it
+ * handles itself (Enter in its list, arrows) it marks with preventDefault so the host leaves it alone.
+ */
+export interface DomCellEditor<TRowData = unknown> {
+	mount(container: HTMLElement, params: DomCellEditorParams<TRowData>): DomCellEditorHandle;
+}
+
+/** A column's editor: an adapter component (React) or a DOM editor. */
+export type ColumnCellEditorSpec<TRowData = unknown> =
+	| ((props: CellEditorProps<TRowData>) => unknown)
+	| { kind: 'dom'; editor: DomCellEditor<TRowData> };
+
+export function isDomCellEditorSpec<TRowData = unknown>(spec: unknown): spec is { kind: 'dom'; editor: DomCellEditor<TRowData> } {
+	return typeof spec === 'object' && spec !== null && (spec as { kind?: unknown }).kind === 'dom';
+}
+
 /** Type guard — returns true when renderer is a DomCellRenderer (has a mount function) */
 export function isDomCellRenderer<TRowData = unknown>(renderer: unknown): renderer is DomCellRenderer<TRowData> {
 	return typeof renderer === 'object' && renderer !== null && typeof (renderer as DomCellRenderer).mount === 'function';
@@ -332,7 +362,7 @@ export interface ColumnDef<TRowData = unknown> {
 	 * aggregate is text through `valueFormatter`. Mounted by the grid directly, on every bind.
 	 */
 	aggregateRenderer?: { kind: 'dom'; renderer: DomAggregateRenderer<TRowData> };
-	cellEditor?: (props: CellEditorProps<TRowData>) => unknown;
+	cellEditor?: ColumnCellEditorSpec<TRowData>;
 	headerMenuRenderer?: (props: HeaderMenuRendererProps<TRowData>) => void;
 	headerMenuComponent?: any;
 	sortable?: boolean;

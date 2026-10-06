@@ -7,7 +7,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 import { GridProvider } from './gridContext.js';
 import { GridView, type GridViewProps } from './GridView.js';
 import { isProductionBuild, sameColumnDefs, sameInitialValue } from './initialProps.js';
-import { resolveColumnTypes } from './resolveColumnTypes.js';
+import { resolveColumnTypes } from '@eregister/wit-grid-core';
 import type {
 	ColumnDef,
 	GridInitialState,

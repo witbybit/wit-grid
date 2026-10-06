@@ -82,7 +82,7 @@ export default function ShowroomTitleBanner({
 						{activePage === 'dashboard' && 'Executive Portfolio & SVG Market Analytics Streamer'}
 						{activePage === 'gantt' && 'Quantitative Gantt Scheduling & Task Optimizer Arena'}
 						{activePage === 'nested' && 'Nested and Group Grid Arena'}
-						{activePage === 'native' && 'Native Cell Types — Built into @eregister/wit-grid-react'}
+						{activePage === 'native' && 'Native Cell Types — Built into the grid core'}
 						{activePage === 'wide' && 'Wide Grid — Column Virtualization Showcase'}
 						{activePage === 'colgroups' && 'Multi-Level Column Header Groups'}
 						{activePage === 'floatingfilters' && 'Floating Filters — Inline Filter Row with Custom Renderers'}
@@ -113,7 +113,7 @@ export default function ShowroomTitleBanner({
 							'Track, extrapolate, and align multi-day team sprints utilizing dynamic styling slots and drag-to-fill date progressions.'}
 						{activePage === 'nested' && 'Examples of nested and grouped grids'}
 						{activePage === 'native' &&
-							'Checkbox, multi-select tags, date picker, dropdown badge, and number stepper — all zero external deps, CSS-variable themed.'}
+							'Select, multi-select, combobox, people, dates, numbers, progress and more — DOM cells that follow the grid theme.'}
 						{activePage === 'wide' &&
 							'100 columns × 500 rows. Only the visible column slice is rendered — scroll horizontally to watch the live badge track colStart/colEnd in real time.'}
 						{activePage === 'colgroups' &&

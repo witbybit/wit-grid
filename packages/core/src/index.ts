@@ -113,6 +113,10 @@ export type {
 	AggregateRendererParams,
 	DomCellRendererParams,
 	DomCellRendererRowRef,
+	DomCellEditor,
+	DomCellEditorHandle,
+	DomCellEditorParams,
+	ColumnCellEditorSpec,
 	ImperativeCellHandle,
 	RowStyleRule,
 	GroupRowStyleRule,
@@ -178,7 +182,7 @@ export type { ExpandAllOptions } from './rowModel.js';
 export { renderGroupToggle } from './renderer/hierarchyCell.js';
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
-export { isDomCellRenderer } from './columnDef.js';
+export { isDomCellRenderer, isDomCellEditorSpec } from './columnDef.js';
 export {
 	areCellPointersEqual,
 	areCanonicalCellPointersEqual,
@@ -298,3 +302,6 @@ export { GridMetric } from './diagnostics/GridInstrumentation.js';
 // ── Insight Layer ─────────────────────────────────────────────────────────────
 export type { GridInsightLayer, GridInsightLayerId, GridInsightSeverity, GridCellDecoration, GridRowDecoration } from './insights/insightTypes.js';
 export { GridInsightRegistry } from './insights/GridInsightRegistry.js';
+
+// ── Built-in cell types ───────────────────────────────────────────────────────
+export * from './cells/index.js';
