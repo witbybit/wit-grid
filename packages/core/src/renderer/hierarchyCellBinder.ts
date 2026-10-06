@@ -29,9 +29,11 @@ export interface BindHierarchyCellRequest<TRowData> {
 	isStuck?: boolean;
 }
 
-/** Per-call selection set, rebuilt only when the selection array changes. */
-let selectedSetFor: readonly string[] | null = null;
-let selectedSet: ReadonlySet<string> = new Set();
+/**
+ * The selection array as a Set, built once per array. Keyed by the (immutable) array itself, so
+ * several grids on one page each keep theirs instead of rebuilding on every switch between them.
+ */
+const selectedSets = new WeakMap<readonly string[], ReadonlySet<string>>();
 
 /** The narrow slice of binder deps the hierarchy cell needs (both lane and cell binder deps fit). */
 export interface HierarchyCellBinderDeps<TRowData> {
@@ -85,11 +87,9 @@ export function createHierarchyDeps<TRowData>(engine: GridEngine<TRowData>, stat
 		getCellValue: (rowId, field) => engine.data.getCellValue(rowId, field),
 		isRowSelected: (rowId) => {
 			const ids = readInteractionState(state).rowSelection.selectedRowIds;
-			if (ids !== selectedSetFor) {
-				selectedSetFor = ids;
-				selectedSet = new Set(ids);
-			}
-			return selectedSet.has(rowId);
+			let selected = selectedSets.get(ids);
+			if (!selected) selectedSets.set(ids, (selected = new Set(ids)));
+			return selected.has(rowId);
 		},
 		getDescendantSelection: (id) => engine.groupingFeature.getDescendantSelection(id).state,
 	};

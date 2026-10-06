@@ -140,6 +140,26 @@ describe('FloatingFilterRenderer Tab navigation', () => {
 		second.renderer.unmount();
 	});
 
+	it("keeps each grid's operator menu its own: another grid's scroll or menu never closes it", () => {
+		const a = makeGrid([{ field: 'name', lane: 'center' }]);
+		const b = makeGrid([{ field: 'name', lane: 'center' }]);
+		const openMenu = (grid: HTMLElement) => grid.querySelector<HTMLButtonElement>('.og-floating-filter-op-btn')!.click();
+		const menus = () => document.querySelectorAll('#og-floating-op-menu');
+
+		openMenu(a.grid);
+		expect(menus()).toHaveLength(1);
+		b.renderer.syncScrollLeft({} as GridLayoutPlan);
+		expect(menus()).toHaveLength(1);
+		openMenu(b.grid);
+		expect(menus()).toHaveLength(2);
+
+		a.renderer.syncScrollLeft({} as GridLayoutPlan);
+		expect(menus()).toHaveLength(1);
+		b.renderer.unmount();
+		expect(menus()).toHaveLength(0);
+		a.renderer.unmount();
+	});
+
 	it('does not retain a destroyed grid as a Tab target', () => {
 		const destroyed = makeGrid([{ field: 'destroyed', lane: 'center' }]);
 		const live = makeGrid([{ field: 'live', lane: 'center' }]);

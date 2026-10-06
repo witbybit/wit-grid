@@ -41,24 +41,6 @@ function debounce(fn: (...args: unknown[]) => void, ms: number): (...args: unkno
 const DROPDOWN_ID = 'og-floating-set-dropdown';
 const OP_MENU_ID = 'og-floating-op-menu';
 
-// Menus this module opened. syncScrollLeft closes menus on every horizontal scroll frame, so it
-// uses these refs instead of two document.getElementById lookups per frame. Both menus are only
-// ever created below (which records them here); a ref that was removed elsewhere is detached, and
-// removing a detached node is a no-op.
-let openDropdownEl: HTMLElement | null = null;
-let openOpMenuEl: HTMLElement | null = null;
-
-function closeOpenMenus(): void {
-	if (openDropdownEl) {
-		openDropdownEl.remove();
-		openDropdownEl = null;
-	}
-	if (openOpMenuEl) {
-		openOpMenuEl.remove();
-		openOpMenuEl = null;
-	}
-}
-
 // ── Main class ───────────────────────────────────────────────────────────────
 
 export class FloatingFilterRenderer<TRowData = unknown> {
@@ -74,6 +56,12 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 	private lastVisibleRange = { startIdx: -1, endIdx: -1, pinLeft: -1, pinRight: -1 };
 	private lastTopologyVersion = -1;
 	private unsubscribers: (() => void)[] = [];
+	/**
+	 * The menus this grid opened. Per instance, so one grid's horizontal scroll or unmount never
+	 * closes another grid's open menu. A ref removed elsewhere is detached; removing it is a no-op.
+	 */
+	private openDropdownEl: HTMLElement | null = null;
+	private openOpMenuEl: HTMLElement | null = null;
 
 	constructor(engine: GridEngine<TRowData>) {
 		this.engine = engine;
@@ -92,10 +80,17 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 		this.unsubscribers.push(unsub1, unsub2);
 	}
 
+	private closeOpenMenus(): void {
+		this.openDropdownEl?.remove();
+		this.openDropdownEl = null;
+		this.openOpMenuEl?.remove();
+		this.openOpMenuEl = null;
+	}
+
 	public unmount(): void {
 		this.unsubscribers.forEach((u) => u());
 		this.unsubscribers = [];
-		closeOpenMenus();
+		this.closeOpenMenus();
 		this.clearCells();
 		this.filterLayer = null;
 		this.filterLeftLayer = null;
@@ -108,8 +103,8 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 
 	public syncScrollLeft(_layoutPlan: GridLayoutPlan): void {
 		// Pin lanes now use CSS position:sticky — no JS counter-transform needed.
-		// Close the set-filter dropdown on horizontal scroll (it's fixed-position and won't track).
-		closeOpenMenus();
+		// Close this grid's menus on horizontal scroll (they're fixed-position and won't track).
+		this.closeOpenMenus();
 	}
 
 	private syncVisibleFilters(force: boolean, plan: GridLayoutPlan): void {
@@ -413,11 +408,11 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 		filterType: string,
 		setFilter: (f: ColumnFilter | null) => void
 	): void {
-		document.getElementById(OP_MENU_ID)?.remove();
+		this.openOpMenuEl?.remove();
 
 		const menu = document.createElement('div');
 		menu.id = OP_MENU_ID;
-		openOpMenuEl = menu;
+		this.openOpMenuEl = menu;
 		const rect = anchor.getBoundingClientRect();
 		menu.style.cssText = [
 			'position:fixed',
@@ -602,7 +597,7 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 		setFilter: (f: ColumnFilter | null) => void
 	): void {
 		// Toggle: if already open for this cell, close it
-		const existing = document.getElementById(DROPDOWN_ID);
+		const existing = this.openDropdownEl?.isConnected ? this.openDropdownEl : null;
 		if (existing) {
 			existing.remove();
 			if ((existing as any).__cell === cell) return;
@@ -612,7 +607,7 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 
 		const dropdown = document.createElement('div');
 		dropdown.id = DROPDOWN_ID;
-		openDropdownEl = dropdown;
+		this.openDropdownEl = dropdown;
 		(dropdown as any).__cell = cell;
 		dropdown.style.cssText = [
 			'position:fixed',
