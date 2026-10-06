@@ -27,6 +27,12 @@ export type { GroupDef } from './hierarchyConfig.js';
 
 export interface RowPipelineInput<TData = unknown> {
 	nodes: RowNode<TData>[];
+	/**
+	 * Changes whenever row membership, order or data changes (RowDataStore.dataVersion). When set, a
+	 * run whose row-shaping inputs are unchanged reuses the previous row tree and only flattens
+	 * (expansion, detail rows, pagination, heights). Omit to always run every stage.
+	 */
+	dataVersion?: number;
 	columns: ColumnDef<TData>[];
 	sortModel: SortModel | null;
 	filterModel: FilterModel | null;
@@ -79,8 +85,47 @@ export interface RowPipelineOutput<TData = unknown> {
 
 export type RowPipelineResult<TData = unknown> = RowPipelineOutput<TData>;
 
+/**
+ * Everything the row tree (filter, group / tree, sort, aggregate) is built from, compared by
+ * reference. Flatten inputs (expansion, detail, heights, totals placement, pagination) are not part
+ * of it: they are re-applied on every run.
+ */
+interface TreeStageKey<TData> {
+	dataVersion: number;
+	nodes: RowNode<TData>[];
+	columns: ColumnDef<TData>[];
+	sortModel: SortModel | null;
+	filterModel: FilterModel | null;
+	quickFilterModel: QuickFilterModel | null | undefined;
+	queryModel: GridQueryModel | null | undefined;
+	groupBy: GroupingConfig<TData>['by'] | undefined;
+	treeData: TreeDataConfig<TData> | undefined;
+	aggregationDefs: AggregationConfig<TData>['defs'] | undefined;
+	hasDetail: boolean;
+}
+
+function sameTreeStageKey<TData>(a: TreeStageKey<TData>, b: TreeStageKey<TData>): boolean {
+	return (
+		a.dataVersion === b.dataVersion &&
+		a.nodes === b.nodes &&
+		a.columns === b.columns &&
+		a.sortModel === b.sortModel &&
+		a.filterModel === b.filterModel &&
+		a.quickFilterModel === b.quickFilterModel &&
+		a.queryModel === b.queryModel &&
+		a.groupBy === b.groupBy &&
+		a.treeData === b.treeData &&
+		a.aggregationDefs === b.aggregationDefs &&
+		a.hasDetail === b.hasDetail
+	);
+}
+
 export class RowPipeline<TData = unknown> {
 	private version = 0;
+	/** The last built row tree and grand totals, reused while its key is unchanged. */
+	private treeCache: { key: TreeStageKey<TData>; roots: RowTreeNode<TData>[]; grandAggregates: Record<string, unknown> | undefined } | null = null;
+	/** Runs that reused the cached tree (diagnostics and tests). */
+	public treeCacheHits = 0;
 
 	public run(input: RowPipelineInput<TData>): RowPipelineOutput<TData> {
 		const {
@@ -107,8 +152,32 @@ export class RowPipeline<TData = unknown> {
 
 		let roots: RowTreeNode<TData>[] | null = null;
 		let visualRows: VisualRow<TData>[] | null = null;
+		let grandAggregates: Record<string, unknown> | undefined;
 
-		if (groupDefs.length > 0) {
+		const treeKey: TreeStageKey<TData> | null =
+			input.dataVersion === undefined
+				? null
+				: {
+						dataVersion: input.dataVersion,
+						nodes,
+						columns,
+						sortModel,
+						filterModel,
+						quickFilterModel,
+						queryModel,
+						groupBy: grouping?.by,
+						treeData,
+						aggregationDefs: aggregation?.defs,
+						hasDetail: !!detail,
+					};
+		const cached = treeKey && this.treeCache && sameTreeStageKey(this.treeCache.key, treeKey) ? this.treeCache : null;
+
+		if (cached) {
+			// Only expansion, detail, heights or pagination changed: the tree is current as built.
+			this.treeCacheHits++;
+			roots = cached.roots;
+			grandAggregates = cached.grandAggregates;
+		} else if (groupDefs.length > 0) {
 			const filteredNodes = applyQueryModelFilter(applyClientFilterOnly(nodes, columns, filterModel, quickFilterModel), columns, queryModel);
 			roots = groupStage(filteredNodes, groupDefs, context);
 		} else if (treeData) {
@@ -150,14 +219,16 @@ export class RowPipeline<TData = unknown> {
 			}
 		}
 
-		if (roots && (groupDefs.length > 0 || treeData) && ((sortModel && sortModel.length > 0) || groupDefs.some((def) => def.comparator))) {
-			sortTreeStage(roots, sortModel, columns, groupDefs);
+		if (!cached) {
+			if (roots && (groupDefs.length > 0 || treeData) && ((sortModel && sortModel.length > 0) || groupDefs.some((def) => def.comparator))) {
+				sortTreeStage(roots, sortModel, columns, groupDefs);
+			}
+			grandAggregates =
+				roots && aggDefs.length > 0
+					? aggregateStage(roots, aggDefs, context, { aggregateTreeParents: treeData?.aggregateParents ?? true })
+					: undefined;
+			this.treeCache = treeKey && roots ? { key: treeKey, roots, grandAggregates } : null;
 		}
-
-		const grandAggregates =
-			roots && aggDefs.length > 0
-				? aggregateStage(roots, aggDefs, context, { aggregateTreeParents: treeData?.aggregateParents ?? true })
-				: undefined;
 
 		const stickyGroupMeta = new Map<number, number>();
 		visualRows ??= flattenStage(

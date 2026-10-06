@@ -100,8 +100,23 @@ export class RowDataStore<T> {
 	private sourceIndexById: Map<string, number> | null = null;
 	private getRowId: (row: T) => string;
 
+	/**
+	 * Bumped by every change to row membership, order or data. Derived structures (the pipeline's
+	 * stage cache) compare it to know whether rows may have changed since they were built.
+	 */
+	private _dataVersion = 0;
+
 	constructor(getRowId: (row: T) => string) {
 		this.getRowId = getRowId;
+	}
+
+	public get dataVersion(): number {
+		return this._dataVersion;
+	}
+
+	/** For writers that change a node's data in place (cell writes). */
+	public markDataChanged(): void {
+		this._dataVersion++;
 	}
 
 	public setRows(rows: T[]): void {
@@ -114,6 +129,7 @@ export class RowDataStore<T> {
 	 * appear or disappear are reported as added / removed.
 	 */
 	public replaceRows(rows: T[]): RowReplaceResult<T> {
+		this._dataVersion++;
 		const changedNodes: RowNode<T>[] = [];
 		const changedFieldsByRow = new Map<string, Set<string>>();
 		const changedValuesByRow = new Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>();
@@ -201,6 +217,7 @@ export class RowDataStore<T> {
 	}
 
 	public applyTransaction(transaction: { add?: T[]; addIndex?: number; remove?: T[]; update?: T[] }): StoreTransactionResult<T> {
+		this._dataVersion++;
 		const added: RowNode<T>[] = [];
 		const removed: RowNode<T>[] = [];
 		const updated: RowNode<T>[] = [];
@@ -359,6 +376,7 @@ export class RowDataStore<T> {
 	}
 
 	public restoreTransactionSnapshot(snapshot: RowDataStoreTransactionSnapshot<T>): void {
+		this._dataVersion++;
 		// A complete snapshot owns the whole id space: rows added after capture are dropped.
 		if (snapshot.complete) this.rowsById = new Map();
 		for (const [id, entry] of snapshot.entries) {
@@ -377,6 +395,7 @@ export class RowDataStore<T> {
 
 	/** Reorder rows by providing a new array of row IDs. IDs not present in the store are silently dropped. */
 	public setRowOrder(rowIds: string[]): void {
+		this._dataVersion++;
 		const next: string[] = [];
 		for (const id of rowIds) {
 			if (this.rowsById.has(id)) next.push(id);

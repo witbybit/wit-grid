@@ -763,14 +763,16 @@ function describeVisualRowDiff<TData>(
 ): RowModelRefreshResult {
 	let prefix = 0;
 	const minLength = Math.min(previousRows.length, nextRows.length);
-	while (prefix < minLength && sameVisualRowIdentity(previousRows[prefix], nextRows[prefix])) {
+	// Unchanged rows are usually the same object (flatten reuses them), so identity is checked first.
+	while (prefix < minLength && (previousRows[prefix] === nextRows[prefix] || sameVisualRowIdentity(previousRows[prefix], nextRows[prefix]))) {
 		prefix++;
 	}
 
 	let suffix = 0;
 	while (
 		suffix < minLength - prefix &&
-		sameVisualRowIdentity(previousRows[previousRows.length - 1 - suffix], nextRows[nextRows.length - 1 - suffix])
+		(previousRows[previousRows.length - 1 - suffix] === nextRows[nextRows.length - 1 - suffix] ||
+			sameVisualRowIdentity(previousRows[previousRows.length - 1 - suffix], nextRows[nextRows.length - 1 - suffix]))
 	) {
 		suffix++;
 	}
@@ -781,7 +783,7 @@ function describeVisualRowDiff<TData>(
 	// Rows that kept their place (the identical prefix and suffix) may still carry new aggregates.
 	let aggregateChangedIndices: number[] | undefined;
 	const noteAggregateChange = (prev: VisualRow<TData>, next: VisualRow<TData>, index: number) => {
-		if (!sameRowAggregates(prev, next)) (aggregateChangedIndices ??= []).push(index);
+		if (prev !== next && !sameRowAggregates(prev, next)) (aggregateChangedIndices ??= []).push(index);
 	};
 	for (let i = 0; i < prefix; i++) noteAggregateChange(previousRows[i], nextRows[i], i);
 	for (let k = suffix - 1; k >= 0; k--) {
@@ -1250,7 +1252,8 @@ export class ClientRowModelController<TData = unknown>
 		if (!this._roots) return null;
 		const input = this.buildPipelineInput(this.runtime.getState(), false);
 		// A separate pipeline: the live one's version and caches are untouched.
-		return new RowPipeline<TData>().run({ ...input, detail: undefined, expansion: { rows: {}, details: {}, base: true } }).visualRows;
+		return new RowPipeline<TData>().run({ ...input, dataVersion: undefined, detail: undefined, expansion: { rows: {}, details: {}, base: true } })
+			.visualRows;
 	};
 
 	public isDetailOpen = (rowId: string): boolean => {
@@ -1580,6 +1583,7 @@ export class ClientRowModelController<TData = unknown>
 		}
 
 		node.setData(updatedRow);
+		this.dataStore.markDataChanged();
 
 		return {
 			updatedNodes: [node],
@@ -2131,7 +2135,9 @@ export class ClientRowModelController<TData = unknown>
 				}
 				return ids;
 			}
-			const result = this.pipeline.run(this.buildPipelineInput(state, false));
+			// A side run over its own tree: the live tree's row back-pointers (which the incremental
+			// index follows) must keep pointing into the live visual rows.
+			const result = new RowPipeline<TData>().run({ ...this.buildPipelineInput(state, false), dataVersion: undefined });
 			return result.visualRows.flatMap((row) => (row.kind === 'data' ? [row.rowId] : []));
 		}
 		const ids: string[] = [];
@@ -2144,6 +2150,7 @@ export class ClientRowModelController<TData = unknown>
 	private buildPipelineInput(state: ReturnType<ClientRowModelRuntime<TData>['getState']>, paginate: boolean): RowPipelineInput<TData> {
 		return {
 			nodes: this.dataStore.getAllNodes(),
+			dataVersion: this.dataStore.dataVersion,
 			columns: state.columns,
 			sortModel: state.sortModel,
 			filterModel: state.filterModel,
