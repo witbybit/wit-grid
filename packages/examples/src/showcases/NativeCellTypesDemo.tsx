@@ -25,11 +25,14 @@ import {
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
+	openCellPopover,
+	CELL_HUES,
 } from '@eregister/wit-grid-react';
 import type {
 	BuiltInThemeName,
 	CascadeOption,
 	CellOption,
+	CellPopover,
 	ColumnDef,
 	ColumnTypeDefinition,
 	GridApi,
@@ -206,16 +209,40 @@ const NOTES = [
 	'Blocked until the staging cluster is upgraded.',
 ];
 
-/** Opening a linked record: a demo stand-in for navigating to it. */
-function showToast(text: string) {
-	const toast = document.createElement('div');
-	toast.textContent = text;
-	toast.style.cssText =
-		'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;' +
-		'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s';
-	document.body.appendChild(toast);
-	setTimeout(() => (toast.style.opacity = '0'), 1600);
-	setTimeout(() => toast.remove(), 2000);
+/**
+ * Pressing a linked record chip: a preview card anchored to the chip, built on the grid's own
+ * popover so it follows the grid theme. A real app would navigate or open a drawer from here.
+ */
+let openPreview: CellPopover | null = null;
+function showRecordPreview(value: string, chip: HTMLElement) {
+	openPreview?.close();
+	const record = PROJECTS.find((p) => p.value === value);
+	if (!record) return;
+	const [code, stage] = (record.description ?? '').split(' · ');
+	const hue = CELL_HUES[record.color as keyof typeof CELL_HUES] ?? CELL_HUES.blue;
+	const card = document.createElement('div');
+	card.style.cssText = 'width:260px;padding:8px;display:flex;flex-direction:column;gap:12px';
+	card.innerHTML = `
+		<div style="display:flex;align-items:center;gap:10px">
+			<span style="width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:700;color:#fff;background:${hue}">${record.label![0]}</span>
+			<div style="min-width:0">
+				<div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+				<div style="font-size:12px;color:var(--og-ct-muted)">${code}</div>
+			</div>
+		</div>
+		<div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px">
+			<span style="color:var(--og-ct-muted)">Stage</span><span>${stage}</span>
+			<span style="color:var(--og-ct-muted)">Linked tasks</span><span>${(parseInt(value.slice(4), 10) % 9) + 2}</span>
+			<span style="color:var(--og-ct-muted)">Lead</span><span>${PEOPLE[parseInt(value.slice(4), 10) % PEOPLE.length].label}</span>
+		</div>
+		<div style="display:flex;justify-content:flex-end;gap:6px">
+			<button type="button" class="og-ct-btn" data-ghost>Close</button>
+			<button type="button" class="og-ct-btn" data-primary>Open project</button>
+		</div>`;
+	(card.querySelector('div > div > div') as HTMLElement).textContent = record.label!;
+	const popover = openCellPopover({ anchor: chip, content: card, label: record.label, onDismiss: () => (openPreview = null) });
+	openPreview = popover;
+	for (const button of card.querySelectorAll('button')) button.addEventListener('click', () => popover.close());
 }
 
 const TASKS = [
@@ -265,7 +292,7 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 		loadOptions: projectsServer.load,
 		resolveOptions: projectsServer.resolve,
 		searchPlaceholder: 'Find a project…',
-		onOpen: (value) => showToast(`Open project ${PROJECTS.find((p) => p.value === value)?.label ?? value}`),
+		onOpen: (value, _params, chip) => showRecordPreview(value, chip),
 	}),
 	location: cascadeColumnType({ options: LOCATIONS, searchPlaceholder: 'Search cities…' }),
 	sprint: dateRangeColumnType(),
@@ -291,7 +318,7 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },
 	{ field: 'location', header: 'Office', width: 240, type: 'location' },
 	{ field: 'due', header: 'Due', width: 140, type: 'date' },
-	{ field: 'sprint', header: 'Sprint', width: 200, type: 'sprint' },
+	{ field: 'sprint', header: 'Sprint', width: 250, type: 'sprint' },
 	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
 	{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },
 	{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },
@@ -380,7 +407,7 @@ const TYPE_REFERENCE: { name: string; text: string }[] = [
 	{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },
 	{ name: 'ratingColumnType', text: 'Stars, click to rate.' },
 	{ name: 'segmentedColumnType', text: 'Two to four options inline; one press picks (Effort).' },
-	{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; chips open the record (Projects).' },
+	{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; pressing a chip opens a preview (Projects).' },
 	{ name: 'cascadeColumnType', text: 'A path through a tree, one column per level, search across paths (Office).' },
 	{ name: 'dateRangeColumnType', text: 'Two-month range calendar with presets (Sprint).' },
 	{ name: 'sparklineColumnType', text: 'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).' },

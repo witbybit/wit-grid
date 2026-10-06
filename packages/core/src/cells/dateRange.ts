@@ -173,12 +173,15 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 			let start: Date | null = initial?.start ?? null;
 			let finish: Date | null = initial?.end ?? null;
 			let hover: Date | null = null;
+			let keyboard = false;
 			let cursor = day(initial?.start ?? new Date());
 			let view = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-			const monthCount = options.months ?? (window.innerWidth < 640 ? 1 : 2);
+			// Two months when they fit beside the presets (about 720px), else one.
+			const monthCount = options.months ?? (document.documentElement.clientWidth >= (presets.length > 0 ? 720 : 580) ? 2 : 1);
 
 			const panel = document.createElement('div');
 			panel.className = 'og-ct-range-panel';
+			const presetButtons: { preset: DateRangePreset; button: HTMLButtonElement }[] = [];
 			if (presets.length > 0) {
 				const side = document.createElement('div');
 				side.className = 'og-ct-range-presets';
@@ -187,6 +190,7 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 					button.type = 'button';
 					button.className = 'og-ct-range-preset';
 					button.textContent = preset.label;
+					presetButtons.push({ preset, button });
 					button.addEventListener('mousedown', (event) => event.preventDefault());
 					button.addEventListener('click', () => end.commit(writeDateRange(params.value, preset.range())));
 					side.appendChild(button);
@@ -195,6 +199,24 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 			}
 			const main = document.createElement('div');
 			main.className = 'og-ct-range-main';
+			const fields = document.createElement('div');
+			fields.className = 'og-ct-range-fields';
+			const field = (label: string) => {
+				const box = document.createElement('div');
+				box.className = 'og-ct-range-field';
+				const caption = document.createElement('span');
+				caption.className = 'og-ct-range-field-label';
+				caption.textContent = label;
+				const value = document.createElement('span');
+				value.className = 'og-ct-range-field-value';
+				box.append(caption, value);
+				return { box, value };
+			};
+			const startField = field('Start');
+			const endField = field('End');
+			const arrow = createCellIcon('arrowRight', 14, 'og-ct-range-arrow');
+			fields.append(startField.box, arrow, endField.box);
+			const fieldFormat = new Intl.DateTimeFormat(options.locale, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 			const months = document.createElement('div');
 			months.className = 'og-ct-range-months';
 			months.tabIndex = 0;
@@ -223,7 +245,7 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 				apply
 			);
 			foot.append(summary, actions);
-			main.append(months, foot);
+			main.append(fields, months, foot);
 			panel.appendChild(main);
 
 			const monthTitle = new Intl.DateTimeFormat(options.locale, { month: 'long', year: 'numeric' });
@@ -290,7 +312,7 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 					title.textContent = monthTitle.format(month);
 					head.append(prev, title, next);
 					const grid = document.createElement('div');
-					grid.className = 'og-ct-cal-grid';
+					grid.className = 'og-ct-cal-grid og-ct-range-grid';
 					for (let i = 0; i < 7; i++) {
 						const dow = document.createElement('div');
 						dow.className = 'og-ct-cal-dow';
@@ -311,15 +333,24 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 							grid.appendChild(cell);
 							continue;
 						}
-						cell.textContent = String(date.getDate());
+						// The number sits in a pill (the range ends); the button behind it carries the band.
+						const number = document.createElement('span');
+						number.textContent = String(date.getDate());
+						cell.appendChild(number);
 						cell.setAttribute('aria-label', dayLabel.format(date));
 						const edge = same(date, lo) || same(date, hi);
 						cell.setAttribute('aria-selected', String(edge));
-						if (same(date, lo)) cell.setAttribute('data-range-start', '');
-						if (same(date, hi)) cell.setAttribute('data-range-end', '');
+						const spans = !!lo && !!hi && !same(lo, hi);
+						if (same(date, lo)) cell.setAttribute(spans ? 'data-range-start' : 'data-range-single', '');
+						if (same(date, hi) && spans) cell.setAttribute('data-range-end', '');
 						if (lo && hi && date > lo && date < hi) cell.setAttribute('data-in-range', '');
+						if (start && !finish) cell.setAttribute('data-preview', '');
+						// The band rounds off where a week row (or the month) begins and ends.
+						if (date.getDay() === weekStartsOn || date.getDate() === 1) cell.setAttribute('data-row-start', '');
+						const lastOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+						if ((date.getDay() + 1) % 7 === weekStartsOn || date.getDate() === lastOfMonth) cell.setAttribute('data-row-end', '');
 						if (same(date, today)) cell.setAttribute('data-today', '');
-						if (same(date, cursor) && document.activeElement === months) cell.setAttribute('data-active', '');
+						if (keyboard && same(date, cursor)) cell.setAttribute('data-active', '');
 						cell.addEventListener('mousedown', (event) => event.preventDefault());
 						cell.addEventListener('click', () => pick(date));
 						cell.addEventListener('mouseenter', () => {
@@ -334,11 +365,21 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 					months.appendChild(block);
 				}
 				const range = complete();
-				summary.textContent = range
-					? `${formatDateRange(range, options.locale)} · ${dateRangeLength(range)} days`
-					: start
-						? 'Pick an end date'
-						: 'Pick a start date';
+				const days = range ? dateRangeLength(range) : 0;
+				summary.textContent = range ? `${days} ${days === 1 ? 'day' : 'days'}` : start ? 'Pick an end date' : 'Pick a start date';
+				startField.value.textContent = start ? fieldFormat.format(start) : '—';
+				endField.value.textContent = finish
+					? fieldFormat.format(finish)
+					: start && hover
+						? fieldFormat.format(hover < start ? start : hover)
+						: '—';
+				const pickingEnd = !!start && !finish;
+				startField.box.toggleAttribute('data-picking', !pickingEnd);
+				endField.box.toggleAttribute('data-picking', pickingEnd);
+				for (const { preset, button } of presetButtons) {
+					const r = preset.range();
+					button.setAttribute('aria-pressed', String(!!range && same(day(r.start), range.start) && same(day(r.end), range.end)));
+				}
 				cellText.textContent = range ? formatDateRange(range, options.locale) : '';
 				apply.disabled = !range;
 			}
@@ -352,12 +393,14 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 					next = new Date(cursor.getFullYear(), cursor.getMonth() + delta, Math.min(cursor.getDate(), 28));
 				} else if (event.key === 'Enter' || event.key === ' ') {
 					event.preventDefault();
+					keyboard = true;
 					// Enter saves a complete range; otherwise (and Space, always) it picks the day.
 					if (event.key === 'Enter' && complete()) commitRange();
 					else pick(cursor);
 					return;
 				} else return;
 				event.preventDefault();
+				keyboard = true;
 				cursor = next;
 				hover = null;
 				const last = addMonths(view, monthCount - 1);
@@ -366,7 +409,12 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 					view = addMonths(new Date(cursor.getFullYear(), cursor.getMonth(), 1), -(monthCount - 1));
 				render();
 			});
-			months.addEventListener('focus', render);
+			months.addEventListener('mousemove', () => {
+				if (keyboard) {
+					keyboard = false;
+					render();
+				}
+			});
 			months.addEventListener('mouseleave', () => {
 				if (hover) {
 					hover = null;
@@ -377,7 +425,7 @@ export function createDateRangeEditor(options: DateRangeCellOptions = {}): DomCe
 			const popover = openCellPopover({
 				anchor: root,
 				content: panel,
-				className: 'og-ct-popover-wide',
+				className: 'og-ct-popover-range',
 				label: 'Choose a date range',
 				// Clicking away keeps a complete range; Escape (or an unfinished one) leaves the cell as it was.
 				onDismiss: (reason) => {

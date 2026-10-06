@@ -62,6 +62,7 @@ describe('React public boundary', () => {
 			'number',
 			'numberColumnType',
 			'oneOf',
+			'openCellPopover',
 			'parseMultiValue',
 			'percentColumnType',
 			'personColumnType',

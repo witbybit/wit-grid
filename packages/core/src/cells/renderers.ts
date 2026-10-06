@@ -402,8 +402,11 @@ export interface MultiSelectRendererOptions {
 	maxVisible?: number;
 	/** Colour values with no option from the palette (free tags). Default true. */
 	autoColor?: boolean;
-	/** Called when a chip is pressed (open the linked record, say). The press does not select the cell. */
-	onOpen?: (value: string, params: DomCellRendererParams<any>) => void;
+	/**
+	 * Called when a chip is pressed (open the linked record, say), with the chip to anchor a preview
+	 * to (`openCellPopover`). The press does not select the cell.
+	 */
+	onOpen?: (value: string, params: DomCellRendererParams<any>, chip: HTMLElement) => void;
 }
 
 export function createMultiSelectRenderer(options: CellOptionsInput, config: MultiSelectRendererOptions = {}): DomCellRenderer<any> {
@@ -448,7 +451,7 @@ export function createMultiSelectRenderer(options: CellOptionsInput, config: Mul
 				event.stopPropagation();
 				event.preventDefault();
 				const params = paramsOf.get(root);
-				if (params) config.onOpen!(chip.dataset.value!, params);
+				if (params) config.onOpen!(chip.dataset.value!, params, chip);
 			});
 		},
 		paramsOf

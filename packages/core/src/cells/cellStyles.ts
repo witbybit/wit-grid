@@ -49,7 +49,9 @@ export const CELL_STYLES = `
 .og-ct-badge[data-variant='outline'] { background: transparent; box-shadow: inset 0 0 0 1px var(--og-ct-control-border); color: var(--og-ct-text); }
 .og-ct-dot { width: 8px; height: 8px; border-radius: 999px; flex: none; background: var(--og-ct-hue, var(--og-ct-muted)); }
 .og-ct-chips { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
-.og-ct-more { color: var(--og-ct-muted); font-variant-numeric: tabular-nums; }
+.og-ct-more { flex: none; color: var(--og-ct-muted); font-variant-numeric: tabular-nums; }
+/* In a row of chips the last one shrinks (with an ellipsis) so the “+N” stays in view. */
+.og-ct-chips > .og-ct-badge, .og-ct-chips > .og-ct-record { flex: 0 1 auto; min-width: 28px; }
 
 .og-ct-checkbox {
   width: 16px; height: 16px; border-radius: 4px; flex: none; display: grid; place-items: center;
@@ -102,7 +104,9 @@ export const CELL_STYLES = `
 .og-ct-popover {
   position: fixed; z-index: 10000; box-sizing: border-box; min-width: 180px; max-width: min(440px, calc(100vw - 16px));
   padding: 4px; border-radius: 10px; border: 1px solid var(--og-popover-border);
-  background: var(--og-popover-bg); color: var(--og-popover-text, var(--og-text-color));
+  /* Themes give popovers a slightly translucent colour: lay it over the opaque grid background. */
+  background: linear-gradient(var(--og-popover-bg), var(--og-popover-bg)), var(--og-bg-color);
+  color: var(--og-popover-text, var(--og-text-color));
   box-shadow: 0 16px 36px -12px rgba(0, 0, 0, .45), 0 2px 8px -2px rgba(0, 0, 0, .2);
   font-family: var(--og-font-family); font-size: 13px; line-height: 1.35; outline: none; overflow-y: auto;
   animation: og-ct-pop .12s ease-out;
@@ -297,25 +301,82 @@ export const CELL_STYLES = `
 .og-ct-cascade-tail { display: inline-flex; flex: none; margin-left: auto; color: var(--og-ct-muted); }
 
 /* ── Date range ────────────────────────────────────────────────────────── */
-.og-ct-range-length { flex: none; font-size: 11px; color: var(--og-ct-subtle); font-variant-numeric: tabular-nums; }
+.og-ct-range-length {
+  flex: none; padding: 1px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 500;
+  color: var(--og-ct-muted); background: var(--og-ct-neutral-bg); font-variant-numeric: tabular-nums;
+}
+.og-ct-popover-range { max-width: calc(100vw - 16px); overflow: hidden auto; padding: 0; }
 .og-ct-range-panel { display: flex; }
 .og-ct-range-presets {
-  display: flex; flex-direction: column; gap: 1px; padding: 4px 6px 4px 2px; min-width: 120px;
+  display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; width: 132px; flex: none;
   border-right: 1px solid var(--og-popover-divider, var(--og-popover-border));
 }
 .og-ct-range-preset {
-  text-align: left; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent;
-  color: var(--og-ct-text); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  text-align: left; height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--og-ct-muted); font: inherit; font-size: 12.5px; cursor: pointer; white-space: nowrap;
+  transition: background-color .12s ease, color .12s ease;
 }
-.og-ct-range-preset:hover { background: var(--og-popover-item-hover-bg); }
-.og-ct-range-main { display: flex; flex-direction: column; padding-left: 4px; }
-.og-ct-range-months { display: flex; gap: 12px; outline: none; }
-.og-ct-range-months .og-ct-cal-day { border-radius: 0; }
-.og-ct-cal-day[data-in-range] { background: color-mix(in srgb, var(--og-ct-accent) 16%, transparent); }
-.og-ct-cal-day[data-range-start] { border-radius: 6px 0 0 6px; }
-.og-ct-cal-day[data-range-end] { border-radius: 0 6px 6px 0; }
-.og-ct-cal-day[data-range-start][data-range-end] { border-radius: 6px; }
-.og-ct-range-summary { font-size: 12px; color: var(--og-ct-muted); align-self: center; }
+.og-ct-range-preset:hover { background: var(--og-popover-item-hover-bg); color: var(--og-ct-text); }
+.og-ct-range-preset[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--og-ct-accent) 14%, transparent); color: var(--og-ct-accent); font-weight: 500;
+}
+.og-ct-range-main { display: flex; flex-direction: column; min-width: 0; padding: 12px 14px 0; }
+.og-ct-range-fields { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.og-ct-range-field {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 8px;
+  border: 1px solid var(--og-popover-input-border, var(--og-popover-border)); background: var(--og-popover-input-bg, transparent);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.og-ct-range-field[data-picking] { border-color: var(--og-ct-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-ct-accent) 18%, transparent); }
+.og-ct-range-field-label { font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; color: var(--og-ct-subtle); }
+.og-ct-range-field-value { font-size: 13px; color: var(--og-ct-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.og-ct-range-arrow { color: var(--og-ct-subtle); }
+.og-ct-range-months { display: flex; gap: 20px; outline: none; }
+.og-ct-range-months:focus-visible { outline: none; }
+.og-ct-range-months .og-ct-calendar { width: 238px; padding: 0; }
+.og-ct-range-months .og-ct-calendar + .og-ct-calendar { padding-left: 20px; border-left: 1px solid var(--og-popover-divider, var(--og-popover-border)); }
+.og-ct-range-months .og-ct-cal-head { padding: 0 0 8px; font-size: 13px; }
+.og-ct-range-months .og-ct-cal-nav { width: 26px; height: 26px; border-color: transparent; color: var(--og-ct-muted); }
+.og-ct-range-months .og-ct-cal-nav:hover { color: var(--og-ct-text); }
+.og-ct-range-grid { gap: 2px 0; }
+.og-ct-range-grid .og-ct-cal-day {
+  position: relative; height: 34px; border-radius: 0; background: transparent; box-shadow: none;
+}
+/* The base calendar paints the whole day; here the pill and band do (declared before the band rules). */
+.og-ct-range-grid .og-ct-cal-day:hover,
+.og-ct-range-grid .og-ct-cal-day[data-active],
+.og-ct-range-grid .og-ct-cal-day[aria-selected='true'] { background: transparent; }
+.og-ct-range-grid .og-ct-cal-day > span {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; margin: auto; border-radius: 8px;
+  transition: background-color .1s ease;
+}
+.og-ct-range-grid .og-ct-cal-day:hover > span { background: var(--og-popover-item-hover-bg); }
+.og-ct-range-grid .og-ct-cal-day[data-today] > span::after {
+  content: ''; position: absolute; bottom: 3px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 999px; background: var(--og-ct-accent);
+}
+/* The band: in-range days, and the inner half of each end. */
+.og-ct-range-grid .og-ct-cal-day[data-in-range] { background: color-mix(in srgb, var(--og-ct-accent) 15%, transparent); }
+.og-ct-range-grid .og-ct-cal-day[data-in-range][data-preview] { background: color-mix(in srgb, var(--og-ct-accent) 9%, transparent); }
+.og-ct-range-grid .og-ct-cal-day[data-range-start] { background: linear-gradient(to right, transparent 50%, color-mix(in srgb, var(--og-ct-accent) 15%, transparent) 50%); }
+.og-ct-range-grid .og-ct-cal-day[data-range-end] { background: linear-gradient(to left, transparent 50%, color-mix(in srgb, var(--og-ct-accent) 15%, transparent) 50%); }
+.og-ct-range-grid .og-ct-cal-day[data-range-start][data-row-end], .og-ct-range-grid .og-ct-cal-day[data-range-end][data-row-start] { background: transparent; }
+.og-ct-range-grid .og-ct-cal-day[data-in-range][data-row-start] { border-radius: 8px 0 0 8px; }
+.og-ct-range-grid .og-ct-cal-day[data-in-range][data-row-end] { border-radius: 0 8px 8px 0; }
+.og-ct-range-grid .og-ct-cal-day[data-in-range][data-row-start][data-row-end] { border-radius: 8px; }
+.og-ct-range-grid .og-ct-cal-day[data-range-start] > span,
+.og-ct-range-grid .og-ct-cal-day[data-range-end] > span,
+.og-ct-range-grid .og-ct-cal-day[data-range-single] > span {
+  background: var(--og-ct-accent); color: var(--og-ct-on-accent); font-weight: 600;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--og-ct-accent) 45%, transparent);
+}
+.og-ct-range-grid .og-ct-cal-day[data-range-start] > span::after,
+.og-ct-range-grid .og-ct-cal-day[data-range-end] > span::after,
+.og-ct-range-grid .og-ct-cal-day[data-range-single] > span::after { background: var(--og-ct-on-accent); }
+.og-ct-range-grid .og-ct-cal-day[data-active] > span { box-shadow: inset 0 0 0 2px var(--og-ct-accent); }
+.og-ct-range-main .og-ct-cal-foot {
+  align-items: center; margin: 12px -14px 0; padding: 10px 14px; border-top: 1px solid var(--og-popover-divider, var(--og-popover-border));
+}
+.og-ct-range-summary { font-size: 12px; color: var(--og-ct-muted); font-variant-numeric: tabular-nums; }
 .og-ct-range-actions { display: flex; gap: 6px; }
 
 /* ── Sparkline ─────────────────────────────────────────────────────────── */

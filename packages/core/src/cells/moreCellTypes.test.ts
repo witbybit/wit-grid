@@ -193,7 +193,11 @@ describe('linked records', () => {
 		// A recycled cell: same value, another row.
 		update(['p1', 'p2'], 'r7');
 		press(container.querySelectorAll('.og-ct-record')[1]);
-		expect(onOpen).toHaveBeenCalledWith('p2', expect.objectContaining({ node: expect.objectContaining({ id: 'r7' }) }));
+		expect(onOpen).toHaveBeenCalledWith(
+			'p2',
+			expect.objectContaining({ node: expect.objectContaining({ id: 'r7' }) }),
+			container.querySelectorAll('.og-ct-record')[1]
+		);
 	});
 });
 
