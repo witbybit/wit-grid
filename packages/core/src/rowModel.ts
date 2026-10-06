@@ -1739,6 +1739,8 @@ export class ClientRowModelController<TData = unknown>
 					changedEndIndex: Math.max(changedStartIndex, this.visualRows.length - 1),
 				};
 			}
+			const grouped = this.tryIncrementalGroupedMembership(added, removed);
+			if (grouped) return grouped;
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
 		}
@@ -1863,25 +1865,26 @@ export class ClientRowModelController<TData = unknown>
 	 * inputs, sort keys) by patching the tree and flat list, instead of a full pipeline run.
 	 * Null when the update needs the full run.
 	 */
-	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
-		const nodes = writeResult.updatedNodes;
-		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
-		const state = this.runtime.getState();
+	/**
+	 * The grouped incremental index, created on first use, when the grid is one it can patch: grouped
+	 * client rows with no tree, detail, pagination, query or row-height callback, and the same
+	 * configuration it was keyed on. `checkFilter`: the write may move rows in or out of the filter,
+	 * which needs filters decided by plain row data.
+	 */
+	private acquireGroupedIndex(state: ReturnType<ClientRowModelRuntime<TData>['getState']>, checkFilter: boolean): boolean {
 		const seed = this._incrementalSeed;
-		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return null;
+		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return false;
 		const now = this.captureIncrementalSeed(state);
 		for (const key of Object.keys(now)) {
 			if (now[key] === seed[key]) continue;
 			// A re-declared column list that reads the same values (new formatters, headers, widths) keeps the index.
 			if (key === 'columns' && samePipelineColumns(now[key] as ColumnDef<TData>[], seed[key] as ColumnDef<TData>[])) continue;
-			return null;
+			return false;
 		}
-		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return null;
-		if (state.queryModel && state.queryModel.root.children.length > 0) return null;
-		// A row may change group or enter / leave the filter only when those are decided by plain row data.
-		const checkFilter = impact === 'group-key' || impact === 'filter-key';
+		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return false;
+		if (state.queryModel && state.queryModel.root.children.length > 0) return false;
 		const hasFilter = !!state.quickFilterModel?.text.trim() || (!!state.filterModel && Object.keys(state.filterModel).length > 0);
-		if (checkFilter && hasFilter && state.columns.some((column) => column.valueGetter)) return null;
+		if (checkFilter && hasFilter && state.columns.some((column) => column.valueGetter)) return false;
 		if (this._incremental === undefined) {
 			const expansionBase: unknown = state.expansion.base;
 			this._incremental = IncrementalRowIndex.create<TData>({
@@ -1898,10 +1901,62 @@ export class ClientRowModelController<TData = unknown>
 				rowHeights: state.rowHeights,
 				countSensitiveExpansion: typeof state.grouping.defaultExpanded === 'function' || typeof expansionBase === 'function',
 			});
-			if (!this._incremental) return null;
 		}
+		return !!this._incremental;
+	}
+
+	/**
+	 * Rows added to or removed from a grouped grid: patched into their existing groups by the
+	 * incremental index instead of re-running the pipeline. Null when it cannot (a group created or
+	 * emptied, an unsupported configuration); the caller refreshes.
+	 */
+	private tryIncrementalGroupedMembership(added: RowNode<TData>[], removed: RowNode<TData>[]): RowModelRefreshResult | null {
+		const state = this.runtime.getState();
+		if (!this.acquireGroupedIndex(state, true)) return null;
 		const previousRowCount = this.visualRows.length;
-		const result = this._incremental.apply(
+		const result = this._incremental!.applyMembership(added, removed, {
+			visualRows: this.visualRows,
+			visualRowIdToIndex: this.visualRowIdToIndex,
+			groupMeta: this._groupMeta,
+			groupMetaByVisualIndex: this._groupMetaByVisualIndex,
+			stickyGroupMeta: this._stickyGroupMeta,
+		});
+		if (!result) {
+			this._incremental = undefined;
+			return null;
+		}
+		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		// Every data node, filtered-out ones included, as a full run's stats.totalDataRows counts them.
+		this.dataRowCount = this.dataStore.getRowCount();
+		if (!result.membershipChanged) return { changed: false };
+		this._hierarchyIndex = null;
+		this.groupNodesFor = null;
+		this.markRowPositionsStale(0);
+		this.runtime.bumpGlobalVersion();
+		if (Object.keys(state.rowHeights).length > 0) this._uniformHeight = undefined;
+		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
+		return {
+			changed: true,
+			reason: 'bulk',
+			previousRowCount,
+			nextRowCount: this.visualRows.length,
+			changedStartIndex: result.changedStartIndex,
+			changedEndIndex: result.changedEndIndex,
+			changedRanges: result.changedRanges.length > 0 ? result.changedRanges : undefined,
+			aggregateChangedIndices: aggregates,
+		};
+	}
+
+	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
+		const nodes = writeResult.updatedNodes;
+		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
+		const state = this.runtime.getState();
+		// A row may change group or enter / leave the filter only when those are decided by plain row data.
+		const checkFilter = impact === 'group-key' || impact === 'filter-key';
+		if (!this.acquireGroupedIndex(state, checkFilter)) return null;
+		const index = this._incremental!;
+		const previousRowCount = this.visualRows.length;
+		const result = index.apply(
 			nodes,
 			writeResult.changedValuesByRow,
 			{

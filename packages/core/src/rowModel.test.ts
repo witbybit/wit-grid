@@ -1622,6 +1622,81 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		controller.dispose();
 	});
 
+	describe('adding and removing rows in a grouped grid', () => {
+		const BASE: AggRow[] = [
+			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
+			{ id: '2', name: 'Bob', category: 'Mkt', salary: 90, bonus: 5 },
+			{ id: '3', name: 'Cara', category: 'Eng', salary: 200, bonus: 30 },
+			{ id: '4', name: 'Dev', category: 'Mkt', salary: 50, bonus: 1 },
+		];
+		function setup() {
+			const inst = new RecordingGridInstrumentation();
+			const grid = makeAggStore(BASE.map((row) => ({ ...row })));
+			grid.store.setInstrumentation(inst);
+			inst.reset();
+			const ids = () =>
+				Array.from({ length: grid.controller.getVisualRowCount() }, (_, i) => grid.controller.getVisualRow(i)!).map((row) =>
+					row.kind === 'data' ? row.rowId : row.id
+				);
+			return { ...grid, ids, fullRebuilds: () => inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD) };
+		}
+
+		it('appends a row into its existing group without a full rebuild', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { add: [{ id: '5', name: 'Eve', category: 'Eng', salary: 1, bonus: 50 }] } });
+			expect(ids()).toEqual(['group:category=Eng', '1', '3', '5', 'group:category=Mkt', '2', '4']);
+			expect(getGroupAggregates(controller, 'group:category=Eng')).toMatchObject({ salary: 301, bonus: 30 });
+			expect(controller.getDataRowCount()).toBe(5);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('removes a row that is not the first of its group without a full rebuild', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { remove: [BASE[3]] } });
+			expect(ids()).toEqual(['group:category=Eng', '1', '3', 'group:category=Mkt', '2']);
+			expect(getGroupAggregates(controller, 'group:category=Mkt')).toMatchObject({ salary: 90, bonus: 5 });
+			expect(controller.getDataRowCount()).toBe(3);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('removes the first row of a group incrementally when a sort fixes the group order', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.setSortModel([{ colId: 'salary', sort: 'desc' }]);
+			const before = fullRebuilds();
+			store.transaction({ rows: { remove: [BASE[2]] } });
+			expect(ids().filter((id) => !id.startsWith('group:'))).toEqual(['1', '2', '4']);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(100);
+			expect(fullRebuilds()).toBe(before);
+			controller.dispose();
+		});
+
+		it('falls back to a full rebuild when a group is created or an unsorted group may reorder, and stays correct', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { add: [{ id: '6', name: 'Fay', category: 'Ops', salary: 7, bonus: 7 }] } });
+			expect(ids()).toContain('group:category=Ops');
+			expect(fullRebuilds()).toBe(1);
+			// Eng's first row: Mkt could now appear first in source order.
+			store.transaction({ rows: { remove: [BASE[0]] } });
+			expect(ids()).toEqual(['group:category=Mkt', '2', '4', 'group:category=Eng', '3', 'group:category=Ops', '6']);
+			expect(fullRebuilds()).toBe(2);
+			controller.dispose();
+		});
+
+		it('adding a row the filter hides changes nothing shown and still counts the row', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.setFilterModel({ salary: { type: 'number', operator: 'gt', value: 60 } });
+			const shown = ids();
+			const before = fullRebuilds();
+			store.transaction({ rows: { add: [{ id: '7', name: 'Gil', category: 'Eng', salary: 10, bonus: 1 }] } });
+			expect(ids()).toEqual(shown);
+			expect(controller.getDataRowCount()).toBe(5);
+			expect(fullRebuilds()).toBe(before);
+			controller.dispose();
+		});
+	});
+
 	describe('cell writes to aggregated columns stay on the incremental path', () => {
 		const ROWS: AggRow[] = [
 			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },

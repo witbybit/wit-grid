@@ -75,6 +75,9 @@ export interface IncrementalApplyResult {
 	membershipChanged: boolean;
 	/** The flat list gained or lost rows or rewrote whole group spans: indices after the first change shifted. */
 	listChanged: boolean;
+	/** applyMembership: data rows that entered / left the displayed groups. */
+	entered?: number;
+	left?: number;
 }
 
 type ChangedValues = Map<string, Map<string, { oldValue: unknown; newValue: unknown }>>;
@@ -172,6 +175,10 @@ export class IncrementalRowIndex<TData> {
 	private readonly rowHeights: Record<string, number>;
 	/** Rows can change group / enter / leave the filter: needs plain group columns without key creators. */
 	private readonly structuralOk: boolean;
+	/** Group levels keep their order under membership changes (a sort model or comparators on every level). */
+	private readonly groupOrderStable: boolean;
+	/** structuralOk apart from group-order stability: what applyMembership needs before its own order checks. */
+	private readonly membershipOk: boolean;
 	private readonly groupById = new Map<string, GroupNode<TData>>();
 	private readonly leafOf = new Map<string, { leaf: LeafNode<TData>; parent: GroupNode<TData> }>();
 	private readonly parentOf = new Map<GroupNode<TData>, GroupNode<TData> | null>();
@@ -198,11 +205,12 @@ export class IncrementalRowIndex<TData> {
 		// Without a sort model a group level without a comparator keeps first-appearance order, which a
 		// membership change can alter; only sorted levels are order-stable.
 		const groupOrderStable = this.sortModel.length > 0 || this.groupDefs.every((def) => !!def.comparator);
-		this.structuralOk =
+		this.groupOrderStable = groupOrderStable;
+		this.membershipOk =
 			!config.countSensitiveExpansion &&
-			groupOrderStable &&
 			this.groupDefs.length === this.levels &&
 			this.groupDefs.every((def) => !def.keyCreator && !def.colId.includes('.') && !byField.get(def.colId)?.valueGetter);
+		this.structuralOk = this.membershipOk && groupOrderStable;
 		this.statCols = [...new Set(config.aggDefs.filter((d) => STAT_FUNCS.has(d.aggFunc as string)).map((d) => d.colId))];
 		this.distinctCols = [...new Set(config.aggDefs.filter((d) => d.aggFunc === 'distinctCount').map((d) => d.colId))];
 		this.minMaxCols = new Set(config.aggDefs.filter((d) => d.aggFunc === 'min' || d.aggFunc === 'max').map((d) => d.colId));
@@ -361,6 +369,86 @@ export class IncrementalRowIndex<TData> {
 	}
 
 	/** The existing group of every level a row belongs to, or null when one of them does not exist yet. */
+	/**
+	 * Rows added to or removed from the data. An added row that passes the filter enters its existing
+	 * group; a removed row that was shown leaves its group. Null (the caller runs the full pipeline)
+	 * when a group would be created or emptied, when the configuration rules out structural changes,
+	 * or when too many rows changed for patching to pay off.
+	 */
+	public applyMembership(
+		added: readonly RowNode<TData>[],
+		removed: readonly RowNode<TData>[],
+		target: IncrementalTarget<TData>
+	): IncrementalApplyResult | null {
+		if (!this.membershipOk || !this.plainFields) return null;
+		if (added.length + removed.length > Math.max(INCREMENTAL_MIN_ROW_LIMIT, this.leafOf.size * INCREMENTAL_ROW_SHARE_LIMIT)) return null;
+		// Unsorted levels are ordered by each group's first row in source order. A row appended after
+		// its group's first row, or a removed row that was not its group's first, leaves every level's
+		// order as it was (a group's first row is also the first row of each group above it); anything
+		// else may reorder groups and runs in full.
+		const ordered = this.groupOrderStable;
+		const firstLeafOf = (group: GroupNode<TData>): LeafNode<TData> | undefined => group.children[0] as LeafNode<TData> | undefined;
+		const structural: StructuralOp<TData>[] = [];
+		const ids = new Set<string>();
+		let left = 0;
+		let entered = 0;
+		for (const node of removed) {
+			const entry = this.leafOf.get(node.id);
+			// A filtered-out row was never shown: removing it changes nothing displayed.
+			if (!entry) continue;
+			if (ids.has(node.id)) return null;
+			if (!ordered && firstLeafOf(entry.parent) === entry.leaf) return null;
+			ids.add(node.id);
+			structural.push({ node, leaf: entry.leaf, from: entry.parent, to: null, changed: undefined });
+			left++;
+		}
+		for (const node of added) {
+			// An id that is still shown (or removed in the same write) is a replacement: run in full.
+			if (this.leafOf.has(node.id) || ids.has(node.id)) return null;
+			if (this.matchesFilter && !this.matchesFilter(node)) continue;
+			const chain = this.resolveChain(node);
+			if (!chain) return null;
+			if (!ordered) {
+				const first = firstLeafOf(chain[this.levels - 1]);
+				const firstIndex = first ? this.getSourceIndex(first.rowId) : undefined;
+				const index = this.getSourceIndex(node.id);
+				if (firstIndex === undefined || index === undefined || index < firstIndex) return null;
+			}
+			ids.add(node.id);
+			structural.push({
+				node,
+				leaf: { kind: 'data', rowId: node.id, node, depth: this.levels },
+				from: null,
+				to: chain[this.levels - 1],
+				changed: undefined,
+			});
+			entered++;
+		}
+		if (structural.length === 0) {
+			return {
+				moved: false,
+				changedRanges: [],
+				aggregateChangedIndices: [],
+				membershipChanged: false,
+				listChanged: false,
+				entered: 0,
+				left: 0,
+			};
+		}
+		const net = new Map<GroupNode<TData>, number>();
+		for (const op of structural) {
+			if (op.from) net.set(op.from, (net.get(op.from) ?? 0) - 1);
+			if (op.to) net.set(op.to, (net.get(op.to) ?? 0) + 1);
+		}
+		for (const [group, n] of net) if (group.children.length + n < 1) return null;
+		try {
+			const result = this.applyValidated(new Map(), structural, target);
+			return result ? { ...result, entered, left } : null;
+		} catch {
+			return null;
+		}
+	}
+
 	private resolveChain(node: RowNode<TData>): GroupNode<TData>[] | null {
 		const path: GroupPathItem[] = [];
 		const chain: GroupNode<TData>[] = [];

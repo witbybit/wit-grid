@@ -20,6 +20,8 @@ selected. Ancestor groups update as their rows are selected. `GroupRenderContext
 
 ### Fixed — editing grouped, aggregated grids
 
+- Adding or removing a row in a grouped grid re-ran the whole pipeline (130–195 ms at 200k rows). A row added to an existing group, or removed from a group that stays non-empty, is now patched in place (about 15–50 ms). Without a sort, an add must land after its group's first row and a remove must not be a group's first row, since those could reorder groups; anything else, and any add that creates a group, still rebuilds.
+
 - Each quick-filter keystroke re-filtered and rebuilt every row (130–330 ms at 200k rows). Typing now narrows from the previous matches, recent results are cached (backspace is instant), a keystroke that matches the same rows rebuilds nothing, and clearing the box reuses the unfiltered rows: typically 15–25 ms, 0–3 ms when cached. The first keystroke after loading still builds each row's search text once.
 
 - Expanding or collapsing a group, opening a detail row or changing pages re-ran filtering, grouping, sorting and aggregation over every row. Opening or closing one group now replaces only that group's rows (about 5 ms on 200k grouped rows, was 100–160 ms); expand/collapse all, detail rows and page changes reuse the row tree and only re-flatten.

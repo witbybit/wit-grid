@@ -119,7 +119,7 @@ describe('RowPipeline filter stage (flat grid)', () => {
 			} else if (op === 4) {
 				store.engine.setCellValue(`s${next(120)}`, 'region', REGIONS[next(3)]);
 			} else {
-				store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'lessThan', value: next(100) } });
+				store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'lt', value: next(100) } });
 			}
 			expect(visibleIds(), `step ${step}, op ${op}`).toEqual(freshIds());
 		}
@@ -199,14 +199,14 @@ describe('RowPipeline tree cache', () => {
 		check('add', () => grid.store.transaction({ rows: { add: [{ id: 'new', region: 'EMEA', country: 'A', amount: 5 }] } }));
 		check('edit', () => grid.store.engine.setCellValue('s1', 'amount', 999));
 		check('sort', () => grid.store.setSortModel([{ colId: 'amount', sort: 'desc' }]));
-		check('filter', () => grid.store.setFilterModel({ amount: { type: 'number', operator: 'greaterThan', value: 10 } }));
+		check('filter', () => grid.store.setFilterModel({ amount: { type: 'number', operator: 'gt', value: 10 } }));
 		check('aggregation', () => grid.store.setAggregation([{ colId: 'amount', aggFunc: 'max' }]));
 		expect(describeRows(grid.visible())).toEqual(describeRows(grid.fresh()));
 		grid.controller.dispose();
 	});
 
 	it('matches an uncached pipeline across random sequences of expansion, edits, transactions, sorts and filters', () => {
-		for (let seed = 1; seed <= 6; seed++) {
+		for (let seed = 1; seed <= 12; seed++) {
 			const grid = mount(sales(80));
 			let random = seed;
 			const next = (n: number) => {
@@ -218,8 +218,10 @@ describe('RowPipeline tree cache', () => {
 					.visible()
 					.filter((row) => row.kind === 'group')
 					.map((row) => row.id);
+			let nextId = 1000;
+			const liveIds = new Set(Array.from({ length: 80 }, (_, i) => `s${i}`));
 			for (let step = 0; step < 40; step++) {
-				const op = next(9);
+				const op = next(11);
 				if (op <= 2) {
 					const ids = groupIds();
 					if (ids.length > 0) {
@@ -233,8 +235,19 @@ describe('RowPipeline tree cache', () => {
 					grid.store.transaction({ rows: { update: [{ id, region: REGIONS[next(3)], country: COUNTRIES[next(4)], amount: next(100) }] } });
 				} else if (op === 5) {
 					grid.store.setSortModel(next(2) === 0 ? null : [{ colId: 'amount', sort: next(2) === 0 ? 'asc' : 'desc' }]);
+				} else if (op === 9) {
+					// Add a row: usually into an existing group, sometimes one that creates a group.
+					const id = `s${nextId++}`;
+					liveIds.add(id);
+					const country = next(5) === 0 ? 'Z' : COUNTRIES[next(4)];
+					grid.store.transaction({ rows: { add: [{ id, region: REGIONS[next(3)], country, amount: next(100) }] } });
+				} else if (op === 10) {
+					const ids = [...liveIds];
+					const id = ids[next(ids.length)];
+					liveIds.delete(id);
+					grid.store.transaction({ rows: { remove: [{ id, region: '', country: '', amount: 0 }] } });
 				} else if (op === 6) {
-					grid.store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'greaterThan', value: next(90) } });
+					grid.store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'gt', value: next(90) } });
 				} else {
 					// Typing in the quick filter: extend, backspace or clear (narrowing and the text cache).
 					const current = grid.store.getState().quickFilterModel?.text ?? '';
@@ -243,6 +256,7 @@ describe('RowPipeline tree cache', () => {
 					grid.store.engine.setQuickFilterModel(text ? { text } : null);
 				}
 				expect(describeRows(grid.visible()), `seed ${seed}, step ${step}, op ${op}`).toEqual(describeRows(grid.fresh()));
+				expect(grid.controller.getDataRowCount(), `count: seed ${seed}, step ${step}`).toBe(liveIds.size);
 				const { live, fresh } = grid.derived();
 				expect(live, `derived: seed ${seed}, step ${step}, op ${op}`).toEqual(fresh);
 				// Every displayed data row resolves to its position.
