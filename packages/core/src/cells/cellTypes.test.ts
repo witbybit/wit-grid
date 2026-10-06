@@ -222,6 +222,33 @@ describe('editors', () => {
 		expect(onCancel).not.toHaveBeenCalled();
 	});
 
+	it('number and date: Enter hands focus back to the cell', () => {
+		for (const editor of [createNumberEditor(), createDateEditor()]) {
+			const cell = document.createElement('div');
+			cell.className = 'og-cell';
+			cell.tabIndex = -1;
+			const container = document.createElement('div');
+			cell.appendChild(container);
+			document.body.appendChild(cell);
+			const handle = editor.mount(container, {
+				rowId: 'r1',
+				colField: 'f',
+				value: '2026-03-04',
+				onChange: vi.fn(),
+				onCommit: vi.fn(),
+				onCancel: vi.fn(),
+				api: {} as any,
+				col: { field: 'f', header: 'F' },
+			});
+			const input = container.querySelector('input')!;
+			expect(document.activeElement).toBe(input);
+			key(input, 'Enter');
+			expect(document.activeElement).toBe(cell);
+			handle.destroy?.();
+			cell.remove();
+		}
+	});
+
 	it('number: arrows step within bounds, Enter commits a number', () => {
 		const { container, onCommit, onChange } = mountEditor(createNumberEditor({ min: 0, max: 10, step: 5 }), 8);
 		const input = container.querySelector('input')!;

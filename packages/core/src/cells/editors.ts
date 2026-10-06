@@ -48,7 +48,9 @@ function editSession(params: Params, container: HTMLElement) {
 	const finish = (byPointer: boolean) => {
 		done = true;
 		release();
-		if (!byPointer && cell?.isConnected && !cell.contains(document.activeElement)) cell.focus({ preventScroll: true });
+		// Focus may be in the editor's own input inside the cell, which is about to be removed: move it
+		// to the cell itself.
+		if (!byPointer && cell?.isConnected && document.activeElement !== cell) cell.focus({ preventScroll: true });
 	};
 	return {
 		hold(focus: () => void) {
