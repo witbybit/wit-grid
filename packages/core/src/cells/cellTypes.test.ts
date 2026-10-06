@@ -193,6 +193,35 @@ describe('editors', () => {
 		expect(clicked.onCommit).toHaveBeenCalledWith('2026-03-20');
 	});
 
+	it('number: the grid taking focus back to the cell does not end the edit', () => {
+		const cell = document.createElement('div');
+		cell.className = 'og-cell';
+		cell.tabIndex = -1;
+		const container = document.createElement('div');
+		cell.appendChild(container);
+		document.body.appendChild(cell);
+		const onCommit = vi.fn();
+		const onCancel = vi.fn();
+		createNumberEditor().mount(container, {
+			rowId: 'r1',
+			colField: 'f',
+			value: 5,
+			onChange: vi.fn(),
+			onCommit,
+			onCancel,
+			api: {} as any,
+			col: { field: 'f', header: 'F' },
+		});
+		const input = container.querySelector('input')!;
+		expect(document.activeElement).toBe(input);
+		// Focus passes through <body> on its way back to the cell.
+		input.blur();
+		cell.focus();
+		expect(document.activeElement).toBe(input);
+		expect(onCommit).not.toHaveBeenCalled();
+		expect(onCancel).not.toHaveBeenCalled();
+	});
+
 	it('number: arrows step within bounds, Enter commits a number', () => {
 		const { container, onCommit, onChange } = mountEditor(createNumberEditor({ min: 0, max: 10, step: 5 }), 8);
 		const input = container.querySelector('input')!;

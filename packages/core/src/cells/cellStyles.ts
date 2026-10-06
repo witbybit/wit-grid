@@ -117,6 +117,8 @@ export const CELL_STYLES = `
 .og-ct-search:focus-within { border-color: var(--og-ct-accent); }
 .og-ct-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--og-ct-text); font: inherit; }
 .og-ct-search input::placeholder { color: var(--og-ct-subtle); }
+/* The field's frame shows focus; the input itself draws no second ring. */
+.og-ct-search input:focus, .og-ct-search input:focus-visible { outline: none; box-shadow: none; }
 .og-ct-list { max-height: 296px; overflow-y: auto; overscroll-behavior: contain; scroll-padding: 4px; outline: none; }
 .og-ct-group { padding: 8px 8px 4px; font-size: 11.5px; font-weight: 500; color: var(--og-ct-muted); }
 .og-ct-option {

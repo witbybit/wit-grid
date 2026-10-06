@@ -108,12 +108,8 @@ export function createNumberEditor(options: NumberCellOptions = {}): DomCellEdit
 					end.commit(parsed());
 				}
 			});
-			input.addEventListener('blur', (event) => {
-				// The grid putting focus back on this cell is not the user leaving the editor.
-				const to = event.relatedTarget as Node | null;
-				if (to && container.closest('.og-cell')?.contains(to)) return;
-				end.commit(parsed(), true);
-			});
+			// No commit on blur: the grid may take focus back just after mounting the editor (which
+			// the session's hold returns), and a click elsewhere already commits the draft.
 
 			const stepper = document.createElement('span');
 			stepper.className = 'og-ct-stepper';
