@@ -22,14 +22,14 @@ import {
 
 type Params = DomCellRendererParams<any>;
 
-function cell(container: HTMLElement, align?: 'end' | 'center'): HTMLDivElement {
+export function cell(container: HTMLElement, align?: 'end' | 'center'): HTMLDivElement {
 	const root = document.createElement('div');
 	root.className = align ? `og-ct-cell og-ct-cell-${align}` : 'og-ct-cell';
 	container.appendChild(root);
 	return root;
 }
 
-function setHue(el: HTMLElement, color: string | undefined) {
+export function setHue(el: HTMLElement, color: string | undefined) {
 	if (color) {
 		el.style.setProperty('--og-ct-hue', color);
 		el.setAttribute('data-hued', '');
@@ -40,7 +40,7 @@ function setHue(el: HTMLElement, color: string | undefined) {
 }
 
 /** Writes a value through the grid (selecting the cell first, as a click on it would). */
-function writeValue(params: Params, value: unknown) {
+export function writeValue(params: Params, value: unknown) {
 	const rowId = params.node.id;
 	const colField = params.col.field;
 	params.api.selectCell({ rowId, colField }, 'pointer');
@@ -48,9 +48,11 @@ function writeValue(params: Params, value: unknown) {
 }
 
 /** A renderer that redraws from the value alone, skipping updates whose value did not change. */
-function valueRenderer(
+export function valueRenderer(
 	build: (root: HTMLElement, params: Params) => (value: unknown, params: Params) => void,
-	align?: 'end' | 'center'
+	align?: 'end' | 'center',
+	/** Sees every update, value changed or not (a recycled cell keeps its value but changes row). */
+	onParams?: (root: HTMLElement, params: Params) => void
 ): DomCellRenderer<any> {
 	return {
 		mount(container, params) {
@@ -58,6 +60,7 @@ function valueRenderer(
 			const draw = build(root, params);
 			let last: unknown = {};
 			const update = (p: Params) => {
+				onParams?.(root, p);
 				if (Object.is(p.value, last)) return;
 				last = p.value;
 				draw(p.value, p);
@@ -135,17 +138,33 @@ export function createLinkRenderer(options: LinkCellOptions = {}): DomCellRender
 
 // ─── Checkbox ─────────────────────────────────────────────────────────────────
 
-/** A checkbox that toggles on press, writing back in the value's own shape (boolean, 'true', 1). */
-export function createCheckboxRenderer(): DomCellRenderer<any> {
+/**
+ * A checkbox or switch that toggles on press, writing back in the value's own shape (boolean,
+ * 'true', 1). Double-clicks stay with the control (two presses), never opening an editor.
+ */
+function createToggleRenderer(kind: 'checkbox' | 'switch', labels?: { on?: string; off?: string }): DomCellRenderer<any> {
 	return {
 		mount(container, params) {
-			const root = cell(container, 'center');
+			const root = cell(container, kind === 'checkbox' || !labels ? 'center' : undefined);
 			root.classList.add('og-ct-checkbox-host');
-			root.setAttribute('role', 'checkbox');
-			const box = document.createElement('span');
-			box.className = 'og-ct-checkbox';
-			box.innerHTML = cellIconSvg('check', 12);
-			root.appendChild(box);
+			root.setAttribute('role', kind);
+			let control: HTMLElement;
+			let text: HTMLSpanElement | null = null;
+			if (kind === 'checkbox') {
+				control = document.createElement('span');
+				control.className = 'og-ct-checkbox';
+				control.innerHTML = cellIconSvg('check', 12);
+			} else {
+				control = document.createElement('span');
+				control.className = 'og-ct-switch';
+				control.appendChild(document.createElement('i'));
+				if (labels) {
+					text = document.createElement('span');
+					text.className = 'og-ct-switch-label';
+				}
+			}
+			root.appendChild(control);
+			if (text) root.appendChild(text);
 			let current = params;
 			let checked: boolean | null = null;
 			const update = (p: Params) => {
@@ -154,8 +173,9 @@ export function createCheckboxRenderer(): DomCellRenderer<any> {
 				if (next === checked) return;
 				checked = next;
 				root.setAttribute('aria-checked', String(next));
-				if (next) box.setAttribute('data-checked', '');
-				else box.removeAttribute('data-checked');
+				if (next) control.setAttribute('data-checked', '');
+				else control.removeAttribute('data-checked');
+				if (text) text.textContent = (next ? labels?.on : labels?.off) ?? '';
 			};
 			const onMouseDown = (event: MouseEvent) => {
 				if (event.button !== 0) return;
@@ -163,16 +183,41 @@ export function createCheckboxRenderer(): DomCellRenderer<any> {
 				event.preventDefault();
 				writeValue(current, toggleCheckedValue(current.value));
 			};
+			const onDoubleClick = (event: MouseEvent) => event.stopPropagation();
 			root.addEventListener('mousedown', onMouseDown);
+			root.addEventListener('dblclick', onDoubleClick);
 			update(params);
-			return { update, destroy: () => root.removeEventListener('mousedown', onMouseDown) };
+			return {
+				update,
+				destroy() {
+					root.removeEventListener('mousedown', onMouseDown);
+					root.removeEventListener('dblclick', onDoubleClick);
+				},
+			};
 		},
 	};
 }
 
+/** A checkbox that toggles on press, writing back in the value's own shape (boolean, 'true', 1). */
+export function createCheckboxRenderer(): DomCellRenderer<any> {
+	return createToggleRenderer('checkbox');
+}
+
+export interface SwitchCellOptions {
+	/** Text beside the switch for each state (e.g. 'Active' / 'Paused'). */
+	onLabel?: string;
+	offLabel?: string;
+}
+
+/** An on / off switch, toggled on press. */
+export function createSwitchRenderer(options: SwitchCellOptions = {}): DomCellRenderer<any> {
+	const labels = options.onLabel || options.offLabel ? { on: options.onLabel, off: options.offLabel } : undefined;
+	return createToggleRenderer('switch', labels);
+}
+
 // ─── Options: select, multi-select, combobox ─────────────────────────────────
 
-export type BadgeVariant = 'soft' | 'dot' | 'outline' | 'plain';
+export type BadgeVariant = 'soft' | 'dot' | 'outline' | 'plain' | 'record';
 
 /** Options given as a list or a store: a list becomes a store of static options. */
 export type CellOptionsInput = readonly CellOption[] | CellOptionsStore;
@@ -197,20 +242,25 @@ function storeRenderer(
 	store: CellOptionsStore,
 	keysOf: (value: unknown) => string[],
 	draw: (root: HTMLElement, value: unknown) => void,
-	setup?: (root: HTMLElement) => void
+	setup?: (root: HTMLElement) => void,
+	paramsOf?: WeakMap<HTMLElement, DomCellRendererParams<any>>
 ): DomCellRenderer<any> {
-	return valueRenderer((root) => {
-		setup?.(root);
-		let current: unknown;
-		return (value) => {
-			current = value;
-			const waiting = store.ensure(keysOf(value));
-			draw(root, value);
-			waiting?.then(() => {
-				if (Object.is(current, value)) draw(root, value);
-			});
-		};
-	});
+	return valueRenderer(
+		(root) => {
+			setup?.(root);
+			let current: unknown;
+			return (value) => {
+				current = value;
+				const waiting = store.ensure(keysOf(value));
+				draw(root, value);
+				waiting?.then(() => {
+					if (Object.is(current, value)) draw(root, value);
+				});
+			};
+		},
+		undefined,
+		paramsOf ? (root, params) => paramsOf.set(root, params) : undefined
+	);
 }
 
 function singleKey(value: unknown): string[] {
@@ -220,6 +270,22 @@ function singleKey(value: unknown): string[] {
 /** A badge for an option (or an unknown value: a neutral badge, or hashed colour with `autoColor`). */
 export function createOptionBadge(option: CellOption | undefined, value: string, variant: BadgeVariant, autoColor = false): HTMLElement {
 	const label = option ? optionLabel(option) : value;
+	if (variant === 'record') {
+		// A linked record: a lettered tile in the record's colour, then its name.
+		const chip = document.createElement('span');
+		chip.className = 'og-ct-record';
+		chip.dataset.value = value;
+		if (option?.description) chip.title = `${label} · ${option.description}`;
+		const tile = document.createElement('span');
+		tile.className = 'og-ct-record-tile';
+		tile.style.setProperty('--og-ct-hue', resolveCellColor(option?.color as CellColor | undefined) ?? hashCellColor(value));
+		tile.textContent = (label.trim()[0] ?? '?').toUpperCase();
+		const text = document.createElement('span');
+		text.className = 'og-ct-record-label';
+		text.textContent = label;
+		chip.append(tile, text);
+		return chip;
+	}
 	if (variant === 'plain') {
 		const wrap = document.createElement('span');
 		wrap.className = 'og-ct-cell';
@@ -233,6 +299,7 @@ export function createOptionBadge(option: CellOption | undefined, value: string,
 	}
 	const badge = document.createElement('span');
 	badge.className = 'og-ct-badge';
+	badge.dataset.value = value;
 	if (variant !== 'soft') badge.setAttribute('data-variant', variant);
 	const color = resolveCellColor(option?.color as CellColor | undefined) ?? (autoColor ? hashCellColor(value) : undefined);
 	setHue(badge, color);
@@ -265,19 +332,87 @@ export function createSelectRenderer(options: CellOptionsInput, config: SelectRe
 	});
 }
 
+export interface SegmentedCellOptions {
+	/** Show each option's dot / icon in its segment. Default true. */
+	markers?: boolean;
+}
+
+/**
+ * Every option inline as a segmented control: one press picks, no popover. Suits two to four
+ * short options (Low / Medium / High). The chosen segment is tinted with its option colour.
+ */
+export function createSegmentedRenderer(options: readonly CellOption[], config: SegmentedCellOptions = {}): DomCellRenderer<any> {
+	const markers = config.markers ?? true;
+	return {
+		mount(container, params) {
+			const root = cell(container);
+			const group = document.createElement('div');
+			group.className = 'og-ct-segmented';
+			group.setAttribute('role', 'radiogroup');
+			const segments = options.map((option) => {
+				const segment = document.createElement('span');
+				segment.className = 'og-ct-segment';
+				segment.setAttribute('role', 'radio');
+				segment.dataset.value = option.value;
+				setHue(segment, resolveCellColor(option.color));
+				if (markers && option.icon) segment.appendChild(createCellIcon(option.icon, 12));
+				const label = document.createElement('span');
+				label.textContent = optionLabel(option);
+				segment.appendChild(label);
+				group.appendChild(segment);
+				return segment;
+			});
+			root.appendChild(group);
+			let current = params;
+			let shown: string | null | undefined;
+			const update = (p: Params) => {
+				current = p;
+				const value = p.value == null || p.value === '' ? null : String(p.value);
+				if (value === shown) return;
+				shown = value;
+				for (const segment of segments) segment.setAttribute('aria-checked', String(segment.dataset.value === value));
+			};
+			const onMouseDown = (event: MouseEvent) => {
+				const segment = (event.target as Element).closest<HTMLElement>('.og-ct-segment');
+				if (!segment || event.button !== 0) return;
+				event.stopPropagation();
+				event.preventDefault();
+				if (segment.dataset.value !== shown) writeValue(current, segment.dataset.value);
+			};
+			const onDoubleClick = (event: MouseEvent) => {
+				if ((event.target as Element).closest('.og-ct-segment')) event.stopPropagation();
+			};
+			group.addEventListener('mousedown', onMouseDown);
+			group.addEventListener('dblclick', onDoubleClick);
+			update(params);
+			return {
+				update,
+				destroy() {
+					group.removeEventListener('mousedown', onMouseDown);
+					group.removeEventListener('dblclick', onDoubleClick);
+				},
+			};
+		},
+	};
+}
+
 export interface MultiSelectRendererOptions {
 	variant?: BadgeVariant;
 	/** Chips shown before “+N”. Default: as many as the column fits. */
 	maxVisible?: number;
 	/** Colour values with no option from the palette (free tags). Default true. */
 	autoColor?: boolean;
+	/** Called when a chip is pressed (open the linked record, say). The press does not select the cell. */
+	onOpen?: (value: string, params: DomCellRendererParams<any>) => void;
 }
 
 export function createMultiSelectRenderer(options: CellOptionsInput, config: MultiSelectRendererOptions = {}): DomCellRenderer<any> {
 	const store = toOptionsStore(options);
 	const variant = config.variant ?? 'soft';
-	const autoColor = config.autoColor ?? true;
+	const autoColor = config.autoColor ?? variant !== 'record';
 	const maxVisible = config.maxVisible ?? 3;
+	// The latest params of each mounted cell, for `onOpen`.
+	const paramsOf = new WeakMap<HTMLElement, DomCellRendererParams<any>>();
 	return storeRenderer(
 		store,
 		parseMultiValue,
@@ -303,7 +438,20 @@ export function createMultiSelectRenderer(options: CellOptionsInput, config: Mul
 				root.appendChild(more);
 			}
 		},
-		(root) => root.classList.add('og-ct-chips')
+		(root) => {
+			root.classList.add('og-ct-chips');
+			if (!config.onOpen) return;
+			root.setAttribute('data-openable', '');
+			root.addEventListener('mousedown', (event) => {
+				const chip = (event.target as Element).closest<HTMLElement>('[data-value]');
+				if (!chip || event.button !== 0) return;
+				event.stopPropagation();
+				event.preventDefault();
+				const params = paramsOf.get(root);
+				if (params) config.onOpen!(chip.dataset.value!, params);
+			});
+		},
+		paramsOf
 	);
 }
 

@@ -129,3 +129,33 @@ function pagedSearch<T extends CellOption>(all: readonly T[]) {
 
 export const accountsServer = pagedSearch(ACCOUNTS);
 export const directoryServer = pagedSearch(DIRECTORY);
+
+const PROJECT_WORDS = [
+	'Apollo',
+	'Borealis',
+	'Cascade',
+	'Delta',
+	'Ember',
+	'Falcon',
+	'Granite',
+	'Harbor',
+	'Indigo',
+	'Juniper',
+	'Keystone',
+	'Lumen',
+	'Meridian',
+	'Nimbus',
+	'Orion',
+	'Polaris',
+];
+const PROJECT_KINDS = ['Launch', 'Migration', 'Redesign', 'Audit', 'Rollout', 'Research'];
+const PROJECT_COLORS: CellOption['color'][] = ['blue', 'violet', 'emerald', 'amber', 'rose', 'cyan', 'indigo', 'orange'];
+
+export const PROJECTS: CellOption[] = Array.from({ length: 3_000 }, (_, i) => ({
+	value: `prj-${i + 1}`,
+	label: `${PROJECT_WORDS[i % PROJECT_WORDS.length]} ${PROJECT_KINDS[Math.floor(i / PROJECT_WORDS.length) % PROJECT_KINDS.length]}${i >= 96 ? ` ${Math.floor(i / 96) + 1}` : ''}`,
+	description: `PRJ-${String(i + 1).padStart(4, '0')} · ${['Planning', 'Active', 'On hold', 'Shipped'][i % 4]}`,
+	color: PROJECT_COLORS[i % PROJECT_COLORS.length],
+}));
+
+export const projectsServer = pagedSearch(PROJECTS);

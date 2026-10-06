@@ -61,5 +61,22 @@ export {
 	urlColumnType,
 	emailColumnType,
 	personColumnType,
+	switchColumnType,
+	segmentedColumnType,
+	colorColumnType,
+	longTextColumnType,
+	dateRangeColumnType,
+	cascadeColumnType,
+	linkedRecordColumnType,
+	sparklineColumnType,
 } from './cellTypes.js';
-export type { ColumnTypeDefinition, CellOptionInput } from './cellTypes.js';
+export type { ColumnTypeDefinition, CellOptionInput, LinkedRecordOptions } from './cellTypes.js';
+export { createToggleEditor } from './editors.js';
+export { createSparklineRenderer } from './sparkline.js';
+export type { SparklineCellOptions } from './sparkline.js';
+export { defaultDateRangePresets } from './dateRange.js';
+export type { DateRange, DateRangePreset, DateRangeCellOptions } from './dateRange.js';
+export type { CascadeOption, CascadeCellOptions } from './cascade.js';
+export type { ColorCellOptions } from './color.js';
+export type { LongTextCellOptions } from './longText.js';
+export type { SegmentedCellOptions, SwitchCellOptions } from './renderers.js';

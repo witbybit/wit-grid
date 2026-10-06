@@ -17,10 +17,27 @@ import {
 	progressColumnType,
 	ratingColumnType,
 	selectColumnType,
+	segmentedColumnType,
+	switchColumnType,
+	colorColumnType,
+	longTextColumnType,
+	dateRangeColumnType,
+	cascadeColumnType,
+	linkedRecordColumnType,
+	sparklineColumnType,
 } from '@eregister/wit-grid-react';
-import type { BuiltInThemeName, CellOption, ColumnDef, ColumnTypeDefinition, GridApi, GridReadyEvent, PersonOption } from '@eregister/wit-grid-react';
+import type {
+	BuiltInThemeName,
+	CascadeOption,
+	CellOption,
+	ColumnDef,
+	ColumnTypeDefinition,
+	GridApi,
+	GridReadyEvent,
+	PersonOption,
+} from '@eregister/wit-grid-react';
 import { Box, Code2, ChevronRight, Palette } from 'lucide-react';
-import { ACCOUNTS, DIRECTORY, accountsServer, directoryServer } from './nativeCellTypesServer';
+import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
 
@@ -31,8 +48,17 @@ interface TaskRow {
 	status: string;
 	priority: string;
 	labels: string[];
+	effort: string;
 	team: string;
 	account: string;
+	projects: string[];
+	location: string[];
+	sprint: { start: string; end: string };
+	billable: boolean;
+	trend: number[];
+	commits: number[];
+	color: string;
+	notes: string;
 	watchers: string[];
 	owner: string;
 	reviewers: string;
@@ -97,6 +123,101 @@ const PEOPLE: PersonOption[] = [
 	{ value: 'kai', label: 'Kai Tanaka', description: 'Infrastructure', group: 'Engineering' },
 ];
 
+const EFFORT: CellOption[] = [
+	{ value: 's', label: 'S', color: 'emerald' },
+	{ value: 'm', label: 'M', color: 'amber' },
+	{ value: 'l', label: 'L', color: 'rose' },
+];
+
+/** Office locations: country → state → city. */
+const LOCATIONS: CascadeOption[] = [
+	{
+		value: 'in',
+		label: 'India',
+		children: [
+			{
+				value: 'ka',
+				label: 'Karnataka',
+				children: [
+					{ value: 'blr', label: 'Bengaluru' },
+					{ value: 'mys', label: 'Mysuru' },
+				],
+			},
+			{
+				value: 'mh',
+				label: 'Maharashtra',
+				children: [
+					{ value: 'bom', label: 'Mumbai' },
+					{ value: 'pnq', label: 'Pune' },
+				],
+			},
+			{ value: 'dl', label: 'Delhi', children: [{ value: 'del', label: 'New Delhi' }] },
+		],
+	},
+	{
+		value: 'us',
+		label: 'United States',
+		children: [
+			{
+				value: 'ca',
+				label: 'California',
+				children: [
+					{ value: 'sf', label: 'San Francisco' },
+					{ value: 'la', label: 'Los Angeles' },
+				],
+			},
+			{ value: 'ny', label: 'New York', children: [{ value: 'nyc', label: 'New York City' }] },
+			{ value: 'wa', label: 'Washington', children: [{ value: 'sea', label: 'Seattle' }] },
+		],
+	},
+	{
+		value: 'de',
+		label: 'Germany',
+		children: [
+			{ value: 'be', label: 'Berlin', children: [{ value: 'ber', label: 'Berlin' }] },
+			{ value: 'by', label: 'Bavaria', children: [{ value: 'muc', label: 'Munich' }] },
+		],
+	},
+	{
+		value: 'jp',
+		label: 'Japan',
+		children: [
+			{
+				value: 'tk',
+				label: 'Tokyo',
+				children: [
+					{ value: 'shb', label: 'Shibuya' },
+					{ value: 'mnt', label: 'Minato' },
+				],
+			},
+		],
+	},
+];
+const LOCATION_PATHS: string[][] = LOCATIONS.flatMap((c) =>
+	(c.children ?? []).flatMap((s) => (s.children ?? []).map((city) => [c.value, s.value, city.value]))
+);
+
+const NOTES = [
+	'Waiting on legal review before the copy changes go out.',
+	'Repro only on Safari 17.\nAttach the HAR file from the support ticket.',
+	'Pair with design on the empty states; spec is in the linked doc.',
+	'',
+	'Customer asked for a CSV export as well — scope it separately.',
+	'Blocked until the staging cluster is upgraded.',
+];
+
+/** Opening a linked record: a demo stand-in for navigating to it. */
+function showToast(text: string) {
+	const toast = document.createElement('div');
+	toast.textContent = text;
+	toast.style.cssText =
+		'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;' +
+		'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s';
+	document.body.appendChild(toast);
+	setTimeout(() => (toast.style.opacity = '0'), 1600);
+	setTimeout(() => toast.remove(), 2000);
+}
+
 const TASKS = [
 	'Redesign onboarding flow',
 	'Fix flaky checkout test',
@@ -138,6 +259,21 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 	progress: progressColumnType(),
 	confidence: progressColumnType({ max: 1, traffic: true }),
 	rating: ratingColumnType(),
+	effort: segmentedColumnType(EFFORT),
+	// Links to another table: record chips, a record picker paged from its API, chips open the record.
+	projects: linkedRecordColumnType([], {
+		loadOptions: projectsServer.load,
+		resolveOptions: projectsServer.resolve,
+		searchPlaceholder: 'Find a project…',
+		onOpen: (value) => showToast(`Open project ${PROJECTS.find((p) => p.value === value)?.label ?? value}`),
+	}),
+	location: cascadeColumnType({ options: LOCATIONS, searchPlaceholder: 'Search cities…' }),
+	sprint: dateRangeColumnType(),
+	billable: switchColumnType({ onLabel: 'Billable', offLabel: 'Internal' }),
+	trend: sparklineColumnType({ type: 'area', colorBy: 'trend', curve: 'smooth', label: 'change' }),
+	commits: sparklineColumnType({ type: 'bar', color: 'violet', label: 'last', reference: 'average', format: { decimals: 0 } }),
+	color: colorColumnType(),
+	notes: longTextColumnType({ maxLength: 500, placeholder: 'Add a note…' }),
 };
 
 const COLUMNS: ColumnDef<TaskRow>[] = [
@@ -145,17 +281,26 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'task', header: 'Task', width: 220 },
 	{ field: 'status', header: 'Status', width: 140, type: 'status' },
 	{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },
+	{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },
 	{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },
 	{ field: 'team', header: 'Team', width: 150, type: 'team' },
 	{ field: 'account', header: 'Account', width: 200, type: 'account' },
+	{ field: 'projects', header: 'Projects', width: 240, type: 'projects' },
 	{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },
 	{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },
 	{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },
+	{ field: 'location', header: 'Office', width: 240, type: 'location' },
 	{ field: 'due', header: 'Due', width: 140, type: 'date' },
+	{ field: 'sprint', header: 'Sprint', width: 200, type: 'sprint' },
 	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
+	{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },
 	{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },
+	{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },
+	{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },
 	{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },
 	{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },
+	{ field: 'color', header: 'Colour', width: 130, type: 'color' },
+	{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },
 	{ field: 'spec', header: 'Spec', width: 190, type: 'url' },
 	{ field: 'contact', header: 'Contact', width: 200, type: 'email' },
 	{ field: 'updated', header: 'Updated', width: 190, type: 'datetime' },
@@ -178,8 +323,31 @@ function generateTasks(count: number): TaskRow[] {
 			labels: [pick(LABELS, i).value, pick(LABELS, i * 2 + 3).value, ...(i % 4 === 0 ? [pick(LABELS, i + 4).value] : [])].filter(
 				(v, k, all) => all.indexOf(v) === k
 			),
+			effort: pick(EFFORT, i * 2).value,
 			team: pick(TEAMS, i * 7).value,
 			account: pick(ACCOUNTS, i * 37).value,
+			projects:
+				i % 5 === 3
+					? []
+					: [
+							pick(PROJECTS, i * 11).value,
+							...(i % 2 === 0 ? [pick(PROJECTS, i * 17 + 5).value] : []),
+							...(i % 6 === 0 ? [pick(PROJECTS, i + 40).value] : []),
+						],
+			location: pick(LOCATION_PATHS, i * 3),
+			sprint: (() => {
+				const start = new Date(2026, 8, 1 + (i % 6) * 14);
+				const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 13);
+				const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+				return { start: iso(start), end: iso(end) };
+			})(),
+			billable: i % 3 !== 1,
+			trend: Array.from({ length: 12 }, (_, w) =>
+				Math.round(40 + 25 * Math.sin((w + i) / 2.2) + ((i * 7 + w * 13) % 17) + (i % 2 ? w * 2 : -w))
+			),
+			commits: Array.from({ length: 10 }, (_, d) => ((i * 31 + d * 17) % 23) - (d % 4 === 3 ? 4 : 0)),
+			color: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#64748b'][i % 8],
+			notes: pick(NOTES, i),
 			watchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],
 			owner: owner.value,
 			reviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),
@@ -211,7 +379,14 @@ const TYPE_REFERENCE: { name: string; text: string }[] = [
 	{ name: "'number' · 'currency' · 'percent'", text: 'Intl number formats, stepper editor with bounds.' },
 	{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },
 	{ name: 'ratingColumnType', text: 'Stars, click to rate.' },
-	{ name: "'checkbox'", text: 'Toggles on press, keeps the value’s own shape.' },
+	{ name: 'segmentedColumnType', text: 'Two to four options inline; one press picks (Effort).' },
+	{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; chips open the record (Projects).' },
+	{ name: 'cascadeColumnType', text: 'A path through a tree, one column per level, search across paths (Office).' },
+	{ name: 'dateRangeColumnType', text: 'Two-month range calendar with presets (Sprint).' },
+	{ name: 'sparklineColumnType', text: 'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).' },
+	{ name: 'longTextColumnType', text: 'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).' },
+	{ name: 'colorColumnType', text: 'Palette, hex field and the system picker (Colour).' },
+	{ name: "'checkbox' · switchColumnType", text: 'Toggle on press or Enter, keeping the value’s own shape (Billing).' },
 	{ name: "'url' · 'email'", text: 'Safe links (http, https, mailto only).' },
 ];
 

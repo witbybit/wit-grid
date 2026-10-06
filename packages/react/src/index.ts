@@ -50,6 +50,16 @@ export {
 	createMultiSelectEditor,
 	parseMultiValue,
 	createCellOptionsStore,
+	switchColumnType,
+	segmentedColumnType,
+	colorColumnType,
+	longTextColumnType,
+	dateRangeColumnType,
+	cascadeColumnType,
+	linkedRecordColumnType,
+	sparklineColumnType,
+	createSparklineRenderer,
+	defaultDateRangePresets,
 } from '@eregister/wit-grid-core';
 export type {
 	CellOption,
@@ -72,6 +82,17 @@ export type {
 	CellOptionsPage,
 	CellOptionsLoader,
 	CellOptionsResolver,
+	LinkedRecordOptions,
+	SparklineCellOptions,
+	DateRange,
+	DateRangePreset,
+	DateRangeCellOptions,
+	CascadeOption,
+	CascadeCellOptions,
+	ColorCellOptions,
+	LongTextCellOptions,
+	SegmentedCellOptions,
+	SwitchCellOptions,
 } from '@eregister/wit-grid-core';
 
 // ─── Advanced filter API ──────────────────────────────────────────────────────

@@ -16,9 +16,15 @@ import {
 	createNumberEditor,
 	createPersonEditor,
 	createSelectEditor,
+	createToggleEditor,
 	type SelectEditorOptions,
 } from './editors.js';
-import { formatCellDate, formatCellNumber, parseMultiValue, type DateCellOptions, type NumberCellOptions } from './format.js';
+import { createCascadeEditor, createCascadeRenderer, createCascadeStore, parseCascadeValue, type CascadeCellOptions } from './cascade.js';
+import { createColorEditor, createColorRenderer, normalizeHexColor, type ColorCellOptions } from './color.js';
+import { createDateRangeEditor, createDateRangeRenderer, formatDateRange, parseDateRange, type DateRangeCellOptions } from './dateRange.js';
+import { createLongTextEditor, createLongTextRenderer, type LongTextCellOptions } from './longText.js';
+import { createSparklineRenderer, parseSparklineValues, type SparklineCellOptions } from './sparkline.js';
+import { formatCellDate, formatCellNumber, isCheckedCellValue, parseMultiValue, type DateCellOptions, type NumberCellOptions } from './format.js';
 import { optionLabel, type CellOption } from './listbox.js';
 import { createCellOptionsStore, type CellOptionsSourceConfig, type CellOptionsStore } from './optionsStore.js';
 import {
@@ -30,8 +36,12 @@ import {
 	createPersonRenderer,
 	createProgressRenderer,
 	createRatingRenderer,
+	createSegmentedRenderer,
 	createSelectRenderer,
+	createSwitchRenderer,
 	type LinkCellOptions,
+	type SegmentedCellOptions,
+	type SwitchCellOptions,
 	type MultiSelectRendererOptions,
 	type PersonCellOptions,
 	type PersonOption,
@@ -88,8 +98,88 @@ function optionsStoreFor(input: readonly CellOptionInput[], config: CellOptionsS
 export function checkboxColumnType(): ColumnTypeDefinition<any> {
 	return {
 		renderer: { kind: 'dom', renderer: createCheckboxRenderer() },
-		// The checkbox toggles on press; there is nothing to type.
-		cellEditor: undefined,
+		// Toggles on press; Enter / F2 toggles too, with nothing to type.
+		cellEditor: { kind: 'dom', editor: createToggleEditor() },
+		valueFormatter: ({ value }) => (isCheckedCellValue(value) ? 'Yes' : 'No'),
+	};
+}
+
+/** An on / off switch: toggles on press, or Enter. Optional labels beside it ('Active' / 'Paused'). */
+export function switchColumnType(options: SwitchCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createSwitchRenderer(options) },
+		cellEditor: { kind: 'dom', editor: createToggleEditor() },
+		valueFormatter: ({ value }) => (isCheckedCellValue(value) ? (options.onLabel ?? 'On') : (options.offLabel ?? 'Off')),
+	};
+}
+
+/** Two to four options inline as a segmented control: one press picks. Enter opens them as a list. */
+export function segmentedColumnType(input: readonly CellOptionInput[], config: SegmentedCellOptions = {}): ColumnTypeDefinition<any> {
+	const store = optionsStoreFor(input, {});
+	return {
+		renderer: { kind: 'dom', renderer: createSegmentedRenderer(store.options, config) },
+		cellEditor: { kind: 'dom', editor: createSelectEditor(store) },
+		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
+		filterDef: selectFilter(store),
+	};
+}
+
+/** A colour: swatch and hex code; the editor offers a palette, a hex field and the system picker. */
+export function colorColumnType(options: ColorCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createColorRenderer(options) },
+		cellEditor: { kind: 'dom', editor: createColorEditor(options) },
+		valueFormatter: ({ value }) => normalizeHexColor(value)?.toUpperCase() ?? '',
+	};
+}
+
+/** Notes and descriptions: a clamped preview, edited in a textarea popover (Ctrl / ⌘ + Enter saves). */
+export function longTextColumnType(options: LongTextCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createLongTextRenderer(options) },
+		cellEditor: { kind: 'dom', editor: createLongTextEditor(options) },
+	};
+}
+
+/** A start and end date: “Mar 4 – 18, 2026”, picked on a two-month calendar with presets. */
+export function dateRangeColumnType(options: DateRangeCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createDateRangeRenderer(options) },
+		cellEditor: { kind: 'dom', editor: createDateRangeEditor(options) },
+		valueFormatter: ({ value }) => {
+			const range = parseDateRange(value);
+			return range ? formatDateRange(range, options.locale) : '';
+		},
+	};
+}
+
+/**
+ * A path through a tree (Country → State → City): shown as a breadcrumb, picked one column per
+ * level. Give the tree as `options`, or load levels with `loadChildren`.
+ */
+export function cascadeColumnType(options: CascadeCellOptions): ColumnTypeDefinition<any> {
+	const store = createCascadeStore(options);
+	return {
+		renderer: { kind: 'dom', renderer: createCascadeRenderer(store) },
+		cellEditor: { kind: 'dom', editor: createCascadeEditor(store) },
+		valueFormatter: ({ value }) => {
+			const path = parseCascadeValue(value, options.valueSeparator);
+			return path
+				.map((v, i) => {
+					const node = store.node(path.slice(0, i + 1));
+					return node ? optionLabel(node) : v;
+				})
+				.join(options.separator ?? ' › ');
+		},
+	};
+}
+
+/** A small chart of the cell's numbers: line, area, bar or win / loss. Display only. */
+export function sparklineColumnType(options: SparklineCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createSparklineRenderer(options) },
+		valueFormatter: ({ value }) => parseSparklineValues(value).join(', '),
+		filterDef: { type: 'none' },
 	};
 }
 
@@ -169,6 +259,40 @@ export function multiSelectColumnType(
 	};
 }
 
+export interface LinkedRecordOptions extends SelectEditorOptions, CellOptionsSourceConfig {
+	/** Several records per cell (default) or one. */
+	multiple?: boolean;
+	/** Record chips shown before “+N”. Default 2. */
+	maxVisible?: number;
+	/** A chip was pressed: open that record (navigate, show a drawer…). */
+	onOpen?: MultiSelectRendererOptions['onOpen'];
+}
+
+/**
+ * Links to records of another table (Airtable-style link fields): record chips in the cell, a
+ * searchable record picker, usually over `loadOptions` / `resolveOptions` from that table's API.
+ */
+export function linkedRecordColumnType(input: readonly CellOptionInput[], config: LinkedRecordOptions = {}): ColumnTypeDefinition<any> {
+	const store = optionsStoreFor(input, config);
+	const multiple = config.multiple ?? true;
+	const editorConfig: SelectEditorOptions = { searchable: true, searchPlaceholder: 'Find a record\u2026', ...config, variant: 'record' };
+	return {
+		renderer: {
+			kind: 'dom',
+			renderer: createMultiSelectRenderer(store, {
+				variant: 'record',
+				maxVisible: multiple ? (config.maxVisible ?? 2) : 1,
+				onOpen: config.onOpen,
+			}),
+		},
+		cellEditor: { kind: 'dom', editor: multiple ? createMultiSelectEditor(store, editorConfig) : createSelectEditor(store, editorConfig) },
+		valueFormatter: ({ value }) =>
+			parseMultiValue(value)
+				.map((v) => labelOf(store, v))
+				.join(', '),
+	};
+}
+
 /** Free-form tags: any text, coloured from the palette, new ones created by typing. */
 export function tagsColumnType(
 	input: readonly CellOptionInput[] = [],
@@ -235,6 +359,11 @@ export const BUILTIN_COLUMN_TYPES: Readonly<Record<string, ColumnTypeDefinition<
 	email: emailColumnType(),
 	tags: tagsColumnType(),
 	person: personColumnType(),
+	switch: switchColumnType(),
+	color: colorColumnType(),
+	longText: longTextColumnType(),
+	dateRange: dateRangeColumnType(),
+	sparkline: sparklineColumnType(),
 };
 
 /**

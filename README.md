@@ -539,6 +539,28 @@ A type fills in `renderer`, `cellEditor`, `valueFormatter` (export, tooltips) an
 
 Options are `{ value, label?, color?, icon?, description?, group?, disabled? }`; `color` is a palette name (`gray`, `red`, `amber`, `emerald`, `blue`, `violet`, `rose`…) or any CSS colour. To restyle cells alone, set `--og-ct-accent`, `--og-ct-radius` or `--og-ct-rating` on the grid.
 
+#### More cell types
+
+| Factory                                                    | Value                                             | Cell                                           | Editor                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `switchColumnType({ onLabel, offLabel })`                  | boolean (`'true'`, `1` keep shape)                | On / off switch, toggles on press              | Enter toggles                                                          |
+| `segmentedColumnType(options)`                             | option value                                      | All options inline; one press picks            | Enter opens them as a list                                             |
+| `colorColumnType({ swatches })`                            | `#rrggbb`                                         | Swatch and hex                                 | Palette (arrow keys), hex field, system picker, screen eyedropper      |
+| `longTextColumnType({ lines, maxLength })`                 | string                                            | One to three clamped lines, full text on hover | Textarea popover: Enter adds a line, Ctrl / ⌘ + Enter saves            |
+| `linkedRecordColumnType(records, { loadOptions, onOpen })` | record ids                                        | Record chips; pressing one calls `onOpen`      | Record picker (paged from your API with `loadOptions`)                 |
+| `cascadeColumnType({ options \| loadChildren })`           | path `['in', 'ka', 'blr']` or `'in/ka/blr'`       | “India › Karnataka › Bengaluru”                | One column per level, ← → ↑ ↓ Enter, search across paths, async levels |
+| `dateRangeColumnType({ presets })`                         | `{ start, end }`, `[start, end]` or `'start/end'` | “Mar 4 – 18, 2026” and its length              | Two-month range calendar with presets, Apply                           |
+| `sparklineColumnType(options)`                             | numbers (array, `'1,2,3'`, `{ values }`)          | Line, area, bar or win / loss chart            | (display only)                                                         |
+
+Sparklines take `type`, `color` or `colorBy: 'trend'`, `curve: 'smooth'`, `markers` (`last`, `minmax`, `all`),
+`reference` (a value, `'average'` or `'zero'`), `label` (`last`, `change`), `format`, fixed `min` / `max` for
+comparable rows, `height` and `strokeWidth`. They stretch to the column without measuring it and keep strokes
+and markers crisp.
+
+`cascadeColumnType` loads levels with `loadChildren(path, signal)` (mark leaves `isLeaf: true`), labels stored
+paths with `resolvePath(path)`, and searches a server with `searchPaths(query, signal)`; `changeOnSelect` allows
+picking a state as well as a city. Checkbox cells now toggle on Enter too.
+
 #### Options from a server
 
 `selectColumnType`, `comboboxColumnType`, `multiSelectColumnType`, `tagsColumnType` and `personColumnType`

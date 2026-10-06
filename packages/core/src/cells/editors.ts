@@ -12,6 +12,7 @@ import type { CellOptionsStore } from './optionsStore.js';
 import {
 	parseCellDate,
 	parseCellNumber,
+	toggleCheckedValue,
 	parseMultiValue,
 	toIsoDay,
 	toIsoTime,
@@ -22,7 +23,7 @@ import {
 
 type Params = DomCellEditorParams<any>;
 
-function editorShell(container: HTMLElement): HTMLDivElement {
+export function editorShell(container: HTMLElement): HTMLDivElement {
 	const root = document.createElement('div');
 	root.className = 'og-cell-editor og-ct-editor';
 	container.appendChild(root);
@@ -38,7 +39,7 @@ function editorShell(container: HTMLElement): HTMLDivElement {
  * - `commit` / `cancel` end the edit exactly once. Focus then returns to the cell (it may be in a
  *   popover on <body>) so the keyboard keeps driving the grid; not after a press elsewhere.
  */
-function editSession(params: Params, container: HTMLElement) {
+export function editSession(params: Params, container: HTMLElement) {
 	const cell = container.closest<HTMLElement>('.og-cell');
 	let done = false;
 	let focusEditor: (() => void) | null = null;
@@ -71,6 +72,31 @@ function editSession(params: Params, container: HTMLElement) {
 			params.onCancel();
 		},
 		release,
+	};
+}
+
+// ─── Toggle ───────────────────────────────────────────────────────────────────
+
+/**
+ * For checkbox and switch cells: starting an edit (Enter, F2, a double-click that reached the grid)
+ * toggles the value and ends at once. There is nothing to type.
+ */
+export function createToggleEditor(): DomCellEditor<any> {
+	return {
+		mount(container, params) {
+			const end = editSession(params, container);
+			let live = true;
+			// After mounting: the host is ready for the commit, and a remount (StrictMode) cancels it.
+			queueMicrotask(() => {
+				if (live) end.commit(toggleCheckedValue(params.value));
+			});
+			return {
+				destroy() {
+					live = false;
+					end.release();
+				},
+			};
+		},
 	};
 }
 
