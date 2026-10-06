@@ -1,6 +1,9 @@
 import { createClientGrid, createInfiniteGrid, createServerSideGrid, createLocalStorageAdapter } from '@eregister/wit-grid-core';
 import type { RowAnimationOptions } from '@eregister/wit-grid-core';
-import { useEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
+
+/** useLayoutEffect in the browser, useEffect on the server (where layout effects warn and never run). */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 import { GridProvider } from './gridContext.js';
 import { GridView, type GridViewProps } from './GridView.js';
 import { isProductionBuild, sameColumnDefs, sameInitialValue } from './initialProps.js';
@@ -296,7 +299,9 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		api.setShowFilterChipBar(!!showFilterChipBar);
 	}, [api, showFilterChipBar]);
 
-	useEffect(() => {
+	// New rows reach the grid during the commit, not in a passive effect that React may run after the
+	// browser paints: a live data change is drawn on the next frame instead of one frame later.
+	useIsomorphicLayoutEffect(() => {
 		if (rowModelType !== 'client' && rowModelType !== undefined) return;
 		api.setRows(rows as TRowData[]);
 	}, [api, rowModelType, rows]);

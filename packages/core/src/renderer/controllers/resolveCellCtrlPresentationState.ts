@@ -108,6 +108,7 @@ function hydrateCellCtrlFromScrollDecision<TRowData>(
 	state.isEditing = 'isEditing' in presentation ? presentation.isEditing : cellCtrl.visualState.editing;
 	state.isFocused = 'isFocused' in presentation ? presentation.isFocused : cellCtrl.visualState.focused;
 	state.forceLiveInteractive = 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined;
+	state.domUpdateBudgeted = 'budgeted' in presentation ? presentation.budgeted : undefined;
 	state.keepVersionFresh = 'keepVersionFresh' in presentation ? presentation.keepVersionFresh : undefined;
 	state.recordVersions =
 		'recordVersionsFrom' in presentation

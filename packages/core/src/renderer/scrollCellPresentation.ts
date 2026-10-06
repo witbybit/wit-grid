@@ -255,6 +255,11 @@ export type ScrollCellPresentation =
 			className: string;
 			portalCellKey: string;
 			formattedValue: string;
+			/**
+			 * Whether the frame's DOM-update budget may defer it. False for cells the user can see:
+			 * a row entering the viewport is always drawn whole; the budget bounds overscan work.
+			 */
+			budgeted: boolean;
 			isFocused: boolean;
 			recordVersions: CellDisplaySnapshot | VisualFreshness;
 			title: string | null;
@@ -506,6 +511,7 @@ export function resolveScrollCellPresentation<TRowData>(
 			className: cellClassName,
 			portalCellKey,
 			formattedValue: applyScrollText(deps, node, col, deps.getCheapDisplayValue(node.id, col.field) ?? ''),
+			budgeted: !isInVisibleContent,
 			isFocused,
 			recordVersions: snapshot ?? versionsFromCtx(),
 			title: snapshot?.title || null,

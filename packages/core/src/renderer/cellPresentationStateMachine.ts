@@ -16,6 +16,8 @@ export interface CellPresentationState {
 	isEditing?: boolean;
 	isFocused?: boolean;
 	forceLiveInteractive?: boolean;
+	/** `dom-update` only: whether the frame's DOM-update budget may defer it (false while visible). */
+	domUpdateBudgeted?: boolean;
 	keepVersionFresh?: boolean;
 	recordVersions?: VisualFreshness | CellDisplaySnapshot;
 	freshness: VisualFreshness;

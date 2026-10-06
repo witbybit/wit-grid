@@ -86,7 +86,10 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 
-	if (!(deps.tryConsumeDomUpdateBudget?.() ?? true)) {
+	// A visible cell is always drawn (its time still counts, so overscan backs off first); only an
+	// off-screen cell waits for the post-scroll repaint when the frame's budget is spent.
+	const admitted = deps.tryConsumeDomUpdateBudget?.() ?? true;
+	if (!admitted && presentation.domUpdateBudgeted !== false) {
 		deps.incrementDomUpdatesDeferredDuringScroll?.();
 		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Budget);
 		const didWrite = cellSlot.update(

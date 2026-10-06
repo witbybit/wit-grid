@@ -19,6 +19,15 @@ export function readScenario(): Scenario {
 /** Values a tick scenario has edited, by `<rowId>/<colId>`: the cell's current value from then on. */
 const editedValues = new Map<string, string | number>();
 
+/**
+ * For each edited cell, its value before the latest edit and the fidelity sample count when that edit
+ * was handed to the grid. An edit can land after the grid's frame but before that frame's sample, and
+ * no renderer can draw data before it has it: such a cell may show its previous value in exactly the
+ * first sample after the edit. One sample later it must be current; anything older is stale.
+ */
+const editLag = new Map<string, { previous: string | number; sample: number }>();
+let fidelitySampleCount = 0;
+
 /** The value a cell holds: its edited value, else what makeRows put there from its ids (`r<row>`, `c<col>`). */
 function cellValue(rowId: string, colId: string): string | number {
 	const edited = editedValues.get(`${rowId}/${colId}`);
@@ -43,13 +52,12 @@ export const styledCells = new URLSearchParams(location.search).get('styled') ==
 export const HOT_CLASS = 'bench-hot';
 export const isHotValue = (value: unknown): boolean => typeof value === 'number' && value > 500;
 
-export function expectedSignature(rowId: string, colId: string, domCols: number): string {
-	const base = expectedContentSignature(rowId, colId, domCols);
-	return styledCells && isHotValue(cellValue(rowId, colId)) ? `${base}|hot` : base;
+export function expectedSignature(rowId: string, colId: string, domCols: number, value = cellValue(rowId, colId)): string {
+	const base = expectedContentSignature(colId, domCols, value);
+	return styledCells && isHotValue(value) ? `${base}|hot` : base;
 }
 
-function expectedContentSignature(rowId: string, colId: string, domCols: number): string {
-	const value = cellValue(rowId, colId);
+function expectedContentSignature(colId: string, domCols: number, value: string | number): string {
 	if (formatNumbers && typeof value === 'number' && Number(colId.slice(1)) >= domCols) return formatBenchValue(value);
 	return Number(colId.slice(1)) < domCols ? `${value}|${(typeof value === 'number' ? value : 0) / 10}%` : String(value);
 }
@@ -117,6 +125,8 @@ interface FidelityStats {
 	otherContent: number;
 	/** ms from the last input until the first frame with every visible cell final (-1: never). */
 	settleMs: number;
+	/** Edited cells showing their previous value in the first sample after the edit (allowed; see editLag). */
+	editLag: number;
 	wrongExamples: string[];
 	otherExamples: string[];
 }
@@ -131,6 +141,7 @@ const emptyFidelity = (): FidelityStats => ({
 	incomplete: 0,
 	otherContent: 0,
 	settleMs: -1,
+	editLag: 0,
 	wrongExamples: [],
 	otherExamples: [],
 });
@@ -180,6 +191,7 @@ export function installMeasurement(options: {
 	function sampleFidelity(stats: FidelityStats): void {
 		const box = bodyBox();
 		if (!box) return;
+		fidelitySampleCount++;
 		const seen = new Map<string, string>();
 		let wrong = 0;
 		const rows = options.rows();
@@ -201,7 +213,10 @@ export function installMeasurement(options: {
 				seen.set(key, signature);
 				stats.cellFrames++;
 				const expected = expectedSignature(rowId, colId, domCols);
-				if (signature !== expected) {
+				const lag = signature === expected ? undefined : editLag.get(key);
+				if (lag && fidelitySampleCount === lag.sample + 1 && signature === expectedSignature(rowId, colId, domCols, lag.previous)) {
+					stats.editLag++;
+				} else if (signature !== expected) {
 					wrong++;
 					if (signature === '') stats.blank++;
 					// Incomplete: the right text (and decoration) without the renderer's bar.
@@ -336,6 +351,7 @@ export function installTicker(initial: BenchRow[], replace: (rows: BenchRow[]) =
 		const next = rows.slice();
 		const value = (Number(rows[k].c1) + 1) % 1000;
 		next[k] = { ...rows[k], c1: value };
+		editLag.set(`${rows[k].id}/c1`, { previous: rows[k].c1, sample: fidelitySampleCount });
 		editedValues.set(`${rows[k].id}/c1`, value);
 		rows = next;
 		replace(next);
