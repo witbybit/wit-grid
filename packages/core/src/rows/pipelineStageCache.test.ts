@@ -77,6 +77,91 @@ function describeRows(rows: readonly VisualRow<Sale>[]): string[] {
 	});
 }
 
+describe('RowPipeline filter stage (flat grid)', () => {
+	it('matches an uncached pipeline while typing, sorting, editing and filtering', () => {
+		const store = new GridStore<Sale>({
+			getRowId: (row) => row.id,
+			columns: [
+				{ field: 'region', header: 'Region' },
+				{ field: 'country', header: 'Country' },
+				{ field: 'amount', header: 'Amount' },
+				{ field: 'id', header: 'Code', valueGetter: ({ row }) => `${(row as Sale).region}-${(row as Sale).amount}` },
+			],
+		});
+		const controller = new ClientRowModelController<Sale>(store.getClientRowModelRuntime(), {
+			rows: sales(120),
+			columns: store.getState().columns,
+		});
+		const internals = controller as unknown as {
+			buildPipelineInput(state: unknown, paginate: boolean): Parameters<RowPipeline<Sale>['run']>[0];
+			runtime: { getState(): unknown };
+		};
+		const visibleIds = () => Array.from({ length: controller.getVisualRowCount() }, (_, i) => controller.getVisualRow(i)!.id);
+		const freshIds = () =>
+			new RowPipeline<Sale>()
+				.run({ ...internals.buildPipelineInput(internals.runtime.getState(), true), dataVersion: undefined })
+				.visualRows.map((row) => row.id);
+		let random = 7;
+		const next = (n: number) => {
+			random = (random * 1103515245 + 12345) >>> 0;
+			return random % n;
+		};
+		for (let step = 0; step < 80; step++) {
+			const op = next(6);
+			if (op <= 2) {
+				const current = store.getState().quickFilterModel?.text ?? '';
+				const choice = next(4);
+				const words = ['e', 'a', 'ea', 'm', 'p-', '1', 'emea'];
+				const text = choice === 0 ? words[next(words.length)] : choice === 1 ? current.slice(0, -1) : current + 'eamp-1 '[next(7)];
+				store.engine.setQuickFilterModel(text ? { text } : null);
+			} else if (op === 3) {
+				store.setSortModel(next(2) === 0 ? null : [{ colId: 'amount', sort: next(2) === 0 ? 'asc' : 'desc' }]);
+			} else if (op === 4) {
+				store.engine.setCellValue(`s${next(120)}`, 'region', REGIONS[next(3)]);
+			} else {
+				store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'lessThan', value: next(100) } });
+			}
+			expect(visibleIds(), `step ${step}, op ${op}`).toEqual(freshIds());
+		}
+		controller.dispose();
+	});
+
+	it('never narrows from a cached text the new text does not contain', () => {
+		const store = new GridStore<Sale>({
+			getRowId: (row) => row.id,
+			columns: [
+				{ field: 'region', header: 'Region' },
+				{ field: 'country', header: 'Country' },
+			],
+		});
+		const controller = new ClientRowModelController<Sale>(store.getClientRowModelRuntime(), {
+			rows: sales(60),
+			columns: store.getState().columns,
+		});
+		const internals = controller as unknown as {
+			buildPipelineInput(state: unknown, paginate: boolean): Parameters<RowPipeline<Sale>['run']>[0];
+			runtime: { getState(): unknown };
+		};
+		const visibleIds = () => Array.from({ length: controller.getVisualRowCount() }, (_, i) => controller.getVisualRow(i)!.id);
+		const freshIds = () =>
+			new RowPipeline<Sale>()
+				.run({ ...internals.buildPipelineInput(internals.runtime.getState(), true), dataVersion: undefined })
+				.visualRows.map((row) => row.id);
+		for (const sequence of [
+			['e', 'em', 'eme', 'emea', '', 'a'],
+			['ap', 'apa', 'a', 'pa'],
+			['amer', 'me', 'e'],
+			['c', 'ca', 'a', 'b'],
+		]) {
+			for (const text of sequence) {
+				store.engine.setQuickFilterModel(text ? { text } : null);
+				expect(visibleIds(), `"${text}" after ${sequence.join(' > ')}`).toEqual(freshIds());
+			}
+		}
+		controller.dispose();
+	});
+});
+
 describe('RowPipeline tree cache', () => {
 	it('reuses the row tree when only expansion changes, and keeps unchanged rows identical', () => {
 		const grid = mount(sales(60));
@@ -134,7 +219,7 @@ describe('RowPipeline tree cache', () => {
 					.filter((row) => row.kind === 'group')
 					.map((row) => row.id);
 			for (let step = 0; step < 40; step++) {
-				const op = next(7);
+				const op = next(9);
 				if (op <= 2) {
 					const ids = groupIds();
 					if (ids.length > 0) {
@@ -148,8 +233,14 @@ describe('RowPipeline tree cache', () => {
 					grid.store.transaction({ rows: { update: [{ id, region: REGIONS[next(3)], country: COUNTRIES[next(4)], amount: next(100) }] } });
 				} else if (op === 5) {
 					grid.store.setSortModel(next(2) === 0 ? null : [{ colId: 'amount', sort: next(2) === 0 ? 'asc' : 'desc' }]);
-				} else {
+				} else if (op === 6) {
 					grid.store.setFilterModel(next(2) === 0 ? null : { amount: { type: 'number', operator: 'greaterThan', value: next(90) } });
+				} else {
+					// Typing in the quick filter: extend, backspace or clear (narrowing and the text cache).
+					const current = grid.store.getState().quickFilterModel?.text ?? '';
+					const choice = next(4);
+					const text = choice === 0 ? '' : choice === 1 ? current.slice(0, -1) : current + 'mepca1 '[next(7)];
+					grid.store.engine.setQuickFilterModel(text ? { text } : null);
 				}
 				expect(describeRows(grid.visible()), `seed ${seed}, step ${step}, op ${op}`).toEqual(describeRows(grid.fresh()));
 				const { live, fresh } = grid.derived();

@@ -864,7 +864,13 @@ function prepareQuickFilter<TData>(
 	if (targetColumns.length === 0) return null;
 	return {
 		kind: 'quick',
-		getters: targetColumns.map((column) => makeGetter(column)),
+		// Plain fields are read straight from the data: the row caches the joined text itself, so
+		// going through the per-node cell cache would only fill a Map entry per row and column.
+		getters: targetColumns.map((column) => {
+			if (column.valueGetter) return makeGetter(column);
+			const read = compilePathGetter(column.field) as (data: TData) => unknown;
+			return (node: RowNode<TData>) => read(node.data);
+		}),
 		textValue: quickFilterModel.text.trim().toLowerCase(),
 		// Plain-field columns read node-cached values that only change with node.data, so their
 		// lowercased text can be cached per row. valueGetter columns may be impure: never cached.
@@ -873,36 +879,35 @@ function prepareQuickFilter<TData>(
 	};
 }
 
-interface QuickFilterTextCacheEntry {
-	data: unknown;
-	signature: string;
-	lowered: Array<string | undefined>;
-}
+/** Joins a row's column texts: a control character no typed text contains, so a match never spans two columns. */
+const QUICK_FILTER_SEPARATOR = '';
 
 /**
- * Per-row lowercased quick-filter text, so each keystroke does not re-run
- * `String().toLowerCase()` for rows × columns. An entry is valid while the row's data
- * reference (rows are replaced immutably) and the target column set are unchanged.
+ * Each row keeps its plain-field column texts lowercased and joined (RowNode.quickText), so a
+ * keystroke is one `includes` per row instead of `String().toLowerCase()` for rows × columns. The
+ * text is valid for its column set (`quickTextSignature`) until the row's data changes.
  */
-const quickFilterTextCache = new WeakMap<RowNode<unknown>, QuickFilterTextCacheEntry>();
-
 function matchQuickFilter<TData>(node: RowNode<TData>, pf: PreparedQuickFilter<TData>): boolean {
 	const getters = pf.getters;
-	let entry = quickFilterTextCache.get(node as RowNode<unknown>);
-	if (!entry || entry.data !== node.data || entry.signature !== pf.signature) {
-		entry = { data: node.data, signature: pf.signature, lowered: new Array(getters.length) };
-		quickFilterTextCache.set(node as RowNode<unknown>, entry);
-	}
-	const lowered = entry.lowered;
-	for (let i = 0; i < getters.length; i++) {
-		let text: string;
-		if (pf.cacheable[i]) {
-			const cached = lowered[i];
-			text = cached !== undefined ? cached : (lowered[i] = String(getters[i](node) ?? '').toLowerCase());
-		} else {
-			text = String(getters[i](node) ?? '').toLowerCase();
+	let joined = node.quickText;
+	if (joined === undefined || node.quickTextSignature !== pf.signature) {
+		joined = '';
+		for (let i = 0; i < getters.length; i++) {
+			if (pf.cacheable[i]) joined += String(getters[i](node) ?? '').toLowerCase() + QUICK_FILTER_SEPARATOR;
 		}
-		if (text.includes(pf.textValue)) return true;
+		node.quickText = joined;
+		node.quickTextSignature = pf.signature;
+	}
+	if (joined.includes(pf.textValue)) return true;
+	// valueGetter columns may be impure: evaluated on every check, never cached.
+	for (let i = 0; i < getters.length; i++) {
+		if (
+			!pf.cacheable[i] &&
+			String(getters[i](node) ?? '')
+				.toLowerCase()
+				.includes(pf.textValue)
+		)
+			return true;
 	}
 	return false;
 }
@@ -2299,6 +2304,14 @@ export class ClientRowModelController<TData = unknown>
 
 		const result = this.pipeline.run(this.buildPipelineInput(state, true));
 		const { visualRows } = result;
+		if (visualRows === previousRows && result.pageWindow === undefined && this._pageWindow === null) {
+			// The very same rows (a keystroke or filter change that matched the same rows): every
+			// position and index is still right. Only the incremental index, built for the previous
+			// filter and configuration, is dropped and re-keyed.
+			this._incremental = undefined;
+			this._incrementalSeed = this.captureIncrementalSeed(state);
+			return { changed: false, reason, previousRowCount: previousRows.length, nextRowCount: visualRows.length, groupId };
+		}
 		const refreshResult = describeVisualRowDiff(previousRows, visualRows, reason, groupId);
 
 		this.visualRows = visualRows;

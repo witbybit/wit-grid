@@ -3151,7 +3151,8 @@ describe('GridStore undo and redo functionality', () => {
 		const initialRowsDomainCalls = rowsDomain.mock.calls.length;
 		const initialFilteringDomainCalls = filteringDomain.mock.calls.length;
 
-		const filterModel = { name: { type: 'text', operator: 'contains', value: 'a' } } as const;
+		// Matches only Beta, so the filter really changes the rows.
+		const filterModel = { name: { type: 'text', operator: 'contains', value: 'e' } } as const;
 
 		store.setFilterModel(filterModel);
 
@@ -3189,6 +3190,28 @@ describe('GridStore undo and redo functionality', () => {
 			filtering: initialVersions.filtering + 2,
 		});
 
+		controller.dispose();
+	});
+
+	it('a filter change that keeps exactly the same rows bumps the filtering domain but not the rows twice', () => {
+		const store = new GridStore<TestRow>({
+			columns: [{ field: 'name', header: 'Name', width: 150 }],
+			getRowId: (row) => row.id,
+		});
+		const controller = new ClientRowModelController<TestRow>(store.getClientRowModelRuntime(), {
+			rows: [
+				{ id: '1', name: 'Alpha', price: 10 },
+				{ id: '2', name: 'Gamma', price: 30 },
+			],
+			columns: store.getState().columns,
+		});
+		const before = store.engine.getDomainVersions();
+		store.setFilterModel({ name: { type: 'text', operator: 'contains', value: 'a' } });
+		const after = store.engine.getDomainVersions();
+		expect(after.filtering).toBe(before.filtering + 1);
+		// The commit itself bumps rows once; the unchanged result adds no second "rows changed".
+		expect(after.rows).toBe(before.rows + 1);
+		expect(controller.getVisualRowCount()).toBe(2);
 		controller.dispose();
 	});
 

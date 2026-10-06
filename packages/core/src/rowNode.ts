@@ -2,6 +2,8 @@
  * A node wrapping a single row datum, owned by the row data store.
  * Caches computed cell values until row data changes.
  */
+import type { VisualRow } from './visualRow.js';
+
 export class RowNode<TRowData = unknown> {
 	public id!: string;
 	public data!: TRowData;
@@ -12,6 +14,14 @@ export class RowNode<TRowData = unknown> {
 	public visualIndex = -1;
 	/** Internal: this row's data visual id (`row:…`), built once instead of on every pipeline run. */
 	public dataVisualId: string | undefined = undefined;
+	/**
+	 * Internal: the quick filter's lowercased search text for the column set `quickTextSignature`.
+	 * Fields rather than a WeakMap: a keystroke reads it for every row. Cleared when data changes.
+	 */
+	public quickText: string | undefined = undefined;
+	public quickTextSignature: string | undefined = undefined;
+	/** Internal: the flat grid's last visual row for this node, reused while it would be drawn the same. */
+	public flatRow: VisualRow<TRowData> | undefined = undefined;
 
 	private cellValueCache = new Map<string, unknown>();
 
@@ -24,6 +34,7 @@ export class RowNode<TRowData = unknown> {
 		if (this.data !== data) {
 			this.data = data;
 			this.clearValueCache();
+			this.quickText = undefined;
 		}
 	}
 
