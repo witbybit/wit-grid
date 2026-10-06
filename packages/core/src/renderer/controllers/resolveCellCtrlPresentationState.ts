@@ -9,7 +9,7 @@ import {
 	type ScrollCellPresentationDeps,
 	type ScrollCellPresentationInput,
 } from '../scrollCellPresentation.js';
-import { resolveCellPresentationRepair } from '../cellPresentationStateMachine.js';
+import { presentationNeedsPostScrollRepair } from '../cellPresentationStateMachine.js';
 
 export type CellCtrlBindPhase = 'scroll' | 'full-bind' | 'prewarm' | 'fidelity';
 
@@ -100,7 +100,7 @@ function hydrateCellCtrlFromScrollDecision<TRowData>(
 	state.className = presentation.className;
 	state.title = title;
 	state.validationError = validationError;
-	state.repair = resolveCellPresentationRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false);
+	state.needsPostScrollRepair = presentationNeedsPostScrollRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false);
 	state.freshness = freshness;
 	state.contentMode = 'contentMode' in presentation ? presentation.contentMode : undefined;
 	state.formattedValue = formattedValue;
@@ -146,7 +146,7 @@ function hydrateCellCtrlFromFullBind(cellCtrl: CellCtrl, context: NonNullable<Ce
 		className: context.className,
 		title: context.title,
 		validationError: context.validationError,
-		repair: 'none',
+		needsPostScrollRepair: false,
 		freshness: context.freshness,
 		contentMode: context.contentMode,
 		formattedValue: context.formattedValue,

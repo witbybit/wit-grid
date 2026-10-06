@@ -78,7 +78,6 @@ export interface RowRendererRuntimeArgs<TRowData = unknown> {
 	incrementCurrentScrollCellsPatched: () => void;
 	incrementCurrentScrollCellsWritten: () => void;
 	incrementPostScrollDirtyCellsDecorated: () => void;
-	incrementStalePostScrollRepairsRejected: () => void;
 	getColumnShift?: (colIndex: number) => number;
 }
 
@@ -98,7 +97,6 @@ export interface RowRendererRuntimeStateHost<TRowData = unknown> {
 	currentScrollCellsWritten: number;
 	currentScrollPortalOps: number;
 	postScrollDirtyCellsDecorated: number;
-	stalePostScrollRepairsRejected: number;
 	dirtyCellsMarkedDuringScroll: number;
 	/** This frame's ViewportPlan (see viewportPlanner.ts), populated by RowRenderer.recycleViewport
 	 *  before the bind loop runs. Null before the first frame. */
@@ -179,9 +177,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			},
 			incrementPostScrollDirtyCellsDecorated: () => {
 				this.deps.stateHost.postScrollDirtyCellsDecorated++;
-			},
-			incrementStalePostScrollRepairsRejected: () => {
-				this.deps.stateHost.stalePostScrollRepairsRejected++;
 			},
 			getColumnShift: this.deps.getColumnShift,
 		};
@@ -316,7 +311,6 @@ export class RowRendererRuntimeBridge<TRowData = unknown> {
 			dirtyRowsAfterScroll: this.deps.stateHost.dirtyRowsAfterScroll,
 			dirtyBuckets: this.deps.stateHost.dirtyBuckets,
 			incrementPostScrollDirtyCellsDecorated: this.runtimeArgs.incrementPostScrollDirtyCellsDecorated,
-			incrementStalePostScrollRepairsRejected: this.runtimeArgs.incrementStalePostScrollRepairsRejected,
 			rebindHierarchyRow: (slot, row, rowIndex) => {
 				const engine = this.deps.engine;
 				const plan = engine.columns.getCompiledPlan();

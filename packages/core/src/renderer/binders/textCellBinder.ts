@@ -52,8 +52,8 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 			throw new Error(`applyTextCellPresentation: '${presentation.kind}' is not a text render state`);
 	}
 
-	if (isScroll && presentation.repair !== 'none') {
-		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	if (isScroll && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
 	}
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);

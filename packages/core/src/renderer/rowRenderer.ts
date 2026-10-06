@@ -96,7 +96,6 @@ export class RowRenderer<TRowData = unknown> {
 	public currentScrollPortalOps = 0;
 	public runtimeState!: RenderRuntimeState;
 	public dirtyCellsMarkedDuringScroll = 0;
-	public stalePostScrollRepairsRejected = 0;
 
 	/** Current viewport-owned resources; cumulative paint telemetry remains in RenderStats. */
 	public getOwnershipSnapshot(): Readonly<{

@@ -4,9 +4,10 @@ import {
 	assertCellSlotLifecycleInvariants,
 	CellSlotLifecycleEvent,
 	CellSlotLifecycleState,
+	isLegalCellSlotLifecycleTransition,
 	transitionCellSlotLifecycle,
 } from './cellSlotLifecycle.js';
-import { CellSlot } from './cellSlot.js';
+import { CellSlot, cellSlotWriteStats } from './cellSlot.js';
 
 describe('cell slot lifecycle state machine', () => {
 	it('supports repeated physical reuse without reviving destroyed slots', () => {
@@ -18,7 +19,19 @@ describe('cell slot lifecycle state machine', () => {
 		state = transitionCellSlotLifecycle(state, CellSlotLifecycleEvent.Bind);
 		state = transitionCellSlotLifecycle(state, CellSlotLifecycleEvent.Destroy);
 		expect(state).toBe(CellSlotLifecycleState.Destroyed);
-		expect(() => transitionCellSlotLifecycle(state, CellSlotLifecycleEvent.Bind)).toThrow('Destroyed cell slot');
+		expect(isLegalCellSlotLifecycleTransition(state, CellSlotLifecycleEvent.Bind)).toBe(false);
+		expect(isLegalCellSlotLifecycleTransition(state, CellSlotLifecycleEvent.HotRelease)).toBe(false);
+		expect(isLegalCellSlotLifecycleTransition(state, CellSlotLifecycleEvent.ColdRelease)).toBe(false);
+		expect(transitionCellSlotLifecycle(state, CellSlotLifecycleEvent.Bind)).toBe(CellSlotLifecycleState.Destroyed);
+	});
+
+	it('counts a bind on a destroyed slot as a violation and keeps it destroyed', () => {
+		const slot = new CellSlot(document.createElement('div'));
+		slot.destroy();
+		const before = cellSlotWriteStats.cellSlotLifecycleViolations;
+		slot.unbindHot();
+		expect(cellSlotWriteStats.cellSlotLifecycleViolations).toBe(before + 1);
+		expect(slot.lifecycleState).toBe(CellSlotLifecycleState.Destroyed);
 	});
 
 	it('makes cold destroy idempotent', () => {
@@ -65,6 +78,9 @@ describe('cell slot lifecycle state machine', () => {
 		slot.destroy();
 		expect(slot.lifecycleState).toBe(CellSlotLifecycleState.Destroyed);
 		assertCellSlotLifecycleInvariants(slot);
-		expect(() => slot.update(0, 'name', 2, 'r3', 0, -1, 100, 'og-cell', 'text', 'Cara', 'Cara')).toThrow('Destroyed cell slot');
+		const violations = cellSlotWriteStats.cellSlotLifecycleViolations;
+		slot.update(0, 'name', 2, 'r3', 0, -1, 100, 'og-cell', 'text', 'Cara', 'Cara');
+		expect(cellSlotWriteStats.cellSlotLifecycleViolations).toBe(violations + 1);
+		expect(slot.lifecycleState).toBe(CellSlotLifecycleState.Destroyed);
 	});
 });

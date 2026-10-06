@@ -7,8 +7,12 @@ import { createCellInstanceRendererKey } from './identityKeys.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
 import type { HierarchyCellParts } from './hierarchyCell.js';
-import type { CellPresentationRepair } from './cellPresentationStateMachine.js';
-import { CellSlotLifecycleEvent, CellSlotLifecycleState, transitionCellSlotLifecycle } from './cellSlotLifecycle.js';
+import {
+	CellSlotLifecycleEvent,
+	CellSlotLifecycleState,
+	isLegalCellSlotLifecycleTransition,
+	transitionCellSlotLifecycle,
+} from './cellSlotLifecycle.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
 export interface CellCtrlOwner {
@@ -56,6 +60,8 @@ export const cellSlotWriteStats = {
 	cellWidthWrites: 0,
 	cellLeftWrites: 0,
 	cellDomReadsAvoided: 0,
+	/** Ownership events on a destroyed slot (a stray bind or release after destroy); always a bug. */
+	cellSlotLifecycleViolations: 0,
 };
 
 export function resetCellSlotWriteStats(): void {
@@ -65,6 +71,7 @@ export function resetCellSlotWriteStats(): void {
 	cellSlotWriteStats.cellWidthWrites = 0;
 	cellSlotWriteStats.cellLeftWrites = 0;
 	cellSlotWriteStats.cellDomReadsAvoided = 0;
+	cellSlotWriteStats.cellSlotLifecycleViolations = 0;
 }
 
 export function recordCellSlotMountedVisualVersions(cellSlot: CellSlot, versions: CellSlotMountedVisualVersions): void {
@@ -214,7 +221,7 @@ export class CellSlot<TRowData = unknown> {
 	 * Null when the slot is unbound. Logic that needs cell identity (portal key, row/col
 	 * association) must read from binding, not from element.dataset.
 	 */
-	public binding: CellBinding | null = null;
+	public binding: Readonly<CellBinding> | null = null;
 	private bindingRecord: CellBinding | null = null;
 
 	// Position — also reflected in binding when bound
@@ -239,12 +246,8 @@ export class CellSlot<TRowData = unknown> {
 	public lastAriaInvalid: boolean | undefined = undefined;
 	public lastClassName = '';
 	public lastContentMode: CellContentMode = 'empty';
-	/** Explicit post-scroll work lane; set when enqueued and cleared when repaired or unbound. */
-	public postScrollRepair: CellPresentationRepair = 'none';
-	/** Bitset of causes that requested the current deferred repair. */
+	/** Diagnostics bitset (PostScrollRepairReason) of why this cell is queued for post-scroll repair. */
 	public postScrollRepairReasons = 0;
-	/** Binding generation that requested the repair; a mismatch makes queued work obsolete. */
-	public postScrollRepairBindingGeneration = -1;
 	public lastPortalKey: string | undefined = undefined;
 	// Cached so unbindHot can skip the hasAttribute DOM read in the hot path.
 	public hasTabIndex = false;
@@ -462,7 +465,7 @@ export class CellSlot<TRowData = unknown> {
 	): boolean {
 		let domUpdated = false;
 		if (this.lifecycleState !== CellSlotLifecycleState.Bound) {
-			this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, CellSlotLifecycleEvent.Bind);
+			this.transitionLifecycle(CellSlotLifecycleEvent.Bind);
 		}
 
 		if (this.colIndex !== colIndex) {
@@ -628,7 +631,7 @@ export class CellSlot<TRowData = unknown> {
 		contentMode: CellContentMode
 	): void {
 		if (this.lifecycleState !== CellSlotLifecycleState.Bound) {
-			this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, CellSlotLifecycleEvent.Bind);
+			this.transitionLifecycle(CellSlotLifecycleEvent.Bind);
 		}
 		let binding = this.bindingRecord;
 		if (
@@ -659,8 +662,13 @@ export class CellSlot<TRowData = unknown> {
 		this.binding = binding;
 	}
 
+	private transitionLifecycle(event: CellSlotLifecycleEvent): void {
+		if (!isLegalCellSlotLifecycleTransition(this.lifecycleState, event)) cellSlotWriteStats.cellSlotLifecycleViolations++;
+		this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, event);
+	}
+
 	public unbindHot(): void {
-		this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, CellSlotLifecycleEvent.HotRelease);
+		this.transitionLifecycle(CellSlotLifecycleEvent.HotRelease);
 		this.rowBindingGeneration++;
 		this.binding = null;
 		this.colIndex = -1;
@@ -717,7 +725,7 @@ export class CellSlot<TRowData = unknown> {
 	}
 
 	public releaseCold(): void {
-		this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, CellSlotLifecycleEvent.ColdRelease);
+		this.transitionLifecycle(CellSlotLifecycleEvent.ColdRelease);
 		this.detachCellCtrl();
 		this.releaseContentMount();
 		if (this.renderer !== null) {
@@ -750,9 +758,7 @@ export class CellSlot<TRowData = unknown> {
 		if (this.hasTabIndex) this.element.removeAttribute('tabindex');
 		this.lastClassName = '';
 		this.lastContentMode = 'empty';
-		this.postScrollRepair = 'none';
 		this.postScrollRepairReasons = 0;
-		this.postScrollRepairBindingGeneration = -1;
 		this.lastPortalKey = undefined;
 		this.hasTabIndex = false;
 		this.lastMountedRowVersion = -1;
@@ -781,6 +787,6 @@ export class CellSlot<TRowData = unknown> {
 	public destroy(): void {
 		if (this.lifecycleState === CellSlotLifecycleState.Destroyed) return;
 		this.releaseCold();
-		this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, CellSlotLifecycleEvent.Destroy);
+		this.transitionLifecycle(CellSlotLifecycleEvent.Destroy);
 	}
 }

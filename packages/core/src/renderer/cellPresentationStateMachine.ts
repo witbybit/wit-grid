@@ -11,7 +11,8 @@ export interface CellPresentationState {
 	contentMode?: CellContentMode;
 	formattedValue?: string;
 	portalKey?: string;
-	repair: CellPresentationRepair;
+	/** The presentation is provisional during scroll and must be re-bound by post-scroll repair. */
+	needsPostScrollRepair: boolean;
 	isEditing?: boolean;
 	isFocused?: boolean;
 	forceLiveInteractive?: boolean;
@@ -20,7 +21,8 @@ export interface CellPresentationState {
 	freshness: VisualFreshness;
 }
 
-export type CellPresentationRepair = 'none' | 'motion' | 'fidelity';
+/** Which post-scroll budget repairs a queued cell: cheap text/visual work or rich renderer work. */
+export type PostScrollRepairLaneKind = 'motion' | 'fidelity';
 
 /**
  * Allocation-free causality carried by deferred post-scroll repairs. Multiple causes may be
@@ -36,31 +38,32 @@ export const PostScrollRepairReason = {
 
 export type PostScrollRepairReason = (typeof PostScrollRepairReason)[keyof typeof PostScrollRepairReason];
 
-export function isPostScrollRepairCurrent(rowBindingGeneration: number, repairBindingGeneration: number): boolean {
-	return repairBindingGeneration === rowBindingGeneration;
-}
-
-/** Classifies repair intent at enqueue time for paths that do not resolve a CellPresentationState. */
-export function resolvePostScrollRepair(input: {
+/**
+ * Classifies a queued cell's lane from what the physical slot presents *when the queue drains*.
+ * The lane is derived, never stored: the dirty queue holds physical elements that can be rebound
+ * or cold-released while queued, and a stored copy would have to be kept in sync with a queue the
+ * slot does not own.
+ */
+export function classifyPostScrollRepairLane(input: {
 	hasCustomRenderer: boolean;
 	isCheckbox: boolean;
 	contentMode: CellContentMode;
-}): Exclude<CellPresentationRepair, 'none'> {
+}): PostScrollRepairLaneKind {
 	return input.hasCustomRenderer || input.isCheckbox || input.contentMode === 'portal' || input.contentMode === 'custom' ? 'fidelity' : 'motion';
 }
 
-export function resolveCellPresentationRepair(kind: CellPresentationState['kind'], markDirty: boolean): CellPresentationRepair {
+/** Whether a scroll-time presentation is provisional and must be queued for post-scroll repair. */
+export function presentationNeedsPostScrollRepair(kind: CellPresentationState['kind'], markDirty: boolean): boolean {
 	switch (kind) {
 		case 'primitive':
-			return markDirty ? 'motion' : 'none';
 		case 'checkbox-selector':
 		case 'frozen-portal':
-			return markDirty ? 'fidelity' : 'none';
+			return markDirty;
 		case 'stand-in':
 		case 'live-renderer':
-			return 'fidelity';
+			return true;
 		default:
-			return 'none';
+			return false;
 	}
 }
 
@@ -74,6 +77,8 @@ export interface CellPresentationTransition {
 	nextPortalKey?: string;
 	releasePortalKey?: string;
 	portalOwnership: 'none' | 'acquire' | 'preserve' | 'release' | 'replace';
+	/** Why the resolved presentation was impossible, or null. Ownership was planned without the disallowed key. */
+	violation: string | null;
 }
 
 const ROUTE_BY_KIND: Record<CellPresentationState['kind'], CellPresentationRoute> = {
@@ -105,24 +110,36 @@ export function getPresentationPortalKey(presentation: CellPresentationState): s
 	}
 }
 
-/** Fails at the physical-render boundary when a resolver emits an impossible state. */
-export function assertValidCellPresentationState(presentation: CellPresentationState): void {
-	const portalKey = getPresentationPortalKey(presentation);
+/**
+ * Returns why a resolved presentation is impossible, or null when it is valid. Allocation-free on
+ * the valid path, so the dispatcher can check every bind. Ownership of a disallowed portal key is
+ * never honoured (getPresentationPortalKey drops it), which is what makes reporting-and-continuing
+ * safe in production.
+ */
+export function getCellPresentationStateViolation(presentation: CellPresentationState): string | null {
+	return getViolationForPortalKey(presentation, getPresentationPortalKey(presentation));
+}
+
+function getViolationForPortalKey(presentation: CellPresentationState, portalKey: string | undefined): string | null {
 	switch (presentation.kind) {
 		case 'live-renderer':
 		case 'dom-update':
 		case 'frozen-portal':
-			if (!portalKey) throw new Error(`Cell presentation '${presentation.kind}' requires a portal key.`);
-			return;
+			return portalKey ? null : `Cell presentation '${presentation.kind}' requires a portal key.`;
 		case 'buffered':
-			if (presentation.contentMode === 'portal' && !portalKey) throw new Error('Buffered portal presentation requires a portal key.');
-			if (presentation.contentMode !== 'portal' && presentation.portalKey) {
-				throw new Error('Buffered non-portal presentation cannot retain a portal key.');
-			}
-			return;
+			if (presentation.contentMode === 'portal' && !portalKey) return 'Buffered portal presentation requires a portal key.';
+			if (presentation.contentMode !== 'portal' && presentation.portalKey)
+				return 'Buffered non-portal presentation cannot retain a portal key.';
+			return null;
 		default:
-			if (presentation.portalKey) throw new Error(`Cell presentation '${presentation.kind}' cannot own a portal key.`);
+			return presentation.portalKey ? `Cell presentation '${presentation.kind}' cannot own a portal key.` : null;
 	}
+}
+
+/** Strict form for tests and diagnostics. */
+export function assertValidCellPresentationState(presentation: CellPresentationState): void {
+	const violation = getCellPresentationStateViolation(presentation);
+	if (violation) throw new Error(violation);
 }
 
 /**
@@ -135,6 +152,7 @@ export function createCellPresentationTransition(): CellPresentationTransition {
 		nextKind: 'primitive',
 		nextRoute: 'text',
 		portalOwnership: 'none',
+		violation: null,
 	};
 }
 
@@ -143,7 +161,6 @@ export function planCellPresentationTransitionInto(
 	previousPortalKey: string | undefined,
 	presentation: CellPresentationState
 ): void {
-	assertValidCellPresentationState(presentation);
 	const nextPortalKey = getPresentationPortalKey(presentation);
 	const releasePortalKey = previousPortalKey && previousPortalKey !== nextPortalKey ? previousPortalKey : undefined;
 	let portalOwnership: CellPresentationTransition['portalOwnership'];
@@ -158,4 +175,5 @@ export function planCellPresentationTransitionInto(
 	transition.nextPortalKey = nextPortalKey;
 	transition.releasePortalKey = releasePortalKey;
 	transition.portalOwnership = portalOwnership;
+	transition.violation = getViolationForPortalKey(presentation, nextPortalKey);
 }

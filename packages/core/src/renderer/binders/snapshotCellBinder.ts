@@ -23,8 +23,8 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 	deps.cellRenderer.showPortalContent(cellSlot.element);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
-	if (input.phase === 'scroll' && presentation.repair !== 'none') {
-		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	if (input.phase === 'scroll' && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
 	}
 
 	const didWrite = cellSlot.update(

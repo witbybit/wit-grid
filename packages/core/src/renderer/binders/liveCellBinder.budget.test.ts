@@ -135,7 +135,7 @@ function makeDispatchInput(
 		className: presentation.className,
 		title: presentation.title ?? null,
 		validationError: presentation.validationError,
-		repair: 'none',
+		needsPostScrollRepair: false,
 		freshness: cellCtrl.freshness!,
 		portalKey: presentation.portalCellKey,
 		isEditing: presentation.isEditing,

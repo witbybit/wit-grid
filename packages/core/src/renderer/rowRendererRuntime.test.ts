@@ -43,7 +43,6 @@ function makeStateHost(overrides?: Partial<RowRendererRuntimeStateHost<unknown>>
 		currentScrollCellsWritten: 0,
 		currentScrollPortalOps: 0,
 		postScrollDirtyCellsDecorated: 0,
-		stalePostScrollRepairsRejected: 0,
 		dirtyCellsMarkedDuringScroll: 0,
 		...overrides,
 	};

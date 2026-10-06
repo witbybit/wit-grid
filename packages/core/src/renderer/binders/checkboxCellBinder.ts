@@ -8,8 +8,8 @@ export function applyCheckboxCellPresentation<TRowData>(input: DispatchCellPrese
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
 
-	if (input.phase === 'scroll' && presentation.repair !== 'none') {
-		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	if (input.phase === 'scroll' && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
 	}
 	if (input.phase === 'full-bind' && runtime.checkbox) {
 		// Cached on the slot; the parent check re-queries only if something replaced it.

@@ -7,7 +7,7 @@ import type { RowCellBinderDeps } from '../rowCellBinder.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { deriveCellCtrlAccessibilityState, type CellCtrl } from '../controllers/CellCtrl.js';
 import { createCellRendererLifecycle, type CellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
-import type { CellPresentationRepair, PostScrollRepairReason } from '../cellPresentationStateMachine.js';
+import type { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 const lifecyclesByDeps = new WeakMap<object, CellRendererLifecycle<any>>();
 
@@ -28,14 +28,11 @@ export function getCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TRowD
 export function markCellForPostScrollRepair<TRowData>(
 	deps: RowCellBinderDeps<TRowData>,
 	cellSlot: CellSlot<TRowData>,
-	repair: Exclude<CellPresentationRepair, 'none'>,
 	reason: PostScrollRepairReason
 ): void {
-	// Fidelity subsumes motion. Multiple independent reasons can enqueue the same physical cell in
-	// one frame, so a later text repair must not downgrade renderer/style work already requested.
-	if (cellSlot.postScrollRepair !== 'fidelity') cellSlot.postScrollRepair = repair;
+	// Several causes can queue the same physical cell in one frame; the bits are diagnostics only.
+	// The repair lane is classified when the queue drains (classifyPostScrollRepairLane).
 	cellSlot.postScrollRepairReasons |= reason;
-	cellSlot.postScrollRepairBindingGeneration = cellSlot.rowBindingGeneration;
 	deps.markCellDirtyAfterScroll(cellSlot.element);
 }
 

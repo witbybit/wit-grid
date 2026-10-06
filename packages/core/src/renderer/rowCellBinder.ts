@@ -907,7 +907,7 @@ export function bindCellDuringScroll<TRowData>(deps: RowCellBinderDeps<TRowData>
 				styleRuleClass === undefined &&
 				(ctx.selectionChangedDuringScroll || !isWarmBindingVersionFresh || ctx.styleChangedDuringScroll || ctx.loadingChangedDuringScroll)));
 	if (shouldDeferCellStyleRefresh) {
-		markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Style);
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Style);
 		deps.incrementStyleHookCallsDuringScroll();
 	}
 

@@ -15,10 +15,19 @@ export const CellSlotLifecycleEvent = {
 
 export type CellSlotLifecycleEvent = (typeof CellSlotLifecycleEvent)[keyof typeof CellSlotLifecycleEvent];
 
-/** Pure lifecycle transition used by CellSlot at ownership boundaries, never per steady-state write. */
+/** Destroy is accepted from any state (idempotent); nothing else may leave Destroyed. */
+export function isLegalCellSlotLifecycleTransition(state: CellSlotLifecycleState, event: CellSlotLifecycleEvent): boolean {
+	return event === CellSlotLifecycleEvent.Destroy || state !== CellSlotLifecycleState.Destroyed;
+}
+
+/**
+ * Pure lifecycle transition used by CellSlot at ownership boundaries, never per steady-state write.
+ * Destroyed is absorbing: an illegal event leaves the slot destroyed. Callers detect the violation
+ * with isLegalCellSlotLifecycleTransition and count it, so a stray bind on a detached slot is
+ * surfaced in telemetry and tests without throwing out of a frame.
+ */
 export function transitionCellSlotLifecycle(state: CellSlotLifecycleState, event: CellSlotLifecycleEvent): CellSlotLifecycleState {
-	if (event === CellSlotLifecycleEvent.Destroy) return CellSlotLifecycleState.Destroyed;
-	if (state === CellSlotLifecycleState.Destroyed) throw new Error('Destroyed cell slot cannot be rebound or hot-released.');
+	if (event === CellSlotLifecycleEvent.Destroy || state === CellSlotLifecycleState.Destroyed) return CellSlotLifecycleState.Destroyed;
 	return event === CellSlotLifecycleEvent.Bind ? CellSlotLifecycleState.Bound : CellSlotLifecycleState.Vacant;
 }
 

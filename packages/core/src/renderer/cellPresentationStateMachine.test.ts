@@ -4,10 +4,9 @@ import {
 	createCellPresentationTransition,
 	getCellPresentationRoute,
 	getPresentationPortalKey,
-	isPostScrollRepairCurrent,
 	planCellPresentationTransitionInto,
-	resolveCellPresentationRepair,
-	resolvePostScrollRepair,
+	classifyPostScrollRepairLane,
+	presentationNeedsPostScrollRepair,
 	type CellPresentationState,
 } from './cellPresentationStateMachine.js';
 
@@ -15,7 +14,7 @@ function presentation(kind: CellPresentationState['kind'], overrides: Partial<Ce
 	return {
 		kind,
 		className: 'og-cell',
-		repair: 'none',
+		needsPostScrollRepair: false,
 		freshness: {
 			rowVersion: 1,
 			globalVersion: 1,
@@ -93,31 +92,41 @@ describe('cell presentation state machine', () => {
 		expect(() => assertValidCellPresentationState(presentation(kind))).toThrow('requires a portal key');
 	});
 
+	it('plans an impossible state without throwing: records the violation and never honours the disallowed key', () => {
+		const planned = plan('held', presentation('primitive', { portalKey: 'stale' }));
+		expect(planned.violation).toContain('cannot own a portal key');
+		expect(planned.nextPortalKey).toBeUndefined();
+		expect(planned.releasePortalKey).toBe('held');
+		expect(plan(undefined, presentation('primitive')).violation).toBeNull();
+	});
+
 	it('rejects portal ownership on a primitive state', () => {
 		expect(() => assertValidCellPresentationState(presentation('primitive', { portalKey: 'stale' }))).toThrow('cannot own a portal key');
 	});
 
 	it.each([
-		['primitive', true, 'motion'],
-		['primitive', false, 'none'],
-		['frozen-portal', true, 'fidelity'],
-		['frozen-portal', false, 'none'],
-		['stand-in', false, 'fidelity'],
-		['live-renderer', false, 'fidelity'],
-		['dom-update', true, 'none'],
-	] as const)('resolves %s dirty=%s to %s repair', (kind, dirty, repair) => {
-		expect(resolveCellPresentationRepair(kind, dirty)).toBe(repair);
+		['primitive', true, true],
+		['primitive', false, false],
+		['checkbox-selector', true, true],
+		['checkbox-selector', false, false],
+		['frozen-portal', true, true],
+		['frozen-portal', false, false],
+		['stand-in', false, true],
+		['live-renderer', false, true],
+		['dom-update', true, false],
+		['buffered', true, false],
+		['loading', true, false],
+	] as const)('%s with markDirty=%s needs post-scroll repair: %s', (kind, dirty, needsRepair) => {
+		expect(presentationNeedsPostScrollRepair(kind, dirty)).toBe(needsRepair);
 	});
 
-	it('classifies non-presentation enqueue paths once at their boundary', () => {
-		expect(resolvePostScrollRepair({ hasCustomRenderer: false, isCheckbox: false, contentMode: 'text' })).toBe('motion');
-		expect(resolvePostScrollRepair({ hasCustomRenderer: true, isCheckbox: false, contentMode: 'loading' })).toBe('fidelity');
-		expect(resolvePostScrollRepair({ hasCustomRenderer: false, isCheckbox: true, contentMode: 'custom' })).toBe('fidelity');
-	});
-
-	it('rejects deferred work after its physical slot is rebound', () => {
-		expect(isPostScrollRepairCurrent(7, 7)).toBe(true);
-		expect(isPostScrollRepairCurrent(8, 7)).toBe(false);
+	it('classifies the repair lane from the column and what the slot currently presents', () => {
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: false, isCheckbox: false, contentMode: 'text' })).toBe('motion');
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: false, isCheckbox: false, contentMode: 'empty' })).toBe('motion');
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: true, isCheckbox: false, contentMode: 'fallback' })).toBe('fidelity');
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: false, isCheckbox: true, contentMode: 'text' })).toBe('fidelity');
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: false, isCheckbox: false, contentMode: 'portal' })).toBe('fidelity');
+		expect(classifyPostScrollRepairLane({ hasCustomRenderer: false, isCheckbox: false, contentMode: 'custom' })).toBe('fidelity');
 	});
 
 	it('matches an independent portal-ownership oracle across seeded transition sequences', () => {

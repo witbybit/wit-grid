@@ -7,7 +7,7 @@ import type { ScrollCellPresentation } from '../scrollCellPresentation.js';
 import { dispatchCellPresentation } from './cellPresentationDispatcher.js';
 import { createCellCtrl } from '../controllers/CellCtrl.js';
 import { getColumnInstanceIdentity } from '../../columnDef.js';
-import { resolveCellPresentationRepair } from '../cellPresentationStateMachine.js';
+import { PostScrollRepairReason, presentationNeedsPostScrollRepair } from '../cellPresentationStateMachine.js';
 
 /**
  * One golden test per mode per lane (4 modes x 3 lanes = 12) — proves cellPresentationDispatcher.ts
@@ -128,7 +128,7 @@ function makeDispatchInput(
 		className: presentation.className,
 		title: 'title' in presentation ? (presentation.title ?? null) : null,
 		validationError: 'validationError' in presentation ? presentation.validationError : undefined,
-		repair: resolveCellPresentationRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false),
+		needsPostScrollRepair: presentationNeedsPostScrollRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false),
 		freshness: cellCtrl.freshness!,
 		contentMode: 'contentMode' in presentation ? presentation.contentMode : undefined,
 		formattedValue: 'formattedValue' in presentation ? presentation.formattedValue : undefined,
@@ -212,7 +212,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			expect(request.cellSlot.lastFormattedValue).toBe('hello');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
-			expect(request.cellSlot.postScrollRepair).toBe('motion');
+			expect(request.cellSlot.postScrollRepairReasons).toBe(PostScrollRepairReason.Presentation);
 		});
 
 		it(`live mode (${lane}): mounts the real renderer immediately`, () => {
@@ -272,7 +272,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			};
 			dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
-			expect(request.cellSlot.postScrollRepair).toBe('fidelity');
+			expect(request.cellSlot.postScrollRepairReasons).toBe(PostScrollRepairReason.Presentation);
 			expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 			expect(request.cellSlot.lastFormattedValue).toBe('★ chip');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
@@ -416,7 +416,6 @@ describe('cellPresentationDispatcher — seeded physical transition sequences', 
 			let random = seed;
 			let heldPortalKey: string | undefined;
 			let expectedReleaseCount = 0;
-			let expectedRepair: 'motion' | 'fidelity' = 'motion';
 
 			for (let step = 0; step < 32; step++) {
 				random = (random * 1103515245 + 12345) >>> 0;
@@ -483,8 +482,10 @@ describe('cellPresentationDispatcher — seeded physical transition sequences', 
 				);
 				expect(request.cellSlot.lastPortalKey, `seed ${seed}, step ${step}`).toBe(portalKey);
 				expect(deps.releaseCellPortal, `seed ${seed}, step ${step}`).toHaveBeenCalledTimes(expectedReleaseCount);
-				if (kind !== 'primitive') expectedRepair = 'fidelity';
-				expect(request.cellSlot.postScrollRepair).toBe(expectedRepair);
+				// The slot records why it was queued; it never stores a lane that could go stale.
+				expect(request.cellSlot.postScrollRepairReasons !== 0, `seed ${seed}, step ${step}`).toBe(
+					deps.markCellDirtyAfterScroll.mock.calls.length > 0
+				);
 				heldPortalKey = portalKey;
 			}
 		}

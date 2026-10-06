@@ -12,6 +12,7 @@ import { applySnapshotCellPresentation } from './snapshotCellBinder.js';
 import { applyCheckboxCellPresentation } from './checkboxCellBinder.js';
 import { getCellRendererLifecycle } from './binderShared.js';
 import { createCellPresentationTransition, planCellPresentationTransitionInto } from '../cellPresentationStateMachine.js';
+import { reportRendererFault } from '../rendererFaults.js';
 
 export interface CellBindGeometry {
 	rowIndex: number;
@@ -80,6 +81,15 @@ export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentati
 		cellSlot.lastPortalKey;
 	const transition = transitionScratch;
 	planCellPresentationTransitionInto(transition, heldPortalKey, nextPresentation);
+	// A resolver bug must not abort the frame: report it and render the presentation with only the
+	// portal ownership it is allowed (the planner already dropped a disallowed key).
+	if (transition.violation) {
+		reportRendererFault(deps.engine, 'cell-presentation-invariant', new Error(transition.violation), {
+			kind: nextPresentation.kind,
+			rowId: cellCtrl.rowId,
+			field: cellCtrl.field,
+		});
+	}
 	// Release may cross an adapter boundary. Capture the decision before that call so a re-entrant
 	// dispatch cannot overwrite the shared scratch record before this dispatch reaches its binder.
 	const nextRoute = transition.nextRoute;

@@ -40,7 +40,7 @@ function applyLiveStandIn<TRowData>(input: DispatchCellPresentationInput<TRowDat
 	const scrollText = (runtime.mount?.col as InternalColumnDef<TRowData> | undefined)?.cellRendererCapabilities?.scrollText;
 	const standIn = scrollText ? scrollText({ value: runtime.mount?.value, formattedValue: cheap }) || cheap : cheap;
 	deps.incrementLiveReactStandInsDuringScroll?.();
-	if (input.phase === 'scroll') markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Budget);
+	if (input.phase === 'scroll') markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Budget);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(
@@ -88,7 +88,7 @@ function applyDomUpdateCellPresentation<TRowData>(input: DispatchCellPresentatio
 
 	if (!(deps.tryConsumeDomUpdateBudget?.() ?? true)) {
 		deps.incrementDomUpdatesDeferredDuringScroll?.();
-		markCellForPostScrollRepair(deps, cellSlot, 'fidelity', PostScrollRepairReason.Budget);
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Budget);
 		const didWrite = cellSlot.update(
 			geometry.colIndex,
 			cellCtrl.field,
@@ -173,8 +173,8 @@ export function applyLiveCellPresentation<TRowData>(input: DispatchCellPresentat
 	const { deps, cellCtrl, cellSlot, geometry, runtime, rowVersion } = input;
 	const presentation = cellCtrl.presentationState;
 	if (presentation.kind === 'dom-update') return applyDomUpdateCellPresentation(input);
-	if (input.phase === 'scroll' && presentation.repair !== 'none') {
-		markCellForPostScrollRepair(deps, cellSlot, presentation.repair, PostScrollRepairReason.Presentation);
+	if (input.phase === 'scroll' && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
 	}
 	const lifecycle = getCellRendererLifecycle(deps);
 	const mountRuntime = runtime.mount;
