@@ -11,6 +11,21 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Added — checkbox selection across groups
+
+With `rowSelection: 'multiple'`, group rows get a tri-state checkbox in the selection column: it selects or deselects
+every order beneath the group, nested and collapsed groups included, and shows a dash while the group is partly
+selected. Ancestor groups update as their rows are selected. `GroupRenderContext.selection` (`'all'`, `'some'`,
+`'none'`) lets a custom group renderer draw the same state.
+
+### Fixed — checkbox selection
+
+- Ctrl/Cmd+click toggled a row twice, selecting and immediately deselecting it. It now toggles once and leaves the cell cursor where it is.
+- A checkbox in a recycled row could show the previous row's checked state and, if clicked before scrolling settled, toggle that hidden row. Checkboxes are now correct on every scroll frame, and a click acts on the row the cell shows.
+- Group rows in the selection column kept a leftover row checkbox from a recycled slot.
+- `hierarchyColumn.renderer` was also drawn on a grouped grid's leaf rows. Leaf rows now keep the built-in cell, which also keeps React work during scroll to group rows.
+- A React group renderer could show a blank cell while scrolling: a deferred first mount now shows the group label until it mounts, and stuck sticky headers mount immediately.
+
 ### Added — row animation styles
 
 `rowAnimation` (React prop; `rendererOptions.rowAnimation` and `api.setRowAnimation` in core) chooses how rows

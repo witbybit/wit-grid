@@ -329,7 +329,8 @@ export function resolveScrollCellPresentation<TRowData>(
 		input;
 
 	if (col.checkboxSelection) {
-		return { kind: 'checkbox-selector', className: buildCellPinClass(lane) + ' og-cell-row-selector', markDirty: isInVisibleContent };
+		// The checkbox binder writes the checked state on every scroll frame; nothing to repair later.
+		return { kind: 'checkbox-selector', className: buildCellPinClass(lane) + ' og-cell-row-selector', markDirty: false };
 	}
 
 	const compiledPlan = ctx.plan.columnPlans[colIndex];

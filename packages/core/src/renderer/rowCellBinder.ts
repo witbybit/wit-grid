@@ -419,6 +419,8 @@ function getScrollDecisionDeps<TRowData>(deps: RowCellBinderDeps<TRowData>): Scr
  */
 let scrollScratchInUse = false;
 const scrollInputScratch = {} as ScrollCellPresentationInput<any>;
+// Consumed synchronously by the checkbox binder within one dispatch.
+const scrollCheckboxScratch = { checked: false };
 const scrollGeometryScratch: CellBindGeometry = { rowIndex: 0, colIndex: 0, left: 0, right: 0, width: 0, dragShift: 0, lane: 'center' };
 const scrollRuntimeScratch: CellBindRuntime<any> = { globalVersion: 0, rowSlotId: '', slotGeneration: 0 };
 const scrollDispatchScratch = {
@@ -460,7 +462,13 @@ function fillScrollDispatchInput<TRowData>(
 	runtime.slotGeneration = request.pooledRowGeneration;
 	runtime.rowHeight = deps.engine.geometry?.rowHeights?.[request.rowIndex];
 	runtime.colWidth = request.ctx.plan?.colWidths?.[request.colIndex];
-	runtime.checkbox = undefined;
+	if (request.col.checkboxSelection) {
+		const selectedRowIds = readInteractionState(deps.engine.stateManager.getState()).rowSelection.selectedRowIds;
+		scrollCheckboxScratch.checked = !!deps.selectionPaint.getSelectedRowIdSet(selectedRowIds)?.has(request.node.id);
+		runtime.checkbox = scrollCheckboxScratch;
+	} else {
+		runtime.checkbox = undefined;
+	}
 	runtime.mount =
 		mount === undefined
 			? undefined
@@ -632,11 +640,7 @@ export function bindCellFull<TRowData>(deps: RowCellBinderDeps<TRowData>, reques
 				slotGeneration: request.slotGeneration,
 				rowHeight: deps.engine.geometry?.rowHeights?.[rowIndex],
 				colWidth: cellWidth,
-				checkbox: {
-					checked: isChecked,
-					ariaLabel: isChecked ? `Deselect row ${rowIndex + 1}` : `Select row ${rowIndex + 1}`,
-					title: 'Select row. Shift-click selects a range.',
-				},
+				checkbox: { checked: isChecked },
 			},
 			phase: 'full-bind',
 			rowVersion,

@@ -304,8 +304,13 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 		this.rowSelectionAnchorId = rowId;
 	}
 
+	/** Row clicks select rows only in a grid that shows a checkbox-selection column. */
+	private isRowClickSelectionActive(): boolean {
+		return this.runtime.getDisplayedColumns().some((col) => col.checkboxSelection);
+	}
+
 	public handleDataRowClick(pointer: GridCellPointer, event: MouseEvent): void {
-		if (!this.runtime.getDisplayedColumns().some((col) => col.checkboxSelection)) return;
+		if (!this.isRowClickSelectionActive()) return;
 		const col = this.resolvePointerColumn(pointer);
 		if (col?.checkboxSelection) return;
 		const rowIndex = this.runtime.getVisualIndexByRowId(pointer.rowId) ?? -1;
@@ -597,10 +602,9 @@ export class GridInteractionController<TRowData = unknown> implements GridIntera
 	public handleMouseDown = (pointer: GridCellPointer, event: MouseEvent): void => {
 		if (event.button !== 0) return;
 		this.invalidateEditNavigation();
-		if (event.ctrlKey || event.metaKey) {
-			this.commands.applyRowSelectionGesture({ kind: 'toggle', rowIds: [pointer.rowId], source: 'pointer' });
-			return;
-		}
+		// Ctrl/Cmd+click toggles the row on `click` (handleDataRowClick). Mouse-down only keeps the cell
+		// cursor where it is, so the toggle never moves focus or starts a range drag.
+		if ((event.ctrlKey || event.metaKey) && this.isRowClickSelectionActive()) return;
 		const state = this.runtime.getStateSnapshot();
 		const interaction = readInteractionState(state);
 		const prevFocus = interaction.focus.cell;

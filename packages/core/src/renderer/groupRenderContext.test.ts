@@ -239,11 +239,13 @@ describe('hierarchyColumn.renderer', () => {
 		const ctx = rec.seen.find((c) => c.id === 'group:region=EMEA')!;
 		expect(ctx).toMatchObject({ kind: 'group', level: 0, count: '2', indentPx: 0 });
 
-		const mountsBefore = rec.mount.mock.calls.length;
+		// EMEA's own cell is updated in place. (Collapsing it moves the APAC group into a slot that
+		// showed a leaf row's built-in cell, which mounts the renderer there once.)
+		const drawnBefore = cell().querySelector('.custom-group');
 		ctx.toggle();
 		grid.renderer.fullPaint();
+		expect(cell().querySelector('.custom-group')).toBe(drawnBefore);
 		expect(cell().querySelector('.custom-group')!.textContent).toBe('<EMEA>|closed|rest');
-		expect(rec.mount.mock.calls.length).toBe(mountsBefore);
 		grid.destroy();
 	});
 

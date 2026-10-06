@@ -41,11 +41,15 @@ export function createGridViewportInteractionRouter(deps: GridViewportInteractio
 				return;
 			}
 
+			// Selection checkboxes carry no row identity of their own: the row comes from the cell's
+			// current binding, so a checkbox in a recycled cell can never act on the row it showed before.
 			const checkbox = target.closest<HTMLInputElement>('input.og-row-checkbox');
 			if (checkbox) {
 				event.stopPropagation();
-				const rowId = checkbox.dataset.rowId;
-				if (rowId) interaction.dispatchInput({ kind: 'row-checkbox-click', rowId, checked: checkbox.checked, event });
+				const rowId = deps.resolveCellPointer(checkbox)?.rowId;
+				if (!rowId) return;
+				if (checkbox.classList.contains('og-group-select-checkbox')) deps.onHierarchySelect?.(rowId, checkbox.checked);
+				else interaction.dispatchInput({ kind: 'row-checkbox-click', rowId, checked: checkbox.checked, event });
 				return;
 			}
 

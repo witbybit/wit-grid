@@ -38,10 +38,9 @@ export interface CellBindRuntime<TRowData> {
 		isSelected: boolean;
 		renderPhase: CellRendererPhase;
 	};
+	/** Present for checkbox-selection columns on every bind phase, scroll included. */
 	checkbox?: {
 		checked: boolean;
-		ariaLabel: string;
-		title: string;
 	};
 }
 

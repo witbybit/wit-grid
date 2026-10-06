@@ -1,3 +1,4 @@
+import { isGroupingActive } from '../rows/hierarchyConfig.js';
 import { hierarchyCellInputsFor } from '../rows/hierarchyCellModel.js';
 import type { ColumnDef } from '../columnDef.js';
 import { readInteractionState } from '../interaction/interactionState.js';
@@ -99,6 +100,11 @@ export function createHierarchyDeps<TRowData>(engine: GridEngine<TRowData>, stat
  * the parts are written directly (and diffed), so the cell is current on every scroll frame —
  * a recycled row never shows another row's label, and nothing waits for scroll to settle.
  */
+/** The portal row key a React `hierarchyColumn.renderer` is mounted under for this physical cell. */
+export function hierarchyCellRowKey(cellSlot: CellSlot<any>): string {
+	return `hierarchy-cell:${cellSlot.cellInstanceId}`;
+}
+
 /**
  * Draws a cell through `hierarchyColumn.renderer`: a DOM renderer is mounted here and updated in
  * place; a React component is mounted by the adapter into the cell's content element, keyed by the
@@ -134,7 +140,7 @@ function bindCustomHierarchyCell<TRowData>(
 	if (spec.kind === 'dom') {
 		handle = spec.renderer.mount(cellSlot.contentElement, ctx) ?? {};
 	} else {
-		const rowKey = `hierarchy-cell:${cellSlot.cellInstanceId}`;
+		const rowKey = hierarchyCellRowKey(cellSlot);
 		// React owns everything inside its own host element. Core may clear the content element (a
 		// rebind to the built-in cell, a remount): that detaches the host whole, so React's later
 		// unmount still finds its nodes where it left them.
@@ -166,7 +172,9 @@ export function bindHierarchyCell<TRowData>(deps: HierarchyCellBinderDeps<TRowDa
 		cellSlot.update(colIndex, col.field, rowIndex, rowId, left, -1, width, `${baseClass} og-cell-hierarchy`, 'empty', undefined, '', undefined);
 		return;
 	}
-	const spec = state.hierarchyColumn ? state.hierarchyColumn.renderer : undefined;
+	// The renderer draws groups, totals and tree rows. A grouped grid's leaf rows are not groups: they
+	// keep the built-in cell (indent only), which also keeps React work during scroll to group rows.
+	const spec = state.hierarchyColumn && !(row.kind === 'data' && isGroupingActive(state.grouping)) ? state.hierarchyColumn.renderer : undefined;
 	let custom = false;
 	if (spec) {
 		try {

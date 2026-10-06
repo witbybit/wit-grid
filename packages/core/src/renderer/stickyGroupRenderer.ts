@@ -1,3 +1,4 @@
+import { hierarchyCellRowKey } from './hierarchyCellBinder.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { VisualRow } from '../visualRow.js';
 import type { CompiledColumnTopology } from './columnTopology.js';
@@ -269,6 +270,9 @@ export class StickyGroupRenderer<TRowData = unknown> {
 				state: this.engine.stateManager.getState(),
 				isStuck: host.stuck,
 			});
+			// Like the full-width path below: a stuck header is never left blank behind the scroll-time
+			// mount budget. There are at most a few stuck hosts, so their React cells mount now.
+			host.slot.forEachCell((cell) => this.portalMountManager.flushDeferredRowMount(hierarchyCellRowKey(cell)));
 		} else {
 			el.dataset.rowKey = rowKey;
 			// The body's pinned full-width wrapper (`og-row-portal-host`: sticky left, viewport wide), so

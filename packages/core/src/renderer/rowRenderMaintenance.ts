@@ -242,6 +242,15 @@ export function repaintInvalidatedRows<TRowData>(deps: RowRenderMaintenanceDeps<
 			});
 		}
 	}
+
+	// A group row's selection checkbox summarises rows that may be hidden beneath it (collapsed or
+	// filtered into a closed branch), so any row-selection change rebinds the visible group rows.
+	if (deps.rebindHierarchyRow && frame.reasons.includes('selection')) {
+		for (const [rowIndex, slot] of deps.activeRows) {
+			const row = rowModel.getVisualRow(rowIndex);
+			if (row?.kind === 'group' || row?.kind === 'total') deps.rebindHierarchyRow(slot, row, rowIndex);
+		}
+	}
 }
 
 export function repaintInvalidatedCells<TRowData>(deps: RowRenderMaintenanceDeps<TRowData>, frame: InvalidationFrame): void {

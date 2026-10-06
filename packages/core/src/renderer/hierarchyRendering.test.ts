@@ -774,3 +774,40 @@ describe('aggregateRenderer', () => {
 		store.destroy();
 	});
 });
+
+describe('hierarchyColumn.renderer in a grouped grid', () => {
+	it('draws group rows only, never leaf rows, and reports how much of each group is selected', () => {
+		const drawn: Array<{ id: string; kind: string; selection: string }> = [];
+		const record = (ctx: { id: string; kind: string; selection: string }) => drawn.push({ id: ctx.id, kind: ctx.kind, selection: ctx.selection });
+		const grid = mountGrid({
+			grouping: { by: ['region'], defaultExpanded: true },
+			rowSelection: { mode: 'multiple' },
+			hierarchyColumn: {
+				renderer: {
+					kind: 'dom',
+					renderer: {
+						mount: (container, ctx) => {
+							record(ctx as never);
+							container.textContent = `[${ctx.label}]`;
+							return { update: (next) => record(next as never) };
+						},
+					},
+				},
+			},
+		});
+		expect(drawn.length).toBeGreaterThan(0);
+		expect(drawn.every((entry) => entry.kind !== 'data')).toBe(true);
+		// The leaf rows keep the built-in (indent-only) cell.
+		const leaf = grid.cellOf(grid.rowAt(1), '__hierarchy__');
+		expect(grid.rowAt(1)?.dataset.rowId).toBe('row:1');
+		expect(leaf?.textContent).toBe('');
+
+		grid.store.selectRows(['1'], { mode: 'replace' } as never);
+		grid.renderer.fullPaint();
+		expect(drawn.filter((entry) => entry.id === 'group:region=EMEA').at(-1)?.selection).toBe('some');
+		grid.store.selectRows(['1', '2'], { mode: 'replace' } as never);
+		grid.renderer.fullPaint();
+		expect(drawn.filter((entry) => entry.id === 'group:region=EMEA').at(-1)?.selection).toBe('all');
+		grid.destroy();
+	});
+});

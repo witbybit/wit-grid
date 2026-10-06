@@ -651,9 +651,10 @@ export class PortalMountManager<TRowData = unknown> {
 			this.stats.deferredDuringScroll++;
 			this.deferredRowReleases.delete(mount.rowKey);
 			this.deferredRowMounts.set(mount.rowKey, mount);
-			// The container still shows the previous row's content until this mount is applied: hide
-			// it and show the new row's label instead (CSS only, so the adapter's DOM is untouched).
-			if (existingContainer === mount.container && existingVisualRow && existingVisualRow.id !== mount.visualRow.id)
+			// Until this mount is applied the container is either empty (a new host) or still shows the
+			// previous row's content: show the new row's label instead of a blank or a wrong row (CSS
+			// only, so the adapter's DOM is untouched).
+			if (existingContainer !== mount.container || !existingVisualRow || existingVisualRow.id !== mount.visualRow.id)
 				markRowContentPending(mount.container, mount.context?.label ?? '');
 			return;
 		}

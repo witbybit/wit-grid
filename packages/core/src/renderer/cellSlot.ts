@@ -272,9 +272,10 @@ export class CellSlot<TRowData = unknown> {
 	/** Horizontal-retention recency stamp (see cellSlotRetention.ts); larger = touched more recently. */
 	public retentionStamp = 0;
 
-	/** Cached row-selector checkbox (checkbox-selection columns) — see checkboxCellBinder.ts. */
-
+	/** The selection checkbox in a checkbox-selection column (row or group) — see checkboxCellBinder.ts. */
 	public rowCheckbox: HTMLInputElement | null = null;
+	/** rowIndex * 4 + checked state the checkbox's aria-label was last written for; -1 = never. */
+	public rowCheckboxLabelKey = -1;
 	/**
 	 * The cell's text was written for a group / total row (an aggregate). A data bind clears it first:
 	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
@@ -493,6 +494,9 @@ export class CellSlot<TRowData = unknown> {
 			this.rowId = rowId;
 			this.element.setAttribute('data-row-id', rowId);
 			domUpdated = true;
+			// Paths that draw a row without committing a binding (group, total and loading rows) must
+			// not leave the previous row's identity behind for pointer resolution to find.
+			if (this.binding !== null && this.binding.rowId !== rowId) this.binding = null;
 			// A stale inline visibility can only be left over from before this identity was bound
 			// (nothing sets it on a bound cell), so the style read is limited to rebinds.
 			if (this.element.style.visibility) {
