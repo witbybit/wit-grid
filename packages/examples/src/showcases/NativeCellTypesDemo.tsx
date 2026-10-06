@@ -373,9 +373,9 @@ function NativeCellTypesDemoInner({
 	const [showSnippet, setShowSnippet] = useState(false);
 
 	return (
-		<div className='flex flex-col xl:flex-row h-full w-full gap-5 overflow-hidden'>
-			{/* ── Grid panel ── */}
-			<div className='flex-1 flex flex-col gap-4 min-h-0 min-w-0'>
+		<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>
+			{/* ── Grid panel: never squeezed below a usable height when the sidebar stacks under it ── */}
+			<div className='flex-1 flex flex-col gap-4 min-h-[360px] lg:min-h-0 min-w-0'>
 				{/* Header */}
 				<div className='bg-slate-900/10 border border-slate-900 rounded-xl p-3 flex items-center justify-between gap-4 shrink-0 relative overflow-hidden'>
 					<div className='absolute right-0 top-0 translate-x-8 -translate-y-8 w-20 h-20 bg-purple-500/5 rounded-full blur-xl pointer-events-none' />
@@ -407,7 +407,7 @@ function NativeCellTypesDemoInner({
 
 			{/* ── Info sidebar ── */}
 			{!compact && (
-				<div className='w-full xl:w-[308px] flex flex-col gap-4 shrink-0 overflow-y-auto max-h-full xl:max-h-none pr-1.5'>
+				<div className='w-full lg:w-[308px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1.5'>
 					{/* Cell type reference */}
 					<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5 glass-card relative overflow-hidden'>
 						<div className='absolute right-0 top-0 translate-x-12 -translate-y-12 w-24 h-24 bg-purple-600/5 rounded-full blur-2xl pointer-events-none' />
