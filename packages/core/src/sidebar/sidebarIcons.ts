@@ -13,6 +13,8 @@ const PATHS = {
 	plus: '<path d="M12 5v14M5 12h14"/>',
 	search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
 	chevronRight: '<path d="m9 18 6-6-6-6"/>',
+	expandAll: '<path d="m7 15 5 5 5-5M7 9l5-5 5 5"/>',
+	collapseAll: '<path d="m7 20 5-5 5 5M7 4l5 5 5-5"/>',
 	check: '<path d="M20 6 9 17l-5-5"/>',
 	arrowUp: '<path d="m5 12 7-7 7 7M12 19V5"/>',
 	arrowDown: '<path d="M12 5v14M19 12l-7 7-7-7"/>',

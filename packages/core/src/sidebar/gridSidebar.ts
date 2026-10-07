@@ -9,6 +9,7 @@ import type { ColumnFilter } from '../filterModel.js';
 import type { DomFilterEditorHandle, FilterSurface } from '../filters/filterDef.js';
 import { defaultGridScheduler, type GridScheduler } from '../renderer/gridScheduler.js';
 import { disposables, el, iconButton } from './panelKit.js';
+import { columnsPanel } from './panels/columnsPanel.js';
 import { filtersPanel } from './panels/filtersPanel.js';
 import { sortPanel } from './panels/sortPanel.js';
 import { themesPanel } from './panels/themesPanel.js';
@@ -35,6 +36,7 @@ interface BuiltinPanel {
 }
 
 const BUILTIN: Partial<Record<BuiltinSidebarPanelId, BuiltinPanel>> = {
+	columns: { label: 'Columns', icon: 'columns', panel: columnsPanel },
 	filters: { label: 'Filters', icon: 'filter', panel: filtersPanel },
 	sort: { label: 'Sort', icon: 'sort', panel: sortPanel },
 	themes: { label: 'Themes', icon: 'palette', panel: themesPanel },

@@ -110,6 +110,40 @@ describe('GridSidebar', () => {
 		expect(api.getStateSnapshot().sortModel).toEqual([{ colId: 'age', sort: 'desc' }]);
 	});
 
+	it('columns: hide, group from a row or the pills, pin from the menu, reorder within a lane', () => {
+		const { api, tab, body } = setup({ panels: ['columns'] });
+		tab('columns').click();
+		const rowOf = (name: string) =>
+			[...body().querySelectorAll<HTMLElement>('.og-sb-col')].find((r) => r.querySelector('.og-sb-col-name')!.textContent === name)!;
+		rowOf('Age').querySelector<HTMLElement>('.og-sb-checkbox')!.click();
+		expect(api.getColumns().find((c) => c.field === 'age')!.hide).toBe(true);
+		rowOf('Age').querySelector<HTMLElement>('.og-sb-checkbox')!.click();
+		expect(api.getColumns().find((c) => c.field === 'age')!.hide).toBeFalsy();
+
+		rowOf('Name').querySelector<HTMLElement>('[aria-label="Group by Name"]')!.click();
+		expect(api.getGroupBy()).toEqual(['name']);
+		expect(body().querySelector('.og-sb-pill-label')!.textContent).toBe('Name');
+		body().querySelector<HTMLElement>('.og-sb-pill [aria-label="Stop grouping by Name"]')!.click();
+		expect(api.getGroupBy()).toEqual([]);
+
+		rowOf('Age').querySelector<HTMLElement>('[aria-label="Pin Age"]')!.click();
+		[...document.querySelectorAll<HTMLElement>('.og-sb-menu-item')].find((b) => b.textContent?.includes('Pin left'))!.click();
+		expect(api.getPinnedColumns().left).toBe(1);
+		expect(api.getDisplayedColumns()[0].field).toBe('age');
+		expect(body().querySelector('.og-sb-lane-title')!.textContent).toBe('Pinned left');
+
+		rowOf('Age').querySelector<HTMLElement>('[aria-label="Pin Age"]')!.click();
+		[...document.querySelectorAll<HTMLElement>('.og-sb-menu-item')].find((b) => b.textContent?.includes('No pin'))!.click();
+		expect(api.getPinnedColumns().left).toBe(0);
+
+		// Drag Name below Age (both in the scrolling lane).
+		const drag = (type: string, target: HTMLElement) => target.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { clientY: 1000 }));
+		drag('dragstart', rowOf('Name'));
+		drag('dragover', rowOf('Age'));
+		drag('drop', rowOf('Age'));
+		expect(api.getDisplayedColumns().map((c) => c.field)).toEqual(['age', 'name']);
+	});
+
 	it('themes: a card per theme; picking one switches the grid', () => {
 		const switchTheme = vi.fn();
 		// The api is frozen: spy on a child of it.

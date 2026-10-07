@@ -71,3 +71,30 @@ export function disposables() {
 		},
 	};
 }
+
+/** A checkbox in the cell editors' style (a button with role="checkbox"). */
+export function checkbox(label: string, checked: boolean, onToggle: () => void): HTMLButtonElement {
+	const box = el('button', 'og-ct-checkbox og-sb-checkbox');
+	box.type = 'button';
+	box.setAttribute('role', 'checkbox');
+	box.setAttribute('aria-label', label);
+	box.setAttribute('aria-checked', String(checked));
+	box.toggleAttribute('data-checked', checked);
+	box.innerHTML = sidebarIconSvg('check', 12);
+	box.addEventListener('click', onToggle);
+	return box;
+}
+
+/** A labelled switch row. */
+export function switchRow(label: string, checked: boolean, onChange: (next: boolean) => void): HTMLButtonElement {
+	const row = el('button', 'og-sb-switch-row');
+	row.type = 'button';
+	row.setAttribute('role', 'switch');
+	row.setAttribute('aria-checked', String(checked));
+	const control = el('span', 'og-ct-switch');
+	control.toggleAttribute('data-checked', checked);
+	control.appendChild(el('i'));
+	row.append(el('span', 'og-sb-switch-label', label), control);
+	row.addEventListener('click', () => onChange(!checked));
+	return row;
+}
