@@ -11,6 +11,7 @@ import { defaultGridScheduler, type GridScheduler } from '../renderer/gridSchedu
 import { disposables, el, iconButton } from './panelKit.js';
 import { columnsPanel } from './panels/columnsPanel.js';
 import { filtersPanel } from './panels/filtersPanel.js';
+import { queryPanel } from './panels/queryPanel.js';
 import { sortPanel } from './panels/sortPanel.js';
 import { themesPanel } from './panels/themesPanel.js';
 import { sidebarIconSvg, type SidebarIconName } from './sidebarIcons.js';
@@ -40,6 +41,7 @@ const BUILTIN: Partial<Record<BuiltinSidebarPanelId, BuiltinPanel>> = {
 	filters: { label: 'Filters', icon: 'filter', panel: filtersPanel },
 	sort: { label: 'Sort', icon: 'sort', panel: sortPanel },
 	themes: { label: 'Themes', icon: 'palette', panel: themesPanel },
+	query: { label: 'Query', icon: 'query', panel: queryPanel },
 };
 
 const BUILTIN_ICONS: Record<BuiltinSidebarPanelId, SidebarIconName> = {
@@ -66,6 +68,13 @@ export interface GridSidebarDeps {
 		colField: string,
 		surface: FilterSurface,
 		onApplied?: (filter: ColumnFilter | null) => void
+	): DomFilterEditorHandle | null;
+	mountDraftEditor(
+		container: HTMLElement,
+		colField: string,
+		surface: FilterSurface,
+		filter: ColumnFilter | null,
+		onChange: (filter: ColumnFilter | null) => void
 	): DomFilterEditorHandle | null;
 	mountPanel?: AdapterPanelMount;
 	scheduler?: GridScheduler;
@@ -261,7 +270,11 @@ export class GridSidebar<TRowData = unknown> {
 			api: this.api,
 			actions: this.actions,
 			close: () => this.api.closePanel(),
-			mountFilterEditor: (container, colField, surface = 'sidebar', onApplied) => this.deps.mountFilterEditor(container, colField, surface, onApplied),
+			mountFilterEditor: (container, colField, options = {}) => {
+				const surface = options.surface ?? 'sidebar';
+				if (options.draft) return this.deps.mountDraftEditor(container, colField, surface, options.draft.filter, options.draft.onChange);
+				return this.deps.mountFilterEditor(container, colField, surface, options.onApplied);
+			},
 		};
 		if (panel.panel) {
 			this.open = { id: panel.id, handle: panel.panel.mount(this.body, context) };

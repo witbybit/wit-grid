@@ -12,15 +12,18 @@ export interface SidebarPanelContext<TRowData = unknown> {
 	/** Closes the sidebar. */
 	close(): void;
 	/**
-	 * Mounts a column's filter editor (the same editor as every other filter surface); it applies its
-	 * filter itself and tells `onApplied` of each one.
+	 * Mounts a column's filter editor (the same editor as every other filter surface). By default it
+	 * applies its filter to the grid and tells `onApplied` of each one; given `draft`, it edits that
+	 * filter instead and reports changes to `draft.onChange` (the query builder).
 	 */
-	mountFilterEditor(
-		container: HTMLElement,
-		colField: string,
-		surface?: FilterSurface,
-		onApplied?: (filter: ColumnFilter | null) => void
-	): DomFilterEditorHandle | null;
+	mountFilterEditor(container: HTMLElement, colField: string, options?: SidebarFilterEditorOptions): DomFilterEditorHandle | null;
+}
+
+export interface SidebarFilterEditorOptions {
+	/** Default 'sidebar'. */
+	surface?: FilterSurface;
+	onApplied?: (filter: ColumnFilter | null) => void;
+	draft?: { filter: ColumnFilter | null; onChange: (filter: ColumnFilter | null) => void };
 }
 
 export interface SidebarPanelHandle {

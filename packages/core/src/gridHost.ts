@@ -261,6 +261,8 @@ export function mountGridHost<TRowData>(
 		sidebar = new GridSidebar(api, config, {
 			mountFilterEditor: (target, colField, surface, onApplied) =>
 				renderEngine.filterPopover.mountEditor(target, colField, surface, undefined, onApplied),
+			mountDraftEditor: (target, colField, surface, filter, onChange) =>
+				renderEngine.filterPopover.mountDraftEditor(target, colField, surface, filter, onChange),
 			mountPanel: options.mountPanel,
 		});
 		// The sidebar wears the grid's theme scope, so it follows the grid's theme.

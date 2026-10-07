@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GridApi } from '../api/GridApi.js';
+import type { ColumnFilter } from '../filterModel.js';
 import { createClientGrid } from '../createGrid.js';
 import { GridSidebar } from './gridSidebar.js';
 import type { GridSidebarConfig } from './sidebarTypes.js';
@@ -10,6 +11,9 @@ interface Row {
 	name: string;
 	age: number;
 }
+
+/** The last draft editor's change callback (query conditions). */
+let draftChange: ((filter: ColumnFilter | null) => void) | null = null;
 
 function setup(config: GridSidebarConfig<Row>, mountPanel = vi.fn(() => () => {}), wrap?: (api: GridApi<Row>) => GridApi<Row>) {
 	const api = createClientGrid<Row>({
@@ -22,7 +26,14 @@ function setup(config: GridSidebarConfig<Row>, mountPanel = vi.fn(() => () => {}
 			{ field: 'age', header: 'Age', filterDef: { type: 'number' } },
 		],
 	});
-	const sidebar = new GridSidebar(wrap ? wrap(api) : api, config, { mountFilterEditor: () => null, mountPanel });
+	const sidebar = new GridSidebar(wrap ? wrap(api) : api, config, {
+		mountFilterEditor: () => null,
+		mountDraftEditor: (_container, _field, _surface, _filter, onChange) => {
+			draftChange = onChange;
+			return {};
+		},
+		mountPanel,
+	});
 	document.body.appendChild(sidebar.element);
 	const tab = (id: string) => sidebar.element.querySelector<HTMLButtonElement>(`.og-sb-tab[data-panel="${id}"]`)!;
 	const body = () => sidebar.element.querySelector('.og-sb-body')!;
@@ -142,6 +153,28 @@ describe('GridSidebar', () => {
 		drag('dragover', rowOf('Age'));
 		drag('drop', rowOf('Age'));
 		expect(api.getDisplayedColumns().map((c) => c.field)).toEqual(['age', 'name']);
+	});
+
+	it('query: a draft of conditions in All / Any groups, applied with Apply', () => {
+		const { api, tab, body, byText } = setup({ panels: ['query'] });
+		tab('query').click();
+		byText('Add a condition').click();
+		expect(body().querySelector('.og-sb-select')!.textContent).toBe('Name');
+		draftChange!({ type: 'text', operator: 'contains', value: 'Av' });
+		expect(api.getStateSnapshot().queryModel ?? null).toBeNull();
+		expect(body().querySelector('.og-sb-footer-status')!.textContent).toBe('1 condition · not applied');
+		byText('Group').click();
+		draftChange!({ type: 'text', operator: 'equals', value: 'Liam' });
+		byText('Any').click();
+		byText('Apply').click();
+		const root = api.getStateSnapshot().queryModel!.root;
+		expect(root.operator).toBe('or');
+		expect(root.children[0]).toMatchObject({ kind: 'condition', columnId: 'name', filter: { value: 'Av' } });
+		expect(root.children[1]).toMatchObject({ kind: 'group', children: [{ kind: 'condition', filter: { value: 'Liam' } }] });
+		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava', 'Liam']);
+		// A query set elsewhere shows in the panel.
+		api.setQueryModel(null);
+		expect(body().textContent).toContain('No query yet');
 	});
 
 	it('themes: a card per theme; picking one switches the grid', () => {

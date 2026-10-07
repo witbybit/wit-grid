@@ -310,6 +310,7 @@ export type {
 	BuiltinSidebarPanelId,
 	GridSidebarConfig,
 	SidebarPanel,
+	SidebarFilterEditorOptions,
 	SidebarPanelContext,
 	SidebarPanelDef,
 	SidebarPanelHandle,

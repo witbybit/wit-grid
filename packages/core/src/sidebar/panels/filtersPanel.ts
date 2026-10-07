@@ -50,7 +50,7 @@ export const filtersPanel: SidebarPanel<any> = {
 			section.editor?.destroy?.();
 			section.body!.textContent = '';
 			section.shown = filterOf(section.field);
-			section.editor = mountFilterEditor(section.body!, section.field, 'sidebar', (applied) => (section.shown = applied));
+			section.editor = mountFilterEditor(section.body!, section.field, { onApplied: (applied) => (section.shown = applied) });
 		};
 
 		const setOpen = (section: Section, next: boolean) => {

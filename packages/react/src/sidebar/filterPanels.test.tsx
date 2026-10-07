@@ -72,19 +72,20 @@ describe('the sidebar hosts the core filter editors', () => {
 
 	it('Query panel: a condition edits its filter with the column’s editor and applies on Apply', async () => {
 		const api = setup('query');
-		const add = await waitFor(() => screen.getAllByTitle('Add condition')[0]);
-		fireEvent.click(add);
-		const select = (await waitFor(() => screen.getByLabelText('Column'))) as HTMLSelectElement;
-		fireEvent.change(select, { target: { value: 'status' } });
+		fireEvent.click(await waitFor(() => screen.getByText('Add a condition')));
+		fireEvent.click(screen.getByLabelText('Column'));
+		const statusOption = [...document.querySelectorAll<HTMLElement>('.og-ct-popover .og-ct-option')].find((el) => el.textContent?.includes('Status'))!;
+		act(() => {
+			statusOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+			statusOption.click();
+		});
 		const paused = await waitFor(() => {
-			const option = [...document.querySelectorAll('.og-flt-host .og-ct-option')].find((el) =>
-				el.textContent?.includes('Paused')
-			) as HTMLElement;
+			const option = [...document.querySelectorAll<HTMLElement>('.og-sb-qcond .og-ct-option')].find((el) => el.textContent?.includes('Paused'));
 			expect(option).toBeTruthy();
-			return option;
+			return option!;
 		});
 		act(() => paused.click());
-		fireEvent.click(screen.getByText('Apply query'));
+		fireEvent.click(screen.getByText('Apply'));
 		const query = api.getStateSnapshot().queryModel!;
 		expect(query.root.children[0]).toMatchObject({ kind: 'condition', columnId: 'status', filter: { type: 'select', values: ['Paused'] } });
 		await waitFor(() => expect(document.querySelector('.og-grid-container')!.textContent).not.toContain('Alice'));
