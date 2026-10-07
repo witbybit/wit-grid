@@ -12155,7 +12155,7 @@
 			"title": "Advanced filters",
 			"description": "Text, select, async, infinite, custom filters, global quick search, and named workspace views.",
 			"sourcePath": "packages/examples/src/showcases/AdvancedFiltersDemo.tsx",
-			"source": "/**\n * Workspace Views Demo — named views layered on top of the Advanced Filters showcase.\n *\n * Demonstrates:\n *  • FakeAsyncWorkspaceAdapter: simulates real network latency on every adapter call\n *  • Pre-seeded system / team / personal views with embedded filter & sort state\n *  • Live workspace state subscription → active-view bar, dirty indicator\n *  • Per-operation event log fed by GridEventName.view* events\n *  • Error injection to show the panel's error state\n */\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\nimport {\n\tGrid,\n\tGridEventName,\n\ttype ColumnDef,\n\ttype GridApi,\n\ttype GridReadyEvent,\n\ttype FilterModel,\n\ttype ColumnFilterDef,\n\ttype FilterFetchParams,\n\ttype FilterFetchResult,\n\ttype FilterPageParams,\n\ttype FilterPageResult,\n\ttype CustomFilterRendererParams,\n\ttype SelectFilterCondition,\n\ttype GridWorkspaceAdapter,\n\ttype GridViewDefinition,\n\ttype GridWorkspaceState,\n\ttype PersistedGridState,\n} from '@eregister/wit-grid-react';\n\n// ── Row type ──────────────────────────────────────────────────────────────────\n\ninterface EmployeeRow {\n\tid: string;\n\tname: string;\n\tdepartment: string;\n\tlocation: string;\n\tstatus: 'Active' | 'On Leave' | 'Contractor' | 'Alumni';\n\tlevel: 'IC1' | 'IC2' | 'IC3' | 'IC4' | 'IC5' | 'M1' | 'M2' | 'M3';\n\tsalary: number;\n\tstartDate: string;\n\tskills: string;\n}\n\n// ── Data ──────────────────────────────────────────────────────────────────────\n\nconst DEPARTMENTS = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'Finance', 'Operations', 'HR', 'Legal', 'Support'];\nconst LOCATIONS = ['San Francisco', 'New York', 'London', 'Berlin', 'Singapore', 'Toronto', 'Austin', 'Remote'];\nconst STATUSES: EmployeeRow['status'][] = ['Active', 'On Leave', 'Contractor', 'Alumni'];\nconst LEVELS: EmployeeRow['level'][] = ['IC1', 'IC2', 'IC3', 'IC4', 'IC5', 'M1', 'M2', 'M3'];\nconst NAMES = [\n\t'Alice Chen',\n\t'Bob Martinez',\n\t'Carol Smith',\n\t'David Kim',\n\t'Emma Wilson',\n\t'Frank Lee',\n\t'Grace Park',\n\t'Henry Brown',\n\t'Iris Davis',\n\t'Jake Thompson',\n\t'Kate Anderson',\n\t'Liam Johnson',\n\t'Maya Patel',\n\t'Noah Williams',\n\t'Olivia Garcia',\n\t'Peter Zhang',\n\t'Quinn Rodriguez',\n\t'Rachel Torres',\n\t'Sam White',\n\t'Tara Nguyen',\n];\nconst ALL_SKILLS = [\n\t'React',\n\t'TypeScript',\n\t'Python',\n\t'Go',\n\t'Rust',\n\t'SQL',\n\t'Figma',\n\t'Kubernetes',\n\t'AWS',\n\t'Machine Learning',\n\t'Data Analysis',\n\t'Product Strategy',\n\t'UX Research',\n\t'Copywriting',\n\t'SEO',\n\t'Finance',\n\t'Compliance',\n\t'Recruiting',\n];\n\nfunction generateEmployees(count: number): EmployeeRow[] {\n\treturn Array.from({ length: count }, (_, i) => ({\n\t\tid: `EMP-${String(i + 1).padStart(4, '0')}`,\n\t\tname: `${NAMES[i % NAMES.length]} ${Math.floor(i / NAMES.length) + 1}`,\n\t\tdepartment: DEPARTMENTS[i % DEPARTMENTS.length],\n\t\tlocation: LOCATIONS[i % LOCATIONS.length],\n\t\tstatus: STATUSES[i % STATUSES.length],\n\t\tlevel: LEVELS[i % LEVELS.length],\n\t\tsalary: 60000 + (i % 8) * 20000 + Math.floor(i / 3) * 500,\n\t\tstartDate: new Date(2015 + (i % 10), (i * 3) % 12, (i % 28) + 1).toISOString().slice(0, 10),\n\t\tskills: ALL_SKILLS.slice((i * 3) % ALL_SKILLS.length, ((i * 3) % ALL_SKILLS.length) + 3).join(', '),\n\t}));\n}\n\nconst ALL_ROWS = generateEmployees(200);\n\n// ── Fake async helpers ────────────────────────────────────────────────────────\n\nfunction fakeDelay<T>(ms: number, value: T): Promise<T> {\n\treturn new Promise((resolve) => setTimeout(() => resolve(value), ms));\n}\n\n// Jitter so operations feel like a real backend (not robotically uniform).\nfunction jitter(base: number): number {\n\treturn base + Math.floor(Math.random() * base * 0.4);\n}\n\nasync function fetchDepartmentOptions(params: FilterFetchParams, signal: AbortSignal): Promise<FilterFetchResult<string>> {\n\tawait fakeDelay(400, null);\n\tif (signal.aborted) return { options: [] };\n\tconst q = params.query.toLowerCase();\n\tconst matched = DEPARTMENTS.filter((d) => d.toLowerCase().includes(q));\n\treturn {\n\t\toptions: matched.map((d) => ({ label: d, value: d, count: ALL_ROWS.filter((r) => r.department === d).length })),\n\t\ttotalCount: matched.length,\n\t};\n}\n\nasync function fetchSkillsPage(params: FilterPageParams, signal: AbortSignal): Promise<FilterPageResult<string>> {\n\tawait fakeDelay(300, null);\n\tif (signal.aborted) return { options: [], hasMore: false };\n\tconst q = params.query.toLowerCase();\n\tconst matched = ALL_SKILLS.filter((s) => s.toLowerCase().includes(q));\n\tconst page = matched.slice(params.page * params.pageSize, (params.page + 1) * params.pageSize);\n\treturn {\n\t\toptions: page.map((s) => ({ label: s, value: s })),\n\t\thasMore: (params.page + 1) * params.pageSize < matched.length,\n\t\ttotalCount: matched.length,\n\t};\n}\n\n// ── Custom salary range filter ────────────────────────────────────────────────\n\nfunction SalaryRangeFilter({ params }: { params: CustomFilterRendererParams }) {\n\tconst current = params.value?.type === 'select' ? (params.value as SelectFilterCondition) : null;\n\tconst [min, setMin] = useState(current ? String(current.values[0] ?? '') : '');\n\tconst [max, setMax] = useState(current ? String(current.values[1] ?? '') : '');\n\n\tconst commit = (minVal: string, maxVal: string) => {\n\t\tconst minN = minVal ? Number(minVal) : null;\n\t\tconst maxN = maxVal ? Number(maxVal) : null;\n\t\tif (minN === null && maxN === null) {\n\t\t\tparams.onCommit(null);\n\t\t\treturn;\n\t\t}\n\t\tparams.onCommit({ type: 'select', values: [minN, maxN], labels: [`$${minVal || 0}–$${maxVal || '∞'}`] });\n\t};\n\n\treturn (\n\t\t<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>\n\t\t\t<div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>\n\t\t\t\t<input\n\t\t\t\t\ttype='number'\n\t\t\t\t\tplaceholder='Min salary'\n\t\t\t\t\tvalue={min}\n\t\t\t\t\tonChange={(e) => setMin(e.target.value)}\n\t\t\t\t\tonBlur={() => commit(min, max)}\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tflex: 1,\n\t\t\t\t\t\theight: 26,\n\t\t\t\t\t\tpadding: '0 8px',\n\t\t\t\t\t\tfontSize: 11,\n\t\t\t\t\t\tbackground: '#1e293b',\n\t\t\t\t\t\tborder: '1px solid #334155',\n\t\t\t\t\t\tborderRadius: 4,\n\t\t\t\t\t\tcolor: '#e2e8f0',\n\t\t\t\t\t\toutline: 'none',\n\t\t\t\t\t}}\n\t\t\t\t/>\n\t\t\t\t<span style={{ fontSize: 10, color: '#64748b' }}>–</span>\n\t\t\t\t<input\n\t\t\t\t\ttype='number'\n\t\t\t\t\tplaceholder='Max'\n\t\t\t\t\tvalue={max}\n\t\t\t\t\tonChange={(e) => setMax(e.target.value)}\n\t\t\t\t\tonBlur={() => commit(min, max)}\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tflex: 1,\n\t\t\t\t\t\theight: 26,\n\t\t\t\t\t\tpadding: '0 8px',\n\t\t\t\t\t\tfontSize: 11,\n\t\t\t\t\t\tbackground: '#1e293b',\n\t\t\t\t\t\tborder: '1px solid #334155',\n\t\t\t\t\t\tborderRadius: 4,\n\t\t\t\t\t\tcolor: '#e2e8f0',\n\t\t\t\t\t\toutline: 'none',\n\t\t\t\t\t}}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t\t{current && (\n\t\t\t\t<button\n\t\t\t\t\tonClick={() => {\n\t\t\t\t\t\tsetMin('');\n\t\t\t\t\t\tsetMax('');\n\t\t\t\t\t\tparams.onCommit(null);\n\t\t\t\t\t}}\n\t\t\t\t\tstyle={{ fontSize: 10, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}\n\t\t\t\t>\n\t\t\t\t\tClear\n\t\t\t\t</button>\n\t\t\t)}\n\t\t</div>\n\t);\n}\n\n// ── Column definitions ────────────────────────────────────────────────────────\n\nconst STATUS_COLORS: Record<string, string> = {\n\tActive: '#22c55e',\n\t'On Leave': '#f59e0b',\n\tContractor: '#60a5fa',\n\tAlumni: '#94a3b8',\n};\n\nfunction makeColumns(): ColumnDef<EmployeeRow>[] {\n\treturn [\n\t\t{ field: 'id', header: 'ID', width: 100, filterType: 'none' },\n\t\t{ field: 'name', header: 'Name', width: 180, filterType: 'text' },\n\t\t{\n\t\t\tfield: 'department',\n\t\t\theader: 'Department',\n\t\t\twidth: 160,\n\t\t\tfilterDef: {\n\t\t\t\ttype: 'async-multi-select',\n\t\t\t\tfetchOptions: fetchDepartmentOptions,\n\t\t\t\tplaceholder: 'Search departments…',\n\t\t\t\tshowSelectAll: true,\n\t\t\t\tdebounceMs: 200,\n\t\t\t} satisfies ColumnFilterDef<EmployeeRow, string>,\n\t\t},\n\t\t{\n\t\t\tfield: 'location',\n\t\t\theader: 'Location',\n\t\t\twidth: 150,\n\t\t\tfilterDef: { type: 'multi-select', options: LOCATIONS.map((l) => ({ label: l, value: l })), searchable: true } satisfies ColumnFilterDef<\n\t\t\t\tEmployeeRow,\n\t\t\t\tstring\n\t\t\t>,\n\t\t},\n\t\t{\n\t\t\tfield: 'status',\n\t\t\theader: 'Status',\n\t\t\twidth: 130,\n\t\t\trenderer: {\n\t\t\t\tkind: 'react',\n\t\t\t\tcomponent: ({ value }: { value: string }) => (\n\t\t\t\t\t<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>\n\t\t\t\t\t\t<span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[value] ?? '#94a3b8', flexShrink: 0 }} />\n\t\t\t\t\t\t{value}\n\t\t\t\t\t</span>\n\t\t\t\t),\n\t\t\t},\n\t\t\tfilterDef: { type: 'single-select', options: STATUSES.map((s) => ({ label: s, value: s })) } satisfies ColumnFilterDef<\n\t\t\t\tEmployeeRow,\n\t\t\t\tstring\n\t\t\t>,\n\t\t},\n\t\t{\n\t\t\tfield: 'level',\n\t\t\theader: 'Level',\n\t\t\twidth: 100,\n\t\t\tfilterDef: { type: 'multi-select', options: LEVELS.map((l) => ({ label: l, value: l })), showSelectAll: true } satisfies ColumnFilterDef<\n\t\t\t\tEmployeeRow,\n\t\t\t\tstring\n\t\t\t>,\n\t\t},\n\t\t{\n\t\t\tfield: 'salary',\n\t\t\theader: 'Salary',\n\t\t\twidth: 130,\n\t\t\tvalueFormatter: ({ value }) => `$${Number(value).toLocaleString()}`,\n\t\t\tfilterDef: { type: 'custom', renderFilter: (params) => <SalaryRangeFilter params={params as any} /> } satisfies ColumnFilterDef<\n\t\t\t\tEmployeeRow,\n\t\t\t\tnumber\n\t\t\t>,\n\t\t},\n\t\t{ field: 'startDate', header: 'Start Date', width: 130, filterType: 'date' },\n\t\t{\n\t\t\tfield: 'skills',\n\t\t\theader: 'Skills',\n\t\t\twidth: 220,\n\t\t\tfilterDef: {\n\t\t\t\ttype: 'infinite-multi-select',\n\t\t\t\tfetchPage: fetchSkillsPage,\n\t\t\t\tpageSize: 6,\n\t\t\t\tplaceholder: 'Search skills…',\n\t\t\t\tdebounceMs: 150,\n\t\t\t} satisfies ColumnFilterDef<EmployeeRow, string>,\n\t\t},\n\t];\n}\n\n// ── Pre-seeded workspace views ────────────────────────────────────────────────\n// v:2 matches the current GRID_STATE_SCHEMA_VERSION.\n// Each view embeds a PersistedGridState with a real filter / sort model.\n\nconst _T = Date.now();\n\nfunction makeView(\n\tid: string,\n\tname: string,\n\tdescription: string,\n\tscope: GridViewDefinition['scope'],\n\tfilterModel: FilterModel | null,\n\tsortModel?: { colId: string; sort: 'asc' | 'desc' }[],\n\tthemeName?: any\n): GridViewDefinition {\n\treturn {\n\t\tid,\n\t\tname,\n\t\tdescription,\n\t\tscope,\n\t\tcreatedAt: _T - 7_200_000,\n\t\tupdatedAt: _T - 600_000,\n\t\tversion: 1,\n\t\tstate: {\n\t\t\tv: 2,\n\t\t\tstate: {\n\t\t\t\tfilterModel: filterModel ?? null,\n\t\t\t\tsortModel: sortModel ?? null,\n\t\t\t\tthemeName,\n\t\t\t},\n\t\t} as PersistedGridState,\n\t};\n}\n\nconst SEED_VIEWS: GridViewDefinition[] = [\n\tmakeView(\n\t\t'eng-active',\n\t\t'Engineering · Active',\n\t\t'Current headcount in Engineering who are active employees',\n\t\t'system',\n\t\t{\n\t\t\tdepartment: { type: 'select', values: ['Engineering'], labels: ['Engineering'] },\n\t\t\tstatus: { type: 'select', values: ['Active'], labels: ['Active'] },\n\t\t},\n\t\t[{ colId: 'salary', sort: 'desc' }],\n\t\t'dark'\n\t),\n\tmakeView(\n\t\t'remote-team',\n\t\t'Remote Team',\n\t\t'All employees working remotely, sorted by level',\n\t\t'team',\n\t\t{ location: { type: 'select', values: ['Remote'], labels: ['Remote'] } },\n\t\t[{ colId: 'level', sort: 'asc' }],\n\t\t'spreadsheet'\n\t),\n\tmakeView(\n\t\t'senior-ics',\n\t\t'Senior ICs',\n\t\t'IC4 and IC5 contributors across all departments',\n\t\t'team',\n\t\t{ level: { type: 'select', values: ['IC4', 'IC5'], labels: ['IC4', 'IC5'] } },\n\t\t[{ colId: 'salary', sort: 'desc' }],\n\t\t'warm-orange'\n\t),\n\tmakeView('contractors', 'All Contractors', 'External contractors — useful for billing and access reviews', 'personal', {\n\t\tstatus: { type: 'select', values: ['Contractor'], labels: ['Contractor'] },\n\t}),\n\tmakeView(\n\t\t'sf-high-earners',\n\t\t'SF High Earners',\n\t\t'San Francisco employees earning over $100k — comp review baseline',\n\t\t'personal',\n\t\t{\n\t\t\tlocation: { type: 'select', values: ['San Francisco'], labels: ['San Francisco'] },\n\t\t\tsalary: { type: 'select', values: [100000, null], labels: ['$100,000–∞'] },\n\t\t},\n\t\t[{ colId: 'salary', sort: 'desc' }]\n\t),\n];\n\nconst DEFAULT_VIEW_ID = 'eng-active';\n\n// ── FakeAsyncWorkspaceAdapter ─────────────────────────────────────────────────\n\nclass FakeAsyncWorkspaceAdapter implements GridWorkspaceAdapter {\n\tprivate _views: Map<string, GridViewDefinition>;\n\tprivate _defaultId: string | null;\n\tprivate _injectError = false;\n\n\tconstructor(seeds: GridViewDefinition[], defaultId: string | null) {\n\t\tthis._views = new Map(seeds.map((v) => [v.id, v]));\n\t\tthis._defaultId = defaultId;\n\t}\n\n\tasync listViews(): Promise<readonly GridViewDefinition[]> {\n\t\tawait fakeDelay(jitter(550), null);\n\t\treturn Array.from(this._views.values()).sort((a, b) => a.createdAt - b.createdAt);\n\t}\n\n\tasync getView(id: string): Promise<GridViewDefinition | null> {\n\t\tawait fakeDelay(jitter(180), null);\n\t\treturn this._views.get(id) ?? null;\n\t}\n\n\tasync saveView(view: GridViewDefinition): Promise<void> {\n\t\tif (this._injectError) {\n\t\t\tthis._injectError = false;\n\t\t\tawait fakeDelay(jitter(600), null);\n\t\t\tthrow new Error('Server error: quota exceeded (simulated)');\n\t\t}\n\t\tawait fakeDelay(jitter(480), null);\n\t\tthis._views.set(view.id, view);\n\t}\n\n\tasync deleteView(id: string): Promise<void> {\n\t\tawait fakeDelay(jitter(320), null);\n\t\tthis._views.delete(id);\n\t\tif (this._defaultId === id) this._defaultId = null;\n\t}\n\n\tasync getDefaultView(): Promise<string | null> {\n\t\tawait fakeDelay(jitter(120), null);\n\t\treturn this._defaultId;\n\t}\n\n\tasync setDefaultView(id: string | null): Promise<void> {\n\t\tawait fakeDelay(jitter(220), null);\n\t\tthis._defaultId = id;\n\t}\n\n\t/** Demo helper — next saveView() call will throw a simulated server error. */\n\ttriggerSaveError(): void {\n\t\tthis._injectError = true;\n\t}\n}\n\n// ── Event log ─────────────────────────────────────────────────────────────────\n\ninterface LogEntry {\n\tkey: number;\n\tts: number;\n\ticon: string;\n\tmsg: string;\n\tsub?: string;\n}\n\nlet _logSeq = 0;\n\nfunction makeEntry(icon: string, msg: string, sub?: string): LogEntry {\n\treturn { key: _logSeq++, ts: Date.now(), icon, msg, sub };\n}\n\nconst SCOPE_COLORS: Record<string, string> = {\n\tsystem: '#f472b6',\n\tteam: '#818cf8',\n\tpersonal: '#34d399',\n};\n\nconst SCOPE_LABELS: Record<string, string> = {\n\tsystem: 'System',\n\tteam: 'Team',\n\tpersonal: 'Personal',\n};\n\n// ── Demo page ─────────────────────────────────────────────────────────────────\n\ninterface Props {\n\t/** Hides the workspace control panel (active view/quick-apply/event log) and the filter-type legend. */\n\tcompact?: boolean;\n}\n\nexport default function AdvancedFiltersDemo({ compact = false }: Props = {}) {\n\tconst apiRef = useRef<GridApi<EmployeeRow> | null>(null);\n\tconst [filterModel, setFilterModel] = useState<FilterModel | null>(null);\n\tconst [wsState, setWsState] = useState<GridWorkspaceState | null>(null);\n\tconst [log, setLog] = useState<LogEntry[]>([]);\n\tconst [quickFilterText, setQuickFilterText] = useState('');\n\tconst columns = useMemo(() => makeColumns(), []);\n\tconst rows = useMemo(() => ALL_ROWS, []);\n\n\t// Global search box, wired straight to api.setQuickFilter — matches every column\n\t// (id, name, department, location, status, level, salary, startDate, skills) at once,\n\t// combined via AND with any active per-column filters and the pre-seeded views above.\n\tconst handleQuickFilterChange = (text: string) => {\n\t\tsetQuickFilterText(text);\n\t\tapiRef.current?.setQuickFilter(text);\n\t};\n\n\t// Stable adapter instance — lives for the lifetime of this page.\n\tconst adapter = useMemo(() => new FakeAsyncWorkspaceAdapter(SEED_VIEWS, DEFAULT_VIEW_ID), []);\n\n\tconst pushLog = useCallback((entry: LogEntry) => {\n\t\tsetLog((prev) => [entry, ...prev].slice(0, 12));\n\t}, []);\n\n\tconst onGridReady = useCallback(\n\t\t(e: GridReadyEvent<EmployeeRow>) => {\n\t\t\tapiRef.current = e.api;\n\n\t\t\t// Track filter model for the \"clear filters\" button.\n\t\t\te.api.subscribeToKey('filterModel', (s) => setFilterModel((s as any).filterModel ?? null));\n\n\t\t\t// Track workspace state for the status bar.\n\t\t\te.api.subscribeToWorkspaceState(setWsState);\n\n\t\t\t// Populate the event log from workspace events.\n\t\t\te.api.addEventListener(GridEventName.viewApplied, ({ payload: { view } }) => {\n\t\t\t\tif (!view) return;\n\t\t\t\tpushLog(makeEntry('▶', `Applied \"${view.name}\"`, SCOPE_LABELS[view.scope]));\n\t\t\t});\n\t\t\te.api.addEventListener(GridEventName.viewSaved, ({ payload: { view } }) => {\n\t\t\t\tpushLog(makeEntry('✦', `Saved \"${view.name}\"`, SCOPE_LABELS[view.scope]));\n\t\t\t});\n\t\t\te.api.addEventListener(GridEventName.viewDeleted, ({ payload: { id } }) => {\n\t\t\t\tpushLog(makeEntry('✕', `Deleted view`, id));\n\t\t\t});\n\t\t\te.api.addEventListener(GridEventName.viewRenamed, ({ payload: { id: _id, name } }) => {\n\t\t\t\tpushLog(makeEntry('✎', `Renamed to \"${name}\"`));\n\t\t\t});\n\t\t},\n\t\t[pushLog]\n\t);\n\n\t// Log loading completion when workspace finishes initialising.\n\tuseEffect(() => {\n\t\tif (!wsState) return;\n\t\tif (!wsState.loading && wsState.views.length > 0) {\n\t\t\tpushLog(makeEntry('↓', `Loaded ${wsState.views.length} views from adapter`));\n\t\t}\n\t\t// eslint-disable-next-line react-hooks/exhaustive-deps\n\t}, [wsState?.loading]);\n\n\tconst activeFilters = filterModel ? Object.keys(filterModel).length : 0;\n\tconst activeView = wsState?.views.find((v) => v.id === wsState.activeViewId) ?? null;\n\tconst isDirty = wsState?.dirty ?? false;\n\n\t// Quick-apply a pre-seeded view by ID.\n\tconst applyView = (id: string) => {\n\t\tapiRef.current?.applyView(id).catch(console.error);\n\t};\n\n\treturn (\n\t\t<div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>\n\t\t\t{/* ── Header ────────────────────────────────────────────────── */}\n\t\t\t<div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0 4px', flexShrink: 0 }}>\n\t\t\t\t<div style={{ flex: 1 }}>\n\t\t\t\t\t<div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.01em' }}>Workspace Views Demo</div>\n\t\t\t\t\t<div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>\n\t\t\t\t\t\tNamed views over the Advanced Filters dataset — open Sidebar → <strong style={{ color: '#94a3b8' }}>Views</strong> to save,\n\t\t\t\t\t\trename, and switch views\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\n\t\t\t\t{/* Global quick filter — api.setQuickFilter() searches every column at once. */}\n\t\t\t\t<div style={{ position: 'relative', flexShrink: 0, width: 240 }}>\n\t\t\t\t\t<span\n\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\tposition: 'absolute',\n\t\t\t\t\t\t\tleft: 9,\n\t\t\t\t\t\t\ttop: '50%',\n\t\t\t\t\t\t\ttransform: 'translateY(-50%)',\n\t\t\t\t\t\t\tfontSize: 12,\n\t\t\t\t\t\t\tcolor: '#475569',\n\t\t\t\t\t\t\tpointerEvents: 'none',\n\t\t\t\t\t\t}}\n\t\t\t\t\t>\n\t\t\t\t\t\t🔍\n\t\t\t\t\t</span>\n\t\t\t\t\t<input\n\t\t\t\t\t\ttype='text'\n\t\t\t\t\t\tvalue={quickFilterText}\n\t\t\t\t\t\tonChange={(e) => handleQuickFilterChange(e.target.value)}\n\t\t\t\t\t\tplaceholder='Search all columns…'\n\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\twidth: '100%',\n\t\t\t\t\t\t\theight: 28,\n\t\t\t\t\t\t\tpadding: '0 26px 0 26px',\n\t\t\t\t\t\t\tfontSize: 11,\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\n\t\t\t\t\t\t\tborder: `1px solid ${quickFilterText ? 'rgba(59,130,246,0.4)' : '#1e293b'}`,\n\t\t\t\t\t\t\tborderRadius: 6,\n\t\t\t\t\t\t\tcolor: '#e2e8f0',\n\t\t\t\t\t\t\toutline: 'none',\n\t\t\t\t\t\t\tboxSizing: 'border-box',\n\t\t\t\t\t\t}}\n\t\t\t\t\t/>\n\t\t\t\t\t{quickFilterText && (\n\t\t\t\t\t\t<button\n\t\t\t\t\t\t\tonClick={() => handleQuickFilterChange('')}\n\t\t\t\t\t\t\taria-label='Clear search'\n\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\tposition: 'absolute',\n\t\t\t\t\t\t\t\tright: 6,\n\t\t\t\t\t\t\t\ttop: '50%',\n\t\t\t\t\t\t\t\ttransform: 'translateY(-50%)',\n\t\t\t\t\t\t\t\tfontSize: 13,\n\t\t\t\t\t\t\t\tlineHeight: 1,\n\t\t\t\t\t\t\t\tcolor: '#64748b',\n\t\t\t\t\t\t\t\tbackground: 'none',\n\t\t\t\t\t\t\t\tborder: 'none',\n\t\t\t\t\t\t\t\tcursor: 'pointer',\n\t\t\t\t\t\t\t\tpadding: 2,\n\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\t×\n\t\t\t\t\t\t</button>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\n\t\t\t\t{activeFilters > 0 && (\n\t\t\t\t\t<button\n\t\t\t\t\t\tonClick={() => apiRef.current?.setFilterModel(null)}\n\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\tfontSize: 11,\n\t\t\t\t\t\t\tfontWeight: 600,\n\t\t\t\t\t\t\tcolor: '#60a5fa',\n\t\t\t\t\t\t\tbackground: 'rgba(59,130,246,0.1)',\n\t\t\t\t\t\t\tborder: '1px solid rgba(59,130,246,0.3)',\n\t\t\t\t\t\t\tborderRadius: 6,\n\t\t\t\t\t\t\tpadding: '4px 12px',\n\t\t\t\t\t\t\tcursor: 'pointer',\n\t\t\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\t\t}}\n\t\t\t\t\t>\n\t\t\t\t\t\tClear {activeFilters} filter{activeFilters > 1 ? 's' : ''}\n\t\t\t\t\t</button>\n\t\t\t\t)}\n\t\t\t</div>\n\n\t\t\t{/* ── Workspace control panel ───────────────────────────────── */}\n\t\t\t{!compact && (\n\t\t\t\t<div\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tdisplay: 'grid',\n\t\t\t\t\t\tgridTemplateColumns: '1fr 1fr',\n\t\t\t\t\t\tgap: 10,\n\t\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\t}}\n\t\t\t\t>\n\t\t\t\t\t{/* Left: active view + quick-apply chips */}\n\t\t\t\t\t<div\n\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\n\t\t\t\t\t\t\tborder: '1px solid #1e293b',\n\t\t\t\t\t\t\tborderRadius: 8,\n\t\t\t\t\t\t\tpadding: '10px 12px',\n\t\t\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\t\t\tflexDirection: 'column',\n\t\t\t\t\t\t\tgap: 8,\n\t\t\t\t\t\t}}\n\t\t\t\t\t>\n\t\t\t\t\t\t{/* Active view row */}\n\t\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>\n\t\t\t\t\t\t\t<div\n\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\twidth: 8,\n\t\t\t\t\t\t\t\t\theight: 8,\n\t\t\t\t\t\t\t\t\tborderRadius: '50%',\n\t\t\t\t\t\t\t\t\tbackground: isDirty ? '#f59e0b' : activeView ? '#22c55e' : '#475569',\n\t\t\t\t\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\t\t\t\t\tboxShadow: isDirty ? '0 0 6px #f59e0b80' : activeView ? '0 0 6px #22c55e60' : 'none',\n\t\t\t\t\t\t\t\t\ttransition: 'background 0.3s, box-shadow 0.3s',\n\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t<span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{activeView ? activeView.name : 'No active view'}</span>\n\t\t\t\t\t\t\t{activeView && (\n\t\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\t\tfontSize: 9,\n\t\t\t\t\t\t\t\t\t\tfontWeight: 700,\n\t\t\t\t\t\t\t\t\t\tletterSpacing: '0.07em',\n\t\t\t\t\t\t\t\t\t\tpadding: '1px 5px',\n\t\t\t\t\t\t\t\t\t\tborderRadius: 3,\n\t\t\t\t\t\t\t\t\t\tbackground: `${SCOPE_COLORS[activeView.scope]}18`,\n\t\t\t\t\t\t\t\t\t\tborder: `1px solid ${SCOPE_COLORS[activeView.scope]}40`,\n\t\t\t\t\t\t\t\t\t\tcolor: SCOPE_COLORS[activeView.scope],\n\t\t\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t{SCOPE_LABELS[activeView.scope]}\n\t\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t\t)}\n\t\t\t\t\t\t\t{isDirty && (\n\t\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\t\tfontSize: 9,\n\t\t\t\t\t\t\t\t\t\tfontWeight: 700,\n\t\t\t\t\t\t\t\t\t\tpadding: '1px 6px',\n\t\t\t\t\t\t\t\t\t\tborderRadius: 3,\n\t\t\t\t\t\t\t\t\t\tbackground: 'rgba(245,158,11,0.12)',\n\t\t\t\t\t\t\t\t\t\tborder: '1px solid rgba(245,158,11,0.35)',\n\t\t\t\t\t\t\t\t\t\tcolor: '#f59e0b',\n\t\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\tUNSAVED CHANGES\n\t\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t\t)}\n\t\t\t\t\t\t\t{wsState?.loading && <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>Loading…</span>}\n\t\t\t\t\t\t</div>\n\n\t\t\t\t\t\t{/* Quick-apply chips */}\n\t\t\t\t\t\t<div>\n\t\t\t\t\t\t\t<div\n\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\tfontSize: 9,\n\t\t\t\t\t\t\t\t\tfontWeight: 700,\n\t\t\t\t\t\t\t\t\tletterSpacing: '0.08em',\n\t\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\t\t\t\t\t\tcolor: '#475569',\n\t\t\t\t\t\t\t\t\tmarginBottom: 5,\n\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\tQuick Apply\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t\t<div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>\n\t\t\t\t\t\t\t\t{SEED_VIEWS.map((v) => {\n\t\t\t\t\t\t\t\t\tconst isActive = wsState?.activeViewId === v.id;\n\t\t\t\t\t\t\t\t\tconst col = SCOPE_COLORS[v.scope];\n\t\t\t\t\t\t\t\t\treturn (\n\t\t\t\t\t\t\t\t\t\t<button\n\t\t\t\t\t\t\t\t\t\t\tkey={v.id}\n\t\t\t\t\t\t\t\t\t\t\tonClick={() => applyView(v.id)}\n\t\t\t\t\t\t\t\t\t\t\ttitle={v.description}\n\t\t\t\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\t\t\t\tfontSize: 10,\n\t\t\t\t\t\t\t\t\t\t\t\tfontWeight: 600,\n\t\t\t\t\t\t\t\t\t\t\t\tpadding: '3px 9px',\n\t\t\t\t\t\t\t\t\t\t\t\tborderRadius: 5,\n\t\t\t\t\t\t\t\t\t\t\t\tborder: isActive ? `1px solid ${col}70` : `1px solid ${col}30`,\n\t\t\t\t\t\t\t\t\t\t\t\tbackground: isActive ? `${col}20` : 'transparent',\n\t\t\t\t\t\t\t\t\t\t\t\tcolor: isActive ? col : '#64748b',\n\t\t\t\t\t\t\t\t\t\t\t\tcursor: 'pointer',\n\t\t\t\t\t\t\t\t\t\t\t\ttransition: 'all 0.15s',\n\t\t\t\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t\t\t{v.name}\n\t\t\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t\t})}\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t</div>\n\n\t\t\t\t\t\t{/* Error injection */}\n\t\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>\n\t\t\t\t\t\t\t<button\n\t\t\t\t\t\t\t\tonClick={() => {\n\t\t\t\t\t\t\t\t\tadapter.triggerSaveError();\n\t\t\t\t\t\t\t\t\tpushLog(makeEntry('⚠', 'Next save will fail', 'simulated error injected'));\n\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\tfontSize: 10,\n\t\t\t\t\t\t\t\t\tfontWeight: 600,\n\t\t\t\t\t\t\t\t\tpadding: '3px 10px',\n\t\t\t\t\t\t\t\t\tborderRadius: 5,\n\t\t\t\t\t\t\t\t\tborder: '1px solid rgba(239,68,68,0.3)',\n\t\t\t\t\t\t\t\t\tbackground: 'rgba(239,68,68,0.06)',\n\t\t\t\t\t\t\t\t\tcolor: '#f87171',\n\t\t\t\t\t\t\t\t\tcursor: 'pointer',\n\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\tInject save error\n\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#475569' }}>then save a view to observe error handling in the panel</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t</div>\n\n\t\t\t\t\t{/* Right: event log */}\n\t\t\t\t\t<div\n\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\n\t\t\t\t\t\t\tborder: '1px solid #1e293b',\n\t\t\t\t\t\t\tborderRadius: 8,\n\t\t\t\t\t\t\tpadding: '10px 12px',\n\t\t\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\t\t\tflexDirection: 'column',\n\t\t\t\t\t\t\tgap: 6,\n\t\t\t\t\t\t\tminHeight: 0,\n\t\t\t\t\t\t\toverflow: 'auto',\n\t\t\t\t\t\t\tmaxHeight: 150,\n\t\t\t\t\t\t}}\n\t\t\t\t\t>\n\t\t\t\t\t\t<div\n\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\tfontSize: 9,\n\t\t\t\t\t\t\t\tfontWeight: 700,\n\t\t\t\t\t\t\t\tletterSpacing: '0.08em',\n\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\n\t\t\t\t\t\t\t\tcolor: '#475569',\n\t\t\t\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\tEvent Log\n\t\t\t\t\t\t</div>\n\t\t\t\t\t\t{log.length === 0 ? (\n\t\t\t\t\t\t\t<div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic' }}>Workspace events will appear here…</div>\n\t\t\t\t\t\t) : (\n\t\t\t\t\t\t\t<div style={{ display: 'flex', flexDirection: 'column', gap: 3, overflowY: 'auto' }}>\n\t\t\t\t\t\t\t\t{log.map((entry, i) => (\n\t\t\t\t\t\t\t\t\t<div\n\t\t\t\t\t\t\t\t\t\tkey={entry.key}\n\t\t\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\t\t\t\t\t\t\talignItems: 'baseline',\n\t\t\t\t\t\t\t\t\t\t\tgap: 6,\n\t\t\t\t\t\t\t\t\t\t\topacity: i === 0 ? 1 : Math.max(0.25, 1 - i * 0.12),\n\t\t\t\t\t\t\t\t\t\t\ttransition: 'opacity 0.2s',\n\t\t\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', flexShrink: 0 }}>\n\t\t\t\t\t\t\t\t\t\t\t{new Date(entry.ts).toLocaleTimeString(undefined, {\n\t\t\t\t\t\t\t\t\t\t\t\thour: '2-digit',\n\t\t\t\t\t\t\t\t\t\t\t\tminute: '2-digit',\n\t\t\t\t\t\t\t\t\t\t\t\tsecond: '2-digit',\n\t\t\t\t\t\t\t\t\t\t\t})}\n\t\t\t\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#60a5fa', fontFamily: 'monospace', flexShrink: 0 }}>{entry.icon}</span>\n\t\t\t\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\t\t\t\tfontSize: 10,\n\t\t\t\t\t\t\t\t\t\t\t\tcolor: '#cbd5e1',\n\t\t\t\t\t\t\t\t\t\t\t\twhiteSpace: 'nowrap',\n\t\t\t\t\t\t\t\t\t\t\t\toverflow: 'hidden',\n\t\t\t\t\t\t\t\t\t\t\t\ttextOverflow: 'ellipsis',\n\t\t\t\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t\t\t{entry.msg}\n\t\t\t\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t\t\t\t\t{entry.sub && <span style={{ fontSize: 9, color: '#475569', flexShrink: 0 }}>{entry.sub}</span>}\n\t\t\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t\t\t))}\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t)}\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t)}\n\n\t\t\t{/* ── Filter type legend ────────────────────────────────────── */}\n\t\t\t{!compact && (\n\t\t\t\t<div\n\t\t\t\t\tstyle={{\n\t\t\t\t\t\tdisplay: 'flex',\n\t\t\t\t\t\tflexWrap: 'wrap',\n\t\t\t\t\t\tgap: 6,\n\t\t\t\t\t\tpadding: '5px 10px',\n\t\t\t\t\t\tbackground: 'rgba(30,41,59,0.5)',\n\t\t\t\t\t\tborderRadius: 8,\n\t\t\t\t\t\tborder: '1px solid #1e293b',\n\t\t\t\t\t\tflexShrink: 0,\n\t\t\t\t\t}}\n\t\t\t\t>\n\t\t\t\t\t{[\n\t\t\t\t\t\t{ col: 'Department', type: 'async-multi-select', color: '#818cf8' },\n\t\t\t\t\t\t{ col: 'Location', type: 'multi-select', color: '#34d399' },\n\t\t\t\t\t\t{ col: 'Status', type: 'single-select', color: '#fbbf24' },\n\t\t\t\t\t\t{ col: 'Level', type: 'multi-select', color: '#34d399' },\n\t\t\t\t\t\t{ col: 'Salary', type: 'custom range', color: '#f472b6' },\n\t\t\t\t\t\t{ col: 'Skills', type: 'infinite-multi-select', color: '#60a5fa' },\n\t\t\t\t\t].map(({ col, type, color }) => (\n\t\t\t\t\t\t<div key={col} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>\n\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\t\tpadding: '1px 6px',\n\t\t\t\t\t\t\t\t\tbackground: `${color}18`,\n\t\t\t\t\t\t\t\t\tborder: `1px solid ${color}40`,\n\t\t\t\t\t\t\t\t\tborderRadius: 4,\n\t\t\t\t\t\t\t\t\tcolor,\n\t\t\t\t\t\t\t\t\tfontWeight: 600,\n\t\t\t\t\t\t\t\t\tfontFamily: 'monospace',\n\t\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t{type}\n\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t\t<span style={{ color: '#94a3b8' }}>{col}</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t))}\n\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, marginLeft: 'auto' }}>\n\t\t\t\t\t\t<span\n\t\t\t\t\t\t\tstyle={{\n\t\t\t\t\t\t\t\tpadding: '1px 6px',\n\t\t\t\t\t\t\t\tbackground: '#60a5fa18',\n\t\t\t\t\t\t\t\tborder: '1px solid #60a5fa40',\n\t\t\t\t\t\t\t\tborderRadius: 4,\n\t\t\t\t\t\t\t\tcolor: '#60a5fa',\n\t\t\t\t\t\t\t\tfontWeight: 600,\n\t\t\t\t\t\t\t\tfontFamily: 'monospace',\n\t\t\t\t\t\t\t}}\n\t\t\t\t\t\t>\n\t\t\t\t\t\t\tquickFilter\n\t\t\t\t\t\t</span>\n\t\t\t\t\t\t<span style={{ color: '#94a3b8' }}>Search box above — matches any column, ANDed with the per-column filters</span>\n\t\t\t\t\t</div>\n\t\t\t\t</div>\n\t\t\t)}\n\n\t\t\t{/* ── Grid ──────────────────────────────────────────────────── */}\n\t\t\t<div style={{ flex: 1, minHeight: 0 }}>\n\t\t\t\t<Grid<EmployeeRow>\n\t\t\t\t\trowModelType='client'\n\t\t\t\t\tcolumns={columns}\n\t\t\t\t\trows={rows}\n\t\t\t\t\tgetRowId={(row) => row.id}\n\t\t\t\t\tonGridReady={onGridReady}\n\t\t\t\t\tshowFilterChipBar={true}\n\t\t\t\t\tpersistence='advancedfilters-ws'\n\t\t\t\t\tworkspace={adapter}\n\t\t\t\t\tsidebar={{ panels: ['columns', 'query', 'filters', 'sort', 'themes', 'views'], defaultOpen: 'views' }}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t</div>\n\t);\n}\n",
+			"source": "/**\r\n * Workspace Views Demo — named views layered on top of the Advanced Filters showcase.\r\n *\r\n * Demonstrates:\r\n *  • FakeAsyncWorkspaceAdapter: simulates real network latency on every adapter call\r\n *  • Pre-seeded system / team / personal views with embedded filter & sort state\r\n *  • Live workspace state subscription → active-view bar, dirty indicator\r\n *  • Per-operation event log fed by GridEventName.view* events\r\n *  • Error injection to show the panel's error state\r\n */\r\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\r\nimport {\r\n\tGrid,\r\n\tGridEventName,\r\n\ttype ColumnDef,\r\n\ttype GridApi,\r\n\ttype GridReadyEvent,\r\n\ttype FilterModel,\r\n\ttype ColumnFilterDef,\r\n\ttype CellOptionsPage,\r\n\ttype CellOptionsQuery,\r\n\ttype DomFilterEditorParams,\r\n\ttype GridWorkspaceAdapter,\r\n\ttype GridViewDefinition,\r\n\ttype GridWorkspaceState,\r\n\ttype PersistedGridState,\r\n} from '@eregister/wit-grid-react';\r\n\r\n// ── Row type ──────────────────────────────────────────────────────────────────\r\n\r\ninterface EmployeeRow {\r\n\tid: string;\r\n\tname: string;\r\n\tdepartment: string;\r\n\tlocation: string;\r\n\tstatus: 'Active' | 'On Leave' | 'Contractor' | 'Alumni';\r\n\tlevel: 'IC1' | 'IC2' | 'IC3' | 'IC4' | 'IC5' | 'M1' | 'M2' | 'M3';\r\n\tsalary: number;\r\n\tstartDate: string;\r\n\tskills: string;\r\n}\r\n\r\n// ── Data ──────────────────────────────────────────────────────────────────────\r\n\r\nconst DEPARTMENTS = ['Engineering', 'Product', 'Design', 'Marketing', 'Sales', 'Finance', 'Operations', 'HR', 'Legal', 'Support'];\r\nconst LOCATIONS = ['San Francisco', 'New York', 'London', 'Berlin', 'Singapore', 'Toronto', 'Austin', 'Remote'];\r\nconst STATUSES: EmployeeRow['status'][] = ['Active', 'On Leave', 'Contractor', 'Alumni'];\r\nconst LEVELS: EmployeeRow['level'][] = ['IC1', 'IC2', 'IC3', 'IC4', 'IC5', 'M1', 'M2', 'M3'];\r\nconst NAMES = [\r\n\t'Alice Chen',\r\n\t'Bob Martinez',\r\n\t'Carol Smith',\r\n\t'David Kim',\r\n\t'Emma Wilson',\r\n\t'Frank Lee',\r\n\t'Grace Park',\r\n\t'Henry Brown',\r\n\t'Iris Davis',\r\n\t'Jake Thompson',\r\n\t'Kate Anderson',\r\n\t'Liam Johnson',\r\n\t'Maya Patel',\r\n\t'Noah Williams',\r\n\t'Olivia Garcia',\r\n\t'Peter Zhang',\r\n\t'Quinn Rodriguez',\r\n\t'Rachel Torres',\r\n\t'Sam White',\r\n\t'Tara Nguyen',\r\n];\r\nconst ALL_SKILLS = [\r\n\t'React',\r\n\t'TypeScript',\r\n\t'Python',\r\n\t'Go',\r\n\t'Rust',\r\n\t'SQL',\r\n\t'Figma',\r\n\t'Kubernetes',\r\n\t'AWS',\r\n\t'Machine Learning',\r\n\t'Data Analysis',\r\n\t'Product Strategy',\r\n\t'UX Research',\r\n\t'Copywriting',\r\n\t'SEO',\r\n\t'Finance',\r\n\t'Compliance',\r\n\t'Recruiting',\r\n];\r\n\r\nfunction generateEmployees(count: number): EmployeeRow[] {\r\n\treturn Array.from({ length: count }, (_, i) => ({\r\n\t\tid: `EMP-${String(i + 1).padStart(4, '0')}`,\r\n\t\tname: `${NAMES[i % NAMES.length]} ${Math.floor(i / NAMES.length) + 1}`,\r\n\t\tdepartment: DEPARTMENTS[i % DEPARTMENTS.length],\r\n\t\tlocation: LOCATIONS[i % LOCATIONS.length],\r\n\t\tstatus: STATUSES[i % STATUSES.length],\r\n\t\tlevel: LEVELS[i % LEVELS.length],\r\n\t\tsalary: 60000 + (i % 8) * 20000 + Math.floor(i / 3) * 500,\r\n\t\tstartDate: new Date(2015 + (i % 10), (i * 3) % 12, (i % 28) + 1).toISOString().slice(0, 10),\r\n\t\tskills: ALL_SKILLS.slice((i * 3) % ALL_SKILLS.length, ((i * 3) % ALL_SKILLS.length) + 3).join(', '),\r\n\t}));\r\n}\r\n\r\nconst ALL_ROWS = generateEmployees(200);\r\n\r\n// ── Fake async helpers ────────────────────────────────────────────────────────\r\n\r\nfunction fakeDelay<T>(ms: number, value: T): Promise<T> {\r\n\treturn new Promise((resolve) => setTimeout(() => resolve(value), ms));\r\n}\r\n\r\n// Jitter so operations feel like a real backend (not robotically uniform).\r\nfunction jitter(base: number): number {\r\n\treturn base + Math.floor(Math.random() * base * 0.4);\r\n}\r\n\r\n/** Departments from a pretend server: searched there, with a row count per department. */\r\nasync function loadDepartments({ search, signal }: CellOptionsQuery): Promise<CellOptionsPage> {\r\n\tawait fakeDelay(400, null);\r\n\tif (signal.aborted) return { options: [] };\r\n\tconst q = search.toLowerCase();\r\n\tconst matched = DEPARTMENTS.filter((d) => d.toLowerCase().includes(q));\r\n\treturn {\r\n\t\toptions: matched.map((d) => ({ value: d, description: `${ALL_ROWS.filter((r) => r.department === d).length} people` })),\r\n\t\ttotal: matched.length,\r\n\t};\r\n}\r\n\r\n/** Skills a page at a time: the list loads more as it scrolls. */\r\nasync function loadSkills({ search, offset, limit, signal }: CellOptionsQuery): Promise<CellOptionsPage> {\r\n\tawait fakeDelay(300, null);\r\n\tif (signal.aborted) return { options: [] };\r\n\tconst q = search.toLowerCase();\r\n\tconst matched = ALL_SKILLS.filter((s) => s.toLowerCase().includes(q));\r\n\treturn {\r\n\t\toptions: matched.slice(offset, offset + limit).map((s) => ({ value: s })),\r\n\t\thasMore: offset + limit < matched.length,\r\n\t\ttotal: matched.length,\r\n\t};\r\n}\r\n\r\n// ── Custom salary range filter ────────────────────────────────────────────────\r\n// A custom React filter: it renders on every filter surface (sidebar, header funnel and menu,\r\n// floating row) and emits a built-in number condition, so the grid matches it.\r\n\r\nfunction SalaryRangeFilter({ params }: { params: DomFilterEditorParams }) {\r\n\tconst current = params.filter?.type === 'number' && params.filter.operator === 'inRange' ? params.filter : null;\r\n\tconst [min, setMin] = useState(current ? String(current.value) : '');\r\n\tconst [max, setMax] = useState(current?.valueTo !== undefined ? String(current.valueTo) : '');\r\n\r\n\tconst commit = (minVal: string, maxVal: string) => {\r\n\t\tif (!minVal && !maxVal) {\r\n\t\t\tparams.onChange(null);\r\n\t\t\treturn;\r\n\t\t}\r\n\t\tparams.onChange({ type: 'number', operator: 'inRange', value: minVal ? Number(minVal) : 0, valueTo: maxVal ? Number(maxVal) : undefined });\r\n\t};\r\n\tconst field: React.CSSProperties = {\r\n\t\tflex: 1,\r\n\t\tminWidth: 0,\r\n\t\theight: 30,\r\n\t\tpadding: '0 8px',\r\n\t\tfontSize: 12,\r\n\t\tbackground: 'var(--og-popover-input-bg)',\r\n\t\tborder: '1px solid var(--og-popover-input-border)',\r\n\t\tborderRadius: 7,\r\n\t\tcolor: 'var(--og-text-color)',\r\n\t\toutline: 'none',\r\n\t};\r\n\r\n\treturn (\r\n\t\t<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>\r\n\t\t\t<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>\r\n\t\t\t\t<input\r\n\t\t\t\t\ttype='number'\r\n\t\t\t\t\tplaceholder='Min salary'\r\n\t\t\t\t\tvalue={min}\r\n\t\t\t\t\tonChange={(e) => setMin(e.target.value)}\r\n\t\t\t\t\tonBlur={() => commit(min, max)}\r\n\t\t\t\t\tstyle={field}\r\n\t\t\t\t/>\r\n\t\t\t\t<span style={{ fontSize: 11, opacity: 0.6 }}>–</span>\r\n\t\t\t\t<input\r\n\t\t\t\t\ttype='number'\r\n\t\t\t\t\tplaceholder='Max'\r\n\t\t\t\t\tvalue={max}\r\n\t\t\t\t\tonChange={(e) => setMax(e.target.value)}\r\n\t\t\t\t\tonBlur={() => commit(min, max)}\r\n\t\t\t\t\tstyle={field}\r\n\t\t\t\t/>\r\n\t\t\t</div>\r\n\t\t\t<div style={{ display: 'flex', gap: 6 }}>\r\n\t\t\t\t{[50_000, 100_000, 150_000].map((floor) => (\r\n\t\t\t\t\t<button\r\n\t\t\t\t\t\tkey={floor}\r\n\t\t\t\t\t\tclassName='og-ct-btn'\r\n\t\t\t\t\t\tonClick={() => {\r\n\t\t\t\t\t\t\tsetMin(String(floor));\r\n\t\t\t\t\t\t\tsetMax('');\r\n\t\t\t\t\t\t\tcommit(String(floor), '');\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t>\r\n\t\t\t\t\t\t{`$${floor / 1000}k+`}\r\n\t\t\t\t\t</button>\r\n\t\t\t\t))}\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t);\r\n}\r\n\r\n// ── Column definitions ────────────────────────────────────────────────────────\r\n\r\nconst STATUS_COLORS: Record<string, string> = {\r\n\tActive: '#22c55e',\r\n\t'On Leave': '#f59e0b',\r\n\tContractor: '#60a5fa',\r\n\tAlumni: '#94a3b8',\r\n};\r\n\r\nfunction makeColumns(): ColumnDef<EmployeeRow>[] {\r\n\treturn [\r\n\t\t{ field: 'id', header: 'ID', width: 100, filterDef: { type: 'none' } },\r\n\t\t// No filterDef: text.\r\n\t\t{ field: 'name', header: 'Name', width: 180 },\r\n\t\t{\r\n\t\t\tfield: 'department',\r\n\t\t\theader: 'Department',\r\n\t\t\twidth: 160,\r\n\t\t\tfilterDef: {\r\n\t\t\t\ttype: 'select',\r\n\t\t\t\tloadOptions: loadDepartments,\r\n\t\t\t\tplaceholder: 'Search departments…',\r\n\t\t\t\tdebounceMs: 200,\r\n\t\t\t} satisfies ColumnFilterDef<EmployeeRow>,\r\n\t\t},\r\n\t\t{\r\n\t\t\tfield: 'location',\r\n\t\t\theader: 'Location',\r\n\t\t\twidth: 150,\r\n\t\t\tfilterDef: { type: 'select', options: LOCATIONS.map((value) => ({ value })), searchable: true },\r\n\t\t},\r\n\t\t{\r\n\t\t\tfield: 'status',\r\n\t\t\theader: 'Status',\r\n\t\t\twidth: 130,\r\n\t\t\trenderer: {\r\n\t\t\t\tkind: 'react',\r\n\t\t\t\tcomponent: ({ value }: { value: string }) => (\r\n\t\t\t\t\t<span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>\r\n\t\t\t\t\t\t<span style={{ width: 6, height: 6, borderRadius: '50%', background: STATUS_COLORS[value] ?? '#94a3b8', flexShrink: 0 }} />\r\n\t\t\t\t\t\t{value}\r\n\t\t\t\t\t</span>\r\n\t\t\t\t),\r\n\t\t\t},\r\n\t\t\t// One value at a time.\r\n\t\t\tfilterDef: { type: 'select', multiple: false, options: STATUSES.map((value) => ({ value })) },\r\n\t\t},\r\n\t\t{\r\n\t\t\tfield: 'level',\r\n\t\t\theader: 'Level',\r\n\t\t\twidth: 100,\r\n\t\t\tfilterDef: { type: 'select', options: LEVELS.map((value) => ({ value })) },\r\n\t\t},\r\n\t\t{\r\n\t\t\tfield: 'salary',\r\n\t\t\theader: 'Salary',\r\n\t\t\twidth: 130,\r\n\t\t\tvalueFormatter: ({ value }) => `$${Number(value).toLocaleString()}`,\r\n\t\t\tfilterDef: {\r\n\t\t\t\ttype: 'custom',\r\n\t\t\t\trenderFilter: (params) => <SalaryRangeFilter params={params} />,\r\n\t\t\t\tsummarize: (filter) =>\r\n\t\t\t\t\tfilter.type === 'number'\r\n\t\t\t\t\t\t? `$${filter.value.toLocaleString()} – ${filter.valueTo !== undefined ? `$${filter.valueTo.toLocaleString()}` : '∞'}`\r\n\t\t\t\t\t\t: '',\r\n\t\t\t},\r\n\t\t},\r\n\t\t{ field: 'startDate', header: 'Start Date', width: 130, filterDef: { type: 'date' } },\r\n\t\t{\r\n\t\t\tfield: 'skills',\r\n\t\t\theader: 'Skills',\r\n\t\t\twidth: 220,\r\n\t\t\t// Cells list several skills: Any / All / None of, options paged from a server.\r\n\t\t\tfilterDef: { type: 'select', listValues: true, loadOptions: loadSkills, pageSize: 6, placeholder: 'Search skills…', debounceMs: 150 },\r\n\t\t},\r\n\t];\r\n}\r\n\r\n// ── Pre-seeded workspace views ────────────────────────────────────────────────\r\n// v:2 matches the current GRID_STATE_SCHEMA_VERSION.\r\n// Each view embeds a PersistedGridState with a real filter / sort model.\r\n\r\nconst _T = Date.now();\r\n\r\nfunction makeView(\r\n\tid: string,\r\n\tname: string,\r\n\tdescription: string,\r\n\tscope: GridViewDefinition['scope'],\r\n\tfilterModel: FilterModel | null,\r\n\tsortModel?: { colId: string; sort: 'asc' | 'desc' }[],\r\n\tthemeName?: any\r\n): GridViewDefinition {\r\n\treturn {\r\n\t\tid,\r\n\t\tname,\r\n\t\tdescription,\r\n\t\tscope,\r\n\t\tcreatedAt: _T - 7_200_000,\r\n\t\tupdatedAt: _T - 600_000,\r\n\t\tversion: 1,\r\n\t\tstate: {\r\n\t\t\tv: 2,\r\n\t\t\tstate: {\r\n\t\t\t\tfilterModel: filterModel ?? null,\r\n\t\t\t\tsortModel: sortModel ?? null,\r\n\t\t\t\tthemeName,\r\n\t\t\t},\r\n\t\t} as PersistedGridState,\r\n\t};\r\n}\r\n\r\nconst SEED_VIEWS: GridViewDefinition[] = [\r\n\tmakeView(\r\n\t\t'eng-active',\r\n\t\t'Engineering · Active',\r\n\t\t'Current headcount in Engineering who are active employees',\r\n\t\t'system',\r\n\t\t{\r\n\t\t\tdepartment: { type: 'select', values: ['Engineering'], labels: ['Engineering'] },\r\n\t\t\tstatus: { type: 'select', values: ['Active'], labels: ['Active'] },\r\n\t\t},\r\n\t\t[{ colId: 'salary', sort: 'desc' }],\r\n\t\t'dark'\r\n\t),\r\n\tmakeView(\r\n\t\t'remote-team',\r\n\t\t'Remote Team',\r\n\t\t'All employees working remotely, sorted by level',\r\n\t\t'team',\r\n\t\t{ location: { type: 'select', values: ['Remote'], labels: ['Remote'] } },\r\n\t\t[{ colId: 'level', sort: 'asc' }],\r\n\t\t'spreadsheet'\r\n\t),\r\n\tmakeView(\r\n\t\t'senior-ics',\r\n\t\t'Senior ICs',\r\n\t\t'IC4 and IC5 contributors across all departments',\r\n\t\t'team',\r\n\t\t{ level: { type: 'select', values: ['IC4', 'IC5'], labels: ['IC4', 'IC5'] } },\r\n\t\t[{ colId: 'salary', sort: 'desc' }],\r\n\t\t'warm-orange'\r\n\t),\r\n\tmakeView('contractors', 'All Contractors', 'External contractors — useful for billing and access reviews', 'personal', {\r\n\t\tstatus: { type: 'select', values: ['Contractor'], labels: ['Contractor'] },\r\n\t}),\r\n\tmakeView(\r\n\t\t'sf-high-earners',\r\n\t\t'SF High Earners',\r\n\t\t'San Francisco employees earning over $100k — comp review baseline',\r\n\t\t'personal',\r\n\t\t{\r\n\t\t\tlocation: { type: 'select', values: ['San Francisco'], labels: ['San Francisco'] },\r\n\t\t\tsalary: { type: 'number', operator: 'inRange', value: 100000 },\r\n\t\t},\r\n\t\t[{ colId: 'salary', sort: 'desc' }]\r\n\t),\r\n];\r\n\r\nconst DEFAULT_VIEW_ID = 'eng-active';\r\n\r\n// ── FakeAsyncWorkspaceAdapter ─────────────────────────────────────────────────\r\n\r\nclass FakeAsyncWorkspaceAdapter implements GridWorkspaceAdapter {\r\n\tprivate _views: Map<string, GridViewDefinition>;\r\n\tprivate _defaultId: string | null;\r\n\tprivate _injectError = false;\r\n\r\n\tconstructor(seeds: GridViewDefinition[], defaultId: string | null) {\r\n\t\tthis._views = new Map(seeds.map((v) => [v.id, v]));\r\n\t\tthis._defaultId = defaultId;\r\n\t}\r\n\r\n\tasync listViews(): Promise<readonly GridViewDefinition[]> {\r\n\t\tawait fakeDelay(jitter(550), null);\r\n\t\treturn Array.from(this._views.values()).sort((a, b) => a.createdAt - b.createdAt);\r\n\t}\r\n\r\n\tasync getView(id: string): Promise<GridViewDefinition | null> {\r\n\t\tawait fakeDelay(jitter(180), null);\r\n\t\treturn this._views.get(id) ?? null;\r\n\t}\r\n\r\n\tasync saveView(view: GridViewDefinition): Promise<void> {\r\n\t\tif (this._injectError) {\r\n\t\t\tthis._injectError = false;\r\n\t\t\tawait fakeDelay(jitter(600), null);\r\n\t\t\tthrow new Error('Server error: quota exceeded (simulated)');\r\n\t\t}\r\n\t\tawait fakeDelay(jitter(480), null);\r\n\t\tthis._views.set(view.id, view);\r\n\t}\r\n\r\n\tasync deleteView(id: string): Promise<void> {\r\n\t\tawait fakeDelay(jitter(320), null);\r\n\t\tthis._views.delete(id);\r\n\t\tif (this._defaultId === id) this._defaultId = null;\r\n\t}\r\n\r\n\tasync getDefaultView(): Promise<string | null> {\r\n\t\tawait fakeDelay(jitter(120), null);\r\n\t\treturn this._defaultId;\r\n\t}\r\n\r\n\tasync setDefaultView(id: string | null): Promise<void> {\r\n\t\tawait fakeDelay(jitter(220), null);\r\n\t\tthis._defaultId = id;\r\n\t}\r\n\r\n\t/** Demo helper — next saveView() call will throw a simulated server error. */\r\n\ttriggerSaveError(): void {\r\n\t\tthis._injectError = true;\r\n\t}\r\n}\r\n\r\n// ── Event log ─────────────────────────────────────────────────────────────────\r\n\r\ninterface LogEntry {\r\n\tkey: number;\r\n\tts: number;\r\n\ticon: string;\r\n\tmsg: string;\r\n\tsub?: string;\r\n}\r\n\r\nlet _logSeq = 0;\r\n\r\nfunction makeEntry(icon: string, msg: string, sub?: string): LogEntry {\r\n\treturn { key: _logSeq++, ts: Date.now(), icon, msg, sub };\r\n}\r\n\r\nconst SCOPE_COLORS: Record<string, string> = {\r\n\tsystem: '#f472b6',\r\n\tteam: '#818cf8',\r\n\tpersonal: '#34d399',\r\n};\r\n\r\nconst SCOPE_LABELS: Record<string, string> = {\r\n\tsystem: 'System',\r\n\tteam: 'Team',\r\n\tpersonal: 'Personal',\r\n};\r\n\r\n// ── Demo page ─────────────────────────────────────────────────────────────────\r\n\r\ninterface Props {\r\n\t/** Hides the workspace control panel (active view/quick-apply/event log) and the filter-type legend. */\r\n\tcompact?: boolean;\r\n}\r\n\r\nexport default function AdvancedFiltersDemo({ compact = false }: Props = {}) {\r\n\tconst apiRef = useRef<GridApi<EmployeeRow> | null>(null);\r\n\tconst [filterModel, setFilterModel] = useState<FilterModel | null>(null);\r\n\tconst [wsState, setWsState] = useState<GridWorkspaceState | null>(null);\r\n\tconst [log, setLog] = useState<LogEntry[]>([]);\r\n\tconst [quickFilterText, setQuickFilterText] = useState('');\r\n\tconst columns = useMemo(() => makeColumns(), []);\r\n\tconst rows = useMemo(() => ALL_ROWS, []);\r\n\r\n\t// Global search box, wired straight to api.setQuickFilter — matches every column\r\n\t// (id, name, department, location, status, level, salary, startDate, skills) at once,\r\n\t// combined via AND with any active per-column filters and the pre-seeded views above.\r\n\tconst handleQuickFilterChange = (text: string) => {\r\n\t\tsetQuickFilterText(text);\r\n\t\tapiRef.current?.setQuickFilter(text);\r\n\t};\r\n\r\n\t// Stable adapter instance — lives for the lifetime of this page.\r\n\tconst adapter = useMemo(() => new FakeAsyncWorkspaceAdapter(SEED_VIEWS, DEFAULT_VIEW_ID), []);\r\n\r\n\tconst pushLog = useCallback((entry: LogEntry) => {\r\n\t\tsetLog((prev) => [entry, ...prev].slice(0, 12));\r\n\t}, []);\r\n\r\n\tconst onGridReady = useCallback(\r\n\t\t(e: GridReadyEvent<EmployeeRow>) => {\r\n\t\t\tapiRef.current = e.api;\r\n\r\n\t\t\t// Track filter model for the \"clear filters\" button.\r\n\t\t\te.api.subscribeToKey('filterModel', (s) => setFilterModel((s as any).filterModel ?? null));\r\n\r\n\t\t\t// Track workspace state for the status bar.\r\n\t\t\te.api.subscribeToWorkspaceState(setWsState);\r\n\r\n\t\t\t// Populate the event log from workspace events.\r\n\t\t\te.api.addEventListener(GridEventName.viewApplied, ({ payload: { view } }) => {\r\n\t\t\t\tif (!view) return;\r\n\t\t\t\tpushLog(makeEntry('▶', `Applied \"${view.name}\"`, SCOPE_LABELS[view.scope]));\r\n\t\t\t});\r\n\t\t\te.api.addEventListener(GridEventName.viewSaved, ({ payload: { view } }) => {\r\n\t\t\t\tpushLog(makeEntry('✦', `Saved \"${view.name}\"`, SCOPE_LABELS[view.scope]));\r\n\t\t\t});\r\n\t\t\te.api.addEventListener(GridEventName.viewDeleted, ({ payload: { id } }) => {\r\n\t\t\t\tpushLog(makeEntry('✕', `Deleted view`, id));\r\n\t\t\t});\r\n\t\t\te.api.addEventListener(GridEventName.viewRenamed, ({ payload: { id: _id, name } }) => {\r\n\t\t\t\tpushLog(makeEntry('✎', `Renamed to \"${name}\"`));\r\n\t\t\t});\r\n\t\t},\r\n\t\t[pushLog]\r\n\t);\r\n\r\n\t// Log loading completion when workspace finishes initialising.\r\n\tuseEffect(() => {\r\n\t\tif (!wsState) return;\r\n\t\tif (!wsState.loading && wsState.views.length > 0) {\r\n\t\t\tpushLog(makeEntry('↓', `Loaded ${wsState.views.length} views from adapter`));\r\n\t\t}\r\n\t\t// eslint-disable-next-line react-hooks/exhaustive-deps\r\n\t}, [wsState?.loading]);\r\n\r\n\tconst activeFilters = filterModel ? Object.keys(filterModel).length : 0;\r\n\tconst activeView = wsState?.views.find((v) => v.id === wsState.activeViewId) ?? null;\r\n\tconst isDirty = wsState?.dirty ?? false;\r\n\r\n\t// Quick-apply a pre-seeded view by ID.\r\n\tconst applyView = (id: string) => {\r\n\t\tapiRef.current?.applyView(id).catch(console.error);\r\n\t};\r\n\r\n\treturn (\r\n\t\t<div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>\r\n\t\t\t{/* ── Header ────────────────────────────────────────────────── */}\r\n\t\t\t<div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0 4px', flexShrink: 0 }}>\r\n\t\t\t\t<div style={{ flex: 1 }}>\r\n\t\t\t\t\t<div style={{ fontSize: 15, fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.01em' }}>Workspace Views Demo</div>\r\n\t\t\t\t\t<div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>\r\n\t\t\t\t\t\tNamed views over the Advanced Filters dataset — open Sidebar → <strong style={{ color: '#94a3b8' }}>Views</strong> to save,\r\n\t\t\t\t\t\trename, and switch views\r\n\t\t\t\t\t</div>\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t{/* Global quick filter — api.setQuickFilter() searches every column at once. */}\r\n\t\t\t\t<div style={{ position: 'relative', flexShrink: 0, width: 240 }}>\r\n\t\t\t\t\t<span\r\n\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\tposition: 'absolute',\r\n\t\t\t\t\t\t\tleft: 9,\r\n\t\t\t\t\t\t\ttop: '50%',\r\n\t\t\t\t\t\t\ttransform: 'translateY(-50%)',\r\n\t\t\t\t\t\t\tfontSize: 12,\r\n\t\t\t\t\t\t\tcolor: '#475569',\r\n\t\t\t\t\t\t\tpointerEvents: 'none',\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t>\r\n\t\t\t\t\t\t🔍\r\n\t\t\t\t\t</span>\r\n\t\t\t\t\t<input\r\n\t\t\t\t\t\ttype='text'\r\n\t\t\t\t\t\tvalue={quickFilterText}\r\n\t\t\t\t\t\tonChange={(e) => handleQuickFilterChange(e.target.value)}\r\n\t\t\t\t\t\tplaceholder='Search all columns…'\r\n\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\twidth: '100%',\r\n\t\t\t\t\t\t\theight: 28,\r\n\t\t\t\t\t\t\tpadding: '0 26px 0 26px',\r\n\t\t\t\t\t\t\tfontSize: 11,\r\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\r\n\t\t\t\t\t\t\tborder: `1px solid ${quickFilterText ? 'rgba(59,130,246,0.4)' : '#1e293b'}`,\r\n\t\t\t\t\t\t\tborderRadius: 6,\r\n\t\t\t\t\t\t\tcolor: '#e2e8f0',\r\n\t\t\t\t\t\t\toutline: 'none',\r\n\t\t\t\t\t\t\tboxSizing: 'border-box',\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t/>\r\n\t\t\t\t\t{quickFilterText && (\r\n\t\t\t\t\t\t<button\r\n\t\t\t\t\t\t\tonClick={() => handleQuickFilterChange('')}\r\n\t\t\t\t\t\t\taria-label='Clear search'\r\n\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\tposition: 'absolute',\r\n\t\t\t\t\t\t\t\tright: 6,\r\n\t\t\t\t\t\t\t\ttop: '50%',\r\n\t\t\t\t\t\t\t\ttransform: 'translateY(-50%)',\r\n\t\t\t\t\t\t\t\tfontSize: 13,\r\n\t\t\t\t\t\t\t\tlineHeight: 1,\r\n\t\t\t\t\t\t\t\tcolor: '#64748b',\r\n\t\t\t\t\t\t\t\tbackground: 'none',\r\n\t\t\t\t\t\t\t\tborder: 'none',\r\n\t\t\t\t\t\t\t\tcursor: 'pointer',\r\n\t\t\t\t\t\t\t\tpadding: 2,\r\n\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t×\r\n\t\t\t\t\t\t</button>\r\n\t\t\t\t\t)}\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t{activeFilters > 0 && (\r\n\t\t\t\t\t<button\r\n\t\t\t\t\t\tonClick={() => apiRef.current?.setFilterModel(null)}\r\n\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\tfontSize: 11,\r\n\t\t\t\t\t\t\tfontWeight: 600,\r\n\t\t\t\t\t\t\tcolor: '#60a5fa',\r\n\t\t\t\t\t\t\tbackground: 'rgba(59,130,246,0.1)',\r\n\t\t\t\t\t\t\tborder: '1px solid rgba(59,130,246,0.3)',\r\n\t\t\t\t\t\t\tborderRadius: 6,\r\n\t\t\t\t\t\t\tpadding: '4px 12px',\r\n\t\t\t\t\t\t\tcursor: 'pointer',\r\n\t\t\t\t\t\t\tflexShrink: 0,\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t>\r\n\t\t\t\t\t\tClear {activeFilters} filter{activeFilters > 1 ? 's' : ''}\r\n\t\t\t\t\t</button>\r\n\t\t\t\t)}\r\n\t\t\t</div>\r\n\r\n\t\t\t{/* ── Workspace control panel ───────────────────────────────── */}\r\n\t\t\t{!compact && (\r\n\t\t\t\t<div\r\n\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\tdisplay: 'grid',\r\n\t\t\t\t\t\tgridTemplateColumns: '1fr 1fr',\r\n\t\t\t\t\t\tgap: 10,\r\n\t\t\t\t\t\tflexShrink: 0,\r\n\t\t\t\t\t}}\r\n\t\t\t\t>\r\n\t\t\t\t\t{/* Left: active view + quick-apply chips */}\r\n\t\t\t\t\t<div\r\n\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\r\n\t\t\t\t\t\t\tborder: '1px solid #1e293b',\r\n\t\t\t\t\t\t\tborderRadius: 8,\r\n\t\t\t\t\t\t\tpadding: '10px 12px',\r\n\t\t\t\t\t\t\tdisplay: 'flex',\r\n\t\t\t\t\t\t\tflexDirection: 'column',\r\n\t\t\t\t\t\t\tgap: 8,\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t>\r\n\t\t\t\t\t\t{/* Active view row */}\r\n\t\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>\r\n\t\t\t\t\t\t\t<div\r\n\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\twidth: 8,\r\n\t\t\t\t\t\t\t\t\theight: 8,\r\n\t\t\t\t\t\t\t\t\tborderRadius: '50%',\r\n\t\t\t\t\t\t\t\t\tbackground: isDirty ? '#f59e0b' : activeView ? '#22c55e' : '#475569',\r\n\t\t\t\t\t\t\t\t\tflexShrink: 0,\r\n\t\t\t\t\t\t\t\t\tboxShadow: isDirty ? '0 0 6px #f59e0b80' : activeView ? '0 0 6px #22c55e60' : 'none',\r\n\t\t\t\t\t\t\t\t\ttransition: 'background 0.3s, box-shadow 0.3s',\r\n\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t/>\r\n\t\t\t\t\t\t\t<span style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{activeView ? activeView.name : 'No active view'}</span>\r\n\t\t\t\t\t\t\t{activeView && (\r\n\t\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\t\tfontSize: 9,\r\n\t\t\t\t\t\t\t\t\t\tfontWeight: 700,\r\n\t\t\t\t\t\t\t\t\t\tletterSpacing: '0.07em',\r\n\t\t\t\t\t\t\t\t\t\tpadding: '1px 5px',\r\n\t\t\t\t\t\t\t\t\t\tborderRadius: 3,\r\n\t\t\t\t\t\t\t\t\t\tbackground: `${SCOPE_COLORS[activeView.scope]}18`,\r\n\t\t\t\t\t\t\t\t\t\tborder: `1px solid ${SCOPE_COLORS[activeView.scope]}40`,\r\n\t\t\t\t\t\t\t\t\t\tcolor: SCOPE_COLORS[activeView.scope],\r\n\t\t\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\r\n\t\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t{SCOPE_LABELS[activeView.scope]}\r\n\t\t\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t\t)}\r\n\t\t\t\t\t\t\t{isDirty && (\r\n\t\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\t\tfontSize: 9,\r\n\t\t\t\t\t\t\t\t\t\tfontWeight: 700,\r\n\t\t\t\t\t\t\t\t\t\tpadding: '1px 6px',\r\n\t\t\t\t\t\t\t\t\t\tborderRadius: 3,\r\n\t\t\t\t\t\t\t\t\t\tbackground: 'rgba(245,158,11,0.12)',\r\n\t\t\t\t\t\t\t\t\t\tborder: '1px solid rgba(245,158,11,0.35)',\r\n\t\t\t\t\t\t\t\t\t\tcolor: '#f59e0b',\r\n\t\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\tUNSAVED CHANGES\r\n\t\t\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t\t)}\r\n\t\t\t\t\t\t\t{wsState?.loading && <span style={{ fontSize: 10, color: '#64748b', marginLeft: 4 }}>Loading…</span>}\r\n\t\t\t\t\t\t</div>\r\n\r\n\t\t\t\t\t\t{/* Quick-apply chips */}\r\n\t\t\t\t\t\t<div>\r\n\t\t\t\t\t\t\t<div\r\n\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\tfontSize: 9,\r\n\t\t\t\t\t\t\t\t\tfontWeight: 700,\r\n\t\t\t\t\t\t\t\t\tletterSpacing: '0.08em',\r\n\t\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\r\n\t\t\t\t\t\t\t\t\tcolor: '#475569',\r\n\t\t\t\t\t\t\t\t\tmarginBottom: 5,\r\n\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\tQuick Apply\r\n\t\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t\t<div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>\r\n\t\t\t\t\t\t\t\t{SEED_VIEWS.map((v) => {\r\n\t\t\t\t\t\t\t\t\tconst isActive = wsState?.activeViewId === v.id;\r\n\t\t\t\t\t\t\t\t\tconst col = SCOPE_COLORS[v.scope];\r\n\t\t\t\t\t\t\t\t\treturn (\r\n\t\t\t\t\t\t\t\t\t\t<button\r\n\t\t\t\t\t\t\t\t\t\t\tkey={v.id}\r\n\t\t\t\t\t\t\t\t\t\t\tonClick={() => applyView(v.id)}\r\n\t\t\t\t\t\t\t\t\t\t\ttitle={v.description}\r\n\t\t\t\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\t\t\t\tfontSize: 10,\r\n\t\t\t\t\t\t\t\t\t\t\t\tfontWeight: 600,\r\n\t\t\t\t\t\t\t\t\t\t\t\tpadding: '3px 9px',\r\n\t\t\t\t\t\t\t\t\t\t\t\tborderRadius: 5,\r\n\t\t\t\t\t\t\t\t\t\t\t\tborder: isActive ? `1px solid ${col}70` : `1px solid ${col}30`,\r\n\t\t\t\t\t\t\t\t\t\t\t\tbackground: isActive ? `${col}20` : 'transparent',\r\n\t\t\t\t\t\t\t\t\t\t\t\tcolor: isActive ? col : '#64748b',\r\n\t\t\t\t\t\t\t\t\t\t\t\tcursor: 'pointer',\r\n\t\t\t\t\t\t\t\t\t\t\t\ttransition: 'all 0.15s',\r\n\t\t\t\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t\t\t{v.name}\r\n\t\t\t\t\t\t\t\t\t\t</button>\r\n\t\t\t\t\t\t\t\t\t);\r\n\t\t\t\t\t\t\t\t})}\r\n\t\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t</div>\r\n\r\n\t\t\t\t\t\t{/* Error injection */}\r\n\t\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>\r\n\t\t\t\t\t\t\t<button\r\n\t\t\t\t\t\t\t\tonClick={() => {\r\n\t\t\t\t\t\t\t\t\tadapter.triggerSaveError();\r\n\t\t\t\t\t\t\t\t\tpushLog(makeEntry('⚠', 'Next save will fail', 'simulated error injected'));\r\n\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\tfontSize: 10,\r\n\t\t\t\t\t\t\t\t\tfontWeight: 600,\r\n\t\t\t\t\t\t\t\t\tpadding: '3px 10px',\r\n\t\t\t\t\t\t\t\t\tborderRadius: 5,\r\n\t\t\t\t\t\t\t\t\tborder: '1px solid rgba(239,68,68,0.3)',\r\n\t\t\t\t\t\t\t\t\tbackground: 'rgba(239,68,68,0.06)',\r\n\t\t\t\t\t\t\t\t\tcolor: '#f87171',\r\n\t\t\t\t\t\t\t\t\tcursor: 'pointer',\r\n\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\tInject save error\r\n\t\t\t\t\t\t\t</button>\r\n\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#475569' }}>then save a view to observe error handling in the panel</span>\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t</div>\r\n\r\n\t\t\t\t\t{/* Right: event log */}\r\n\t\t\t\t\t<div\r\n\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\tbackground: 'rgba(15,23,42,0.7)',\r\n\t\t\t\t\t\t\tborder: '1px solid #1e293b',\r\n\t\t\t\t\t\t\tborderRadius: 8,\r\n\t\t\t\t\t\t\tpadding: '10px 12px',\r\n\t\t\t\t\t\t\tdisplay: 'flex',\r\n\t\t\t\t\t\t\tflexDirection: 'column',\r\n\t\t\t\t\t\t\tgap: 6,\r\n\t\t\t\t\t\t\tminHeight: 0,\r\n\t\t\t\t\t\t\toverflow: 'auto',\r\n\t\t\t\t\t\t\tmaxHeight: 150,\r\n\t\t\t\t\t\t}}\r\n\t\t\t\t\t>\r\n\t\t\t\t\t\t<div\r\n\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\tfontSize: 9,\r\n\t\t\t\t\t\t\t\tfontWeight: 700,\r\n\t\t\t\t\t\t\t\tletterSpacing: '0.08em',\r\n\t\t\t\t\t\t\t\ttextTransform: 'uppercase',\r\n\t\t\t\t\t\t\t\tcolor: '#475569',\r\n\t\t\t\t\t\t\t\tflexShrink: 0,\r\n\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\tEvent Log\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t{log.length === 0 ? (\r\n\t\t\t\t\t\t\t<div style={{ fontSize: 10, color: '#334155', fontStyle: 'italic' }}>Workspace events will appear here…</div>\r\n\t\t\t\t\t\t) : (\r\n\t\t\t\t\t\t\t<div style={{ display: 'flex', flexDirection: 'column', gap: 3, overflowY: 'auto' }}>\r\n\t\t\t\t\t\t\t\t{log.map((entry, i) => (\r\n\t\t\t\t\t\t\t\t\t<div\r\n\t\t\t\t\t\t\t\t\t\tkey={entry.key}\r\n\t\t\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\t\t\tdisplay: 'flex',\r\n\t\t\t\t\t\t\t\t\t\t\talignItems: 'baseline',\r\n\t\t\t\t\t\t\t\t\t\t\tgap: 6,\r\n\t\t\t\t\t\t\t\t\t\t\topacity: i === 0 ? 1 : Math.max(0.25, 1 - i * 0.12),\r\n\t\t\t\t\t\t\t\t\t\t\ttransition: 'opacity 0.2s',\r\n\t\t\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace', flexShrink: 0 }}>\r\n\t\t\t\t\t\t\t\t\t\t\t{new Date(entry.ts).toLocaleTimeString(undefined, {\r\n\t\t\t\t\t\t\t\t\t\t\t\thour: '2-digit',\r\n\t\t\t\t\t\t\t\t\t\t\t\tminute: '2-digit',\r\n\t\t\t\t\t\t\t\t\t\t\t\tsecond: '2-digit',\r\n\t\t\t\t\t\t\t\t\t\t\t})}\r\n\t\t\t\t\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t\t\t\t\t<span style={{ fontSize: 10, color: '#60a5fa', fontFamily: 'monospace', flexShrink: 0 }}>{entry.icon}</span>\r\n\t\t\t\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\t\t\t\tfontSize: 10,\r\n\t\t\t\t\t\t\t\t\t\t\t\tcolor: '#cbd5e1',\r\n\t\t\t\t\t\t\t\t\t\t\t\twhiteSpace: 'nowrap',\r\n\t\t\t\t\t\t\t\t\t\t\t\toverflow: 'hidden',\r\n\t\t\t\t\t\t\t\t\t\t\t\ttextOverflow: 'ellipsis',\r\n\t\t\t\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t\t\t{entry.msg}\r\n\t\t\t\t\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t\t\t\t\t{entry.sub && <span style={{ fontSize: 9, color: '#475569', flexShrink: 0 }}>{entry.sub}</span>}\r\n\t\t\t\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t\t\t))}\r\n\t\t\t\t\t\t\t</div>\r\n\t\t\t\t\t\t)}\r\n\t\t\t\t\t</div>\r\n\t\t\t\t</div>\r\n\t\t\t)}\r\n\r\n\t\t\t{/* ── Filter type legend ────────────────────────────────────── */}\r\n\t\t\t{!compact && (\r\n\t\t\t\t<div\r\n\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\tdisplay: 'flex',\r\n\t\t\t\t\t\tflexWrap: 'wrap',\r\n\t\t\t\t\t\tgap: 6,\r\n\t\t\t\t\t\tpadding: '5px 10px',\r\n\t\t\t\t\t\tbackground: 'rgba(30,41,59,0.5)',\r\n\t\t\t\t\t\tborderRadius: 8,\r\n\t\t\t\t\t\tborder: '1px solid #1e293b',\r\n\t\t\t\t\t\tflexShrink: 0,\r\n\t\t\t\t\t}}\r\n\t\t\t\t>\r\n\t\t\t\t\t{[\r\n\t\t\t\t\t\t{ col: 'Department', type: 'select · server search', color: '#818cf8' },\r\n\t\t\t\t\t\t{ col: 'Location', type: 'select', color: '#34d399' },\r\n\t\t\t\t\t\t{ col: 'Status', type: 'select · single', color: '#fbbf24' },\r\n\t\t\t\t\t\t{ col: 'Level', type: 'select', color: '#34d399' },\r\n\t\t\t\t\t\t{ col: 'Salary', type: 'custom (React)', color: '#f472b6' },\r\n\t\t\t\t\t\t{ col: 'Skills', type: 'select · list cells · paged', color: '#60a5fa' },\r\n\t\t\t\t\t].map(({ col, type, color }) => (\r\n\t\t\t\t\t\t<div key={col} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>\r\n\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\t\tpadding: '1px 6px',\r\n\t\t\t\t\t\t\t\t\tbackground: `${color}18`,\r\n\t\t\t\t\t\t\t\t\tborder: `1px solid ${color}40`,\r\n\t\t\t\t\t\t\t\t\tborderRadius: 4,\r\n\t\t\t\t\t\t\t\t\tcolor,\r\n\t\t\t\t\t\t\t\t\tfontWeight: 600,\r\n\t\t\t\t\t\t\t\t\tfontFamily: 'monospace',\r\n\t\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t{type}\r\n\t\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t\t<span style={{ color: '#94a3b8' }}>{col}</span>\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t))}\r\n\t\t\t\t\t<div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, marginLeft: 'auto' }}>\r\n\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\tstyle={{\r\n\t\t\t\t\t\t\t\tpadding: '1px 6px',\r\n\t\t\t\t\t\t\t\tbackground: '#60a5fa18',\r\n\t\t\t\t\t\t\t\tborder: '1px solid #60a5fa40',\r\n\t\t\t\t\t\t\t\tborderRadius: 4,\r\n\t\t\t\t\t\t\t\tcolor: '#60a5fa',\r\n\t\t\t\t\t\t\t\tfontWeight: 600,\r\n\t\t\t\t\t\t\t\tfontFamily: 'monospace',\r\n\t\t\t\t\t\t\t}}\r\n\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\tquickFilter\r\n\t\t\t\t\t\t</span>\r\n\t\t\t\t\t\t<span style={{ color: '#94a3b8' }}>Search box above — matches any column, ANDed with the per-column filters</span>\r\n\t\t\t\t\t</div>\r\n\t\t\t\t</div>\r\n\t\t\t)}\r\n\r\n\t\t\t{/* ── Grid ──────────────────────────────────────────────────── */}\r\n\t\t\t<div style={{ flex: 1, minHeight: 0 }}>\r\n\t\t\t\t<Grid<EmployeeRow>\r\n\t\t\t\t\trowModelType='client'\r\n\t\t\t\t\tcolumns={columns}\r\n\t\t\t\t\trows={rows}\r\n\t\t\t\t\tgetRowId={(row) => row.id}\r\n\t\t\t\t\tonGridReady={onGridReady}\r\n\t\t\t\t\tshowFilterChipBar={true}\r\n\t\t\t\t\tpersistence='advancedfilters-ws'\r\n\t\t\t\t\tworkspace={adapter}\r\n\t\t\t\t\tsidebar={{ panels: ['columns', 'query', 'filters', 'sort', 'themes', 'views'], defaultOpen: 'views' }}\r\n\t\t\t\t/>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t);\r\n}\r\n",
 			"tokens": [
 				[
 					{
@@ -12345,7 +12345,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " FilterFetchParams,",
+						"content": " CellOptionsPage,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -12359,7 +12359,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " FilterFetchResult,",
+						"content": " CellOptionsQuery,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -12373,49 +12373,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " FilterPageParams,",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "type",
-						"color": "#F97583"
-					},
-					{
-						"content": " FilterPageResult,",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "type",
-						"color": "#F97583"
-					},
-					{
-						"content": " CustomFilterRendererParams,",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "type",
-						"color": "#F97583"
-					},
-					{
-						"content": " SelectFilterCondition,",
+						"content": " DomFilterEditorParams,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -15107,6 +15065,12 @@
 				[],
 				[
 					{
+						"content": "/** Departments from a pretend server: searched there, with a row count per department. */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
 						"content": "async",
 						"color": "#F97583"
 					},
@@ -15123,28 +15087,16 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "fetchDepartmentOptions",
+						"content": "loadDepartments",
 						"color": "#B392F0"
 					},
 					{
-						"content": "(",
+						"content": "({ ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "params",
+						"content": "search",
 						"color": "#FFAB70"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "FilterFetchParams",
-						"color": "#B392F0"
 					},
 					{
 						"content": ", ",
@@ -15155,6 +15107,10 @@
 						"color": "#FFAB70"
 					},
 					{
+						"content": " }",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": ":",
 						"color": "#F97583"
 					},
@@ -15163,7 +15119,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "AbortSignal",
+						"content": "CellOptionsQuery",
 						"color": "#B392F0"
 					},
 					{
@@ -15187,19 +15143,11 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "FilterFetchResult",
+						"content": "CellOptionsPage",
 						"color": "#B392F0"
 					},
 					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ">> {",
+						"content": "> {",
 						"color": "#E1E4E8"
 					}
 				],
@@ -15289,7 +15237,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " params.query.",
+						"content": " search.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15419,8 +15367,12 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ({ label: d, value: d, count: ",
+						"content": " ({ value: d, description: ",
 						"color": "#E1E4E8"
+					},
+					{
+						"content": "`${",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "ALL_ROWS",
@@ -15428,7 +15380,7 @@
 					},
 					{
 						"content": ".",
-						"color": "#E1E4E8"
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "filter",
@@ -15436,35 +15388,63 @@
 					},
 					{
 						"content": "((",
-						"color": "#E1E4E8"
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "r",
-						"color": "#FFAB70"
+						"color": "#79B8FF"
 					},
 					{
 						"content": ") ",
-						"color": "#E1E4E8"
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "=>",
 						"color": "#F97583"
 					},
 					{
-						"content": " r.department ",
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "r",
 						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "department",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "===",
 						"color": "#F97583"
 					},
 					{
-						"content": " d).",
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "d",
 						"color": "#E1E4E8"
+					},
+					{
+						"content": ").",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": "length",
 						"color": "#79B8FF"
+					},
+					{
+						"content": "} people`",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": " })),",
@@ -15473,7 +15453,7 @@
 				],
 				[
 					{
-						"content": "\t\ttotalCount: matched.",
+						"content": "\t\ttotal: matched.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15500,6 +15480,12 @@
 				[],
 				[
 					{
+						"content": "/** Skills a page at a time: the list loads more as it scrolls. */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
 						"content": "async",
 						"color": "#F97583"
 					},
@@ -15516,28 +15502,32 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "fetchSkillsPage",
+						"content": "loadSkills",
 						"color": "#B392F0"
 					},
 					{
-						"content": "(",
+						"content": "({ ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "params",
+						"content": "search",
 						"color": "#FFAB70"
 					},
 					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
+						"content": ", ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "FilterPageParams",
-						"color": "#B392F0"
+						"content": "offset",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "limit",
+						"color": "#FFAB70"
 					},
 					{
 						"content": ", ",
@@ -15548,6 +15538,10 @@
 						"color": "#FFAB70"
 					},
 					{
+						"content": " }",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": ":",
 						"color": "#F97583"
 					},
@@ -15556,7 +15550,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "AbortSignal",
+						"content": "CellOptionsQuery",
 						"color": "#B392F0"
 					},
 					{
@@ -15580,19 +15574,11 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "FilterPageResult",
+						"content": "CellOptionsPage",
 						"color": "#B392F0"
 					},
 					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ">> {",
+						"content": "> {",
 						"color": "#E1E4E8"
 					}
 				],
@@ -15652,15 +15638,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { options: [], hasMore: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "false",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " };",
+						"content": " { options: [] };",
 						"color": "#E1E4E8"
 					}
 				],
@@ -15690,7 +15668,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " params.query.",
+						"content": " search.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15786,76 +15764,6 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "page",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " matched.",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "slice",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(params.page ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "*",
-						"color": "#F97583"
-					},
-					{
-						"content": " params.pageSize, (params.page ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "+",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ") ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "*",
-						"color": "#F97583"
-					},
-					{
-						"content": " params.pageSize);",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
 						"content": "return",
 						"color": "#F97583"
 					},
@@ -15866,7 +15774,23 @@
 				],
 				[
 					{
-						"content": "\t\toptions: page.",
+						"content": "\t\toptions: matched.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "slice",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(offset, offset ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " limit).",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15890,13 +15814,13 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ({ label: s, value: s })),",
+						"content": " ({ value: s })),",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\thasMore: (params.page ",
+						"content": "\t\thasMore: offset ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15904,23 +15828,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ") ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "*",
-						"color": "#F97583"
-					},
-					{
-						"content": " params.pageSize ",
+						"content": " limit ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15942,7 +15850,7 @@
 				],
 				[
 					{
-						"content": "\t\ttotalCount: matched.",
+						"content": "\t\ttotal: matched.",
 						"color": "#E1E4E8"
 					},
 					{
@@ -15970,6 +15878,18 @@
 				[
 					{
 						"content": "// ── Custom salary range filter ────────────────────────────────────────────────",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "// A custom React filter: it renders on every filter surface (sidebar, header funnel and menu,",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "// floating row) and emits a built-in number condition, so the grid matches it.",
 						"color": "#6A737D"
 					}
 				],
@@ -16020,7 +15940,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "CustomFilterRendererParams",
+						"content": "DomFilterEditorParams",
 						"color": "#B392F0"
 					},
 					{
@@ -16054,7 +15974,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " params.value?.type ",
+						"content": " params.filter?.type ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16066,7 +15986,31 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'select'",
+						"content": "'number'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "&&",
+						"color": "#F97583"
+					},
+					{
+						"content": " params.filter.operator ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'inRange'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -16078,23 +16022,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " (params.value ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "as",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "SelectFilterCondition",
-						"color": "#B392F0"
-					},
-					{
-						"content": ") ",
+						"content": " params.filter ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16172,31 +16100,7 @@
 						"color": "#B392F0"
 					},
 					{
-						"content": "(current.values[",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": "] ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "??",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "''",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ") ",
+						"content": "(current.value) ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16258,7 +16162,23 @@
 						"color": "#B392F0"
 					},
 					{
-						"content": "(current ",
+						"content": "(current?.valueTo ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!==",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "undefined",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16274,31 +16194,7 @@
 						"color": "#B392F0"
 					},
 					{
-						"content": "(current.values[",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": "] ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "??",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "''",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ") ",
+						"content": "(current.valueTo) ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16403,151 +16299,19 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "minN",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " minVal ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "?",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "Number",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(minVal) ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ";",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "const",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "maxN",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					},
-					{
-						"content": " maxVal ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "?",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "Number",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(maxVal) ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ":",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ";",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t",
-						"color": "#E1E4E8"
-					},
-					{
 						"content": "if",
 						"color": "#F97583"
 					},
 					{
-						"content": " (minN ",
+						"content": " (",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "===",
+						"content": "!",
 						"color": "#F97583"
 					},
 					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " ",
+						"content": "minVal ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -16555,23 +16319,15 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " maxN ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "===",
-						"color": "#F97583"
-					},
-					{
 						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "null",
-						"color": "#79B8FF"
+						"content": "!",
+						"color": "#F97583"
 					},
 					{
-						"content": ") {",
+						"content": "maxVal) {",
 						"color": "#E1E4E8"
 					}
 				],
@@ -16581,7 +16337,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "onCommit",
+						"content": "onChange",
 						"color": "#B392F0"
 					},
 					{
@@ -16623,7 +16379,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "onCommit",
+						"content": "onChange",
 						"color": "#B392F0"
 					},
 					{
@@ -16631,63 +16387,279 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'select'",
+						"content": "'number'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ", values: [minN, maxN], labels: [",
+						"content": ", operator: ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "`$${",
+						"content": "'inRange'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": "minVal",
+						"content": ", value: minVal ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "||",
+						"content": "?",
 						"color": "#F97583"
 					},
 					{
 						"content": " ",
-						"color": "#9ECBFF"
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Number",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(minVal) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
 					},
 					{
 						"content": "0",
 						"color": "#79B8FF"
 					},
 					{
-						"content": "}–$${",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "maxVal",
+						"content": ", valueTo: maxVal ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "||",
+						"content": "?",
 						"color": "#F97583"
 					},
 					{
 						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Number",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(maxVal) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "undefined",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " });",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t};",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "field",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "React",
+						"color": "#B392F0"
+					},
+					{
+						"content": ".",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CSSProperties",
+						"color": "#B392F0"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tflex: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "1",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tminWidth: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "0",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\theight: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "30",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tpadding: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'0 8px'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": "'∞'}`",
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tfontSize: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "12",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tbackground: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'var(--og-popover-input-bg)'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": "] });",
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tborder: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'1px solid var(--og-popover-input-border)'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tborderRadius: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "7",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tcolor: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'var(--og-text-color)'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\toutline: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'none'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
 						"color": "#E1E4E8"
 					}
 				],
@@ -16754,16 +16726,8 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "6",
+						"content": "8",
 						"color": "#79B8FF"
-					},
-					{
-						"content": ", padding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'4px 0'",
-						"color": "#9ECBFF"
 					},
 					{
 						"content": " }}>",
@@ -16804,7 +16768,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "4",
+						"content": "6",
 						"color": "#79B8FF"
 					},
 					{
@@ -16974,139 +16938,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tflex: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\theight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "26",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tpadding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'0 8px'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "11",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#1e293b'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tborder: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'1px solid #334155'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "4",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#e2e8f0'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\toutline: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'none'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t}}",
+						"content": "{field}",
 						"color": "#E1E4E8"
 					}
 				],
@@ -17142,16 +16974,16 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "10",
+						"content": "11",
 						"color": "#79B8FF"
 					},
 					{
-						"content": ", color: ",
+						"content": ", opacity: ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'#64748b'",
-						"color": "#9ECBFF"
+						"content": "0.6",
+						"color": "#79B8FF"
 					},
 					{
 						"content": " }}>–</",
@@ -17320,139 +17152,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": "{{",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tflex: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "1",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\theight: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "26",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tpadding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'0 8px'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tfontSize: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "11",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tbackground: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#1e293b'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tborder: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'1px solid #334155'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tborderRadius: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "4",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\tcolor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#e2e8f0'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t\toutline: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'none'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\t}}",
+						"content": "{field}",
 						"color": "#E1E4E8"
 					}
 				],
@@ -17478,11 +17178,93 @@
 				],
 				[
 					{
-						"content": "\t\t\t{current ",
+						"content": "\t\t\t<",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "&&",
+						"content": "div",
+						"color": "#85E89D"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "style",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{{ display: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'flex'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", gap: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "6",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " }}>",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t{[",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "50_000",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "100_000",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "150_000",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "].",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "map",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "floor",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
 						"color": "#F97583"
 					},
 					{
@@ -17492,7 +17274,7 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t<",
+						"content": "\t\t\t\t\t<",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17502,7 +17284,43 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t\t",
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "key",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{floor}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "'og-ct-btn'",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17528,7 +17346,7 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t\t\t",
+						"content": "\t\t\t\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17540,17 +17358,17 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "''",
-						"color": "#9ECBFF"
+						"content": "String",
+						"color": "#B392F0"
 					},
 					{
-						"content": ");",
+						"content": "(floor));",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\t\t\t\t\t",
+						"content": "\t\t\t\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17572,11 +17390,11 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t\t\tparams.",
+						"content": "\t\t\t\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "onCommit",
+						"content": "commit",
 						"color": "#B392F0"
 					},
 					{
@@ -17584,8 +17402,16 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "null",
-						"color": "#79B8FF"
+						"content": "String",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(floor), ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": ");",
@@ -17594,99 +17420,57 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t\t}}",
+						"content": "\t\t\t\t\t\t}}",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\t\t\t\t",
+						"content": "\t\t\t\t\t>",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t{",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "style",
-						"color": "#B392F0"
+						"content": "`$${",
+						"color": "#9ECBFF"
 					},
 					{
-						"content": "=",
+						"content": "floor",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "/",
 						"color": "#F97583"
 					},
 					{
-						"content": "{{ fontSize: ",
-						"color": "#E1E4E8"
+						"content": " ",
+						"color": "#9ECBFF"
 					},
 					{
-						"content": "10",
+						"content": "1000",
 						"color": "#79B8FF"
 					},
 					{
-						"content": ", color: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'#60a5fa'",
+						"content": "}k+`",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ", background: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'none'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", border: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'none'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", cursor: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'pointer'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", textAlign: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'left'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": ", padding: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "0",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " }}",
+						"content": "}",
 						"color": "#E1E4E8"
 					}
 				],
 				[
 					{
-						"content": "\t\t\t\t>",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t\tClear",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t</",
+						"content": "\t\t\t\t\t</",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17700,7 +17484,21 @@
 				],
 				[
 					{
-						"content": "\t\t\t)}",
+						"content": "\t\t\t\t))}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t</",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "div",
+						"color": "#85E89D"
+					},
+					{
+						"content": ">",
 						"color": "#E1E4E8"
 					}
 				],
@@ -17945,7 +17743,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ", filterType: ",
+						"content": ", filterDef: { type: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -17953,8 +17751,18 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": " },",
+						"content": " } },",
 						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// No filterDef: text.",
+						"color": "#6A737D"
 					}
 				],
 				[
@@ -17981,14 +17789,6 @@
 					{
 						"content": "180",
 						"color": "#79B8FF"
-					},
-					{
-						"content": ", filterType: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'text'",
-						"color": "#9ECBFF"
 					},
 					{
 						"content": " },",
@@ -18055,7 +17855,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'async-multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -18065,7 +17865,7 @@
 				],
 				[
 					{
-						"content": "\t\t\t\tfetchOptions: fetchDepartmentOptions,",
+						"content": "\t\t\t\tloadOptions: loadDepartments,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -18077,20 +17877,6 @@
 					{
 						"content": "'Search departments…'",
 						"color": "#9ECBFF"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tshowSelectAll: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "true",
-						"color": "#79B8FF"
 					},
 					{
 						"content": ",",
@@ -18135,14 +17921,6 @@
 					{
 						"content": "EmployeeRow",
 						"color": "#B392F0"
-					},
-					{
-						"content": ", ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
 					},
 					{
 						"content": ">,",
@@ -18209,7 +17987,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -18233,7 +18011,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "l",
+						"content": "value",
 						"color": "#FFAB70"
 					},
 					{
@@ -18245,7 +18023,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ({ label: l, value: l })), searchable: ",
+						"content": " ({ value })), searchable: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -18253,53 +18031,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": " } ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "satisfies",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "ColumnFilterDef",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "EmployeeRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>,",
+						"content": " },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -18601,12 +18333,30 @@
 				],
 				[
 					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "// One value at a time.",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
 						"content": "\t\t\tfilterDef: { type: ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'single-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
+					},
+					{
+						"content": ", multiple: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "false",
+						"color": "#79B8FF"
 					},
 					{
 						"content": ", options: ",
@@ -18629,7 +18379,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "s",
+						"content": "value",
 						"color": "#FFAB70"
 					},
 					{
@@ -18641,53 +18391,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ({ label: s, value: s })) } ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "satisfies",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "ColumnFilterDef",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "EmployeeRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>,",
+						"content": " ({ value })) },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -18751,7 +18455,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -18775,7 +18479,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "l",
+						"content": "value",
 						"color": "#FFAB70"
 					},
 					{
@@ -18787,61 +18491,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " ({ label: l, value: l })), showSelectAll: ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "true",
-						"color": "#79B8FF"
-					},
-					{
-						"content": " } ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "satisfies",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "ColumnFilterDef",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "EmployeeRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>,",
+						"content": " ({ value })) },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -18967,7 +18617,13 @@
 				],
 				[
 					{
-						"content": "\t\t\tfilterDef: { type: ",
+						"content": "\t\t\tfilterDef: {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\ttype: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -18975,7 +18631,13 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ", ",
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t",
 						"color": "#E1E4E8"
 					},
 					{
@@ -19019,39 +18681,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": "{params ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "as",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "any",
-						"color": "#79B8FF"
-					},
-					{
-						"content": "} /> } ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "satisfies",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "ColumnFilterDef",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
+						"content": "{params} />,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -19061,8 +18691,194 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "EmployeeRow",
+						"content": "summarize",
 						"color": "#B392F0"
+					},
+					{
+						"content": ": (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "filter",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\tfilter.type ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'number'",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`$${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "filter",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "toLocaleString",
+						"color": "#B392F0"
+					},
+					{
+						"content": "()",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "} – ${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "filter",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "valueTo",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "!==",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "undefined",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "`$${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "filter",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "valueTo",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "toLocaleString",
+						"color": "#B392F0"
+					},
+					{
+						"content": "()",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'∞'}`",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
 					},
 					{
 						"content": ",",
@@ -19071,17 +18887,7 @@
 				],
 				[
 					{
-						"content": "\t\t\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "number",
-						"color": "#79B8FF"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t>,",
+						"content": "\t\t\t},",
 						"color": "#E1E4E8"
 					}
 				],
@@ -19117,7 +18923,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ", filterType: ",
+						"content": ", filterDef: { type: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -19125,7 +18931,7 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": " },",
+						"content": " } },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -19179,33 +18985,33 @@
 				],
 				[
 					{
-						"content": "\t\t\tfilterDef: {",
+						"content": "\t\t\t",
 						"color": "#E1E4E8"
+					},
+					{
+						"content": "// Cells list several skills: Any / All / None of, options paged from a server.",
+						"color": "#6A737D"
 					}
 				],
 				[
 					{
-						"content": "\t\t\t\ttype: ",
+						"content": "\t\t\tfilterDef: { type: ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'infinite-multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ",",
+						"content": ", listValues: ",
 						"color": "#E1E4E8"
-					}
-				],
-				[
+					},
 					{
-						"content": "\t\t\t\tfetchPage: fetchSkillsPage,",
-						"color": "#E1E4E8"
-					}
-				],
-				[
+						"content": "true",
+						"color": "#79B8FF"
+					},
 					{
-						"content": "\t\t\t\tpageSize: ",
+						"content": ", loadOptions: loadSkills, pageSize: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -19213,13 +19019,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tplaceholder: ",
+						"content": ", placeholder: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -19227,13 +19027,7 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t\tdebounceMs: ",
+						"content": ", debounceMs: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -19241,45 +19035,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ",",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t\t\t} ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "satisfies",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "ColumnFilterDef",
-						"color": "#B392F0"
-					},
-					{
-						"content": "<",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "EmployeeRow",
-						"color": "#B392F0"
-					},
-					{
-						"content": ", ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "string",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ">,",
+						"content": " },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -20563,11 +20319,19 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'select'",
+						"content": "'number'",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ", values: [",
+						"content": ", operator: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'inRange'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", value: ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -20575,23 +20339,7 @@
 						"color": "#79B8FF"
 					},
 					{
-						"content": ", ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "null",
-						"color": "#79B8FF"
-					},
-					{
-						"content": "], labels: [",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'$100,000–∞'",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "] },",
+						"content": " },",
 						"color": "#E1E4E8"
 					}
 				],
@@ -30215,7 +29963,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'async-multi-select'",
+						"content": "'select · server search'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -30245,7 +29993,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -30275,7 +30023,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'single-select'",
+						"content": "'select · single'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -30305,7 +30053,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'multi-select'",
+						"content": "'select'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -30335,7 +30083,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'custom range'",
+						"content": "'custom (React)'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -30365,7 +30113,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'infinite-multi-select'",
+						"content": "'select · list cells · paged'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -52277,7 +52025,7 @@
 			"title": "Native cell types",
 			"description": "Every built-in cell type (select, multi-select, combobox, person, date, number, progress, rating) with themed editors.",
 			"sourcePath": "packages/examples/src/showcases/NativeCellTypesDemo.tsx",
-			"source": "/**\r\n * Native Cell Types Showcase\r\n *\r\n * Every built-in cell type: renderers and editors come from the grid core (DOM, no React per cell),\r\n * styled from the grid theme, so switching theme restyles cells, badges and editor popovers alike.\r\n */\r\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\r\nimport {\r\n\tBUILT_IN_THEME_METADATA,\r\n\tBUILT_IN_THEME_ORDER,\r\n\tGrid,\r\n\tgetBuiltInTheme,\r\n\tcomboboxColumnType,\r\n\tcurrencyColumnType,\r\n\tmultiSelectColumnType,\r\n\tpersonColumnType,\r\n\tprogressColumnType,\r\n\tratingColumnType,\r\n\tselectColumnType,\r\n\tsegmentedColumnType,\r\n\tswitchColumnType,\r\n\tcolorColumnType,\r\n\tlongTextColumnType,\r\n\tdateRangeColumnType,\r\n\tcascadeColumnType,\r\n\tlinkedRecordColumnType,\r\n\tsparklineColumnType,\r\n} from '@eregister/wit-grid-react';\r\nimport type {\r\n\tBuiltInThemeName,\r\n\tCascadeOption,\r\n\tCellOption,\r\n\tColumnDef,\r\n\tColumnTypeDefinition,\r\n\tGridApi,\r\n\tGridReadyEvent,\r\n\tPersonOption,\r\n} from '@eregister/wit-grid-react';\r\nimport { Box, Code2, ChevronRight, Palette } from 'lucide-react';\r\nimport { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';\r\n\r\n// ─── Data model ───────────────────────────────────────────────────────────────\r\n\r\ninterface TaskRow {\r\n\tid: string;\r\n\tdone: boolean;\r\n\ttask: string;\r\n\tstatus: string;\r\n\tpriority: string;\r\n\tlabels: string[];\r\n\teffort: string;\r\n\tteam: string;\r\n\taccount: string;\r\n\tprojects: string[];\r\n\tlocation: string[];\r\n\tsprint: { start: string; end: string };\r\n\tbillable: boolean;\r\n\ttrend: number[];\r\n\tcommits: number[];\r\n\tcolor: string;\r\n\tnotes: string;\r\n\twatchers: string[];\r\n\towner: string;\r\n\treviewers: string;\r\n\tdue: string;\r\n\tbudget: number;\r\n\tprogress: number;\r\n\tconfidence: number;\r\n\trating: number;\r\n\tspec: string;\r\n\tcontact: string;\r\n\tupdated: string;\r\n}\r\n\r\n// ─── Options ──────────────────────────────────────────────────────────────────\r\n\r\nconst STATUS: CellOption[] = [\r\n\t{ value: 'backlog', label: 'Backlog', color: 'gray' },\r\n\t{ value: 'todo', label: 'To do', color: 'sky' },\r\n\t{ value: 'progress', label: 'In progress', color: 'amber' },\r\n\t{ value: 'review', label: 'In review', color: 'violet' },\r\n\t{ value: 'done', label: 'Done', color: 'emerald' },\r\n\t{ value: 'blocked', label: 'Blocked', color: 'rose' },\r\n];\r\n\r\nconst PRIORITY: CellOption[] = [\r\n\t{ value: 'urgent', label: 'Urgent', color: 'red', description: 'Drop everything' },\r\n\t{ value: 'high', label: 'High', color: 'orange', description: 'This sprint' },\r\n\t{ value: 'medium', label: 'Medium', color: 'yellow', description: 'Next sprint' },\r\n\t{ value: 'low', label: 'Low', color: 'gray', description: 'When there is time' },\r\n];\r\n\r\nconst LABELS: CellOption[] = [\r\n\t{ value: 'bug', label: 'Bug', color: 'red' },\r\n\t{ value: 'feature', label: 'Feature', color: 'blue' },\r\n\t{ value: 'perf', label: 'Performance', color: 'amber' },\r\n\t{ value: 'a11y', label: 'Accessibility', color: 'teal' },\r\n\t{ value: 'docs', label: 'Docs', color: 'gray' },\r\n\t{ value: 'security', label: 'Security', color: 'fuchsia' },\r\n];\r\n\r\nconst TEAMS: CellOption[] = [\r\n\t{ value: 'ui', label: 'UI Design', group: 'Design', color: 'pink' },\r\n\t{ value: 'ux', label: 'UX Research', group: 'Design', color: 'rose' },\r\n\t{ value: 'brand', label: 'Brand', group: 'Design', color: 'fuchsia' },\r\n\t{ value: 'fe', label: 'Frontend', group: 'Engineering', color: 'blue' },\r\n\t{ value: 'be', label: 'Backend', group: 'Engineering', color: 'indigo' },\r\n\t{ value: 'infra', label: 'Infrastructure', group: 'Engineering', color: 'cyan' },\r\n\t{ value: 'qa', label: 'Quality', group: 'Engineering', color: 'teal' },\r\n\t{ value: 'growth', label: 'Growth', group: 'Business', color: 'emerald' },\r\n\t{ value: 'sales', label: 'Sales', group: 'Business', color: 'lime' },\r\n\t{ value: 'support', label: 'Support', group: 'Business', color: 'amber' },\r\n];\r\n\r\nconst PEOPLE: PersonOption[] = [\r\n\t{ value: 'ava', label: 'Ava Chen', description: 'Engineering manager', group: 'Engineering' },\r\n\t{ value: 'liam', label: 'Liam Novak', description: 'Frontend', group: 'Engineering' },\r\n\t{ value: 'noah', label: 'Noah Patel', description: 'Backend', group: 'Engineering' },\r\n\t{ value: 'mia', label: 'Mia Rossi', description: 'Product design', group: 'Design' },\r\n\t{ value: 'zoe', label: 'Zoe Okafor', description: 'Research', group: 'Design' },\r\n\t{ value: 'ethan', label: 'Ethan Brooks', description: 'QA lead', group: 'Engineering' },\r\n\t{ value: 'sofia', label: 'Sofia Lind', description: 'Growth', group: 'Business' },\r\n\t{ value: 'kai', label: 'Kai Tanaka', description: 'Infrastructure', group: 'Engineering' },\r\n];\r\n\r\nconst EFFORT: CellOption[] = [\r\n\t{ value: 's', label: 'S', color: 'emerald' },\r\n\t{ value: 'm', label: 'M', color: 'amber' },\r\n\t{ value: 'l', label: 'L', color: 'rose' },\r\n];\r\n\r\n/** Office locations: country → state → city. */\r\nconst LOCATIONS: CascadeOption[] = [\r\n\t{\r\n\t\tvalue: 'in',\r\n\t\tlabel: 'India',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'ka',\r\n\t\t\t\tlabel: 'Karnataka',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'blr', label: 'Bengaluru' },\r\n\t\t\t\t\t{ value: 'mys', label: 'Mysuru' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{\r\n\t\t\t\tvalue: 'mh',\r\n\t\t\t\tlabel: 'Maharashtra',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'bom', label: 'Mumbai' },\r\n\t\t\t\t\t{ value: 'pnq', label: 'Pune' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{ value: 'dl', label: 'Delhi', children: [{ value: 'del', label: 'New Delhi' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'us',\r\n\t\tlabel: 'United States',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'ca',\r\n\t\t\t\tlabel: 'California',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'sf', label: 'San Francisco' },\r\n\t\t\t\t\t{ value: 'la', label: 'Los Angeles' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t\t{ value: 'ny', label: 'New York', children: [{ value: 'nyc', label: 'New York City' }] },\r\n\t\t\t{ value: 'wa', label: 'Washington', children: [{ value: 'sea', label: 'Seattle' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'de',\r\n\t\tlabel: 'Germany',\r\n\t\tchildren: [\r\n\t\t\t{ value: 'be', label: 'Berlin', children: [{ value: 'ber', label: 'Berlin' }] },\r\n\t\t\t{ value: 'by', label: 'Bavaria', children: [{ value: 'muc', label: 'Munich' }] },\r\n\t\t],\r\n\t},\r\n\t{\r\n\t\tvalue: 'jp',\r\n\t\tlabel: 'Japan',\r\n\t\tchildren: [\r\n\t\t\t{\r\n\t\t\t\tvalue: 'tk',\r\n\t\t\t\tlabel: 'Tokyo',\r\n\t\t\t\tchildren: [\r\n\t\t\t\t\t{ value: 'shb', label: 'Shibuya' },\r\n\t\t\t\t\t{ value: 'mnt', label: 'Minato' },\r\n\t\t\t\t],\r\n\t\t\t},\r\n\t\t],\r\n\t},\r\n];\r\nconst LOCATION_PATHS: string[][] = LOCATIONS.flatMap((c) =>\r\n\t(c.children ?? []).flatMap((s) => (s.children ?? []).map((city) => [c.value, s.value, city.value]))\r\n);\r\n\r\nconst NOTES = [\r\n\t'Waiting on legal review before the copy changes go out.',\r\n\t'Repro only on Safari 17.\\nAttach the HAR file from the support ticket.',\r\n\t'Pair with design on the empty states; spec is in the linked doc.',\r\n\t'',\r\n\t'Customer asked for a CSV export as well — scope it separately.',\r\n\t'Blocked until the staging cluster is upgraded.',\r\n];\r\n\r\n/** Opening a linked record: a demo stand-in for navigating to it. */\r\nfunction showToast(text: string) {\r\n\tconst toast = document.createElement('div');\r\n\ttoast.textContent = text;\r\n\ttoast.style.cssText =\r\n\t\t'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;' +\r\n\t\t'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s';\r\n\tdocument.body.appendChild(toast);\r\n\tsetTimeout(() => (toast.style.opacity = '0'), 1600);\r\n\tsetTimeout(() => toast.remove(), 2000);\r\n}\r\n\r\nconst TASKS = [\r\n\t'Redesign onboarding flow',\r\n\t'Fix flaky checkout test',\r\n\t'Migrate auth to OAuth 2.1',\r\n\t'Dark mode for settings',\r\n\t'Audit color contrast',\r\n\t'Speed up search index',\r\n\t'Quarterly pricing review',\r\n\t'Write API rate-limit docs',\r\n\t'Kubernetes node upgrade',\r\n\t'Customer interview round',\r\n\t'Rebuild CSV importer',\r\n\t'Harden file uploads',\r\n];\r\n\r\n// ─── Column types ─────────────────────────────────────────────────────────────\r\n// Built-in names (checkbox, date, datetime, percent, url, email) need no registration; these add options.\r\n\r\nconst TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {\r\n\tstatus: selectColumnType(STATUS, { noneLabel: 'No status' }),\r\n\tpriority: selectColumnType(PRIORITY, { variant: 'dot' }),\r\n\tlabels: multiSelectColumnType(LABELS, { maxVisible: 2, searchable: true }),\r\n\tteam: comboboxColumnType(TEAMS, { searchPlaceholder: 'Search teams…' }),\r\n\t// Options on a server: paged and searched there, labels looked up for the values in cells.\r\n\taccount: comboboxColumnType([], {\r\n\t\tloadOptions: accountsServer.load,\r\n\t\tresolveOptions: accountsServer.resolve,\r\n\t\tsearchPlaceholder: 'Search 10,000 accounts…',\r\n\t}),\r\n\twatchers: personColumnType({\r\n\t\tmultiple: true,\r\n\t\tloadOptions: directoryServer.load,\r\n\t\tresolveOptions: directoryServer.resolve,\r\n\t\tsearchPlaceholder: 'Search 2,000 people…',\r\n\t}),\r\n\towner: personColumnType({ people: PEOPLE }),\r\n\treviewers: personColumnType({ people: PEOPLE, multiple: true }),\r\n\tbudget: currencyColumnType({ currency: 'USD', decimals: 0, step: 500, colorNegative: true }),\r\n\tprogress: progressColumnType(),\r\n\tconfidence: progressColumnType({ max: 1, traffic: true }),\r\n\trating: ratingColumnType(),\r\n\teffort: segmentedColumnType(EFFORT),\r\n\t// Links to another table: record chips, a record picker paged from its API, chips open the record.\r\n\tprojects: linkedRecordColumnType([], {\r\n\t\tloadOptions: projectsServer.load,\r\n\t\tresolveOptions: projectsServer.resolve,\r\n\t\tsearchPlaceholder: 'Find a project…',\r\n\t\tonOpen: (value) => showToast(`Open project ${PROJECTS.find((p) => p.value === value)?.label ?? value}`),\r\n\t}),\r\n\tlocation: cascadeColumnType({ options: LOCATIONS, searchPlaceholder: 'Search cities…' }),\r\n\tsprint: dateRangeColumnType(),\r\n\tbillable: switchColumnType({ onLabel: 'Billable', offLabel: 'Internal' }),\r\n\ttrend: sparklineColumnType({ type: 'area', colorBy: 'trend', curve: 'smooth', label: 'change' }),\r\n\tcommits: sparklineColumnType({ type: 'bar', color: 'violet', label: 'last', reference: 'average', format: { decimals: 0 } }),\r\n\tcolor: colorColumnType(),\r\n\tnotes: longTextColumnType({ maxLength: 500, placeholder: 'Add a note…' }),\r\n};\r\n\r\nconst COLUMNS: ColumnDef<TaskRow>[] = [\r\n\t{ field: 'done', header: '', width: 48, type: 'checkbox' },\r\n\t{ field: 'task', header: 'Task', width: 220 },\r\n\t{ field: 'status', header: 'Status', width: 140, type: 'status' },\r\n\t{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },\r\n\t{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },\r\n\t{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },\r\n\t{ field: 'team', header: 'Team', width: 150, type: 'team' },\r\n\t{ field: 'account', header: 'Account', width: 200, type: 'account' },\r\n\t{ field: 'projects', header: 'Projects', width: 240, type: 'projects' },\r\n\t{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },\r\n\t{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },\r\n\t{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },\r\n\t{ field: 'location', header: 'Office', width: 240, type: 'location' },\r\n\t{ field: 'due', header: 'Due', width: 140, type: 'date' },\r\n\t{ field: 'sprint', header: 'Sprint', width: 200, type: 'sprint' },\r\n\t{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },\r\n\t{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },\r\n\t{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },\r\n\t{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },\r\n\t{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },\r\n\t{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },\r\n\t{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },\r\n\t{ field: 'color', header: 'Colour', width: 130, type: 'color' },\r\n\t{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },\r\n\t{ field: 'spec', header: 'Spec', width: 190, type: 'url' },\r\n\t{ field: 'contact', header: 'Contact', width: 200, type: 'email' },\r\n\t{ field: 'updated', header: 'Updated', width: 190, type: 'datetime' },\r\n];\r\n\r\nfunction pick<T>(list: readonly T[], n: number): T {\r\n\treturn list[n % list.length];\r\n}\r\n\r\nfunction generateTasks(count: number): TaskRow[] {\r\n\treturn Array.from({ length: count }, (_, i) => {\r\n\t\tconst owner = pick(PEOPLE, i * 3);\r\n\t\tconst progress = (i * 37) % 101;\r\n\t\treturn {\r\n\t\t\tid: `T-${1001 + i}`,\r\n\t\t\tdone: progress >= 90,\r\n\t\t\ttask: pick(TASKS, i) + (i >= TASKS.length ? ` #${Math.floor(i / TASKS.length) + 1}` : ''),\r\n\t\t\tstatus: i % 11 === 5 ? '' : pick(STATUS, i * 5).value,\r\n\t\t\tpriority: pick(PRIORITY, i * 3 + 1).value,\r\n\t\t\tlabels: [pick(LABELS, i).value, pick(LABELS, i * 2 + 3).value, ...(i % 4 === 0 ? [pick(LABELS, i + 4).value] : [])].filter(\r\n\t\t\t\t(v, k, all) => all.indexOf(v) === k\r\n\t\t\t),\r\n\t\t\teffort: pick(EFFORT, i * 2).value,\r\n\t\t\tteam: pick(TEAMS, i * 7).value,\r\n\t\t\taccount: pick(ACCOUNTS, i * 37).value,\r\n\t\t\tprojects:\r\n\t\t\t\ti % 5 === 3\r\n\t\t\t\t\t? []\r\n\t\t\t\t\t: [\r\n\t\t\t\t\t\t\tpick(PROJECTS, i * 11).value,\r\n\t\t\t\t\t\t\t...(i % 2 === 0 ? [pick(PROJECTS, i * 17 + 5).value] : []),\r\n\t\t\t\t\t\t\t...(i % 6 === 0 ? [pick(PROJECTS, i + 40).value] : []),\r\n\t\t\t\t\t\t],\r\n\t\t\tlocation: pick(LOCATION_PATHS, i * 3),\r\n\t\t\tsprint: (() => {\r\n\t\t\t\tconst start = new Date(2026, 8, 1 + (i % 6) * 14);\r\n\t\t\t\tconst end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 13);\r\n\t\t\t\tconst iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;\r\n\t\t\t\treturn { start: iso(start), end: iso(end) };\r\n\t\t\t})(),\r\n\t\t\tbillable: i % 3 !== 1,\r\n\t\t\ttrend: Array.from({ length: 12 }, (_, w) =>\r\n\t\t\t\tMath.round(40 + 25 * Math.sin((w + i) / 2.2) + ((i * 7 + w * 13) % 17) + (i % 2 ? w * 2 : -w))\r\n\t\t\t),\r\n\t\t\tcommits: Array.from({ length: 10 }, (_, d) => ((i * 31 + d * 17) % 23) - (d % 4 === 3 ? 4 : 0)),\r\n\t\t\tcolor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#64748b'][i % 8],\r\n\t\t\tnotes: pick(NOTES, i),\r\n\t\t\twatchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],\r\n\t\t\towner: owner.value,\r\n\t\t\treviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),\r\n\t\t\tdue: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,\r\n\t\t\tbudget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),\r\n\t\t\tprogress,\r\n\t\t\tconfidence: ((i * 29) % 100) / 100,\r\n\t\t\trating: (i * 3) % 6,\r\n\t\t\tspec: `docs.example.com/specs/${1001 + i}`,\r\n\t\t\tcontact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,\r\n\t\t\tupdated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,\r\n\t\t};\r\n\t});\r\n}\r\n\r\n// ─── Reference ────────────────────────────────────────────────────────────────\r\n\r\nconst TYPE_REFERENCE: { name: string; text: string }[] = [\r\n\t{ name: 'selectColumnType', text: 'One option, tinted badge. Variants: soft, dot, outline, plain. Optional “none” entry.' },\r\n\t{ name: 'multiSelectColumnType', text: 'Chips with +N overflow; checkbox list editor.' },\r\n\t{ name: 'comboboxColumnType', text: 'Searchable, grouped list for long option sets.' },\r\n\t{ name: 'tagsColumnType', text: 'Free tags: type to create, colours from the palette.' },\r\n\t{ name: 'personColumnType', text: 'Avatar and name, or stacked avatars; people picker.' },\r\n\t{\r\n\t\tname: 'loadOptions · resolveOptions',\r\n\t\ttext: 'Options from a server: searched there, paged in as the list scrolls, labels looked up for cells (Account, Watchers).',\r\n\t},\r\n\t{ name: \"'date' · 'datetime'\", text: 'Intl formatting; calendar popover with keyboard navigation.' },\r\n\t{ name: \"'number' · 'currency' · 'percent'\", text: 'Intl number formats, stepper editor with bounds.' },\r\n\t{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },\r\n\t{ name: 'ratingColumnType', text: 'Stars, click to rate.' },\r\n\t{ name: 'segmentedColumnType', text: 'Two to four options inline; one press picks (Effort).' },\r\n\t{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; chips open the record (Projects).' },\r\n\t{ name: 'cascadeColumnType', text: 'A path through a tree, one column per level, search across paths (Office).' },\r\n\t{ name: 'dateRangeColumnType', text: 'Two-month range calendar with presets (Sprint).' },\r\n\t{ name: 'sparklineColumnType', text: 'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).' },\r\n\t{ name: 'longTextColumnType', text: 'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).' },\r\n\t{ name: 'colorColumnType', text: 'Palette, hex field and the system picker (Colour).' },\r\n\t{ name: \"'checkbox' · switchColumnType\", text: 'Toggle on press or Enter, keeping the value’s own shape (Billing).' },\r\n\t{ name: \"'url' · 'email'\", text: 'Safe links (http, https, mailto only).' },\r\n];\r\n\r\nconst SNIPPET = `import { selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';\r\n\r\nconst columnTypes = {\r\n  status: selectColumnType([\r\n    { value: 'todo', label: 'To do', color: 'sky' },\r\n    { value: 'done', label: 'Done',  color: 'emerald' },\r\n  ], { noneLabel: 'No status' }),\r\n  team: comboboxColumnType([\r\n    { value: 'fe', label: 'Frontend', group: 'Engineering' },\r\n    { value: 'ui', label: 'UI Design', group: 'Design' },\r\n  ]),\r\n};\r\n\r\nconst columns = [\r\n  { field: 'status', header: 'Status', type: 'status' },\r\n  { field: 'due',    header: 'Due',    type: 'date' },\r\n  { field: 'price',  header: 'Price',  type: 'currency' },\r\n];\r\n\r\n// Colours follow the grid theme. To adjust cells alone, set\r\n// --og-ct-accent, --og-ct-radius, --og-ct-rating… on the grid.`;\r\n\r\n/** Every built-in theme, with its background and accent for the swatch. */\r\nconst THEMES = BUILT_IN_THEME_ORDER.map((name) => {\r\n\tconst tokens = getBuiltInTheme(name);\r\n\treturn { name, label: BUILT_IN_THEME_METADATA[name].label, bg: tokens.bgColor, accent: tokens.focusRing };\r\n});\r\n\r\n// ─── Page component ───────────────────────────────────────────────────────────\r\n\r\ninterface NativeCellTypesDemoProps {\r\n\tonGridReady?: (event: GridReadyEvent<TaskRow>) => void;\r\n\t/** Hides the reference sidebar and the toolbar frame, keeping just the grid (for embedding). */\r\n\tcompact?: boolean;\r\n\t/**\r\n\t * The grid theme, when the host picks it (the docs hero). Hides the built-in theme picker; the\r\n\t * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.\r\n\t */\r\n\ttheme?: BuiltInThemeName;\r\n}\r\n\r\nexport default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {\r\n\tconst rows = useMemo(() => generateTasks(200), []);\r\n\tconst apiRef = useRef<GridApi<TaskRow> | null>(null);\r\n\tconst [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');\r\n\tconst theme = controlledTheme ?? ownTheme;\r\n\tconst themeRef = useRef(theme);\r\n\tconst [showSnippet, setShowSnippet] = useState(false);\r\n\t// The theme the grid is created with (no flash of the default theme); later changes switch it.\r\n\tconst initialState = useMemo(() => ({ themeName: themeRef.current }), []);\r\n\r\n\tconst handleReady = useCallback(\r\n\t\t(event: GridReadyEvent<TaskRow>) => {\r\n\t\t\tapiRef.current = event.api;\r\n\t\t\t// A remounted grid starts on the theme it was created with: bring it to the current one.\r\n\t\t\tif (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);\r\n\t\t\tonGridReady?.(event);\r\n\t\t},\r\n\t\t[onGridReady]\r\n\t);\r\n\tuseEffect(() => {\r\n\t\tthemeRef.current = theme;\r\n\t\tconst api = apiRef.current;\r\n\t\tif (api && api.getThemeName() !== theme) api.switchTheme(theme);\r\n\t}, [theme]);\r\n\r\n\tconst grid = (\r\n\t\t<Grid\r\n\t\t\trowModelType='client'\r\n\t\t\trows={rows}\r\n\t\t\tcolumns={COLUMNS}\r\n\t\t\tcolumnTypes={TASK_COLUMN_TYPES}\r\n\t\t\tinitialState={initialState}\r\n\t\t\tnavigationOptions={{ editTrigger: 'doubleClick' }}\r\n\t\t\tpinLeftColumns={2}\r\n\t\t\tonGridReady={handleReady}\r\n\t\t\trendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}\r\n\t\t/>\r\n\t);\r\n\tif (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;\r\n\r\n\treturn (\r\n\t\t<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>\r\n\t\t\t<div className='flex-1 flex flex-col gap-3 min-h-[360px] lg:min-h-0 min-w-0'>\r\n\t\t\t\t<div className='border border-slate-800 rounded-xl px-3 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-slate-900/30'>\r\n\t\t\t\t\t<div className='flex items-center gap-2 text-[11px] text-slate-300 font-semibold'>\r\n\t\t\t\t\t\t<Box className='w-4 h-4 text-violet-400' />\r\n\t\t\t\t\t\tNative cell types\r\n\t\t\t\t\t\t<span className='text-slate-500 font-normal'>· double-click or press Enter on a cell to edit</span>\r\n\t\t\t\t\t</div>\r\n\t\t\t\t\t{!controlledTheme && (\r\n\t\t\t\t\t\t<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>\r\n\t\t\t\t\t\t\t<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />\r\n\t\t\t\t\t\t\t{THEMES.map((t) => (\r\n\t\t\t\t\t\t\t\t<button\r\n\t\t\t\t\t\t\t\t\tkey={t.name}\r\n\t\t\t\t\t\t\t\t\trole='radio'\r\n\t\t\t\t\t\t\t\t\taria-checked={theme === t.name}\r\n\t\t\t\t\t\t\t\t\tonClick={() => setOwnTheme(t.name)}\r\n\t\t\t\t\t\t\t\t\tclassName={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${\r\n\t\t\t\t\t\t\t\t\t\ttheme === t.name\r\n\t\t\t\t\t\t\t\t\t\t\t? 'border-slate-500 bg-slate-800 text-slate-100'\r\n\t\t\t\t\t\t\t\t\t\t\t: 'border-transparent text-slate-400 hover:bg-slate-800/60'\r\n\t\t\t\t\t\t\t\t\t}`}\r\n\t\t\t\t\t\t\t\t>\r\n\t\t\t\t\t\t\t\t\t<span\r\n\t\t\t\t\t\t\t\t\t\tclassName='w-2.5 h-2.5 rounded-full border border-slate-600'\r\n\t\t\t\t\t\t\t\t\t\tstyle={{ background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)` }}\r\n\t\t\t\t\t\t\t\t\t/>\r\n\t\t\t\t\t\t\t\t\t{t.label}\r\n\t\t\t\t\t\t\t\t</button>\r\n\t\t\t\t\t\t\t))}\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t)}\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>{grid}</div>\r\n\t\t\t</div>\r\n\r\n\t\t\t<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>\r\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>\r\n\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>\r\n\t\t\t\t\t{TYPE_REFERENCE.map((t) => (\r\n\t\t\t\t\t\t<div key={t.name} className='flex flex-col gap-0.5'>\r\n\t\t\t\t\t\t\t<code className='text-[11px] text-violet-300'>{t.name}</code>\r\n\t\t\t\t\t\t\t<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>\r\n\t\t\t\t\t\t</div>\r\n\t\t\t\t\t))}\r\n\t\t\t\t\t<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>\r\n\t\t\t\t\t\tAll cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come from\r\n\t\t\t\t\t\tthe grid theme, so popovers and badges follow the theme switch above.\r\n\t\t\t\t\t</p>\r\n\t\t\t\t</div>\r\n\r\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>\r\n\t\t\t\t\t<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>\r\n\t\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>\r\n\t\t\t\t\t\t\t<Code2 className='w-3.5 h-3.5 text-emerald-400' />\r\n\t\t\t\t\t\t\tUsage\r\n\t\t\t\t\t\t</h3>\r\n\t\t\t\t\t\t<ChevronRight\r\n\t\t\t\t\t\t\tclassName='w-3 h-3 text-slate-500 transition-transform duration-150'\r\n\t\t\t\t\t\t\tstyle={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}\r\n\t\t\t\t\t\t/>\r\n\t\t\t\t\t</button>\r\n\t\t\t\t\t{showSnippet && (\r\n\t\t\t\t\t\t<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>\r\n\t\t\t\t\t\t\t{SNIPPET}\r\n\t\t\t\t\t\t</pre>\r\n\t\t\t\t\t)}\r\n\t\t\t\t</div>\r\n\t\t\t</div>\r\n\t\t</div>\r\n\t);\r\n}\r\n",
+			"source": "/**\n * Native Cell Types Showcase\n *\n * Every built-in cell type: renderers and editors come from the grid core (DOM, no React per cell),\n * styled from the grid theme, so switching theme restyles cells, badges and editor popovers alike.\n */\nimport React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';\nimport {\n\tBUILT_IN_THEME_METADATA,\n\tBUILT_IN_THEME_ORDER,\n\tGrid,\n\tgetBuiltInTheme,\n\tcomboboxColumnType,\n\tcurrencyColumnType,\n\tmultiSelectColumnType,\n\tpersonColumnType,\n\tprogressColumnType,\n\tratingColumnType,\n\tselectColumnType,\n\tsegmentedColumnType,\n\tswitchColumnType,\n\tcolorColumnType,\n\tlongTextColumnType,\n\tdateRangeColumnType,\n\tcascadeColumnType,\n\tlinkedRecordColumnType,\n\tsparklineColumnType,\n\topenCellPopover,\n\tCELL_HUES,\n} from '@eregister/wit-grid-react';\nimport type {\n\tBuiltInThemeName,\n\tCascadeOption,\n\tCellOption,\n\tCellPopover,\n\tColumnDef,\n\tColumnTypeDefinition,\n\tGridApi,\n\tGridReadyEvent,\n\tPersonOption,\n} from '@eregister/wit-grid-react';\nimport { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';\nimport { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';\n\n// ─── Data model ───────────────────────────────────────────────────────────────\n\ninterface TaskRow {\n\tid: string;\n\tdone: boolean;\n\ttask: string;\n\tstatus: string;\n\tpriority: string;\n\tlabels: string[];\n\teffort: string;\n\tteam: string;\n\taccount: string;\n\tprojects: string[];\n\tlocation: string[];\n\tsprint: { start: string; end: string };\n\tbillable: boolean;\n\ttrend: number[];\n\tcommits: number[];\n\tcolor: string;\n\tnotes: string;\n\twatchers: string[];\n\towner: string;\n\treviewers: string;\n\tdue: string;\n\tbudget: number;\n\tprogress: number;\n\tconfidence: number;\n\trating: number;\n\tspec: string;\n\tcontact: string;\n\tupdated: string;\n}\n\n// ─── Options ──────────────────────────────────────────────────────────────────\n\nconst STATUS: CellOption[] = [\n\t{ value: 'backlog', label: 'Backlog', color: 'gray' },\n\t{ value: 'todo', label: 'To do', color: 'sky' },\n\t{ value: 'progress', label: 'In progress', color: 'amber' },\n\t{ value: 'review', label: 'In review', color: 'violet' },\n\t{ value: 'done', label: 'Done', color: 'emerald' },\n\t{ value: 'blocked', label: 'Blocked', color: 'rose' },\n];\n\nconst PRIORITY: CellOption[] = [\n\t{ value: 'urgent', label: 'Urgent', color: 'red', description: 'Drop everything' },\n\t{ value: 'high', label: 'High', color: 'orange', description: 'This sprint' },\n\t{ value: 'medium', label: 'Medium', color: 'yellow', description: 'Next sprint' },\n\t{ value: 'low', label: 'Low', color: 'gray', description: 'When there is time' },\n];\n\nconst LABELS: CellOption[] = [\n\t{ value: 'bug', label: 'Bug', color: 'red' },\n\t{ value: 'feature', label: 'Feature', color: 'blue' },\n\t{ value: 'perf', label: 'Performance', color: 'amber' },\n\t{ value: 'a11y', label: 'Accessibility', color: 'teal' },\n\t{ value: 'docs', label: 'Docs', color: 'gray' },\n\t{ value: 'security', label: 'Security', color: 'fuchsia' },\n];\n\nconst TEAMS: CellOption[] = [\n\t{ value: 'ui', label: 'UI Design', group: 'Design', color: 'pink' },\n\t{ value: 'ux', label: 'UX Research', group: 'Design', color: 'rose' },\n\t{ value: 'brand', label: 'Brand', group: 'Design', color: 'fuchsia' },\n\t{ value: 'fe', label: 'Frontend', group: 'Engineering', color: 'blue' },\n\t{ value: 'be', label: 'Backend', group: 'Engineering', color: 'indigo' },\n\t{ value: 'infra', label: 'Infrastructure', group: 'Engineering', color: 'cyan' },\n\t{ value: 'qa', label: 'Quality', group: 'Engineering', color: 'teal' },\n\t{ value: 'growth', label: 'Growth', group: 'Business', color: 'emerald' },\n\t{ value: 'sales', label: 'Sales', group: 'Business', color: 'lime' },\n\t{ value: 'support', label: 'Support', group: 'Business', color: 'amber' },\n];\n\nconst PEOPLE: PersonOption[] = [\n\t{ value: 'ava', label: 'Ava Chen', description: 'Engineering manager', group: 'Engineering' },\n\t{ value: 'liam', label: 'Liam Novak', description: 'Frontend', group: 'Engineering' },\n\t{ value: 'noah', label: 'Noah Patel', description: 'Backend', group: 'Engineering' },\n\t{ value: 'mia', label: 'Mia Rossi', description: 'Product design', group: 'Design' },\n\t{ value: 'zoe', label: 'Zoe Okafor', description: 'Research', group: 'Design' },\n\t{ value: 'ethan', label: 'Ethan Brooks', description: 'QA lead', group: 'Engineering' },\n\t{ value: 'sofia', label: 'Sofia Lind', description: 'Growth', group: 'Business' },\n\t{ value: 'kai', label: 'Kai Tanaka', description: 'Infrastructure', group: 'Engineering' },\n];\n\nconst EFFORT: CellOption[] = [\n\t{ value: 's', label: 'S', color: 'emerald' },\n\t{ value: 'm', label: 'M', color: 'amber' },\n\t{ value: 'l', label: 'L', color: 'rose' },\n];\n\n/** Office locations: country → state → city. */\nconst LOCATIONS: CascadeOption[] = [\n\t{\n\t\tvalue: 'in',\n\t\tlabel: 'India',\n\t\tchildren: [\n\t\t\t{\n\t\t\t\tvalue: 'ka',\n\t\t\t\tlabel: 'Karnataka',\n\t\t\t\tchildren: [\n\t\t\t\t\t{ value: 'blr', label: 'Bengaluru' },\n\t\t\t\t\t{ value: 'mys', label: 'Mysuru' },\n\t\t\t\t],\n\t\t\t},\n\t\t\t{\n\t\t\t\tvalue: 'mh',\n\t\t\t\tlabel: 'Maharashtra',\n\t\t\t\tchildren: [\n\t\t\t\t\t{ value: 'bom', label: 'Mumbai' },\n\t\t\t\t\t{ value: 'pnq', label: 'Pune' },\n\t\t\t\t],\n\t\t\t},\n\t\t\t{ value: 'dl', label: 'Delhi', children: [{ value: 'del', label: 'New Delhi' }] },\n\t\t],\n\t},\n\t{\n\t\tvalue: 'us',\n\t\tlabel: 'United States',\n\t\tchildren: [\n\t\t\t{\n\t\t\t\tvalue: 'ca',\n\t\t\t\tlabel: 'California',\n\t\t\t\tchildren: [\n\t\t\t\t\t{ value: 'sf', label: 'San Francisco' },\n\t\t\t\t\t{ value: 'la', label: 'Los Angeles' },\n\t\t\t\t],\n\t\t\t},\n\t\t\t{ value: 'ny', label: 'New York', children: [{ value: 'nyc', label: 'New York City' }] },\n\t\t\t{ value: 'wa', label: 'Washington', children: [{ value: 'sea', label: 'Seattle' }] },\n\t\t],\n\t},\n\t{\n\t\tvalue: 'de',\n\t\tlabel: 'Germany',\n\t\tchildren: [\n\t\t\t{ value: 'be', label: 'Berlin', children: [{ value: 'ber', label: 'Berlin' }] },\n\t\t\t{ value: 'by', label: 'Bavaria', children: [{ value: 'muc', label: 'Munich' }] },\n\t\t],\n\t},\n\t{\n\t\tvalue: 'jp',\n\t\tlabel: 'Japan',\n\t\tchildren: [\n\t\t\t{\n\t\t\t\tvalue: 'tk',\n\t\t\t\tlabel: 'Tokyo',\n\t\t\t\tchildren: [\n\t\t\t\t\t{ value: 'shb', label: 'Shibuya' },\n\t\t\t\t\t{ value: 'mnt', label: 'Minato' },\n\t\t\t\t],\n\t\t\t},\n\t\t],\n\t},\n];\nconst LOCATION_PATHS: string[][] = LOCATIONS.flatMap((c) =>\n\t(c.children ?? []).flatMap((s) => (s.children ?? []).map((city) => [c.value, s.value, city.value]))\n);\n\nconst NOTES = [\n\t'Waiting on legal review before the copy changes go out.',\n\t'Repro only on Safari 17.\\nAttach the HAR file from the support ticket.',\n\t'Pair with design on the empty states; spec is in the linked doc.',\n\t'',\n\t'Customer asked for a CSV export as well — scope it separately.',\n\t'Blocked until the staging cluster is upgraded.',\n];\n\n/**\n * Pressing a linked record chip: a preview card anchored to the chip, built on the grid's own\n * popover so it follows the grid theme. A real app would navigate or open a drawer from here.\n */\nlet openPreview: CellPopover | null = null;\nfunction showRecordPreview(value: string, chip: HTMLElement) {\n\topenPreview?.close();\n\tconst record = PROJECTS.find((p) => p.value === value);\n\tif (!record) return;\n\tconst [code, stage] = (record.description ?? '').split(' · ');\n\tconst hue = CELL_HUES[record.color as keyof typeof CELL_HUES] ?? CELL_HUES.blue;\n\tconst card = document.createElement('div');\n\tcard.style.cssText = 'width:260px;padding:8px;display:flex;flex-direction:column;gap:12px';\n\tcard.innerHTML = `\n\t\t<div style=\"display:flex;align-items:center;gap:10px\">\n\t\t\t<span style=\"width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:700;color:#fff;background:${hue}\">${record.label![0]}</span>\n\t\t\t<div style=\"min-width:0\">\n\t\t\t\t<div style=\"font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\"></div>\n\t\t\t\t<div style=\"font-size:12px;color:var(--og-ct-muted)\">${code}</div>\n\t\t\t</div>\n\t\t</div>\n\t\t<div style=\"display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px\">\n\t\t\t<span style=\"color:var(--og-ct-muted)\">Stage</span><span>${stage}</span>\n\t\t\t<span style=\"color:var(--og-ct-muted)\">Linked tasks</span><span>${(parseInt(value.slice(4), 10) % 9) + 2}</span>\n\t\t\t<span style=\"color:var(--og-ct-muted)\">Lead</span><span>${PEOPLE[parseInt(value.slice(4), 10) % PEOPLE.length].label}</span>\n\t\t</div>\n\t\t<div style=\"display:flex;justify-content:flex-end;gap:6px\">\n\t\t\t<button type=\"button\" class=\"og-ct-btn\" data-ghost>Close</button>\n\t\t\t<button type=\"button\" class=\"og-ct-btn\" data-primary>Open project</button>\n\t\t</div>`;\n\t(card.querySelector('div > div > div') as HTMLElement).textContent = record.label!;\n\tconst popover = openCellPopover({ anchor: chip, content: card, label: record.label, onDismiss: () => (openPreview = null) });\n\topenPreview = popover;\n\tfor (const button of card.querySelectorAll('button')) button.addEventListener('click', () => popover.close());\n}\n\nconst TASKS = [\n\t'Redesign onboarding flow',\n\t'Fix flaky checkout test',\n\t'Migrate auth to OAuth 2.1',\n\t'Dark mode for settings',\n\t'Audit color contrast',\n\t'Speed up search index',\n\t'Quarterly pricing review',\n\t'Write API rate-limit docs',\n\t'Kubernetes node upgrade',\n\t'Customer interview round',\n\t'Rebuild CSV importer',\n\t'Harden file uploads',\n];\n\n// ─── Column types ─────────────────────────────────────────────────────────────\n// Built-in names (checkbox, date, datetime, percent, url, email) need no registration; these add options.\n\nconst TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {\n\tstatus: selectColumnType(STATUS, { noneLabel: 'No status' }),\n\tpriority: selectColumnType(PRIORITY, { variant: 'dot' }),\n\tlabels: multiSelectColumnType(LABELS, { maxVisible: 2, searchable: true }),\n\tteam: comboboxColumnType(TEAMS, { searchPlaceholder: 'Search teams…' }),\n\t// Options on a server: paged and searched there, labels looked up for the values in cells.\n\taccount: comboboxColumnType([], {\n\t\tloadOptions: accountsServer.load,\n\t\tresolveOptions: accountsServer.resolve,\n\t\tsearchPlaceholder: 'Search 10,000 accounts…',\n\t}),\n\twatchers: personColumnType({\n\t\tmultiple: true,\n\t\tloadOptions: directoryServer.load,\n\t\tresolveOptions: directoryServer.resolve,\n\t\tsearchPlaceholder: 'Search 2,000 people…',\n\t}),\n\towner: personColumnType({ people: PEOPLE }),\n\treviewers: personColumnType({ people: PEOPLE, multiple: true }),\n\tbudget: currencyColumnType({ currency: 'USD', decimals: 0, step: 500, colorNegative: true }),\n\tprogress: progressColumnType(),\n\tconfidence: progressColumnType({ max: 1, traffic: true }),\n\trating: ratingColumnType(),\n\teffort: segmentedColumnType(EFFORT),\n\t// Links to another table: record chips, a record picker paged from its API, chips open the record.\n\tprojects: linkedRecordColumnType([], {\n\t\tloadOptions: projectsServer.load,\n\t\tresolveOptions: projectsServer.resolve,\n\t\tsearchPlaceholder: 'Find a project…',\n\t\tonOpen: (value, _params, chip) => showRecordPreview(value, chip),\n\t}),\n\tlocation: cascadeColumnType({ options: LOCATIONS, searchPlaceholder: 'Search cities…' }),\n\tsprint: dateRangeColumnType(),\n\tbillable: switchColumnType({ onLabel: 'Billable', offLabel: 'Internal' }),\n\ttrend: sparklineColumnType({ type: 'area', colorBy: 'trend', curve: 'smooth', label: 'change' }),\n\tcommits: sparklineColumnType({ type: 'bar', color: 'violet', label: 'last', reference: 'average', format: { decimals: 0 } }),\n\tcolor: colorColumnType(),\n\tnotes: longTextColumnType({ maxLength: 500, placeholder: 'Add a note…' }),\n};\n\nconst COLUMNS: ColumnDef<TaskRow>[] = [\n\t{ field: 'done', header: '', width: 48, type: 'checkbox' },\n\t{ field: 'task', header: 'Task', width: 220 },\n\t{ field: 'status', header: 'Status', width: 140, type: 'status' },\n\t{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },\n\t{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },\n\t{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },\n\t{ field: 'team', header: 'Team', width: 150, type: 'team' },\n\t{ field: 'account', header: 'Account', width: 200, type: 'account' },\n\t{ field: 'projects', header: 'Projects', width: 240, type: 'projects' },\n\t{ field: 'watchers', header: 'Watchers', width: 120, type: 'watchers' },\n\t{ field: 'owner', header: 'Owner', width: 160, type: 'owner' },\n\t{ field: 'reviewers', header: 'Reviewers', width: 120, type: 'reviewers' },\n\t{ field: 'location', header: 'Office', width: 240, type: 'location' },\n\t{ field: 'due', header: 'Due', width: 140, type: 'date' },\n\t{ field: 'sprint', header: 'Sprint', width: 250, type: 'sprint' },\n\t{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },\n\t{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },\n\t{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },\n\t{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },\n\t{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },\n\t{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },\n\t{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },\n\t{ field: 'color', header: 'Colour', width: 130, type: 'color' },\n\t{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },\n\t{ field: 'spec', header: 'Spec', width: 190, type: 'url' },\n\t{ field: 'contact', header: 'Contact', width: 200, type: 'email' },\n\t{ field: 'updated', header: 'Updated', width: 190, type: 'datetime' },\n];\n\nfunction pick<T>(list: readonly T[], n: number): T {\n\treturn list[n % list.length];\n}\n\nfunction generateTasks(count: number): TaskRow[] {\n\treturn Array.from({ length: count }, (_, i) => {\n\t\tconst owner = pick(PEOPLE, i * 3);\n\t\tconst progress = (i * 37) % 101;\n\t\treturn {\n\t\t\tid: `T-${1001 + i}`,\n\t\t\tdone: progress >= 90,\n\t\t\ttask: pick(TASKS, i) + (i >= TASKS.length ? ` #${Math.floor(i / TASKS.length) + 1}` : ''),\n\t\t\tstatus: i % 11 === 5 ? '' : pick(STATUS, i * 5).value,\n\t\t\tpriority: pick(PRIORITY, i * 3 + 1).value,\n\t\t\tlabels: [pick(LABELS, i).value, pick(LABELS, i * 2 + 3).value, ...(i % 4 === 0 ? [pick(LABELS, i + 4).value] : [])].filter(\n\t\t\t\t(v, k, all) => all.indexOf(v) === k\n\t\t\t),\n\t\t\teffort: pick(EFFORT, i * 2).value,\n\t\t\tteam: pick(TEAMS, i * 7).value,\n\t\t\taccount: pick(ACCOUNTS, i * 37).value,\n\t\t\tprojects:\n\t\t\t\ti % 5 === 3\n\t\t\t\t\t? []\n\t\t\t\t\t: [\n\t\t\t\t\t\t\tpick(PROJECTS, i * 11).value,\n\t\t\t\t\t\t\t...(i % 2 === 0 ? [pick(PROJECTS, i * 17 + 5).value] : []),\n\t\t\t\t\t\t\t...(i % 6 === 0 ? [pick(PROJECTS, i + 40).value] : []),\n\t\t\t\t\t\t],\n\t\t\tlocation: pick(LOCATION_PATHS, i * 3),\n\t\t\tsprint: (() => {\n\t\t\t\tconst start = new Date(2026, 8, 1 + (i % 6) * 14);\n\t\t\t\tconst end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 13);\n\t\t\t\tconst iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;\n\t\t\t\treturn { start: iso(start), end: iso(end) };\n\t\t\t})(),\n\t\t\tbillable: i % 3 !== 1,\n\t\t\ttrend: Array.from({ length: 12 }, (_, w) =>\n\t\t\t\tMath.round(40 + 25 * Math.sin((w + i) / 2.2) + ((i * 7 + w * 13) % 17) + (i % 2 ? w * 2 : -w))\n\t\t\t),\n\t\t\tcommits: Array.from({ length: 10 }, (_, d) => ((i * 31 + d * 17) % 23) - (d % 4 === 3 ? 4 : 0)),\n\t\t\tcolor: ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#ec4899', '#64748b'][i % 8],\n\t\t\tnotes: pick(NOTES, i),\n\t\t\twatchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],\n\t\t\towner: owner.value,\n\t\t\treviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),\n\t\t\tdue: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,\n\t\t\tbudget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),\n\t\t\tprogress,\n\t\t\tconfidence: ((i * 29) % 100) / 100,\n\t\t\trating: (i * 3) % 6,\n\t\t\tspec: `docs.example.com/specs/${1001 + i}`,\n\t\t\tcontact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,\n\t\t\tupdated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,\n\t\t};\n\t});\n}\n\n// ─── Reference ────────────────────────────────────────────────────────────────\n\nconst TYPE_REFERENCE: { name: string; text: string }[] = [\n\t{ name: 'selectColumnType', text: 'One option, tinted badge. Variants: soft, dot, outline, plain. Optional “none” entry.' },\n\t{ name: 'multiSelectColumnType', text: 'Chips with +N overflow; checkbox list editor.' },\n\t{ name: 'comboboxColumnType', text: 'Searchable, grouped list for long option sets.' },\n\t{ name: 'tagsColumnType', text: 'Free tags: type to create, colours from the palette.' },\n\t{ name: 'personColumnType', text: 'Avatar and name, or stacked avatars; people picker.' },\n\t{\n\t\tname: 'loadOptions · resolveOptions',\n\t\ttext: 'Options from a server: searched there, paged in as the list scrolls, labels looked up for cells (Account, Watchers).',\n\t},\n\t{ name: \"'date' · 'datetime'\", text: 'Intl formatting; calendar popover with keyboard navigation.' },\n\t{ name: \"'number' · 'currency' · 'percent'\", text: 'Intl number formats, stepper editor with bounds.' },\n\t{ name: 'progressColumnType', text: 'Bar with label; fixed colour or traffic-light.' },\n\t{ name: 'ratingColumnType', text: 'Stars, click to rate.' },\n\t{ name: 'segmentedColumnType', text: 'Two to four options inline; one press picks (Effort).' },\n\t{ name: 'linkedRecordColumnType', text: 'Record chips from another table, a paged record picker; pressing a chip opens a preview (Projects).' },\n\t{ name: 'cascadeColumnType', text: 'A path through a tree, one column per level, search across paths (Office).' },\n\t{ name: 'dateRangeColumnType', text: 'Two-month range calendar with presets (Sprint).' },\n\t{ name: 'sparklineColumnType', text: 'Line, area, bar or win/loss charts; trend colours, markers, reference lines (Trend, Commits).' },\n\t{ name: 'longTextColumnType', text: 'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).' },\n\t{ name: 'colorColumnType', text: 'Palette, hex field and the system picker (Colour).' },\n\t{ name: \"'checkbox' · switchColumnType\", text: 'Toggle on press or Enter, keeping the value’s own shape (Billing).' },\n\t{\n\t\tname: 'filters',\n\t\ttext: 'Every column filters with an editor that fits its type: funnel in the header, the header menu, the filter row, the sidebar and the query builder all share it.',\n\t},\n\t{ name: \"'url' · 'email'\", text: 'Safe links (http, https, mailto only).' },\n];\n\nconst SNIPPET = `import { selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';\n\nconst columnTypes = {\n  status: selectColumnType([\n    { value: 'todo', label: 'To do', color: 'sky' },\n    { value: 'done', label: 'Done',  color: 'emerald' },\n  ], { noneLabel: 'No status' }),\n  team: comboboxColumnType([\n    { value: 'fe', label: 'Frontend', group: 'Engineering' },\n    { value: 'ui', label: 'UI Design', group: 'Design' },\n  ]),\n};\n\nconst columns = [\n  { field: 'status', header: 'Status', type: 'status' },\n  { field: 'due',    header: 'Due',    type: 'date' },\n  { field: 'price',  header: 'Price',  type: 'currency' },\n];\n\n// Colours follow the grid theme. To adjust cells alone, set\n// --og-ct-accent, --og-ct-radius, --og-ct-rating… on the grid.`;\n\n/** Every built-in theme, with its background and accent for the swatch. */\nconst THEMES = BUILT_IN_THEME_ORDER.map((name) => {\n\tconst tokens = getBuiltInTheme(name);\n\treturn { name, label: BUILT_IN_THEME_METADATA[name].label, bg: tokens.bgColor, accent: tokens.focusRing };\n});\n\n// ─── Page component ───────────────────────────────────────────────────────────\n\ninterface NativeCellTypesDemoProps {\n\tonGridReady?: (event: GridReadyEvent<TaskRow>) => void;\n\t/** Hides the reference sidebar and the toolbar frame, keeping just the grid (for embedding). */\n\tcompact?: boolean;\n\t/**\n\t * The grid theme, when the host picks it (the docs hero). Hides the built-in theme picker; the\n\t * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.\n\t */\n\ttheme?: BuiltInThemeName;\n}\n\nexport default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {\n\tconst rows = useMemo(() => generateTasks(200), []);\n\tconst apiRef = useRef<GridApi<TaskRow> | null>(null);\n\tconst [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');\n\tconst theme = controlledTheme ?? ownTheme;\n\tconst themeRef = useRef(theme);\n\tconst [showSnippet, setShowSnippet] = useState(false);\n\t// The floating filter row: compact filter editors under the headers (on by default on the page).\n\tconst [filterRow, setFilterRow] = useState(!compact);\n\t// The theme the grid is created with (no flash of the default theme); later changes switch it.\n\tconst initialState = useMemo(() => ({ themeName: themeRef.current }), []);\n\n\tconst handleReady = useCallback(\n\t\t(event: GridReadyEvent<TaskRow>) => {\n\t\t\tapiRef.current = event.api;\n\t\t\t// A remounted grid starts on the theme it was created with: bring it to the current one.\n\t\t\tif (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);\n\t\t\tonGridReady?.(event);\n\t\t},\n\t\t[onGridReady]\n\t);\n\tuseEffect(() => {\n\t\tthemeRef.current = theme;\n\t\tconst api = apiRef.current;\n\t\tif (api && api.getThemeName() !== theme) api.switchTheme(theme);\n\t}, [theme]);\n\n\tconst grid = (\n\t\t<Grid\n\t\t\trowModelType='client'\n\t\t\trows={rows}\n\t\t\tcolumns={COLUMNS}\n\t\t\tcolumnTypes={TASK_COLUMN_TYPES}\n\t\t\tinitialState={initialState}\n\t\t\tnavigationOptions={{ editTrigger: 'doubleClick' }}\n\t\t\tpinLeftColumns={2}\n\t\t\tshowFloatingFilters={filterRow}\n\t\t\tshowFilterChipBar\n\t\t\tonGridReady={handleReady}\n\t\t\trendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}\n\t\t/>\n\t);\n\tif (compact) return <div style={{ height: '100%', width: '100%', minHeight: 0, minWidth: 0 }}>{grid}</div>;\n\n\treturn (\n\t\t<div className='flex flex-col lg:flex-row h-full w-full gap-5 overflow-hidden'>\n\t\t\t<div className='flex-1 flex flex-col gap-3 min-h-[360px] lg:min-h-0 min-w-0'>\n\t\t\t\t<div className='border border-slate-800 rounded-xl px-3 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-slate-900/30'>\n\t\t\t\t\t<div className='flex items-center gap-2 text-[11px] text-slate-300 font-semibold'>\n\t\t\t\t\t\t<Box className='w-4 h-4 text-violet-400' />\n\t\t\t\t\t\tNative cell types\n\t\t\t\t\t\t<span className='text-slate-500 font-normal'>· double-click or press Enter to edit · funnel in a header to filter</span>\n\t\t\t\t\t</div>\n\t\t\t\t\t<button\n\t\t\t\t\t\tonClick={() => setFilterRow((v) => !v)}\n\t\t\t\t\t\taria-pressed={filterRow}\n\t\t\t\t\t\tclassName={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${\n\t\t\t\t\t\t\tfilterRow ? 'border-slate-500 bg-slate-800 text-slate-100' : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'\n\t\t\t\t\t\t}`}\n\t\t\t\t\t>\n\t\t\t\t\t\t<Filter className='w-3.5 h-3.5' />\n\t\t\t\t\t\tFilter row\n\t\t\t\t\t</button>\n\t\t\t\t\t{!controlledTheme && (\n\t\t\t\t\t\t<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>\n\t\t\t\t\t\t\t<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />\n\t\t\t\t\t\t\t{THEMES.map((t) => (\n\t\t\t\t\t\t\t\t<button\n\t\t\t\t\t\t\t\t\tkey={t.name}\n\t\t\t\t\t\t\t\t\trole='radio'\n\t\t\t\t\t\t\t\t\taria-checked={theme === t.name}\n\t\t\t\t\t\t\t\t\tonClick={() => setOwnTheme(t.name)}\n\t\t\t\t\t\t\t\t\tclassName={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${\n\t\t\t\t\t\t\t\t\t\ttheme === t.name\n\t\t\t\t\t\t\t\t\t\t\t? 'border-slate-500 bg-slate-800 text-slate-100'\n\t\t\t\t\t\t\t\t\t\t\t: 'border-transparent text-slate-400 hover:bg-slate-800/60'\n\t\t\t\t\t\t\t\t\t}`}\n\t\t\t\t\t\t\t\t>\n\t\t\t\t\t\t\t\t\t<span\n\t\t\t\t\t\t\t\t\t\tclassName='w-2.5 h-2.5 rounded-full border border-slate-600'\n\t\t\t\t\t\t\t\t\t\tstyle={{ background: `linear-gradient(135deg, ${t.bg} 50%, ${t.accent} 50%)` }}\n\t\t\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t\t\t{t.label}\n\t\t\t\t\t\t\t\t</button>\n\t\t\t\t\t\t\t))}\n\t\t\t\t\t\t</div>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\n\t\t\t\t<div className='flex-1 min-h-0 min-w-0 rounded-xl overflow-hidden border border-slate-800'>{grid}</div>\n\t\t\t</div>\n\n\t\t\t<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>\n\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>\n\t\t\t\t\t{TYPE_REFERENCE.map((t) => (\n\t\t\t\t\t\t<div key={t.name} className='flex flex-col gap-0.5'>\n\t\t\t\t\t\t\t<code className='text-[11px] text-violet-300'>{t.name}</code>\n\t\t\t\t\t\t\t<span className='text-[11px] text-slate-500 leading-snug'>{t.text}</span>\n\t\t\t\t\t\t</div>\n\t\t\t\t\t))}\n\t\t\t\t\t<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>\n\t\t\t\t\t\tAll cells are DOM renderers from the grid core: no React work per cell, nothing to freeze while scrolling. Colours come from\n\t\t\t\t\t\tthe grid theme, so popovers and badges follow the theme switch above.\n\t\t\t\t\t</p>\n\t\t\t\t</div>\n\n\t\t\t\t<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-2.5'>\n\t\t\t\t\t<button className='flex items-center justify-between w-full text-left' onClick={() => setShowSnippet((v) => !v)}>\n\t\t\t\t\t\t<h3 className='text-[11px] font-semibold text-slate-300 flex items-center gap-1.5'>\n\t\t\t\t\t\t\t<Code2 className='w-3.5 h-3.5 text-emerald-400' />\n\t\t\t\t\t\t\tUsage\n\t\t\t\t\t\t</h3>\n\t\t\t\t\t\t<ChevronRight\n\t\t\t\t\t\t\tclassName='w-3 h-3 text-slate-500 transition-transform duration-150'\n\t\t\t\t\t\t\tstyle={{ transform: showSnippet ? 'rotate(90deg)' : 'none' }}\n\t\t\t\t\t\t/>\n\t\t\t\t\t</button>\n\t\t\t\t\t{showSnippet && (\n\t\t\t\t\t\t<pre className='text-[10px] text-slate-400 font-mono leading-relaxed bg-slate-950/80 border border-slate-900 rounded-lg p-3 overflow-x-auto whitespace-pre'>\n\t\t\t\t\t\t\t{SNIPPET}\n\t\t\t\t\t\t</pre>\n\t\t\t\t\t)}\n\t\t\t\t</div>\n\t\t\t</div>\n\t\t</div>\n\t);\n}\n",
 			"tokens": [
 				[
 					{
@@ -52467,6 +52215,18 @@
 				],
 				[
 					{
+						"content": "\topenCellPopover,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tCELL_HUES,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
 						"content": "} ",
 						"color": "#E1E4E8"
 					},
@@ -52520,6 +52280,12 @@
 				[
 					{
 						"content": "\tCellOption,",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\tCellPopover,",
 						"color": "#E1E4E8"
 					}
 				],
@@ -52581,7 +52347,7 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " { Box, Code2, ChevronRight, Palette } ",
+						"content": " { Box, Code2, ChevronRight, Filter, Palette } ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -56085,8 +55851,84 @@
 				[],
 				[
 					{
-						"content": "/** Opening a linked record: a demo stand-in for navigating to it. */",
+						"content": "/**",
 						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": " * Pressing a linked record chip: a preview card anchored to the chip, built on the grid's own",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": " * popover so it follows the grid theme. A real app would navigate or open a drawer from here.",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": " */",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "let",
+						"color": "#F97583"
+					},
+					{
+						"content": " openPreview",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CellPopover",
+						"color": "#B392F0"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "|",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "null",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
 					}
 				],
 				[
@@ -56099,7 +55941,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "showToast",
+						"content": "showRecordPreview",
 						"color": "#B392F0"
 					},
 					{
@@ -56107,7 +55949,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "text",
+						"content": "value",
 						"color": "#FFAB70"
 					},
 					{
@@ -56123,7 +55965,41 @@
 						"color": "#79B8FF"
 					},
 					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "chip",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "HTMLElement",
+						"color": "#B392F0"
+					},
+					{
 						"content": ") {",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\topenPreview?.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "close",
+						"color": "#B392F0"
+					},
+					{
+						"content": "();",
 						"color": "#E1E4E8"
 					}
 				],
@@ -56141,7 +56017,263 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "toast",
+						"content": "record",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "PROJECTS",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ".",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "find",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "p",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " p.value ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "===",
+						"color": "#F97583"
+					},
+					{
+						"content": " value);",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "if",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!",
+						"color": "#F97583"
+					},
+					{
+						"content": "record) ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "return",
+						"color": "#F97583"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "code",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "stage",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " (record.description ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "??",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "''",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ").",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "split",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "' · '",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ");",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "hue",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CELL_HUES",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[record.color ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "as",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "keyof",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "typeof",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CELL_HUES",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "??",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "CELL_HUES",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ".blue;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "card",
 						"color": "#79B8FF"
 					},
 					{
@@ -56175,53 +56307,19 @@
 				],
 				[
 					{
-						"content": "\ttoast.textContent ",
+						"content": "\tcard.style.cssText ",
 						"color": "#E1E4E8"
 					},
 					{
 						"content": "=",
 						"color": "#F97583"
-					},
-					{
-						"content": " text;",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\ttoast.style.cssText ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=",
-						"color": "#F97583"
-					}
-				],
-				[
-					{
-						"content": "\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:10001;padding:8px 14px;border-radius:8px;'",
-						"color": "#9ECBFF"
 					},
 					{
 						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "+",
-						"color": "#F97583"
-					}
-				],
-				[
-					{
-						"content": "\t\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "'background:#0f172a;color:#f8fafc;font:500 12.5px system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);transition:opacity .3s'",
+						"content": "'width:260px;padding:8px;display:flex;flex-direction:column;gap:12px'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -56231,37 +56329,7 @@
 				],
 				[
 					{
-						"content": "\tdocument.body.",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "appendChild",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(toast);",
-						"color": "#E1E4E8"
-					}
-				],
-				[
-					{
-						"content": "\t",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "setTimeout",
-						"color": "#B392F0"
-					},
-					{
-						"content": "(() ",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "=>",
-						"color": "#F97583"
-					},
-					{
-						"content": " (toast.style.opacity ",
+						"content": "\tcard.innerHTML ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -56273,19 +56341,373 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'0'",
+						"content": "`",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t<div style=\"display:flex;align-items:center;gap:10px\">",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<span style=\"width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:700;color:#fff;background:${",
 						"color": "#9ECBFF"
 					},
 					{
-						"content": "), ",
+						"content": "hue",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "1600",
+						"content": "}\">${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "record",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "label",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!",
+						"color": "#F97583"
+					},
+					{
+						"content": "[",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "0",
 						"color": "#79B8FF"
 					},
 					{
-						"content": ");",
+						"content": "]",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}</span>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<div style=\"min-width:0\">",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t<div style=\"font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\"></div>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t<div style=\"font-size:12px;color:var(--og-ct-muted)\">${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "code",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "}</div>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t</div>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t</div>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t<div style=\"display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:12.5px\">",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<span style=\"color:var(--og-ct-muted)\">Stage</span><span>${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "stage",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "}</span>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<span style=\"color:var(--og-ct-muted)\">Linked tasks</span><span>${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "parseInt",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "slice",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "4",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "), ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "10",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "9",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "+",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "2",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "}</span>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<span style=\"color:var(--og-ct-muted)\">Lead</span><span>${",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "PEOPLE",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "[",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "parseInt",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "value",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "slice",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "4",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "), ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "10",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ") ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "%",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "PEOPLE",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ".",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "length",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "].",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "label",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "}</span>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t</div>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t<div style=\"display:flex;justify-content:flex-end;gap:6px\">",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<button type=\"button\" class=\"og-ct-btn\" data-ghost>Close</button>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t<button type=\"button\" class=\"og-ct-btn\" data-primary>Open project</button>",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t</div>`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ";",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t(card.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "querySelector",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'div > div > div'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "as",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "HTMLElement",
+						"color": "#B392F0"
+					},
+					{
+						"content": ").textContent ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " record.label",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!",
+						"color": "#F97583"
+					},
+					{
+						"content": ";",
 						"color": "#E1E4E8"
 					}
 				],
@@ -56295,11 +56717,43 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "setTimeout",
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "popover",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "openCellPopover",
 						"color": "#B392F0"
 					},
 					{
-						"content": "(() ",
+						"content": "({ anchor: chip, content: card, label: record.label, ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "onDismiss",
+						"color": "#B392F0"
+					},
+					{
+						"content": ": () ",
 						"color": "#E1E4E8"
 					},
 					{
@@ -56307,23 +56761,123 @@
 						"color": "#F97583"
 					},
 					{
-						"content": " toast.",
+						"content": " (openPreview ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "remove",
-						"color": "#B392F0"
+						"content": "=",
+						"color": "#F97583"
 					},
 					{
-						"content": "(), ",
+						"content": " ",
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "2000",
+						"content": "null",
 						"color": "#79B8FF"
 					},
 					{
-						"content": ");",
+						"content": ") });",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\topenPreview ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " popover;",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "for",
+						"color": "#F97583"
+					},
+					{
+						"content": " (",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "button",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "of",
+						"color": "#F97583"
+					},
+					{
+						"content": " card.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "querySelectorAll",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'button'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ")) button.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "addEventListener",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'click'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ", () ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " popover.",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "close",
+						"color": "#B392F0"
+					},
+					{
+						"content": "());",
 						"color": "#E1E4E8"
 					}
 				],
@@ -57100,6 +57654,22 @@
 						"color": "#FFAB70"
 					},
 					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "_params",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "chip",
+						"color": "#FFAB70"
+					},
+					{
 						"content": ") ",
 						"color": "#E1E4E8"
 					},
@@ -57112,107 +57682,11 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "showToast",
+						"content": "showRecordPreview",
 						"color": "#B392F0"
 					},
 					{
-						"content": "(",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "`Open project ${",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "PROJECTS",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ".",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "find",
-						"color": "#B392F0"
-					},
-					{
-						"content": "((",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "p",
-						"color": "#79B8FF"
-					},
-					{
-						"content": ") ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "=>",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "p",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ".",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "value",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "===",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "value",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": ")?.",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "label",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "??",
-						"color": "#F97583"
-					},
-					{
-						"content": " ",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "value",
-						"color": "#E1E4E8"
-					},
-					{
-						"content": "}`",
-						"color": "#9ECBFF"
-					},
-					{
-						"content": "),",
+						"content": "(value, chip),",
 						"color": "#E1E4E8"
 					}
 				],
@@ -58039,7 +58513,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "200",
+						"content": "250",
 						"color": "#79B8FF"
 					},
 					{
@@ -62341,7 +62815,7 @@
 						"color": "#E1E4E8"
 					},
 					{
-						"content": "'Record chips from another table, a paged record picker; chips open the record (Projects).'",
+						"content": "'Record chips from another table, a paged record picker; pressing a chip opens a preview (Projects).'",
 						"color": "#9ECBFF"
 					},
 					{
@@ -62478,6 +62952,46 @@
 					},
 					{
 						"content": " },",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t{",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\tname: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'filters'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\ttext: ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "'Every column filters with an editor that fits its type: funnel in the header, the header menu, the filter row, the sidebar and the query builder all share it.'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ",",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t},",
 						"color": "#E1E4E8"
 					}
 				],
@@ -63401,6 +63915,70 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "// The floating filter row: compact filter editors under the headers (on by default on the page).",
+						"color": "#6A737D"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "const",
+						"color": "#F97583"
+					},
+					{
+						"content": " [",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "filterRow",
+						"color": "#79B8FF"
+					},
+					{
+						"content": ", ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setFilterRow",
+						"color": "#79B8FF"
+					},
+					{
+						"content": "] ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "useState",
+						"color": "#B392F0"
+					},
+					{
+						"content": "(",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!",
+						"color": "#F97583"
+					},
+					{
+						"content": "compact);",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "// The theme the grid is created with (no flash of the default theme); later changes switch it.",
 						"color": "#6A737D"
 					}
@@ -63949,6 +64527,34 @@
 						"color": "#E1E4E8"
 					},
 					{
+						"content": "showFloatingFilters",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{filterRow}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "showFilterChipBar",
+						"color": "#B392F0"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
 						"content": "onGridReady",
 						"color": "#B392F0"
 					},
@@ -64294,7 +64900,7 @@
 						"color": "#9ECBFF"
 					},
 					{
-						"content": ">· double-click or press Enter on a cell to edit</",
+						"content": ">· double-click or press Enter to edit · funnel in a header to filter</",
 						"color": "#E1E4E8"
 					},
 					{
@@ -64313,6 +64919,226 @@
 					},
 					{
 						"content": "div",
+						"color": "#85E89D"
+					},
+					{
+						"content": ">",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "button",
+						"color": "#85E89D"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "onClick",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{() ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "setFilterRow",
+						"color": "#B392F0"
+					},
+					{
+						"content": "((",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "v",
+						"color": "#FFAB70"
+					},
+					{
+						"content": ") ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "=>",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "!",
+						"color": "#F97583"
+					},
+					{
+						"content": "v)}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "aria-pressed",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{filterRow}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "{",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t\t",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "filterRow",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "?",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'border-slate-500 bg-slate-800 text-slate-100'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": ":",
+						"color": "#F97583"
+					},
+					{
+						"content": " ",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "'border-slate-800 text-slate-400 hover:bg-slate-800/60'",
+						"color": "#9ECBFF"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}`",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": "}",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t>",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\t<",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "Filter",
+						"color": "#79B8FF"
+					},
+					{
+						"content": " ",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "className",
+						"color": "#B392F0"
+					},
+					{
+						"content": "=",
+						"color": "#F97583"
+					},
+					{
+						"content": "'w-3.5 h-3.5'",
+						"color": "#9ECBFF"
+					},
+					{
+						"content": " />",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t\tFilter row",
+						"color": "#E1E4E8"
+					}
+				],
+				[
+					{
+						"content": "\t\t\t\t\t</",
+						"color": "#E1E4E8"
+					},
+					{
+						"content": "button",
 						"color": "#85E89D"
 					},
 					{

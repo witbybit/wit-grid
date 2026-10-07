@@ -19,6 +19,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "BooleanFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "BUILT_IN_THEME_METADATA",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -120,6 +125,16 @@
 		},
 		{
 			"name": "CellOptionsStore",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellPopover",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellPopoverOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -269,7 +284,7 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "CustomFilterRendererParams",
+			"name": "CustomFilterCondition",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -306,6 +321,11 @@
 		{
 			"name": "dateRangeColumnType",
 			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangeFilterCondition",
+			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
@@ -364,6 +384,21 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "DomFilterEditor",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DomFilterEditorHandle",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DomFilterEditorParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "DomGroupRenderer",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -389,42 +424,12 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "FilterFetchParams",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterFetchResult",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
 			"name": "FilterModel",
 			"kind": "type",
 			"source": "./types.js"
 		},
 		{
-			"name": "FilterPageParams",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterPageResult",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterSelectOption",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
 			"name": "FilterSurface",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FloatingFilterRendererParams",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -854,8 +859,18 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "openCellPopover",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "parseMultiValue",
 			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "PathFilterCondition",
+			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
@@ -1072,6 +1087,11 @@
 			"name": "StyleRule",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "summarizeFilter",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "SwitchCellOptions",
@@ -1625,7 +1645,7 @@
 					"name": "groupRowRenderer",
 					"optional": true,
 					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
-					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\r\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
 				},
 				{
 					"name": "detailRowRenderer",
