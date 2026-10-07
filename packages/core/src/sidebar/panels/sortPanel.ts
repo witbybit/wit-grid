@@ -103,7 +103,7 @@ export const sortPanel: SidebarPanel<any> = {
 					const order = el('span', 'og-sb-rule-order', String(index + 1));
 					const name = el('span', 'og-sb-rule-name', labelOf(item.colId));
 					name.title = labelOf(item.colId);
-					const sample = (api.getDataRowAtVisualIndex(0) as Record<string, unknown> | null)?.[item.colId];
+					const sample = (api.getDisplayedRowAtIndex(0)?.data as Record<string, unknown> | undefined)?.[item.colId];
 					const [ascLabel, descLabel] = directionLabels(column, sample);
 					const direction = el('div', 'og-sb-seg');
 					direction.setAttribute('role', 'radiogroup');

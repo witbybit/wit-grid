@@ -512,14 +512,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		this.engine.setQuickFilterModel(trimmed ? { text: trimmed, columnIds } : null);
 	};
 
-	public getQueryModel = (): GridQueryModel | null => {
-		return this.state.queryModel ?? null;
-	};
-
-	public clearQueryModel = (): void => {
-		this.engine.setQueryModel(null);
-	};
-
 	public evaluateQueryForRow = (rowId: string): boolean => {
 		const queryModel = this.state.queryModel;
 		if (!queryModel) return true;

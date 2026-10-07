@@ -155,9 +155,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	getQuickFilter(): QuickFilterModel | null;
 	/** Search a single string across multiple columns (or every column). See `QuickFilterModel`. */
 	setQuickFilter(text: string, columnIds?: string[]): void;
-	getQueryModel(): GridQueryModel | null;
+	/** Sets the cross-column query; `null` clears it. The current one is `getStateSnapshot().queryModel`. */
 	setQueryModel(model: GridQueryModel | null): void;
-	clearQueryModel(): void;
 	evaluateQueryForRow(rowId: string): boolean;
 	getColumnDistinctValues(colField: string): (string | number | null)[];
 	getColumnDistinctValueSummary(colField: string): GridDistinctValueSummary;

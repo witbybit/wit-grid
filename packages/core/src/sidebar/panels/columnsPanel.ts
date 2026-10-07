@@ -38,8 +38,8 @@ export const columnsPanel: SidebarPanel<any> = {
 		const columns = () => api.getColumns().filter((c) => !isHierarchyColumn(c) && !c.field.startsWith('__'));
 		const labelOf = (c: ColumnDef<any>) => c.header || c.field;
 		const groupBy = () => api.getGroupBy();
-		const canGroup = (c: ColumnDef<any>) => c.enableRowGroup !== false && (api.can?.('group', { colField: c.field })?.allowed ?? true);
-		const canPin = (field: string) => api.can?.('pin', { colField: field })?.allowed ?? true;
+		const canGroup = (c: ColumnDef<any>) => c.enableRowGroup !== false && api.can('group', { colField: c.field }).allowed;
+		const canPin = (field: string) => api.can('pin', { colField: field }).allowed;
 		const laneOf = (field: string): Lane | null => {
 			const shown = api.getDisplayedColumns();
 			const index = shown.findIndex((c) => c.field === field);

@@ -14,7 +14,7 @@ const PLUGIN_RUNTIME_MEMBERS = `
 	getColumnDistinctValues getColumnDistinctValueSummary copySelectedRange pasteFromClipboard copyRange
 	setColumnVisible setColumnsVisible getColumns getDisplayedColumns setPinnedColumns getPinnedColumns
 	moveColumn setColumnOrder setColumnReorderEnabled setRowHeight setSortModel setFilterModel getQuickFilter
-	setQuickFilter getQueryModel setQueryModel clearQueryModel evaluateQueryForRow setStyleRules setGroupBy
+	setQuickFilter setQueryModel evaluateQueryForRow setStyleRules setGroupBy
 	getGroupBy addGroupBy removeGroupBy moveGroupBy getGrouping setGrouping updateGrouping getTreeData
 	setTreeData getAggregation setAggregation getHierarchyColumn setHierarchyColumn getDetail setDetail
 	setExpanded toggleExpanded isExpanded expandAll collapseAll setDetailOpen toggleDetailOpen isDetailOpen

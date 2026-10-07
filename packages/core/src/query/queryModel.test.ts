@@ -90,28 +90,28 @@ function makeQuery(root: GridQueryGroup): GridQueryModel {
 
 // ── 1–3: API get/set/clear ─────────────────────────────────────────────────────
 
-describe('api.setQueryModel / getQueryModel / clearQueryModel', () => {
-	it('getQueryModel returns null initially', () => {
+describe('api.setQueryModel', () => {
+	it('no query at first', () => {
 		const { store, controller } = makeStore();
-		expect(store.getQueryModel()).toBeNull();
+		expect(store.getStateSnapshot().queryModel ?? null).toBeNull();
 		controller.dispose();
 		store.destroy();
 	});
 
-	it('setQueryModel stores the model and getQueryModel reflects it', () => {
+	it('stores the model; the snapshot reflects it', () => {
 		const { store, controller } = makeStore();
 		const model = makeQuery(andGroup([cond('name', 'contains', 'Alice')]));
 		store.setQueryModel(model);
-		expect(store.getQueryModel()).toEqual(model);
+		expect(store.getStateSnapshot().queryModel).toEqual(model);
 		controller.dispose();
 		store.destroy();
 	});
 
-	it('clearQueryModel resets to null', () => {
+	it('null clears it', () => {
 		const { store, controller } = makeStore();
 		store.setQueryModel(makeQuery(andGroup([cond('name', 'equals', 'Alice')])));
-		store.clearQueryModel();
-		expect(store.getQueryModel()).toBeNull();
+		store.setQueryModel(null);
+		expect(store.getStateSnapshot().queryModel ?? null).toBeNull();
 		controller.dispose();
 		store.destroy();
 	});
