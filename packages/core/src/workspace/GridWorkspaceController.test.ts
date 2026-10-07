@@ -72,6 +72,16 @@ describe('workspace', () => {
 		api.destroy();
 	});
 
+	it('a view of another schema version is not applied, not made active, and says why', async () => {
+		const old = { ...view('old', { sortModel: [{ colId: 'name', sort: 'desc' }] }), state: { v: 2, state: {} } as PersistedGridState };
+		const api = grid(memoryAdapter([old]));
+		await settle();
+		await expect(api.applyView('old')).rejects.toThrow('could not be applied');
+		expect(api.getWorkspaceState().activeViewId).toBeNull();
+		expect(api.getWorkspaceState().lastError).toContain('could not be applied');
+		api.destroy();
+	});
+
 	it('opens the default view when there is no saved session', async () => {
 		const sorted = view('sorted', { sortModel: [{ colId: 'name', sort: 'desc' }] });
 		const api = grid(memoryAdapter([sorted], 'sorted'));

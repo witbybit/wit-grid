@@ -316,3 +316,6 @@ export type {
 	SidebarPanelHandle,
 } from './sidebar/sidebarTypes.js';
 export { sidebarIconSvg, type SidebarIconName } from './sidebar/sidebarIcons.js';
+// ── Charts ───────────────────────────────────────────────────────────────────
+export { createGridChart, type GridChartHandle } from './charts/gridChart.js';
+export type { ChartAggregate, ChartData, ChartSeries, ChartSource, ChartSpec, ChartType } from './charts/chartTypes.js';

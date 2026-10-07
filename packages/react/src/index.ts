@@ -115,6 +115,8 @@ export type {
 export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
 export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
 export { resolveColumnFilterDef, summarizeFilter } from '@eregister/wit-grid-core';
+export { createGridChart, GRID_STATE_SCHEMA_VERSION } from '@eregister/wit-grid-core';
+export type { ChartAggregate, ChartData, ChartSeries, ChartSource, ChartSpec, ChartType, ExcelExportOptions, GridChartHandle } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
 export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js';

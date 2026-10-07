@@ -43,6 +43,8 @@ export interface GridContextMenuOptions<TRowData = unknown> {
 		| 'filterByValue'
 		| 'excludeValue'
 		| 'clearColumnFilter'
+		| 'chartRange'
+		| 'chartData'
 		| 'exportAll'
 		| 'exportExcel'
 		| 'exportSelected'
@@ -52,6 +54,14 @@ export interface GridContextMenuOptions<TRowData = unknown> {
 }
 
 type DefaultContextMenuItemId = NonNullable<GridContextMenuOptions['excludeDefaults']>[number];
+
+const CHART_ICON = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M8 17V9M13 17V5M18 17v-6"/></svg>`;
+
+/** The selection covers more than one cell. */
+function spansCells(params: { selection: { bounds: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null } }): boolean {
+	const b = params.selection.bounds;
+	return !!b && (b.minRow !== b.maxRow || b.minCol !== b.maxCol);
+}
 
 export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRowData> {
 	readonly name = 'contextMenu';
@@ -242,6 +252,21 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 				action: (p) => this.clearColumnFilter(p),
 			},
 			{ id: 'divider', isDivider: true },
+			{
+				id: 'chartRange',
+				label: 'Chart Range',
+				icon: CHART_ICON,
+				hidden: (p) => !spansCells(p),
+				// Reopened, the window charts the selection now.
+				action: () => this.reopenChart(),
+			},
+			{
+				id: 'chartData',
+				label: 'Chart Data',
+				icon: CHART_ICON,
+				hidden: (p) => spansCells(p),
+				action: () => this.reopenChart(),
+			},
 			{
 				id: 'exportAll',
 				label: 'Export All as CSV',
@@ -483,6 +508,12 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 	private canFilterColumn(colField: string): boolean {
 		const col = this.runtime.getColumnDef(colField);
 		return col ? isFilterableColumn(col) : false;
+	}
+
+	/** Opens the chart window afresh (it picks its data from the selection then). */
+	private reopenChart(): void {
+		if (this.runtime.isChartOpen()) this.runtime.closeChart();
+		this.runtime.openChart();
 	}
 
 	private hasColumnFilter(colField: string): boolean {

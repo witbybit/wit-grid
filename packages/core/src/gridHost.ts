@@ -1,5 +1,6 @@
 import type { AdapterFilterMount } from './filters/filterEditors.js';
 import { GridSidebar } from './sidebar/gridSidebar.js';
+import { GridChartWindow } from './charts/chartWindow.js';
 import type { AdapterPanelMount, GridSidebarConfig } from './sidebar/sidebarTypes.js';
 import { RenderEngine } from './renderer/renderEngine.js';
 import type { RenderStats } from './renderer/renderTelemetry.js';
@@ -65,6 +66,8 @@ export interface GridHostOptions<TRowData = unknown> {
 	sidebar?: GridSidebarConfig<TRowData>;
 	/** Renders adapter sidebar panels (`renderPanel`). */
 	mountPanel?: AdapterPanelMount;
+	/** The chart window, opened with `api.openChart()` (and the context menu's Chart range). */
+	chart?: boolean;
 	autoRowHeight?: boolean;
 }
 
@@ -271,6 +274,7 @@ export function mountGridHost<TRowData>(
 		container.appendChild(sidebar.element);
 	};
 	setSidebar(options.sidebar ?? null);
+	const chartWindow = options.chart ? new GridChartWindow(api) : null;
 
 	const observer = new ResizeObserver((entries) => {
 		if (!internalApi.isBindingCurrent(binding)) return;
@@ -381,6 +385,7 @@ export function mountGridHost<TRowData>(
 			observer.disconnect();
 			sidebar?.destroy();
 			sidebar = null;
+			chartWindow?.destroy();
 			renderEngine.unmount();
 			internalApi.unbindRuntimePorts(binding);
 			if (shell) {

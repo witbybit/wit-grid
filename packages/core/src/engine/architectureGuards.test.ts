@@ -434,11 +434,6 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('InternalGridApi');
 	});
 
-	it('GridChartOverlay.tsx does not import @eregister/wit-grid-core/internal', () => {
-		const content = readFileSync(resolve(REACT_ROOT, 'src', 'chart', 'GridChartOverlay.tsx'), 'utf-8');
-		expect(content).not.toContain('@eregister/wit-grid-core/internal');
-	});
-
 	it('internal adapter entrypoint does not use broad export barrels', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'internal.ts'), 'utf-8');
 		expect(content).not.toContain('export * from');

@@ -30,7 +30,13 @@ import type {
 import type { ColumnDef } from '../columnDef.js';
 import type { RowModelCapability } from '../rowModel.js';
 import type { ColumnState } from '../state/GridState.js';
-import type { GridPersistenceAdapter, PersistenceController, PersistenceStatus, PersistedGridState } from '../persistence/statePersistence.js';
+import {
+	validatePersistedGridState,
+	type GridPersistenceAdapter,
+	type PersistenceController,
+	type PersistenceStatus,
+	type PersistedGridState,
+} from '../persistence/statePersistence.js';
 
 interface GridRuntimeCompositionOptions<TRowData> {
 	runtime: GridRuntime<TRowData>;
@@ -101,6 +107,7 @@ export function createGridRuntimeComposition<TRowData>({
 		applyGridState: (state: PersistedGridState) =>
 			persistenceController ? persistenceController.suspendAutoSave(() => runtime.applyGridState(state)) : runtime.applyGridState(state),
 		getRawRowById: (rowId: string) => runtime.getRawRowById(rowId),
+		forEachNode: (callback: Parameters<typeof runtime.forEachNode>[0]) => runtime.forEachNode(callback),
 		applyRowSelectionGesture: (gesture: RowSelectionGesture) => runtime.applyRowSelectionGesture(gesture),
 		selectRows: (rowIds: string[], options?: SelectRowsOptions) => runtime.selectRows(rowIds, options),
 		deselectRows: (rowIds: string[]) => runtime.deselectRows(rowIds),
@@ -158,6 +165,13 @@ export function createGridRuntimeComposition<TRowData>({
 			if (!workspaceController) return;
 			const view = await workspaceController.getView(id);
 			if (!view) throw new Error(`[wit-grid] workspace: view "${id}" not found`);
+			// A view this grid cannot restore (another schema version, malformed): not applied, not active.
+			const invalid = validatePersistedGridState(view.state);
+			if (invalid) {
+				const error = new Error(`View "${view.name}" could not be applied: ${invalid}`);
+				workspaceController.fail('apply view', error);
+				throw error;
+			}
 			if (persistenceController) {
 				persistenceController.suspendAutoSave(() => runtime.applyGridState(view.state));
 			} else {

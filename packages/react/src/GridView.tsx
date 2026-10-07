@@ -25,7 +25,6 @@ import {
 import { PortalManager, createPortalStore } from './GridPortal.js';
 import { flashCopiedCells } from './cellFlash.js';
 import type { GridSidebarConfig } from './sidebar/sidebarConfig.js';
-import { GridChartOverlay } from './chart/GridChartOverlay.js';
 
 export interface GridViewProps<TRowData = unknown> {
 	api: GridApi<TRowData>;
@@ -199,6 +198,7 @@ export function GridView<TRowData = unknown>({
 			mountFilter: filterMount,
 			sidebar: sidebarRef.current as CoreGridSidebarConfig<TRowData> | undefined,
 			mountPanel: panelMount,
+			chart: enableChart,
 			headerMenu: {
 				mountHeaderMenu: (mount) => {
 					portalStore.mountMenu(mount.colField, mount.container, mount.column, mount.close);
@@ -239,7 +239,7 @@ export function GridView<TRowData = unknown>({
 			host.destroy();
 			portalStore.clear(true);
 		};
-	}, [api, portalStore, hasSidebar]);
+	}, [api, portalStore, hasSidebar, enableChart]);
 
 	useEffect(() => {
 		if (sidebar) hostRef.current?.setSidebar(sidebar as CoreGridSidebarConfig<TRowData>);
@@ -341,7 +341,6 @@ export function GridView<TRowData = unknown>({
 		<GridAdapterContext.Provider value={adapterHandle}>
 			<GridFilterMountContext.Provider value={filterMount}>
 				{gridPane}
-				{enableChart && <GridChartOverlay api={api} />}
 			</GridFilterMountContext.Provider>
 		</GridAdapterContext.Provider>
 	);

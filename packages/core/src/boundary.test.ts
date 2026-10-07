@@ -113,6 +113,7 @@ describe('Public/internal boundary', () => {
 				'createDateRenderer',
 				'createEmptyQueryModel',
 				'createFilterEditor',
+				'createGridChart',
 				'createInfiniteGrid',
 				'createLinkRenderer',
 				'createLocalStorageAdapter',

@@ -39,6 +39,8 @@ export interface GridWorkspaceController {
 	/** The grid's state changed: `dirty` tells whether it still matches the active view. */
 	syncCurrentState(current: PersistedGridState): void;
 	setDefaultView(id: string | null): Promise<void>;
+	/** Records a failure of a workspace operation run elsewhere (lastError, the error callback). */
+	fail(operation: string, error: unknown): void;
 	destroy(): void;
 }
 
@@ -189,6 +191,11 @@ export function createWorkspaceController(adapter: GridWorkspaceAdapter, onError
 				await adapter.setDefaultView?.(id);
 				patch({ defaultViewId: id, lastError: null });
 			});
+		},
+
+		fail(operation, error) {
+			patch({ lastError: error instanceof Error ? error.message : String(error) });
+			onError?.(operation, error);
 		},
 
 		destroy() {
