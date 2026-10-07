@@ -46,7 +46,7 @@
 		{
 			"name": "BuiltinSidebarPanelId",
 			"kind": "type",
-			"source": "./sidebar/GridSidebar.js"
+			"source": "./sidebar/sidebarConfig.js"
 		},
 		{
 			"name": "BuiltInThemeName",
@@ -159,6 +159,36 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "ChartAggregate",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ChartData",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ChartSeries",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ChartSource",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ChartSpec",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ChartType",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "checkboxColumnType",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -220,6 +250,11 @@
 		},
 		{
 			"name": "createDateRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createGridChart",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -419,6 +454,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "ExcelExportOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "FailedVisualRow",
 			"kind": "type",
 			"source": "./types.js"
@@ -442,6 +482,11 @@
 			"name": "Grid",
 			"kind": "value",
 			"source": "./Grid.js"
+		},
+		{
+			"name": "GRID_STATE_SCHEMA_VERSION",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "GridApi",
@@ -495,6 +540,11 @@
 		},
 		{
 			"name": "GridCellPointer",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridChartHandle",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -671,7 +721,7 @@
 		{
 			"name": "GridSidebarConfig",
 			"kind": "type",
-			"source": "./sidebar/GridSidebar.js"
+			"source": "./sidebar/sidebarConfig.js"
 		},
 		{
 			"name": "GridStateSnapshot",
@@ -1059,9 +1109,14 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "SidebarPanelContext",
+			"kind": "type",
+			"source": "./sidebar/sidebarConfig.js"
+		},
+		{
 			"name": "SidebarPanelDef",
 			"kind": "type",
-			"source": "./sidebar/GridSidebar.js"
+			"source": "./sidebar/sidebarConfig.js"
 		},
 		{
 			"name": "SortModel",

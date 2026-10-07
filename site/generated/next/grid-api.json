@@ -35,7 +35,7 @@
 					"name": "transaction",
 					"optional": false,
 					"signature": "(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>",
-					"description": "The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)\ncommit atomically — one change, one undo entry, one repaint of what changed — with any grid\nstate (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it\nwith other queued row-only transactions into one commit before the next frame (high-frequency\nfeeds), awaits async validation of its cells, and resolves once committed. Any synchronous\nwrite commits the queue first, so writes land in call order."
+					"description": "The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)\r\ncommit atomically — one change, one undo entry, one repaint of what changed — with any grid\r\nstate (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it\r\nwith other queued row-only transactions into one commit before the next frame (high-frequency\r\nfeeds), awaits async validation of its cells, and resolves once committed. Any synchronous\r\nwrite commits the queue first, so writes land in call order."
 				},
 				{
 					"name": "transaction",
@@ -393,19 +393,10 @@
 					"description": "Search a single string across multiple columns (or every column). See `QuickFilterModel`."
 				},
 				{
-					"name": "getQueryModel",
-					"optional": false,
-					"signature": "(): GridQueryModel | null"
-				},
-				{
 					"name": "setQueryModel",
 					"optional": false,
-					"signature": "(model: GridQueryModel | null): void"
-				},
-				{
-					"name": "clearQueryModel",
-					"optional": false,
-					"signature": "(): void"
+					"signature": "(model: GridQueryModel | null): void",
+					"description": "Sets the cross-column query; `null` clears it. The current one is `getStateSnapshot().queryModel`."
 				},
 				{
 					"name": "evaluateQueryForRow",
@@ -845,6 +836,12 @@
 					"signature": "(id: string): Promise<void>"
 				},
 				{
+					"name": "revertView",
+					"optional": false,
+					"signature": "(): Promise<void>",
+					"description": "Puts the grid back as it was when the active view was applied, saved or updated."
+				},
+				{
 					"name": "deleteView",
 					"optional": false,
 					"signature": "(id: string): Promise<void>"
@@ -945,6 +942,18 @@
 					"optional": false,
 					"signature": "(options?: CsvExportOptions): string",
 					"description": "The CSV text `exportCsv` would download."
+				},
+				{
+					"name": "exportExcel",
+					"optional": false,
+					"signature": "(options?: ExcelExportOptions): Promise<void>",
+					"description": "Downloads an Excel workbook that keeps the grid's number, currency, percent and date formats."
+				},
+				{
+					"name": "getExcel",
+					"optional": false,
+					"signature": "(options?: ExcelExportOptions): Promise<Blob>",
+					"description": "The workbook `exportExcel` would download."
 				},
 				{
 					"name": "can",
