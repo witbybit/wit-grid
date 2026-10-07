@@ -1,220 +1,111 @@
 /**
- * Rich column filter definition — supersedes the legacy filterType / filterValues on ColumnDef.
+ * A column's filter: the one config every filter surface reads (header funnel and menu, floating
+ * filter row, sidebar panel, query builder), and the filter model and matching it implies.
  *
- * Designed so that no consumer ever needs to write a custom filter component:
- *   - multi-select / single-select      static option lists
- *   - async-multi-select / async-single-select   server-fetched options with debounce + abort
- *   - infinite-multi-select             server-paginated virtually-scrolled list
- *   - custom                            escape hatch: pass any React component
- *
- * All built-in types render consistently across all three filter surfaces:
- *   sidebar panel, header 3-dot menu, and the floating filter row.
+ * Column types supply a default (`selectColumnType` filters as a select of its options, a
+ * date-range column by overlap…); a column's own `filterDef` wins. Without either a column
+ * filters as text.
  */
+import type { CascadeCellOptions, CascadeStore } from '../cells/cascade.js';
+import type { NumberCellOptions } from '../cells/format.js';
+import type { CellOption } from '../cells/listbox.js';
+import type { CellOptionsLoader, CellOptionsResolver, CellOptionsStore } from '../cells/optionsStore.js';
+import type { ColumnFilter, FilterCondition } from '../filterModel.js';
 
-import type { ColumnFilter } from '../filterModel.js';
+export type ColumnFilterType = 'text' | 'number' | 'date' | 'boolean' | 'select' | 'dateRange' | 'path' | 'custom' | 'none';
 
-// ── Option model ──────────────────────────────────────────────────────────────
+/** Where a filter editor is shown: it adapts its layout (compact in the floating row). */
+export type FilterSurface = 'popover' | 'menu' | 'floating' | 'sidebar' | 'query';
 
-export interface FilterSelectOption<TValue = unknown> {
-	/** Display label shown in the filter list and chip bar. */
-	label: string;
-	/** The actual value stored in the filter condition. Must be serializable. */
-	value: TValue;
-	/** When true, the option is visible but cannot be selected. */
-	disabled?: boolean;
-	/** Group header label. Consecutive options sharing the same group render under one divider. */
-	group?: string;
-	/** Secondary text rendered below the label. */
-	description?: string;
-	/** Numeric badge (e.g. matching row count). */
-	count?: number;
-	/** Optional icon — URL, emoji, or icon-font class. */
-	icon?: string;
-}
-
-// ── Async fetch params ────────────────────────────────────────────────────────
-
-export interface FilterFetchParams<TRowData = unknown> {
-	/** Current search query typed by the user. Empty string on initial load. */
-	query: string;
-	/** Values already selected — useful for prioritisation or exclusion hints. */
-	selectedValues: unknown[];
-	/** Static extra payload merged from `filterDef.fetchParams`. */
-	params: Record<string, unknown>;
-}
-
-export interface FilterFetchResult<TValue = unknown> {
-	options: FilterSelectOption<TValue>[];
-	/** Server-side total count — displayed as "Showing X of Y". */
-	totalCount?: number;
-}
-
-export interface FilterPageParams<TRowData = unknown> extends FilterFetchParams<TRowData> {
-	/** 0-based page index. */
-	page: number;
-	/** Rows per page — controlled by `filterDef.pageSize` (default: 50). */
-	pageSize: number;
-}
-
-export interface FilterPageResult<TValue = unknown> {
-	options: FilterSelectOption<TValue>[];
-	/** When false, no further pages exist. */
-	hasMore: boolean;
-	totalCount?: number;
-}
-
-// ── Custom filter renderer params ─────────────────────────────────────────────
-
-export type FilterSurface = 'sidebar' | 'header-menu' | 'floating';
-
-export interface CustomFilterRendererParams<TRowData = unknown> {
-	/** Current filter value from FilterModel, or null when no filter is active. */
-	value: ColumnFilter | null;
-	/**
-	 * Update the pending filter value without triggering the row pipeline.
-	 * Use for live-preview while the user types. Call onCommit to apply.
-	 */
-	onChange: (filter: ColumnFilter | null) => void;
-	/** Commit the filter immediately — triggers row pipeline re-evaluation. */
-	onCommit: (filter: ColumnFilter | null) => void;
-	/** The column field being filtered. */
+export interface DomFilterEditorParams {
+	/** The column's field. */
 	colField: string;
-	/** The rendering surface — use this to render compact vs. full UI. */
+	/** The resolved definition (column type default merged with the column's own). */
+	filterDef: ColumnFilterDef<any>;
+	/** The column's current filter, if any. */
+	filter: ColumnFilter | null;
+	/** Apply a filter (null clears). Editors call it as the user picks, or on Enter / Apply for typed values. */
+	onChange: (filter: ColumnFilter | null) => void;
+	/** The user is done (Enter on a list, Apply): popovers close on it. */
+	onClose?: () => void;
 	surface: FilterSurface;
+	/** Distinct values of the column with row counts (client-side models). */
+	distinctValues?: () => { values: readonly (string | number | null)[]; counts?: readonly number[] };
 }
 
-// ── Filter def ────────────────────────────────────────────────────────────────
+export interface DomFilterEditorHandle {
+	focus?(): void;
+	destroy?(): void;
+}
 
-export type ColumnFilterType =
-	// Legacy (preserved for backwards compat)
-	| 'text'
-	| 'number'
-	| 'date'
-	// New select types
-	| 'multi-select'
-	| 'single-select'
-	| 'async-multi-select'
-	| 'async-single-select'
-	| 'infinite-multi-select'
-	// Full custom React UI
-	| 'custom'
-	| 'none';
+/** A filter editor written against the DOM: core's built-in editors and custom ones alike. */
+export interface DomFilterEditor {
+	mount(container: HTMLElement, params: DomFilterEditorParams): DomFilterEditorHandle;
+}
 
-export interface ColumnFilterDef<TRowData = unknown, TValue = unknown> {
-	// ── Type discriminant ──────────────────────────────────────────────────────
+export interface ColumnFilterDef<TRowData = unknown> {
 	type: ColumnFilterType;
 
-	// ── Static options (multi-select, single-select) ───────────────────────────
-	/**
-	 * Static option list or a sync factory called once on mount.
-	 * For dynamic options use fetchOptions / fetchPage.
-	 */
-	options?: FilterSelectOption<TValue>[] | ((distinctValues: (string | number | null)[]) => FilterSelectOption<TValue>[]);
+	// ── Text, number, date ─────────────────────────────────────────────────────
+	/** Operators offered (by value); default all of the type's operators. */
+	operators?: readonly string[];
+	/** Number display in chips and inputs. */
+	format?: NumberCellOptions;
+	/** Number inputs: bounds and step. */
+	min?: number;
+	max?: number;
+	step?: number;
+	/** Number filter shown as a star picker (“at least ★★★”), up to this many stars. */
+	stars?: number;
 
-	// ── Async options (async-multi-select, async-single-select) ───────────────
-	/**
-	 * Called on mount (empty query) and on each debounced query change.
-	 * The grid manages AbortSignal cancellation — stale results are discarded.
-	 */
-	fetchOptions?: (params: FilterFetchParams<TRowData>, signal: AbortSignal) => Promise<FilterFetchResult<TValue>>;
-
-	// ── Paginated options (infinite-multi-select) ──────────────────────────────
-	/**
-	 * Called for each page load. Page 0 on mount/query change; subsequent pages
-	 * as the user scrolls to the bottom of the list.
-	 */
-	fetchPage?: (params: FilterPageParams<TRowData>, signal: AbortSignal) => Promise<FilterPageResult<TValue>>;
-
-	// ── Custom filter renderer (type: 'custom') ────────────────────────────────
-	/**
-	 * Fully custom React filter component — rendered on all three surfaces unless
-	 * renderFloatingFilter is also provided.
-	 */
-	renderFilter?: (params: CustomFilterRendererParams<TRowData>) => unknown;
-
-	/**
-	 * Compact custom React component for the floating filter row only.
-	 * When omitted and renderFilter is set, renderFilter is used with surface='floating'.
-	 */
-	renderFloatingFilter?: (params: CustomFilterRendererParams<TRowData>) => unknown;
-
-	// ── Shared UX options ──────────────────────────────────────────────────────
-	/** Debounce ms before fetchOptions fires on query change. Default: 250. */
-	debounceMs?: number;
-	/** Minimum query length before fetchOptions fires. Default: 0 (fires on empty). */
-	minQueryLength?: number;
-	/** Maximum height of the option list in px. Default: 280. */
-	maxHeight?: number;
-	/** Rows per page for infinite scroll. Default: 50. */
+	// ── Select ─────────────────────────────────────────────────────────────────
+	/** Several values may be chosen. Default true. */
+	multiple?: boolean;
+	/** Cells hold lists (multi-select, tags, people): offer Any / All / None of. */
+	listValues?: boolean;
+	/** The choices: options, or a column type's store; default the column's distinct values. */
+	options?: readonly CellOption[] | CellOptionsStore;
+	/** Choices from a server, paged and searched there (as cell editors load them). */
+	loadOptions?: CellOptionsLoader;
+	resolveOptions?: CellOptionsResolver;
 	pageSize?: number;
-	/** Placeholder in the search input. */
-	placeholder?: string;
-	/** Text shown when no options match. Default: "No options". */
-	emptyLabel?: string;
-	/** Text shown while loading. Default: "Loading…". */
-	loadingLabel?: string;
-	/**
-	 * Whether to show the search input.
-	 * Default: auto (shown when options.length > 8 or type is async).
-	 */
+	/** Wait this long after typing before searching a server. Default 250 (0 for local options). */
+	debounceMs?: number;
+	/** Search a server only once this many characters are typed. Default 0. */
+	minQueryLength?: number;
+	/** Row counts beside options (client-side models). Default true. */
+	showCounts?: boolean;
+	/** Show colour swatches instead of a list (colour columns). */
+	swatches?: boolean;
 	searchable?: boolean;
-	/** Show "Select All / None" toggle at the top of multi-select lists. Default: true. */
-	showSelectAll?: boolean;
+	placeholder?: string;
+	emptyText?: string;
 
-	// ── Value mapping ──────────────────────────────────────────────────────────
-	/**
-	 * Derive the display label for a stored value (used by chip bar / floating badge).
-	 * Default: String(value).
-	 */
-	getOptionLabel?: (value: TValue) => string;
-	/**
-	 * Extract a serializable key from an option value.
-	 * Default: uses value directly when primitive, JSON.stringify otherwise.
-	 */
-	getOptionValue?: (value: TValue) => string | number;
+	// ── Path (cascading select) ────────────────────────────────────────────────
+	/** The tree to choose from: cascade options, or the column type's tree store (shares loaded levels). */
+	cascade?: CascadeCellOptions | CascadeStore;
 
-	// ── Request enrichment ─────────────────────────────────────────────────────
-	/** Static extra payload passed into every FilterFetchParams.params. */
-	fetchParams?: Record<string, unknown>;
+	// ── Custom ─────────────────────────────────────────────────────────────────
+	/** A DOM editor producing `{ type: 'custom', value }` (or any built-in condition). */
+	editor?: DomFilterEditor;
+	/** An adapter component (React) rendering the editor; adapters host it on every surface. */
+	renderFilter?(params: DomFilterEditorParams): unknown;
+	/** Client-side matching of a custom condition. */
+	matches?(value: unknown, filter: FilterCondition, row: TRowData): boolean;
 
-	// ── Chip bar ───────────────────────────────────────────────────────────────
-	/** Override chip label for the filter chip bar. */
-	getChipLabel?: (filter: ColumnFilter) => string;
+	// ── Chips ──────────────────────────────────────────────────────────────────
+	/** Chip text for this column's filter. */
+	summarize?(filter: ColumnFilter): string;
 }
 
-// ── Normalization ─────────────────────────────────────────────────────────────
+/** The parts of a column the filter config is read from. */
+export interface FilterConfigColumn<TRowData = unknown> {
+	field: string;
+	filterDef?: ColumnFilterDef<TRowData>;
+}
 
-/**
- * Resolve a column's filter definition from its filterDef (preferred) or legacy
- * filterType / filterValues fields. Returns null for filterType='none'.
- */
-export function resolveColumnFilterDef<TRowData>(
-	filterDef: ColumnFilterDef<TRowData> | undefined,
-	filterType: string | undefined,
-	filterValues: (string | number | null)[] | undefined
-): ColumnFilterDef<TRowData> | null {
-	// Explicit filterDef always wins
-	if (filterDef) {
-		if (filterDef.type === 'none') return null;
-		return filterDef;
-	}
-
-	// Normalize legacy filterType
-	const legacyType = filterType ?? 'text';
-
-	if (legacyType === 'none') return null;
-
-	if (legacyType === 'set') {
-		// Convert legacy set filter to multi-select
-		const def: ColumnFilterDef<TRowData, string | number | null> = { type: 'multi-select' };
-		if (filterValues) {
-			def.options = filterValues.map((v) => ({
-				label: v == null ? '(blank)' : String(v),
-				value: v,
-			}));
-		}
-		return def as ColumnFilterDef<TRowData>;
-	}
-
-	return { type: legacyType as ColumnFilterType } as ColumnFilterDef<TRowData>;
+/** A column's filter definition: its own, else text. Null when the column does not filter. */
+export function resolveColumnFilterDef<TRowData>(column: FilterConfigColumn<TRowData>): ColumnFilterDef<TRowData> | null {
+	const def = column.filterDef ?? { type: 'text' };
+	return def.type === 'none' ? null : def;
 }

@@ -60,26 +60,9 @@ function toOptions(input: readonly CellOptionInput[]): CellOption[] {
 	return input.map((option) => (typeof option === 'string' ? { value: option } : option));
 }
 
-function filterOption(option: CellOption) {
-	return { value: option.value, label: optionLabel(option), group: option.group, description: option.description };
-}
-
-/** The column's filter list: the options, or pages from the same loader the editor uses. */
-function selectFilter(store: CellOptionsStore): ColumnTypeDefinition['filterDef'] {
-	const fetch = store.fetch;
-	if (!fetch) return { type: 'multi-select', options: store.options.map(filterOption) };
-	return {
-		type: 'infinite-multi-select',
-		pageSize: store.pageSize,
-		getOptionLabel: (value) => {
-			const option = store.get(String(value));
-			return option ? optionLabel(option) : String(value);
-		},
-		fetchPage: async (params, signal) => {
-			const page = await fetch({ search: params.query, offset: params.page * params.pageSize, limit: params.pageSize, signal });
-			return { options: page.options.map(filterOption), hasMore: !!page.hasMore, totalCount: page.total };
-		},
-	};
+/** A select filter over the column's options (static or loaded): the same store its cells use. */
+function selectFilter(store: CellOptionsStore, listValues = false): ColumnTypeDefinition['filterDef'] {
+	return { type: 'select', options: store, listValues };
 }
 
 function labelOf(store: CellOptionsStore, value: string): string {
@@ -101,6 +84,7 @@ export function checkboxColumnType(): ColumnTypeDefinition<any> {
 		// Toggles on press; Enter / F2 toggles too, with nothing to type.
 		cellEditor: { kind: 'dom', editor: createToggleEditor() },
 		valueFormatter: ({ value }) => (isCheckedCellValue(value) ? 'Yes' : 'No'),
+		filterDef: { type: 'boolean' },
 	};
 }
 
@@ -110,6 +94,7 @@ export function switchColumnType(options: SwitchCellOptions = {}): ColumnTypeDef
 		renderer: { kind: 'dom', renderer: createSwitchRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createToggleEditor() },
 		valueFormatter: ({ value }) => (isCheckedCellValue(value) ? (options.onLabel ?? 'On') : (options.offLabel ?? 'Off')),
+		filterDef: { type: 'boolean' },
 	};
 }
 
@@ -130,6 +115,7 @@ export function colorColumnType(options: ColorCellOptions = {}): ColumnTypeDefin
 		renderer: { kind: 'dom', renderer: createColorRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createColorEditor(options) },
 		valueFormatter: ({ value }) => normalizeHexColor(value)?.toUpperCase() ?? '',
+		filterDef: { type: 'select', swatches: true },
 	};
 }
 
@@ -150,6 +136,7 @@ export function dateRangeColumnType(options: DateRangeCellOptions = {}): ColumnT
 			const range = parseDateRange(value);
 			return range ? formatDateRange(range, options.locale) : '';
 		},
+		filterDef: { type: 'dateRange' },
 	};
 }
 
@@ -171,6 +158,7 @@ export function cascadeColumnType(options: CascadeCellOptions): ColumnTypeDefini
 				})
 				.join(options.separator ?? ' › ');
 		},
+		filterDef: { type: 'path', cascade: store },
 	};
 }
 
@@ -188,7 +176,7 @@ export function numberColumnType(options: NumberCellOptions = {}): ColumnTypeDef
 		renderer: { kind: 'dom', renderer: createNumberRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor(options) },
 		valueFormatter: ({ value }) => formatCellNumber(value, options) ?? '',
-		filterDef: { type: 'number' },
+		filterDef: { type: 'number', format: options, min: options.min, max: options.max, step: options.step },
 	};
 }
 
@@ -256,6 +244,7 @@ export function multiSelectColumnType(
 			parseMultiValue(value)
 				.map((v) => labelOf(store, v))
 				.join(', '),
+		filterDef: selectFilter(store, true),
 	};
 }
 
@@ -290,6 +279,7 @@ export function linkedRecordColumnType(input: readonly CellOptionInput[], config
 			parseMultiValue(value)
 				.map((v) => labelOf(store, v))
 				.join(', '),
+		filterDef: selectFilter(store, multiple),
 	};
 }
 
@@ -305,7 +295,7 @@ export function ratingColumnType(options: RatingCellOptions = {}): ColumnTypeDef
 	return {
 		renderer: { kind: 'dom', renderer: createRatingRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor({ min: 0, max: options.max ?? 5, step: 1, decimals: 0 }) },
-		filterDef: { type: 'number' },
+		filterDef: { type: 'number', stars: options.max ?? 5, min: 0, max: options.max ?? 5, step: 1 },
 	};
 }
 
@@ -342,6 +332,7 @@ export function personColumnType(
 			parseMultiValue(value)
 				.map((v) => labelOf(store, v))
 				.join(', '),
+		filterDef: selectFilter(store, !!config.multiple),
 	};
 }
 

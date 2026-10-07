@@ -1,6 +1,7 @@
 import { resolveCellColor, type CellColor } from './palette.js';
 import { cellIconSvg, createCellIcon, type CellIconName } from './icons.js';
 import type { CellOptionsPage } from './optionsStore.js';
+import { defaultGridScheduler, type GridScheduler } from '../renderer/gridScheduler.js';
 
 /** One choice of a select, multi-select or combobox column. */
 export interface CellOption {
@@ -45,13 +46,23 @@ export interface CellListboxOptions {
 	 * list scrolls near its end, and aborts a page that a newer search makes stale.
 	 */
 	load?: (search: string, offset: number, signal: AbortSignal) => Promise<CellOptionsPage>;
+	/** Wait this long after typing before searching the server (through the grid scheduler). */
+	debounceMs?: number;
+	/** Search the server only once this many characters are typed (an empty search still loads). */
+	minQueryLength?: number;
 	loadingText?: string;
 	errorText?: string;
+	/** Text at the end of an option's row (a row count in filters). */
+	trailing?: (option: CellOption) => string | null;
 }
 
 export interface CellListbox {
 	readonly element: HTMLDivElement;
 	focus(): void;
+	/** Replaces the chosen values (Select all / Clear in filters). */
+	setSelected(values: readonly string[]): void;
+	/** The values of the options listed now (after search). */
+	visibleValues(): string[];
 	/** Aborts a page still loading. */
 	destroy(): void;
 }
@@ -115,7 +126,7 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		search.appendChild(input);
 		element.appendChild(search);
 		input.addEventListener('input', () => {
-			if (load) fetchPage(true);
+			if (load) searchServer();
 			render(input!.value);
 		});
 	} else {
@@ -137,22 +148,62 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 	let controller: AbortController | null = null;
 	const query = () => input?.value ?? '';
 
+	let timer: ReturnType<GridScheduler['timeout']> | null = null;
+	let inFlight: string | null = null;
+	let tooShort = false;
+
+	/** A new search typed: wait out the debounce, then fetch its first page. */
+	function searchServer() {
+		if (timer !== null) defaultGridScheduler.clearTimeout(timer);
+		timer = null;
+		const q = query().trim();
+		tooShort = q.length > 0 && q.length < (config.minQueryLength ?? 0);
+		loaded = [];
+		hasMore = false;
+		total = undefined;
+		failed = false;
+		if (tooShort) {
+			loading = false;
+			return;
+		}
+		loading = true;
+		const wait = config.debounceMs ?? 0;
+		if (wait > 0)
+			timer = defaultGridScheduler.timeout(() => {
+				timer = null;
+				fetchPage(true);
+			}, wait);
+		else fetchPage(true);
+	}
+
 	function fetchPage(reset: boolean) {
 		if (!load) return;
+		const search = query();
 		if (reset) {
 			loaded = [];
 			hasMore = false;
 			total = undefined;
+			// One search request at a time: a newer search waits for the one in flight, then runs.
+			if (inFlight !== null) {
+				loading = true;
+				return;
+			}
 		}
-		controller?.abort();
 		controller = new AbortController();
 		const id = ++request;
+		inFlight = search;
 		loading = true;
 		failed = false;
 		list.setAttribute('aria-busy', 'true');
-		load(query(), loaded.length, controller.signal).then(
+		load(search, loaded.length, controller.signal).then(
 			(page) => {
 				if (id !== request) return;
+				inFlight = null;
+				// The search changed while this page loaded: drop it and run the latest.
+				if (search !== query()) {
+					fetchPage(true);
+					return;
+				}
 				const appended = loaded.length > 0;
 				const seen = new Set(loaded.map((option) => option.value));
 				for (const option of page.options) if (!seen.has(option.value)) loaded.push(option);
@@ -162,6 +213,11 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 			},
 			() => {
 				if (id !== request) return;
+				inFlight = null;
+				if (search !== query()) {
+					fetchPage(true);
+					return;
+				}
 				failed = true;
 				finish(true);
 			}
@@ -191,7 +247,9 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 		if (!load) return;
 		const row = document.createElement('div');
 		row.className = 'og-ct-list-status';
-		if (loading) {
+		if (tooShort) {
+			row.textContent = `Type ${config.minQueryLength} or more characters`;
+		} else if (loading) {
 			row.innerHTML = '<span class="og-ct-spinner" aria-hidden="true"></span>';
 			row.append(config.loadingText ?? 'Loading…');
 		} else if (failed) {
@@ -335,6 +393,13 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 					const marker = (config.leading ?? createOptionMarker)(option);
 					if (marker) row.appendChild(marker);
 					body(row, optionLabel(option), option.description);
+					const trailing = config.trailing?.(option);
+					if (trailing) {
+						const tail = document.createElement('span');
+						tail.className = 'og-ct-option-count';
+						tail.textContent = trailing;
+						row.appendChild(tail);
+					}
 				},
 				selected.has(option.value),
 				index
@@ -379,7 +444,7 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 			list.appendChild(el);
 		}
 
-		if (items.length === 0 && !loading && !failed) {
+		if (items.length === 0 && !loading && !failed && !tooShort) {
 			const empty = document.createElement('div');
 			empty.className = 'og-ct-list-empty';
 			empty.textContent = config.emptyText ?? 'No results found.';
@@ -490,8 +555,15 @@ export function createCellListbox(config: CellListboxOptions): CellListbox {
 	return {
 		element,
 		focus: () => focusTarget.focus({ preventScroll: true }),
+		setSelected(values) {
+			selected.clear();
+			for (const value of values) selected.add(value);
+			render(query(), true);
+		},
+		visibleValues: () => items.flatMap((item) => (item.kind === 'option' ? [item.option.value] : [])),
 		destroy() {
 			request++;
+			if (timer !== null) defaultGridScheduler.clearTimeout(timer);
 			controller?.abort();
 		},
 	};

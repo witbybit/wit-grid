@@ -32,37 +32,67 @@ export interface DateFilterCondition {
 	dateTo?: string;
 }
 
-export interface SetFilterCondition {
-	type: 'set';
-	/**
-	 * Values to include. null matches blank/empty cells.
-	 * An empty array matches no rows.
-	 */
-	values: (string | number | null)[];
-}
-
 /**
- * Used by all new select filter types (multi-select, single-select, async-*, infinite-*).
- * Supersedes SetFilterCondition for new filter definitions while remaining backwards-compatible.
+ * One or more chosen values (select, combobox, multi-select, tags, people, linked records).
+ * Plain cells match when their value is chosen. List cells (arrays, or comma-separated) match by
+ * `matchMode`: any chosen value present (default), all of them present, or none of them present.
  */
 export interface SelectFilterCondition {
 	type: 'select';
-	/** Selected option values. Length 1 for single-select, N for multi-select. */
+	/** Chosen values; null stands for blank cells. */
 	values: (string | number | null)[];
-	/**
-	 * Display labels parallel to values — stored so chip bar can show readable text
-	 * without re-fetching option lists on every render.
-	 */
+	/** Display labels parallel to `values`, kept for filter chips when options load from a server. */
 	labels?: string[];
-	/**
-	 * 'any' (default): row matches if cell value equals ANY selected value (OR logic).
-	 * 'all': row matches only if cell value equals ALL selected values (unusual — useful
-	 *         for array-valued cells or tag matching).
-	 */
-	matchMode?: 'any' | 'all';
+	matchMode?: 'any' | 'all' | 'none';
 }
 
-export type FilterCondition = TextFilterCondition | NumberFilterCondition | DateFilterCondition | SetFilterCondition | SelectFilterCondition;
+/** Checkbox and switch cells: true or false (blank counts as false). */
+export interface BooleanFilterCondition {
+	type: 'boolean';
+	value: boolean;
+}
+
+/**
+ * Date-range cells against a range: `overlaps` (shares any day), `within` (lies inside it) or
+ * `contains` (covers the single date `dateFrom`).
+ */
+export interface DateRangeFilterCondition {
+	type: 'dateRange';
+	operator: 'overlaps' | 'within' | 'contains';
+	/** ISO date (YYYY-MM-DD). */
+	dateFrom: string;
+	/** ISO date; not used by `contains`. */
+	dateTo?: string;
+}
+
+/**
+ * Cascading-select cells: a cell matches when its path starts with any chosen path, so choosing
+ * a country matches every city in it.
+ */
+export interface PathFilterCondition {
+	type: 'path';
+	paths: string[][];
+	/** Display labels for the chosen paths, for filter chips. */
+	labels?: string[];
+}
+
+/** A filter with its own editor and matching (`filterDef.type: 'custom'`); `value` is its own data. */
+export interface CustomFilterCondition {
+	type: 'custom';
+	value: unknown;
+	/** Chip text. */
+	label?: string;
+}
+
+export type FilterCondition =
+	| TextFilterCondition
+	| NumberFilterCondition
+	| DateFilterCondition
+	| SelectFilterCondition
+	| BooleanFilterCondition
+	| DateRangeFilterCondition
+	| PathFilterCondition
+	| CustomFilterCondition;
 
 export interface CompoundFilterCondition {
 	type: 'compound';

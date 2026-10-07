@@ -6,8 +6,8 @@ import type { GridEngine } from '../engine/GridEngine.js';
 import type { GridApi } from '../api/GridApi.js';
 import { reportRendererFault } from './rendererFaults.js';
 import { normalizeCapabilityResult } from '../capabilities/capabilityTypes.js';
-import { getOpsForType, applyFilterToModel } from '../filterOperations.js';
-import type { TextFilterOperator, NumberFilterOperator, DateFilterOperator } from '../filterModel.js';
+import type { FilterPopoverController } from './filterPopoverController.js';
+import type { DomFilterEditorHandle } from '../filters/filterDef.js';
 
 /**
  * Manages the column header context menu/popover lifecycle.
@@ -17,13 +17,16 @@ import type { TextFilterOperator, NumberFilterOperator, DateFilterOperator } fro
 export class HeaderMenuController<TRowData = unknown> {
 	private activePopover: HTMLDivElement | null = null;
 	private activeHeaderCell: HTMLElement | null = null;
-	private filterDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		private readonly engine: GridEngine<TRowData>,
 		private readonly portalMountManager: PortalMountManager<TRowData>,
-		private readonly getApi: () => GridApi<TRowData>
+		private readonly getApi: () => GridApi<TRowData>,
+		private readonly filters: FilterPopoverController<TRowData>
 	) {}
+
+	/** The filter editor embedded in the open menu. */
+	private filterHandle: DomFilterEditorHandle | null = null;
 
 	public show(headerCell: HTMLElement, colField: string): void {
 		// Toggle: clicking the same header button closes it.
@@ -283,83 +286,18 @@ export class HeaderMenuController<TRowData = unknown> {
 
 		const isFilterable =
 			column.canFilter === undefined || normalizeCapabilityResult(column.canFilter({ action: 'filter', colField: column.field })).allowed;
-		if (isFilterable) {
+		if (isFilterable && this.filters.isFilterable(colField)) {
+			// The column's filter editor: the same one the header funnel, sidebar and floating row show.
 			const filterContainer = document.createElement('div');
 			filterContainer.className = 'og-popover-filter-section';
-
 			const filterTitle = document.createElement('div');
 			filterTitle.className = 'og-popover-section-title';
-			filterTitle.textContent = 'Filter Column';
+			filterTitle.textContent = 'Filter';
 			filterContainer.appendChild(filterTitle);
-
-			let currentOperator = 'contains';
-			let currentFilterVal = '';
-			if (state.filterModel && state.filterModel[colField] !== undefined) {
-				const filterObj = state.filterModel[colField] as any;
-				if (filterObj && typeof filterObj === 'object') {
-					currentOperator = filterObj.operator ?? filterObj.type ?? 'contains';
-					currentFilterVal = filterObj.value != null ? String(filterObj.value) : (filterObj.dateFrom ?? '');
-				}
-			}
-
-			const filterType = column.filterType ?? 'text';
-			const select = document.createElement('select');
-			select.className = 'og-popover-select';
-			getOpsForType(filterType).forEach((op) => {
-				const opt = document.createElement('option');
-				opt.value = op.value;
-				opt.textContent = op.label;
-				if (op.value === currentOperator) opt.selected = true;
-				select.appendChild(opt);
-			});
-			filterContainer.appendChild(select);
-
-			const input = document.createElement('input');
-			input.type = 'text';
-			input.className = 'og-popover-input';
-			input.placeholder = 'Filter value...';
-			input.value = currentFilterVal;
-			input.addEventListener('keydown', (e) => {
-				if (e.key === 'Enter') applyBtn.click();
-			});
-			filterContainer.appendChild(input);
-
-			const btnGroup = document.createElement('div');
-			btnGroup.className = 'og-popover-btn-group';
-
-			const clearBtn = document.createElement('button');
-			clearBtn.className = 'og-popover-btn og-btn-secondary';
-			clearBtn.textContent = 'Clear';
-			clearBtn.addEventListener('click', () => {
-				this.engine.setFilterModel(applyFilterToModel(colField, null, state.filterModel));
-				this.hide();
-			});
-			btnGroup.appendChild(clearBtn);
-
-			const applyBtn = document.createElement('button');
-			applyBtn.className = 'og-popover-btn og-btn-primary';
-			applyBtn.textContent = 'Apply';
-			applyBtn.addEventListener('click', () => {
-				const term = input.value.trim();
-				const op = select.value;
-				const opMeta = getOpsForType(filterType).find((o) => o.value === op);
-				let condition = null;
-				if (opMeta?.noValue) {
-					if (filterType === 'number') condition = { type: 'number' as const, operator: op as NumberFilterOperator, value: 0 };
-					else if (filterType === 'date') condition = { type: 'date' as const, operator: op as DateFilterOperator, dateFrom: '' };
-					else condition = { type: 'text' as const, operator: op as TextFilterOperator, value: '' };
-				} else if (term) {
-					if (filterType === 'number')
-						condition = { type: 'number' as const, operator: op as NumberFilterOperator, value: Number(term) || 0 };
-					else if (filterType === 'date') condition = { type: 'date' as const, operator: op as DateFilterOperator, dateFrom: term };
-					else condition = { type: 'text' as const, operator: op as TextFilterOperator, value: term };
-				}
-				this.engine.setFilterModel(applyFilterToModel(colField, condition, state.filterModel));
-				this.hide();
-			});
-			btnGroup.appendChild(applyBtn);
-
-			filterContainer.appendChild(btnGroup);
+			const body = document.createElement('div');
+			body.className = 'og-popover-filter-body';
+			filterContainer.appendChild(body);
+			this.filterHandle = this.filters.mountEditor(body, colField, 'menu', this.hide);
 			sections.push(filterContainer);
 		}
 
@@ -399,10 +337,8 @@ export class HeaderMenuController<TRowData = unknown> {
 	}
 
 	public hide = (): void => {
-		if (this.filterDebounceTimer !== null) {
-			clearTimeout(this.filterDebounceTimer);
-			this.filterDebounceTimer = null;
-		}
+		this.filterHandle?.destroy?.();
+		this.filterHandle = null;
 		if (this.activePopover) {
 			this.activePopover.classList.add('og-closing');
 			this.activePopover.classList.remove('og-visible');
@@ -420,11 +356,12 @@ export class HeaderMenuController<TRowData = unknown> {
 		this._activeColField = null;
 		document.removeEventListener('mousedown', this._handleOutsideClick);
 		document.removeEventListener('keydown', this._handleKeyDown);
-		window.removeEventListener('scroll', this.hide, { capture: true });
+		window.removeEventListener('scroll', this._handleScroll, { capture: true });
 		window.removeEventListener('resize', this.hide);
 	};
 
 	private _handleOutsideClick = (e: MouseEvent): void => {
+		if ((e.target as HTMLElement | null)?.closest?.('.og-ct-popover')) return;
 		if (this.activePopover && !this.activePopover.contains(e.target as Node)) {
 			const clickedMenuBtn = (e.target as HTMLElement).closest('.og-header-menu-button');
 			if (clickedMenuBtn && this.activeHeaderCell !== null && clickedMenuBtn.closest('.og-header-cell') === this.activeHeaderCell) {
@@ -459,9 +396,16 @@ export class HeaderMenuController<TRowData = unknown> {
 	private _bindDismissListeners(): void {
 		document.addEventListener('mousedown', this._handleOutsideClick);
 		document.addEventListener('keydown', this._handleKeyDown);
-		window.addEventListener('scroll', this.hide, { capture: true, passive: true });
+		window.addEventListener('scroll', this._handleScroll, { capture: true, passive: true });
 		window.addEventListener('resize', this.hide);
 	}
+
+	/** The page or grid scrolled: close. Scrolling a list inside the menu (or its popovers) does not. */
+	private _handleScroll = (e: Event): void => {
+		const target = e.target as HTMLElement | null;
+		if (target instanceof Element && (this.activePopover?.contains(target) || target.closest('.og-ct-popover'))) return;
+		this.hide();
+	};
 
 	private _position(popover: HTMLDivElement, rect: DOMRect): void {
 		const popoverWidth = 220;

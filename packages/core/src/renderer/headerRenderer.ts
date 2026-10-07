@@ -20,6 +20,8 @@ export class HeaderRenderer<TRowData = unknown> {
 	private readonly engine: GridEngine<TRowData>;
 	private readonly columnInteractionsGetter: () => ColumnInteractionController<TRowData>;
 	private readonly showHeaderMenu: (cell: HTMLElement, colField: string) => void;
+	private readonly showFilter: (anchor: HTMLElement, colField: string) => void;
+	private readonly isFilterable: (colField: string) => boolean;
 
 	// Keyed by cell.id — leaf: the column's instance id (columnInstanceId, not field — stable across
 	// pin/unpin/reorder of an equivalent column, changes only if the column is semantically replaced);
@@ -55,11 +57,15 @@ export class HeaderRenderer<TRowData = unknown> {
 	constructor(
 		engine: GridEngine<TRowData>,
 		columnInteractionsGetter: () => ColumnInteractionController<TRowData>,
-		showHeaderMenu: (cell: HTMLElement, colField: string) => void
+		showHeaderMenu: (cell: HTMLElement, colField: string) => void,
+		showFilter: (anchor: HTMLElement, colField: string) => void,
+		isFilterable: (colField: string) => boolean
 	) {
 		this.engine = engine;
 		this.columnInteractionsGetter = columnInteractionsGetter;
 		this.showHeaderMenu = showHeaderMenu;
+		this.showFilter = showFilter;
+		this.isFilterable = isFilterable;
 	}
 
 	public mount(headerLayer: HTMLDivElement, headerLeftLayer: HTMLDivElement, headerRightLayer: HTMLDivElement): void {
@@ -268,8 +274,13 @@ export class HeaderRenderer<TRowData = unknown> {
 
 				const currentSort = state.sortModel?.find((s) => s.colId === cell.field);
 				paintSortIndicator(headerCell, cell.checkboxSelection ? null : (currentSort?.sort ?? null), cell.sortable !== false);
-				const filterIndicator = headerCell.querySelector('.og-header-filter-indicator') as HTMLDivElement | null;
-				if (filterIndicator) setDisplay(filterIndicator, state.filterModel && state.filterModel[cell.field] ? 'flex' : 'none');
+				const filterButton = headerCell.querySelector('.og-header-filter-button') as HTMLDivElement | null;
+				if (filterButton) {
+					const filterable = cell.isLeaf && !cell.checkboxSelection && this.isFilterable(cell.field);
+					setDisplay(filterButton, filterable ? 'flex' : 'none');
+					const active = filterable && !!state.filterModel?.[cell.field];
+					if (filterButton.hasAttribute('data-active') !== active) filterButton.toggleAttribute('data-active', active);
+				}
 
 				if (headerCell.dataset.colField !== cell.field) headerCell.dataset.colField = cell.field;
 				const colIndexText = String(cell.colStart);
@@ -406,12 +417,21 @@ export class HeaderRenderer<TRowData = unknown> {
 		sortIndicator.appendChild(svgDesc);
 		headerCell.appendChild(sortIndicator);
 
-		const filterIndicator = document.createElement('div');
-		filterIndicator.className = 'og-header-filter-indicator';
-		filterIndicator.style.display = 'none';
-		// Funnel icon
-		filterIndicator.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`;
-		headerCell.appendChild(filterIndicator);
+		// The column's filter: shown on hover, and in the accent colour while the column is filtered.
+		const filterButton = document.createElement('div');
+		filterButton.className = 'og-header-filter-button';
+		filterButton.setAttribute('role', 'button');
+		filterButton.setAttribute('aria-label', 'Filter column');
+		filterButton.style.display = 'none';
+		filterButton.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>`;
+		filterButton.addEventListener('mousedown', (e) => e.stopPropagation());
+		filterButton.addEventListener('click', (e) => {
+			e.stopPropagation();
+			e.preventDefault();
+			const colField = headerCell.dataset.colField;
+			if (colField) this.showFilter(headerCell, colField);
+		});
+		headerCell.appendChild(filterButton);
 
 		const menuButton = document.createElement('div');
 		menuButton.className = 'og-header-menu-button';

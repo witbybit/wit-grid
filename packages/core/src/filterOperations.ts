@@ -1,200 +1,251 @@
 /**
- * Centralised filter and sort metadata.
- *
- * Single source of truth for:
- *  - Operator tables (TEXT_OPS / NUMBER_OPS / DATE_OPS) with symbol, label, and chip label
- *  - Helper functions used by floatingFilterRenderer, filterChipBarRenderer, contextMenu,
- *    and headerMenuController so none of them duplicate the tables or logic.
+ * Filter metadata and model helpers shared by every filter surface: operator tables, the text of
+ * filter chips, “filter by value”, and filter model edits. All read the column's `filterDef`.
  */
+import { parseCascadeValue } from './cells/cascade.js';
+import { optionLabel, type CellOption } from './cells/listbox.js';
+import { formatCellNumber, isCheckedCellValue, parseMultiValue } from './cells/format.js';
+import { isCellOptionsStore } from './cells/optionsStore.js';
+import type { ColumnFilter, FilterCondition, FilterModel } from './filterModel.js';
+import { resolveColumnFilterDef, type ColumnFilterDef, type FilterConfigColumn } from './filters/filterDef.js';
 
-/** Minimal column shape needed by filter operations — avoids contravariant TRowData issues. */
-export interface FilterableColumn {
-	field: string;
-	filterType?: string | null;
-	filterValues?: unknown[];
-}
-
-import type { ColumnFilter, FilterModel, TextFilterOperator, NumberFilterOperator, DateFilterOperator } from './filterModel.js';
-
-// ── Operator metadata ────────────────────────────────────────────────────────
+// ── Operators ────────────────────────────────────────────────────────────────
 
 export interface OpOption {
 	/** Operator value used in the filter model (e.g. 'contains', 'gt'). */
 	value: string;
-	/** Full label shown in dropdowns and operator menus. */
+	/** Full label shown in operator pickers. */
 	label: string;
-	/** Compact symbol shown on the floating-filter operator button. */
+	/** Compact symbol for the floating filter row. */
 	symbol: string;
-	/** Short label used in filter chip text; falls back to symbol when omitted. */
+	/** Short label for filter chips; falls back to symbol. */
 	chipLabel?: string;
-	/** No value input needed (blank / notBlank operators). */
+	/** No value needed (blank / not blank). */
 	noValue?: boolean;
-	/** Two value inputs needed (inRange operator). */
+	/** Two values needed (between). */
 	range?: boolean;
 }
 
 export const TEXT_OPS: OpOption[] = [
 	{ value: 'contains', label: 'Contains', symbol: '~', chipLabel: 'contains' },
-	{ value: 'notContains', label: 'Not contains', symbol: '!~', chipLabel: '¬contains' },
-	{ value: 'equals', label: 'Equals', symbol: '=', chipLabel: '=' },
-	{ value: 'notEquals', label: 'Not equals', symbol: '≠', chipLabel: '≠' },
-	{ value: 'startsWith', label: 'Starts with', symbol: '^', chipLabel: 'starts' },
-	{ value: 'endsWith', label: 'Ends with', symbol: '$', chipLabel: 'ends' },
-	{ value: 'blank', label: 'Is blank', symbol: '∅', chipLabel: 'is blank', noValue: true },
-	{ value: 'notBlank', label: 'Not blank', symbol: '!∅', chipLabel: 'not blank', noValue: true },
+	{ value: 'notContains', label: 'Does not contain', symbol: '!~', chipLabel: 'not contains' },
+	{ value: 'equals', label: 'Is', symbol: '=', chipLabel: '=' },
+	{ value: 'notEquals', label: 'Is not', symbol: '≠', chipLabel: '≠' },
+	{ value: 'startsWith', label: 'Starts with', symbol: '^', chipLabel: 'starts with' },
+	{ value: 'endsWith', label: 'Ends with', symbol: '$', chipLabel: 'ends with' },
+	{ value: 'blank', label: 'Is empty', symbol: '∅', chipLabel: 'is empty', noValue: true },
+	{ value: 'notBlank', label: 'Is not empty', symbol: '!∅', chipLabel: 'not empty', noValue: true },
 ];
 
 export const NUMBER_OPS: OpOption[] = [
 	{ value: 'equals', label: 'Equals', symbol: '=', chipLabel: '=' },
-	{ value: 'notEquals', label: 'Not equals', symbol: '≠', chipLabel: '≠' },
+	{ value: 'notEquals', label: 'Does not equal', symbol: '≠', chipLabel: '≠' },
 	{ value: 'gt', label: 'Greater than', symbol: '>', chipLabel: '>' },
-	{ value: 'gte', label: 'Greater or equal', symbol: '≥', chipLabel: '≥' },
+	{ value: 'gte', label: 'At least', symbol: '≥', chipLabel: '≥' },
 	{ value: 'lt', label: 'Less than', symbol: '<', chipLabel: '<' },
-	{ value: 'lte', label: 'Less or equal', symbol: '≤', chipLabel: '≤' },
-	{ value: 'inRange', label: 'In range', symbol: '↔', chipLabel: 'in range', range: true },
-	{ value: 'blank', label: 'Is blank', symbol: '∅', chipLabel: 'is blank', noValue: true },
-	{ value: 'notBlank', label: 'Not blank', symbol: '!∅', chipLabel: 'not blank', noValue: true },
+	{ value: 'lte', label: 'At most', symbol: '≤', chipLabel: '≤' },
+	{ value: 'inRange', label: 'Between', symbol: '↔', chipLabel: 'between', range: true },
+	{ value: 'blank', label: 'Is empty', symbol: '∅', chipLabel: 'is empty', noValue: true },
+	{ value: 'notBlank', label: 'Is not empty', symbol: '!∅', chipLabel: 'not empty', noValue: true },
 ];
 
 export const DATE_OPS: OpOption[] = [
-	{ value: 'equals', label: 'On date', symbol: '=', chipLabel: 'on' },
+	{ value: 'equals', label: 'On', symbol: '=', chipLabel: 'on' },
 	{ value: 'before', label: 'Before', symbol: '<', chipLabel: 'before' },
 	{ value: 'after', label: 'After', symbol: '>', chipLabel: 'after' },
-	{ value: 'inRange', label: 'In range', symbol: '↔', chipLabel: 'between', range: true },
-	{ value: 'blank', label: 'Is blank', symbol: '∅', chipLabel: 'is blank', noValue: true },
-	{ value: 'notBlank', label: 'Not blank', symbol: '!∅', chipLabel: 'not blank', noValue: true },
+	{ value: 'inRange', label: 'Between', symbol: '↔', chipLabel: 'between', range: true },
+	{ value: 'blank', label: 'Is empty', symbol: '∅', chipLabel: 'is empty', noValue: true },
+	{ value: 'notBlank', label: 'Is not empty', symbol: '!∅', chipLabel: 'not empty', noValue: true },
 ];
 
-export function getOpsForType(filterType: string): OpOption[] {
-	if (filterType === 'number') return NUMBER_OPS;
-	if (filterType === 'date') return DATE_OPS;
-	return TEXT_OPS;
+export const DATE_RANGE_OPS: OpOption[] = [
+	{ value: 'overlaps', label: 'Overlaps', symbol: '∩', chipLabel: 'overlaps', range: true },
+	{ value: 'within', label: 'Within', symbol: '⊂', chipLabel: 'within', range: true },
+	{ value: 'contains', label: 'Includes date', symbol: '∋', chipLabel: 'includes' },
+];
+
+/** The operators of a filter type, limited to `def.operators` when given. */
+export function getOpsForType(type: string, def?: Pick<ColumnFilterDef, 'operators'> | null): OpOption[] {
+	const all = type === 'number' ? NUMBER_OPS : type === 'date' ? DATE_OPS : type === 'dateRange' ? DATE_RANGE_OPS : TEXT_OPS;
+	const allowed = def?.operators;
+	return allowed ? all.filter((op) => allowed.includes(op.value)) : all;
 }
 
-export function getOpMeta(filterType: string, operator: string): OpOption {
-	return getOpsForType(filterType).find((o) => o.value === operator) ?? { value: operator, label: operator, symbol: '~' };
+export function getOpMeta(type: string, operator: string): OpOption {
+	return getOpsForType(type).find((o) => o.value === operator) ?? { value: operator, label: operator, symbol: '~' };
 }
 
-export function defaultOpForType(filterType: string): string {
-	if (filterType === 'number') return 'equals';
-	if (filterType === 'date') return 'equals';
-	return 'contains';
+export function defaultOpForType(type: string, def?: Pick<ColumnFilterDef, 'operators'> | null): string {
+	return getOpsForType(type, def)[0]?.value ?? (type === 'number' || type === 'date' ? 'equals' : type === 'dateRange' ? 'overlaps' : 'contains');
 }
 
-// ── Column filterability ─────────────────────────────────────────────────────
-
-/** True when the column is set up for filtering (has a filterType other than 'none'). */
-export function isFilterableColumn(col: FilterableColumn): boolean {
-	const ft = col.filterType;
-	return ft !== undefined && ft !== null && ft !== 'none';
+/** True when the column filters at all (its filterDef is not `none`). */
+export function isFilterableColumn(col: FilterConfigColumn): boolean {
+	return resolveColumnFilterDef(col) !== null;
 }
 
-// ── Filter model helpers ─────────────────────────────────────────────────────
+// ── Model edits ──────────────────────────────────────────────────────────────
 
 /**
- * Return a new filter model with `filter` applied to `colField`.
- * Pass `null` as `filter` to clear that column.
- * Returns `null` when the resulting model would be empty.
+ * A new filter model with `filter` set for `colField` (null clears it). Null when the model ends
+ * up empty.
  */
 export function applyFilterToModel(colField: string, filter: ColumnFilter | null, currentModel: FilterModel | null): FilterModel | null {
 	const next = { ...(currentModel ?? {}) };
-	if (filter === null) {
-		delete next[colField];
-	} else {
-		next[colField] = filter;
-	}
+	if (filter === null) delete next[colField];
+	else next[colField] = filter;
 	return Object.keys(next).length > 0 ? next : null;
 }
 
 /**
- * Build a "Filter by Value" (or "Exclude This Value") filter for a column and merge it
- * into the current model.  Used by the context-menu right-click actions.
+ * “Filter by value” / “Exclude value” from a cell (context menu): a condition of the column's
+ * filter type, merged into the model. Select filters add the value to (or exclude it with) the
+ * current choice.
  */
-export function buildFilterByValue(col: FilterableColumn, rawValue: unknown, exclude: boolean, currentModel: FilterModel | null): FilterModel | null {
-	const filterType = col.filterType as string | undefined;
-	const colField = col.field;
-	const next = { ...(currentModel ?? {}) };
+export function buildFilterByValue(
+	col: FilterConfigColumn,
+	rawValue: unknown,
+	exclude: boolean,
+	currentModel: FilterModel | null
+): FilterModel | null {
+	const def = resolveColumnFilterDef(col);
+	if (!def) return currentModel;
+	const filter = filterFromValue(def, rawValue, exclude, currentModel?.[col.field] ?? null);
+	return filter ? applyFilterToModel(col.field, filter, currentModel) : currentModel;
+}
 
-	if (filterType === 'set') {
-		const existing = next[colField]?.type === 'set' ? (next[colField] as { type: 'set'; values: (string | null)[] }).values : null;
-		const strVal = rawValue === null || rawValue === undefined ? null : String(rawValue);
-		if (exclude) {
-			const allValues = (col.filterValues as string[] | undefined) ?? [];
-			next[colField] = { type: 'set', values: allValues.filter((v) => v !== strVal) };
-		} else {
-			const nextVals: (string | null)[] = existing ? [...new Set([...existing, strVal])] : [strVal];
-			next[colField] = { type: 'set', values: nextVals };
+function filterFromValue(def: ColumnFilterDef, raw: unknown, exclude: boolean, current: ColumnFilter | null): ColumnFilter | null {
+	switch (def.type) {
+		case 'select': {
+			const values = def.listValues || Array.isArray(raw) ? parseMultiValue(raw) : raw == null || raw === '' ? [null] : [String(raw)];
+			const mode = exclude ? 'none' : 'any';
+			const prior = current?.type === 'select' && (current.matchMode ?? 'any') === mode ? current.values : [];
+			return { type: 'select', values: [...new Set([...prior, ...values])], matchMode: mode };
 		}
-	} else if (filterType === 'number') {
-		const n = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue));
-		if (isNaN(n)) return currentModel;
-		next[colField] = exclude
-			? { type: 'number', operator: 'notEquals' as NumberFilterOperator, value: n }
-			: { type: 'number', operator: 'equals' as NumberFilterOperator, value: n };
-	} else if (filterType === 'date') {
-		const dateStr = rawValue instanceof Date ? rawValue.toISOString().slice(0, 10) : String(rawValue ?? '').slice(0, 10);
-		if (!dateStr) return currentModel;
-		next[colField] = exclude
-			? { type: 'date', operator: 'after' as DateFilterOperator, dateFrom: dateStr }
-			: { type: 'date', operator: 'equals' as DateFilterOperator, dateFrom: dateStr };
-	} else {
-		const strVal = rawValue === null || rawValue === undefined ? '' : String(rawValue);
-		next[colField] = exclude
-			? { type: 'text', operator: 'notEquals' as TextFilterOperator, value: strVal }
-			: { type: 'text', operator: 'equals' as TextFilterOperator, value: strVal };
+		case 'boolean':
+			return { type: 'boolean', value: exclude ? !isCheckedCellValue(raw) : isCheckedCellValue(raw) };
+		case 'number': {
+			const n = typeof raw === 'number' ? raw : parseFloat(String(raw));
+			if (Number.isNaN(n)) return null;
+			return { type: 'number', operator: exclude ? 'notEquals' : 'equals', value: n };
+		}
+		case 'date': {
+			const day = raw instanceof Date ? raw.toISOString().slice(0, 10) : String(raw ?? '').slice(0, 10);
+			if (!day) return null;
+			return exclude ? { type: 'date', operator: 'after', dateFrom: day } : { type: 'date', operator: 'equals', dateFrom: day };
+		}
+		case 'path': {
+			const cascade = def.cascade;
+			const path = parseCascadeValue(raw, cascade && 'config' in cascade ? cascade.config.valueSeparator : cascade?.valueSeparator);
+			return path.length > 0 && !exclude ? { type: 'path', paths: [path] } : null;
+		}
+		case 'text': {
+			const text = raw == null ? '' : String(raw);
+			return { type: 'text', operator: exclude ? 'notEquals' : 'equals', value: text };
+		}
+		default:
+			return null;
 	}
-
-	return Object.keys(next).length > 0 ? next : null;
 }
 
-// ── Chip bar display text ────────────────────────────────────────────────────
+// ── Chip text ────────────────────────────────────────────────────────────────
 
-/**
- * Return the short text shown inside a filter chip for a single column filter.
- * Example: `contains "Atlas"`, `≥ 100`, `on 2024-01-15`.
- */
-export function getFilterChipText(filter: ColumnFilter): string {
+/** The label of a select value, from the filter's stored labels or the column's options. */
+function selectLabel(def: ColumnFilterDef | null | undefined, value: string | number | null, stored: string | undefined): string {
+	if (value === null) return '(Blanks)';
+	if (stored) return stored;
+	const options = def?.options;
+	const key = String(value);
+	const option: CellOption | undefined = isCellOptionsStore(options) ? options.get(key) : options?.find((o) => o.value === key);
+	return option ? optionLabel(option) : key;
+}
+
+function list(labels: string[], max = 2): string {
+	if (labels.length === 0) return '(none)';
+	const extra = labels.length > max ? ` +${labels.length - max}` : '';
+	return labels.slice(0, max).join(', ') + extra;
+}
+
+function summarizeCondition(filter: FilterCondition, def: ColumnFilterDef | null | undefined): string {
 	switch (filter.type) {
 		case 'text': {
 			const op = getOpMeta('text', filter.operator);
-			const lbl = op.chipLabel ?? op.symbol;
-			if (op.noValue) return lbl;
-			return `${lbl} "${filter.value}"`;
+			const label = op.chipLabel ?? op.symbol;
+			return op.noValue ? label : `${label} “${filter.value}”`;
 		}
 		case 'number': {
 			const op = getOpMeta('number', filter.operator);
-			const lbl = op.chipLabel ?? op.symbol;
-			if (op.noValue) return lbl;
-			if (op.range) return `${filter.value} – ${filter.valueTo ?? '…'}`;
-			return `${lbl} ${filter.value}`;
+			const label = op.chipLabel ?? op.symbol;
+			const fmt = (n: number | undefined) => (n === undefined ? '…' : (formatCellNumber(n, def?.format) ?? String(n)));
+			if (op.noValue) return label;
+			if (def?.stars && filter.operator === 'gte') return `${'★'.repeat(filter.value)} or more`;
+			return op.range ? `${fmt(filter.value)} – ${fmt(filter.valueTo)}` : `${label} ${fmt(filter.value)}`;
 		}
 		case 'date': {
 			const op = getOpMeta('date', filter.operator);
-			const lbl = op.chipLabel ?? op.symbol;
-			if (op.noValue) return lbl;
-			if (op.range) return `${filter.dateFrom} – ${filter.dateTo ?? '…'}`;
-			return `${lbl} ${filter.dateFrom}`;
-		}
-		case 'set': {
-			if (filter.values.length === 0) return '(none)';
-			const labels = filter.values.slice(0, 3).map((v) => (v === null ? '(blank)' : String(v)));
-			const extra = filter.values.length > 3 ? ` +${filter.values.length - 3} more` : '';
-			return labels.join(', ') + extra;
+			const label = op.chipLabel ?? op.symbol;
+			if (op.noValue) return label;
+			return op.range ? `${filter.dateFrom} – ${filter.dateTo ?? '…'}` : `${label} ${filter.dateFrom}`;
 		}
 		case 'select': {
-			if (filter.values.length === 0) return '(none)';
-			// Use stored labels when available — avoids re-fetching async option lists.
-			const displayLabels =
-				filter.labels && filter.labels.length === filter.values.length
-					? filter.labels
-					: filter.values.map((v) => (v === null ? '(blank)' : String(v)));
-			const shown = displayLabels.slice(0, 2);
-			const extra = filter.values.length > 2 ? ` +${filter.values.length - 2} more` : '';
-			return shown.join(', ') + extra;
+			const labels = filter.values.map((v, i) => selectLabel(def, v, filter.labels?.[i]));
+			const mode = filter.matchMode ?? 'any';
+			const prefix = mode === 'none' ? 'not ' : mode === 'all' && filter.values.length > 1 ? 'all of ' : '';
+			return prefix + list(labels);
 		}
-		case 'compound': {
-			const [c1, c2] = filter.conditions;
-			return `${getFilterChipText(c1)} ${filter.operator} ${getFilterChipText(c2)}`;
+		case 'boolean':
+			return filter.value ? 'Yes' : 'No';
+		case 'dateRange': {
+			const op = getOpMeta('dateRange', filter.operator);
+			return op.range ? `${op.chipLabel} ${filter.dateFrom} – ${filter.dateTo ?? '…'}` : `${op.chipLabel} ${filter.dateFrom}`;
 		}
+		case 'path': {
+			const labels = filter.labels ?? filter.paths.map((p) => p[p.length - 1] ?? '');
+			return list(labels);
+		}
+		case 'custom':
+			return filter.label ?? 'custom';
 	}
+}
+
+/** The text of a column's filter chip, e.g. `contains “Atlas”`, `≥ 100`, `Done, Blocked +1`. */
+export function summarizeFilter(filter: ColumnFilter, def?: ColumnFilterDef | null): string {
+	if (def?.summarize) return def.summarize(filter);
+	if (filter.type === 'compound') {
+		const [a, b] = filter.conditions;
+		return `${summarizeCondition(a, def)} ${filter.operator.toLowerCase()} ${summarizeCondition(b, def)}`;
+	}
+	return summarizeCondition(filter, def);
+}
+
+// ── Restoring saved models ───────────────────────────────────────────────────
+
+const CONDITION_TYPES = new Set(['text', 'number', 'date', 'select', 'boolean', 'dateRange', 'path', 'custom']);
+
+function restoreCondition(raw: unknown): FilterCondition | null {
+	if (!raw || typeof raw !== 'object') return null;
+	return CONDITION_TYPES.has((raw as { type?: unknown }).type as string) ? (raw as FilterCondition) : null;
+}
+
+/**
+ * A saved filter model checked against the grid: conditions on columns that no longer exist, and
+ * malformed ones, are dropped. Null when nothing is left.
+ */
+export function restoreFilterModel(raw: unknown, knownFields: ReadonlySet<string>): FilterModel | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const out: FilterModel = {};
+	for (const [field, value] of Object.entries(raw as Record<string, unknown>)) {
+		if (!knownFields.has(field) || !value || typeof value !== 'object') continue;
+		const filter = value as { type?: unknown; operator?: unknown; conditions?: unknown };
+		if (filter.type === 'compound' && Array.isArray(filter.conditions) && filter.conditions.length === 2) {
+			const a = restoreCondition(filter.conditions[0]);
+			const b = restoreCondition(filter.conditions[1]);
+			if (a && b) out[field] = { type: 'compound', operator: filter.operator === 'OR' ? 'OR' : 'AND', conditions: [a, b] };
+			else if (a ?? b) out[field] = (a ?? b)!;
+			continue;
+		}
+		const condition = restoreCondition(value);
+		if (condition) out[field] = condition;
+	}
+	return Object.keys(out).length > 0 ? out : null;
 }

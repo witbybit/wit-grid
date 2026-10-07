@@ -2,7 +2,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { InternalColumnDef } from '../columnDef.js';
+import type { ColumnFilter, FilterModel } from '../filterModel.js';
+import type { ColumnFilterDef } from '../filters/filterDef.js';
 import type { GridLayoutPlan } from './layoutPlan.js';
+import { FilterPopoverController } from './filterPopoverController.js';
 import { FloatingFilterRenderer } from './floatingFilterRenderer.js';
 
 type TestRow = { id: string };
@@ -11,17 +14,13 @@ interface TestColumn {
 	field: string;
 	lane: 'left' | 'center' | 'right';
 	hidden?: boolean;
+	filterDef?: ColumnFilterDef;
 }
 
 function makeGrid(columns: TestColumn[]) {
 	const visibleColumns = columns.filter((column) => !column.hidden);
 	const displayedColumns = visibleColumns.map(
-		({ field }) =>
-			({
-				field,
-				instanceId: field,
-				filterType: 'text',
-			}) as InternalColumnDef<TestRow>
+		({ field, filterDef }) => ({ field, header: field, instanceId: field, filterDef }) as unknown as InternalColumnDef<TestRow>
 	);
 	const topology: any = {
 		version: 1,
@@ -36,142 +35,115 @@ function makeGrid(columns: TestColumn[]) {
 			width: 100,
 		})),
 		byColumnId: new Map(),
-		left: [],
-		center: [],
-		right: [],
-		groupSegments: [],
-		pinLeftWidth: 100,
-		pinRightWidth: 100,
-		pinRightBaseLeft: 200,
-		totalContentWidth: visibleColumns.length * 100,
 	};
-	for (const placement of topology.placements) {
-		topology.byColumnId.set(placement.columnId, placement);
-		topology[placement.lane].push(placement);
-	}
+	for (const placement of topology.placements) topology.byColumnId.set(placement.columnId, placement);
 
+	let filterModel: FilterModel | null = null;
+	const listeners: (() => void)[] = [];
 	const engine = {
 		stateManager: {
-			getState: () => ({ filterModel: null, defaultColWidth: 100 }),
-			subscribeToKey: () => () => {},
+			getState: () => ({ filterModel, defaultColWidth: 100 }),
+			subscribeToKey: (key: string, fn: () => void) => {
+				if (key === 'filterModel') listeners.push(fn);
+				return () => {};
+			},
 		},
 		columns: {
 			getCompiledPlan: () => ({ displayedColumns, colWidths: visibleColumns.map(() => 100) }),
+			getColumnDef: (field: string) => displayedColumns.find((c) => c.field === field),
 		},
 		instrumentation: { increment: vi.fn() },
-		setFilterModel: vi.fn(),
+		getColumnDistinctValueSummary: () => ({ values: ['Active', 'Paused'], counts: [3, 1], truncated: false, limit: null }),
+		setFilterModel: vi.fn((next: FilterModel | null) => {
+			filterModel = next;
+			listeners.forEach((fn) => fn());
+		}),
 	};
-	const renderer = new FloatingFilterRenderer(engine as never);
+	const filters = new FilterPopoverController(engine as never);
+	const renderer = new FloatingFilterRenderer(engine as never, filters);
 	const grid = document.createElement('div');
 	const wrapper = document.createElement('div');
-	wrapper.className = 'og-layer-floating-filter-wrapper';
 	const left = document.createElement('div');
 	const center = document.createElement('div');
 	const right = document.createElement('div');
 	wrapper.append(left, center, right);
 	grid.appendChild(wrapper);
 	document.body.appendChild(grid);
-	renderer.mount(center, left, right);
-	renderer.repaint({
+	const plan = {
 		chrome: { floatingFilterHeight: 36 },
 		columns: { colStart: 0, colEnd: visibleColumns.length - 1, pinLeftCount: 1, pinRightCount: 1 },
 		columnTopology: topology,
-	} as unknown as GridLayoutPlan);
-
-	return { renderer, grid };
+	} as unknown as GridLayoutPlan;
+	renderer.mount(center, left, right);
+	renderer.repaint(plan);
+	// Filter model listeners repaint with the default plan; tests repaint with theirs.
+	listeners.length = 0;
+	listeners.push(() => renderer.repaint(plan));
+	const setExternal = (field: string, filter: ColumnFilter | null) => {
+		filterModel = filter ? { ...(filterModel ?? {}), [field]: filter } : null;
+		renderer.repaint(plan);
+	};
+	return { renderer, grid, engine, setExternal };
 }
 
 function input(grid: HTMLElement, field: string): HTMLInputElement {
 	return grid.querySelector(`[data-col-field="${field}"] input`) as HTMLInputElement;
 }
 
-function tab(target: HTMLInputElement, shiftKey = false): KeyboardEvent {
-	const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
-	target.dispatchEvent(event);
-	return event;
-}
+afterEach(() => {
+	document.body.textContent = '';
+	vi.useRealTimers();
+});
 
-describe('FloatingFilterRenderer Tab navigation', () => {
-	afterEach(() => {
-		document.body.textContent = '';
-		vi.restoreAllMocks();
-	});
-
-	it('uses its owning grid topology/DOM order across pinned lanes and skips hidden columns', () => {
-		// `hidden` is absent from the compiled/displayed topology, so it creates no
-		// focus stop between the two visible center-lane neighbours.
-		const first = makeGrid([
-			{ field: 'left', lane: 'left' },
-			{ field: 'center', lane: 'center' },
-			{ field: 'hidden', lane: 'center', hidden: true },
+describe('FloatingFilterRenderer', () => {
+	it('shows each column’s compact editor in visual order across lanes, so Tab follows the columns', () => {
+		const { grid } = makeGrid([
 			{ field: 'right', lane: 'right' },
+			{ field: 'centerA', lane: 'center' },
+			{ field: 'hidden', lane: 'center', hidden: true },
+			{ field: 'left', lane: 'left' },
+			{ field: 'centerB', lane: 'center' },
 		]);
-		const second = makeGrid([{ field: 'other', lane: 'center' }]);
-
-		const left = input(first.grid, 'left');
-		const center = input(first.grid, 'center');
-		const right = input(first.grid, 'right');
-		const other = input(second.grid, 'other');
-		expect(first.grid.querySelector('[data-col-field="hidden"]')).toBeNull();
-
-		const globalQuery = vi.spyOn(document, 'querySelectorAll');
-		const layoutRead = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
-		left.focus();
-		expect(tab(left).defaultPrevented).toBe(true);
-		expect(document.activeElement).toBe(center);
-		expect(globalQuery).not.toHaveBeenCalled();
-		expect(layoutRead).not.toHaveBeenCalled();
-		expect(tab(center).defaultPrevented).toBe(true);
-		expect(document.activeElement).toBe(right);
-		expect(tab(right, true).defaultPrevented).toBe(true);
-		expect(document.activeElement).toBe(center);
-
-		// At either grid boundary, normal browser Tab behaviour is allowed rather
-		// than the renderer jumping into the other grid.
-		right.focus();
-		expect(tab(right).defaultPrevented).toBe(false);
-		expect(document.activeElement).toBe(right);
-		expect(document.activeElement).not.toBe(other);
-		left.focus();
-		expect(tab(left, true).defaultPrevented).toBe(false);
-		expect(document.activeElement).toBe(left);
-
-		first.renderer.unmount();
-		second.renderer.unmount();
+		const fields = [...grid.querySelectorAll('input')].map((el) => el.closest<HTMLElement>('[data-col-field]')!.dataset.colField);
+		expect(fields).toEqual(['left', 'centerA', 'centerB', 'right']);
+		expect(grid.querySelector('[data-col-field="hidden"]')).toBeNull();
+		// Compact editors: the operator shows as its symbol.
+		expect(grid.querySelector('[data-col-field="left"] .og-flt-op')!.textContent).toBe('~');
 	});
 
-	it("keeps each grid's operator menu its own: another grid's scroll or menu never closes it", () => {
-		const a = makeGrid([{ field: 'name', lane: 'center' }]);
-		const b = makeGrid([{ field: 'name', lane: 'center' }]);
-		const openMenu = (grid: HTMLElement) => grid.querySelector<HTMLButtonElement>('.og-floating-filter-op-btn')!.click();
-		const menus = () => document.querySelectorAll('#og-floating-op-menu');
-
-		openMenu(a.grid);
-		expect(menus()).toHaveLength(1);
-		b.renderer.syncScrollLeft({} as GridLayoutPlan);
-		expect(menus()).toHaveLength(1);
-		openMenu(b.grid);
-		expect(menus()).toHaveLength(2);
-
-		a.renderer.syncScrollLeft({} as GridLayoutPlan);
-		expect(menus()).toHaveLength(1);
-		b.renderer.unmount();
-		expect(menus()).toHaveLength(0);
-		a.renderer.unmount();
+	it('applies typing after a pause (through the grid scheduler) and Enter at once, keeping the field', async () => {
+		vi.useFakeTimers();
+		const { grid, engine } = makeGrid([{ field: 'name', lane: 'center' }]);
+		const field = input(grid, 'name');
+		field.value = 'ali';
+		field.dispatchEvent(new Event('input'));
+		expect(engine.setFilterModel).not.toHaveBeenCalled();
+		await vi.advanceTimersByTimeAsync(320);
+		expect(engine.setFilterModel).toHaveBeenLastCalledWith({ name: { type: 'text', operator: 'contains', value: 'ali' } });
+		field.value = 'alice';
+		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+		expect(engine.setFilterModel).toHaveBeenLastCalledWith({ name: { type: 'text', operator: 'contains', value: 'alice' } });
+		// Its own change does not rebuild the editor (the user keeps typing in the same field).
+		expect(input(grid, 'name')).toBe(field);
 	});
 
-	it('does not retain a destroyed grid as a Tab target', () => {
-		const destroyed = makeGrid([{ field: 'destroyed', lane: 'center' }]);
-		const live = makeGrid([{ field: 'live', lane: 'center' }]);
-		const liveInput = input(live.grid, 'live');
+	it('shows a filter set elsewhere, and lists as a summary chip opening the full editor', () => {
+		const { grid, setExternal } = makeGrid([
+			{ field: 'price', lane: 'center', filterDef: { type: 'number' } },
+			{ field: 'status', lane: 'center', filterDef: { type: 'select' } },
+		]);
+		setExternal('price', { type: 'number', operator: 'gte', value: 100 });
+		expect(input(grid, 'price').value).toBe('100');
+		expect(grid.querySelector('[data-col-field="price"] .og-flt-op')!.textContent).toBe('≥');
 
-		destroyed.renderer.unmount();
-		destroyed.grid.remove();
-		liveInput.focus();
-
-		expect(tab(liveInput, true).defaultPrevented).toBe(false);
-		expect(document.activeElement).toBe(liveInput);
-
-		live.renderer.unmount();
+		const chip = grid.querySelector<HTMLButtonElement>('[data-col-field="status"] .og-flt-chip')!;
+		expect(chip.textContent).toBe('All');
+		chip.click();
+		const options = [...document.querySelectorAll('.og-ct-popover .og-ct-option')];
+		expect(options.map((el) => el.querySelector('.og-ct-option-label')!.textContent)).toEqual(['Active', 'Paused']);
+		expect(options[0].querySelector('.og-ct-option-count')!.textContent).toBe('3');
+		(options[0] as HTMLElement).click();
+		expect(chip.textContent).toBe('Active');
+		expect(chip.hasAttribute('data-active')).toBe(true);
 	});
 });

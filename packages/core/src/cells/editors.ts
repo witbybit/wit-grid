@@ -350,6 +350,8 @@ function createListEditor(setup: ListEditorSetup): DomCellEditor<any> {
 				loadingText: setup.config.loadingText,
 				errorText: setup.config.errorText,
 				leading: setup.leading,
+				debounceMs: store.debounceMs,
+				minQueryLength: store.minQueryLength,
 				load: store.fetch
 					? (search, offset, signal) =>
 							store.fetch!({ search, offset, limit: store.pageSize, signal, rowId: params.rowId, colField: params.colField })

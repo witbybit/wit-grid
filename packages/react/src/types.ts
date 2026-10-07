@@ -15,7 +15,6 @@ import type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 	CompoundFilterCondition,
 	TextFilterOperator,
 	NumberFilterOperator,
@@ -91,7 +90,6 @@ export type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 	CompoundFilterCondition,
 	TextFilterOperator,
 	NumberFilterOperator,
@@ -142,10 +140,9 @@ export type {
 	QueryDiagnostics,
 	QueryConditionDiagnostic,
 	QueryEvaluationContext,
-	QueryOperatorDefinition,
 	GridDistinctValueSummary,
 } from '@eregister/wit-grid-core';
-export { createEmptyQueryModel, isQueryModelActive, countQueryNodes, getQueryOperator, getQueryOperatorsForType } from '@eregister/wit-grid-core';
+export { createEmptyQueryModel, isQueryModelActive, countQueryNodes } from '@eregister/wit-grid-core';
 
 export type {
 	GridCapabilityAction,

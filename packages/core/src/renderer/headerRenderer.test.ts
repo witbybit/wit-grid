@@ -118,7 +118,13 @@ function makeEngine() {
 describe('HeaderRenderer — topology version bailout', () => {
 	it('re-renders when topology version changes with identical column range', () => {
 		const engine = makeEngine();
-		const renderer = new HeaderRenderer(engine as never, () => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never, vi.fn());
+		const renderer = new HeaderRenderer(
+			engine as never,
+			() => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never,
+			vi.fn(),
+			vi.fn(),
+			() => true
+		);
 
 		const layer = document.createElement('div');
 		const leftLayer = document.createElement('div');
@@ -138,7 +144,13 @@ describe('HeaderRenderer — topology version bailout', () => {
 	it('bails out when topology version is identical to last render', () => {
 		const engine = makeEngine();
 		const incrementSpy = engine.instrumentation.increment;
-		const renderer = new HeaderRenderer(engine as never, () => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never, vi.fn());
+		const renderer = new HeaderRenderer(
+			engine as never,
+			() => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never,
+			vi.fn(),
+			vi.fn(),
+			() => true
+		);
 
 		const layer = document.createElement('div');
 		const leftLayer = document.createElement('div');
@@ -160,7 +172,13 @@ describe('HeaderRenderer — topology version bailout', () => {
 
 	it('forceRepaint bypasses topology version bailout', () => {
 		const engine = makeEngine();
-		const renderer = new HeaderRenderer(engine as never, () => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never, vi.fn());
+		const renderer = new HeaderRenderer(
+			engine as never,
+			() => ({ isDraggingColumn: () => false, getColumnShift: () => 0 }) as never,
+			vi.fn(),
+			vi.fn(),
+			() => true
+		);
 
 		const layer = document.createElement('div');
 		const leftLayer = document.createElement('div');

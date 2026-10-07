@@ -102,14 +102,15 @@ export type {
 export type {
 	ColumnFilterDef,
 	ColumnFilterType,
-	FilterSelectOption,
-	FilterFetchParams,
-	FilterFetchResult,
-	FilterPageParams,
-	FilterPageResult,
-	CustomFilterRendererParams,
 	FilterSurface,
+	DomFilterEditor,
+	DomFilterEditorParams,
+	DomFilterEditorHandle,
 	SelectFilterCondition,
+	BooleanFilterCondition,
+	DateRangeFilterCondition,
+	PathFilterCondition,
+	CustomFilterCondition,
 } from '@eregister/wit-grid-core';
 export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
 export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
@@ -179,7 +180,6 @@ export type {
 	TooltipParams,
 	AutoSizeColumnOptions,
 	AutoSizeAllColumnsOptions,
-	FloatingFilterRendererParams,
 } from '@eregister/wit-grid-core';
 
 // ── Data Integrity Pipeline types ─────────────────────────────────────────────

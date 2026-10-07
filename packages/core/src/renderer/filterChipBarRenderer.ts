@@ -1,7 +1,9 @@
+import type { FilterPopoverController } from './filterPopoverController.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { HeaderMenuController } from './headerMenuController.js';
 import type { ColumnFilter } from '../filterModel.js';
-import { getFilterChipText, applyFilterToModel } from '../filterOperations.js';
+import { summarizeFilter, applyFilterToModel } from '../filterOperations.js';
+import { resolveColumnFilterDef } from '../filters/filterDef.js';
 import { summarizeAnalysisState } from '../analysis/analysisState.js';
 
 /**
@@ -20,7 +22,11 @@ export class FilterChipBarRenderer<TRowData = unknown> {
 	private bar: HTMLDivElement | null = null;
 	private unsubscribe: (() => void) | null = null;
 
-	constructor(engine: GridEngine<TRowData>, headerMenu: HeaderMenuController<TRowData>) {
+	constructor(
+		engine: GridEngine<TRowData>,
+		headerMenu: HeaderMenuController<TRowData>,
+		private readonly filters: FilterPopoverController<TRowData>
+	) {
 		this.engine = engine;
 		this.headerMenu = headerMenu;
 	}
@@ -62,7 +68,7 @@ export class FilterChipBarRenderer<TRowData = unknown> {
 		for (const [colField, filterItem] of Object.entries(filterModel ?? {})) {
 			const col = state.columns.find((c) => c.field === colField);
 			const label = col?.header ?? colField;
-			const chipText = getFilterChipText(filterItem as ColumnFilter);
+			const chipText = summarizeFilter(filterItem as ColumnFilter, col ? resolveColumnFilterDef(col) : null);
 
 			const chip = document.createElement('div');
 			chip.className = 'og-filter-chip';
@@ -72,7 +78,7 @@ export class FilterChipBarRenderer<TRowData = unknown> {
 			chipLabel.textContent = `${label}: ${chipText}`;
 			chipLabel.style.cursor = 'pointer';
 			chipLabel.addEventListener('click', () => {
-				this.headerMenu.showForField(colField, chip);
+				this.filters.open(chip, colField);
 			});
 			chip.appendChild(chipLabel);
 

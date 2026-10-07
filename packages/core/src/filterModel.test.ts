@@ -214,31 +214,31 @@ describe('date filter', () => {
 
 // ── Set filter ────────────────────────────────────────────────────────────────
 
-describe('set filter', () => {
+describe('select filter', () => {
 	it('includes only rows with matching values', () => {
 		const { store, controller } = makeStore();
-		store.setFilterModel({ status: { type: 'set', values: ['Active', 'Pending'] } });
+		store.setFilterModel({ status: { type: 'select', values: ['Active', 'Pending'] } });
 		expect(getVisibleNames(store)).toEqual(['Apple', 'Cherry', 'apricot']);
 		controller.dispose();
 	});
 
 	it('null in values matches blank cells', () => {
 		const { store, controller } = makeStore();
-		store.setFilterModel({ status: { type: 'set', values: [null] } });
+		store.setFilterModel({ status: { type: 'select', values: [null] } });
 		expect(getVisibleNames(store)).toEqual(['Date']);
 		controller.dispose();
 	});
 
 	it('empty values array matches no rows', () => {
 		const { store, controller } = makeStore();
-		store.setFilterModel({ status: { type: 'set', values: [] } });
+		store.setFilterModel({ status: { type: 'select', values: [] } });
 		expect(getVisibleNames(store)).toHaveLength(0);
 		controller.dispose();
 	});
 
-	it('set filter with null and a value', () => {
+	it('select filter with null and a value', () => {
 		const { store, controller } = makeStore();
-		store.setFilterModel({ status: { type: 'set', values: ['Active', null] } });
+		store.setFilterModel({ status: { type: 'select', values: ['Active', null] } });
 		expect(getVisibleNames(store)).toEqual(['Apple', 'Cherry', 'Date']);
 		controller.dispose();
 	});

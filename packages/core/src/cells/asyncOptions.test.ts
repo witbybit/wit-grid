@@ -91,7 +91,7 @@ describe('createCellListbox with a loader', () => {
 		expect(lb.element.querySelector('.og-ct-option[data-active] .og-ct-option-label')?.textContent).toBe('City 2');
 	});
 
-	it('searches on the server and drops a page a newer search made stale', async () => {
+	it('keeps one search in flight: newer searches wait, and only the latest runs', async () => {
 		const { load, calls } = manualLoader();
 		const lb = createCellListbox({ options: [], selected: [], load: (search, offset, signal) => load({ search, offset, limit: 3, signal }) });
 		const input = lb.element.querySelector('input')!;
@@ -99,13 +99,45 @@ describe('createCellListbox with a loader', () => {
 		input.dispatchEvent(new Event('input'));
 		input.value = 'City 6';
 		input.dispatchEvent(new Event('input'));
-		expect(calls.map((call) => call.query.search)).toEqual(['', 'City 1', 'City 6']);
-		expect(calls[0].query.signal.aborted).toBe(true);
-		expect(calls[1].query.signal.aborted).toBe(true);
-		calls[2].resolve(pageFor(calls[2].query));
+		// The first page is still loading: the typed searches wait for it.
+		expect(calls.map((call) => call.query.search)).toEqual(['']);
+		calls[0].resolve(pageFor(calls[0].query));
+		await flush();
+		// Its result is stale: dropped, and only the latest search is sent.
+		expect(calls.map((call) => call.query.search)).toEqual(['', 'City 6']);
 		calls[1].resolve(pageFor(calls[1].query));
 		await flush();
 		expect(labels(lb.element)).toEqual(['City 6']);
+	});
+
+	it('waits out the debounce through the grid scheduler, and skips searches below the minimum length', async () => {
+		vi.useFakeTimers();
+		try {
+			const { load, calls } = manualLoader();
+			const lb = createCellListbox({
+				options: [],
+				selected: [],
+				debounceMs: 250,
+				minQueryLength: 2,
+				load: (search, offset, signal) => load({ search, offset, limit: 3, signal }),
+			});
+			calls[0].resolve(pageFor(calls[0].query));
+			await vi.advanceTimersByTimeAsync(0);
+			const input = lb.element.querySelector('input')!;
+			input.value = 'C';
+			input.dispatchEvent(new Event('input'));
+			expect(lb.element.querySelector('.og-ct-list-status')?.textContent).toBe('Type 2 or more characters');
+			input.value = 'Ci';
+			input.dispatchEvent(new Event('input'));
+			input.value = 'City 4';
+			input.dispatchEvent(new Event('input'));
+			await vi.advanceTimersByTimeAsync(200);
+			expect(calls).toHaveLength(1);
+			await vi.advanceTimersByTimeAsync(60);
+			expect(calls.map((call) => call.query.search)).toEqual(['', 'City 4']);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('offers Retry when a page fails', async () => {
@@ -152,15 +184,12 @@ describe('async select columns', () => {
 		expect(container.querySelector('.og-ct-badge')!.textContent).toBe('City 4');
 	});
 
-	it('the editor pages from the loader and passes the cell; the filter uses the same loader', async () => {
+	it('the editor pages from the loader and passes the cell; the filter shares its options', async () => {
 		const loadOptions = vi.fn(async (query: CellOptionsQuery) => pageFor(query));
 		const type = selectColumnType([], { loadOptions });
-		expect(type.filterDef?.type).toBe('infinite-multi-select');
-		const page = await type.filterDef!.fetchPage!(
-			{ query: 'City', selectedValues: [], params: {}, page: 1, pageSize: 3 },
-			new AbortController().signal
-		);
-		expect(page.options.map((option) => option.label)).toEqual(['City 3', 'City 4', 'City 5']);
+		// The column's filter lists the same store: its loaded options label filters too.
+		expect(type.filterDef?.type).toBe('select');
+		expect(type.filterDef?.options).toBeDefined();
 
 		const container = document.createElement('div');
 		document.body.appendChild(container);

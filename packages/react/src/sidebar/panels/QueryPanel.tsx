@@ -1,8 +1,9 @@
 import React, { useCallback, useId, useRef, useState } from 'react';
-import type { GridApi, GridQueryModel, GridQueryGroup, GridQueryCondition, GridQueryNode } from '../../types.js';
-import { createEmptyQueryModel, getQueryOperatorsForType } from '../../types.js';
+import type { GridApi, GridQueryModel, GridQueryGroup, GridQueryCondition, GridQueryNode, ColumnDef } from '../../types.js';
+import { createEmptyQueryModel } from '../../types.js';
 import { useGridKeySelector } from '../../hooks.js';
-import type { ThemeTokens } from '@eregister/wit-grid-core';
+import { resolveColumnFilterDef, type ThemeTokens } from '@eregister/wit-grid-core';
+import { CoreFilterEditor } from '../../filters/CoreFilterEditor.js';
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -37,11 +38,6 @@ const QueryIcon = () => (
 let _idSeq = 0;
 function nextId(): string {
 	return `qn-${++_idSeq}`;
-}
-
-function columnTypeForField(field: string, columns: Array<{ field: string; filterType?: string | null }>): string {
-	const col = columns.find((c) => c.field === field);
-	return (col?.filterType as string | undefined) ?? 'text';
 }
 
 function updateNodeInTree(root: GridQueryGroup, id: string, updater: (node: GridQueryNode) => GridQueryNode): GridQueryGroup {
@@ -81,115 +77,68 @@ function addNodeToGroup(root: GridQueryGroup, groupId: string, node: GridQueryNo
 // ── Condition row ─────────────────────────────────────────────────────────────
 
 interface ConditionRowProps {
+	api: GridApi<unknown>;
 	condition: GridQueryCondition;
-	columns: Array<{ field: string; header?: string | null; filterType?: string | null }>;
+	columns: ColumnDef<any>[];
 	theme: ThemeTokens;
 	onChange: (updated: GridQueryCondition) => void;
 	onRemove: () => void;
 }
 
-function ConditionRow({ condition, columns, theme, onChange, onRemove }: ConditionRowProps) {
-	const filterableCols = columns.filter((c) => c.filterType !== 'none' && c.filterType !== undefined);
-	const colType = columnTypeForField(condition.columnId, columns);
-	const operators = getQueryOperatorsForType(colType);
-	const opDef = operators.find((o) => o.id === condition.operator);
-
-	const inputStyle: React.CSSProperties = {
-		flex: 1,
-		height: 26,
-		padding: '0 8px',
-		fontSize: 11,
-		background: theme.headerBg,
-		border: `1px solid ${theme.borderColor}`,
-		borderRadius: 4,
-		color: theme.headerText,
-		outline: 'none',
-		minWidth: 0,
-	};
-
-	const selectStyle: React.CSSProperties = {
-		...inputStyle,
-		padding: '0 4px',
-		cursor: 'pointer',
-		appearance: 'none' as const,
-	};
-
+/** One condition: a column, and that column's own filter editor (as the header and sidebar show it). */
+function ConditionRow({ api, condition, columns, theme, onChange, onRemove }: ConditionRowProps) {
+	const column = columns.find((c) => c.field === condition.columnId);
 	return (
-		<div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 0' }}>
-			{/* Column selector */}
-			<select
-				value={condition.columnId}
-				onChange={(e) => {
-					const newColId = e.target.value;
-					const newType = columnTypeForField(newColId, columns);
-					const newOps = getQueryOperatorsForType(newType);
-					onChange({ ...condition, columnId: newColId, operator: newOps[0]?.id ?? 'contains', value: undefined, valueTo: undefined });
-				}}
-				style={{ ...selectStyle, flex: '0 0 auto', maxWidth: 110 }}
-			>
-				{filterableCols.map((c) => (
-					<option key={c.field} value={c.field}>
-						{(c.header as string | undefined) ?? c.field}
-					</option>
-				))}
-			</select>
-
-			{/* Operator selector */}
-			<select
-				value={condition.operator}
-				onChange={(e) => onChange({ ...condition, operator: e.target.value, value: undefined, valueTo: undefined })}
-				style={{ ...selectStyle, flex: '0 0 auto', maxWidth: 90 }}
-			>
-				{operators.map((op) => (
-					<option key={op.id} value={op.id}>
-						{op.label}
-					</option>
-				))}
-			</select>
-
-			{/* Value input(s) */}
-			{opDef && opDef.valueArity !== 0 && (
-				<input
-					type={colType === 'number' ? 'number' : colType === 'date' ? 'date' : 'text'}
-					value={condition.value == null ? '' : String(condition.value)}
-					placeholder='Value'
-					onChange={(e) => {
-						const raw = e.target.value;
-						const v = colType === 'number' ? (raw === '' ? undefined : Number(raw)) : raw === '' ? undefined : raw;
-						onChange({ ...condition, value: v });
+		<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0' }}>
+			<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+				<select
+					value={condition.columnId}
+					aria-label='Column'
+					onChange={(e) => onChange({ ...condition, columnId: e.target.value, filter: null })}
+					style={{
+						flex: 1,
+						minWidth: 0,
+						height: 28,
+						padding: '0 6px',
+						fontSize: 12,
+						background: theme.headerBg,
+						border: `1px solid ${theme.borderColor}`,
+						borderRadius: 6,
+						color: theme.textColor,
+						cursor: 'pointer',
 					}}
-					style={inputStyle}
+				>
+					{columns.map((c) => (
+						<option key={c.field} value={c.field}>
+							{c.header || c.field}
+						</option>
+					))}
+				</select>
+				<button
+					onClick={onRemove}
+					title='Remove condition'
+					style={{
+						padding: 4,
+						background: 'none',
+						border: 'none',
+						color: theme.headerText,
+						cursor: 'pointer',
+						opacity: 0.6,
+						flexShrink: 0,
+					}}
+				>
+					<TrashIcon />
+				</button>
+			</div>
+			{column && (
+				<CoreFilterEditor
+					api={api as GridApi<any>}
+					column={column}
+					surface='query'
+					filter={condition.filter}
+					onChange={(filter) => onChange({ ...condition, filter })}
 				/>
 			)}
-			{opDef && opDef.valueArity === 2 && (
-				<input
-					type={colType === 'number' ? 'number' : colType === 'date' ? 'date' : 'text'}
-					value={condition.valueTo == null ? '' : String(condition.valueTo)}
-					placeholder='To'
-					onChange={(e) => {
-						const raw = e.target.value;
-						const v = colType === 'number' ? (raw === '' ? undefined : Number(raw)) : raw === '' ? undefined : raw;
-						onChange({ ...condition, valueTo: v });
-					}}
-					style={{ ...inputStyle, flex: '0 0 60px', minWidth: 0 }}
-				/>
-			)}
-
-			<button
-				onClick={onRemove}
-				title='Remove condition'
-				style={{
-					padding: '4px',
-					background: 'none',
-					border: 'none',
-					color: theme.headerText,
-					cursor: 'pointer',
-					opacity: 0.5,
-					flexShrink: 0,
-				}}
-			>
-				<TrashIcon />
-			</button>
 		</div>
 	);
 }
@@ -197,29 +146,22 @@ function ConditionRow({ condition, columns, theme, onChange, onRemove }: Conditi
 // ── Query group ───────────────────────────────────────────────────────────────
 
 interface QueryGroupProps {
+	api: GridApi<unknown>;
 	group: GridQueryGroup;
 	depth: number;
-	columns: Array<{ field: string; header?: string | null; filterType?: string | null }>;
+	columns: ColumnDef<any>[];
 	theme: ThemeTokens;
 	isRoot: boolean;
 	onUpdate: (updated: GridQueryGroup) => void;
 	onRemove?: () => void;
 }
 
-function QueryGroup({ group, depth, columns, theme, isRoot, onUpdate, onRemove }: QueryGroupProps) {
-	const filterableCols = columns.filter((c) => c.filterType !== 'none' && c.filterType !== undefined);
-	const firstCol = filterableCols[0];
+function QueryGroup({ api, group, depth, columns, theme, isRoot, onUpdate, onRemove }: QueryGroupProps) {
+	const firstCol = columns[0];
 
 	const addCondition = () => {
 		if (!firstCol) return;
-		const colType = columnTypeForField(firstCol.field, columns);
-		const ops = getQueryOperatorsForType(colType);
-		const newCond: GridQueryCondition = {
-			kind: 'condition',
-			id: nextId(),
-			columnId: firstCol.field,
-			operator: ops[0]?.id ?? 'contains',
-		};
+		const newCond: GridQueryCondition = { kind: 'condition', id: nextId(), columnId: firstCol.field, filter: null };
 		onUpdate({ ...group, children: [...group.children, newCond] });
 	};
 
@@ -285,7 +227,7 @@ function QueryGroup({ group, depth, columns, theme, isRoot, onUpdate, onRemove }
 				<button
 					onClick={addCondition}
 					title='Add condition'
-					disabled={filterableCols.length === 0}
+					disabled={columns.length === 0}
 					style={{
 						display: 'flex',
 						alignItems: 'center',
@@ -340,6 +282,7 @@ function QueryGroup({ group, depth, columns, theme, isRoot, onUpdate, onRemove }
 				child.kind === 'condition' ? (
 					<ConditionRow
 						key={child.id}
+						api={api}
 						condition={child}
 						columns={columns}
 						theme={theme}
@@ -349,6 +292,7 @@ function QueryGroup({ group, depth, columns, theme, isRoot, onUpdate, onRemove }
 				) : (
 					<QueryGroup
 						key={child.id}
+						api={api}
 						group={child}
 						depth={depth + 1}
 						columns={columns}
@@ -367,7 +311,8 @@ function QueryGroup({ group, depth, columns, theme, isRoot, onUpdate, onRemove }
 
 export function QueryPanel({ api, onClose }: { api: GridApi<unknown>; onClose: () => void }) {
 	const theme = api.getTheme();
-	const columns = api.getColumns() as Array<{ field: string; header?: string | null; filterType?: string | null }>;
+	// Columns that filter, each with its own filter editor.
+	const columns = (api.getColumns() as ColumnDef<any>[]).filter((c) => resolveColumnFilterDef(c) !== null);
 	const activeQueryModel = useGridKeySelector<GridQueryModel | null>(
 		'queryModel',
 		(s) => (s as { queryModel?: GridQueryModel | null }).queryModel ?? null
@@ -455,6 +400,7 @@ export function QueryPanel({ api, onClose }: { api: GridApi<unknown>; onClose: (
 			<div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '10px 12px' }}>
 				<div style={sectionLabel}>Conditions</div>
 				<QueryGroup
+					api={api}
 					group={draft.root}
 					depth={0}
 					columns={columns}

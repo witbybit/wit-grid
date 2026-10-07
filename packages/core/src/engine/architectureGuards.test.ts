@@ -1953,10 +1953,15 @@ describe('Architecture guardrails', () => {
 		).toHaveLength(0);
 	});
 
-	it('floating filter renderer expresses filter intent through engine.setFilterModel (Plan 103)', () => {
-		const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'floatingFilterRenderer.ts'), 'utf-8');
-		expect(content).toContain('this.engine.setFilterModel(');
-		expect(content).not.toContain('this.engine.stateManager.setState({ filterModel');
+	it('filter surfaces express filter intent through engine.setFilterModel (Plan 103)', () => {
+		// Every filter surface (floating row, header funnel and menu, chip bar) applies filters through
+		// the filter popover controller, which writes through the engine.
+		const controller = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', 'filterPopoverController.ts'), 'utf-8');
+		expect(controller).toContain('this.engine.setFilterModel(');
+		for (const file of ['floatingFilterRenderer.ts', 'filterPopoverController.ts', 'headerMenuController.ts']) {
+			const content = readFileSync(resolve(CORE_ROOT, 'src', 'renderer', file), 'utf-8');
+			expect(content).not.toContain('this.engine.stateManager.setState({ filterModel');
+		}
 	});
 
 	it('pagination bar renderer expresses page changes through engine.setPaginationPage (Plan 103)', () => {

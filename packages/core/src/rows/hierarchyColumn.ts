@@ -43,7 +43,7 @@ function createHierarchyColumn<TData>(
 		width,
 		...(config?.minWidth !== undefined ? { minWidth: config.minWidth } : {}),
 		sortable: false,
-		filterType: 'none',
+		filterDef: { type: 'none' },
 		enableRowGroup: false,
 		suppressHeaderMenu: true,
 		canEdit: () => false,

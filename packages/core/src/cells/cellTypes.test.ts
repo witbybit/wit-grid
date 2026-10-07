@@ -272,7 +272,7 @@ describe('column types', () => {
 		expect(a.renderer).toBe(BUILTIN_COLUMN_TYPES.currency.renderer);
 		expect(b.renderer?.kind).toBe('dom');
 		expect(b.valueFormatter!({} as any)).toBe('own');
-		expect(b.filterDef?.type).toBe('multi-select');
+		expect(b.filterDef?.type).toBe('select');
 		expect(c).toBe(columns[2]);
 		expect(multiSelectColumnType(STATUS).valueFormatter!({ value: ['todo', 'x'] } as any)).toBe('To do, x');
 	});

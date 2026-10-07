@@ -73,6 +73,7 @@ import type { AutoSizeColumnOptions, AutoSizeAllColumnsOptions } from '../featur
 import { ClipboardController } from '../features/ClipboardController.js';
 import type { GridDistinctValueSummary } from '../distinctValues.js';
 import { computeDistinctValueSummary } from '../distinctValues.js';
+import { getColumnValue } from '../rowModel.js';
 import type { GridDomainVersions } from '../state/GridDomainVersions.js';
 import { type GridInstrumentation, NOOP_INSTRUMENTATION } from '../diagnostics/GridInstrumentation.js';
 import { GridCapabilityManager } from '../capabilities/GridCapabilityManager.js';
@@ -1128,8 +1129,10 @@ export class GridEngine<TRowData = unknown> {
 		return [...this.getColumnDistinctValueSummary(colField).values];
 	}
 	public getColumnDistinctValueSummary(colField: string): GridDistinctValueSummary {
+		const column = this.columns.getColumnDef(colField);
 		return computeDistinctValueSummary(this.getDistinctValueSourceNodes(), colField, {
 			maxValues: this.stateManager.getState().runtimeLimits?.maxFilterDistinctValues,
+			getter: column ? (node) => getColumnValue(node, column) : undefined,
 		});
 	}
 	public moveColumn(colField: string, toIndex: number): void {

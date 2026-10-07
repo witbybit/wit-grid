@@ -1,4 +1,5 @@
 import { HeaderMenuController } from './headerMenuController.js';
+import { FilterPopoverController } from './filterPopoverController.js';
 import { ScrollEngine } from './scrollEngine.js';
 import { ColumnInteractionController } from './columnInteractionController.js';
 import { FillDragController } from './fillDragController.js';
@@ -76,6 +77,8 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 	public readonly paginationBarRenderer: PaginationBarRenderer<TRowData>;
 	public readonly stickyGroupRenderer: StickyGroupRenderer<TRowData>;
 	private readonly headerMenu: HeaderMenuController<TRowData>;
+	/** Hosts column filter editors (funnel popover, header menu, floating row, chip bar). */
+	public readonly filterPopover: FilterPopoverController<TRowData>;
 	private readonly viewportInteractionRouter: ReturnType<typeof createGridViewportInteractionRouter>;
 
 	private readonly layoutTransition: LayoutTransitionController<TRowData>;
@@ -155,10 +158,12 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		);
 		this.portalMountManager = new PortalMountManager<TRowData>(engine);
 		this.portalMountManager.maxRowMountsPerScrollFrame = engine.rendererOptions?.fullWidth?.maxMountsPerScrollFrame ?? 4;
+		this.filterPopover = new FilterPopoverController<TRowData>(engine);
 		this.headerMenu = new HeaderMenuController<TRowData>(
 			engine,
 			this.portalMountManager,
-			() => (this.api || this.engine.stateManager) as unknown as GridApi<TRowData>
+			() => (this.api || this.engine.stateManager) as unknown as GridApi<TRowData>,
+			this.filterPopover
 		);
 		this.geometryController = new GeometryController(engine);
 		this.scrollEngine = new ScrollEngine<TRowData>(engine);
@@ -228,7 +233,9 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.headerRenderer = new HeaderRenderer<TRowData>(
 			engine,
 			() => this.columnInteractions,
-			(cell, colField) => this.headerMenu.show(cell, colField)
+			(cell, colField) => this.headerMenu.show(cell, colField),
+			(anchor, colField) => this.filterPopover.open(anchor, colField),
+			(colField) => this.filterPopover.isFilterable(colField)
 		);
 		this.overlayRenderer = new OverlayRenderer<TRowData>(
 			engine,
@@ -264,8 +271,8 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 
 		// Group panel renderer — mounts when showGroupPanel is true
 		this.groupPanelRenderer = new GroupPanelRenderer<TRowData>(engine);
-		this.filterChipBarRenderer = new FilterChipBarRenderer<TRowData>(engine, this.headerMenu);
-		this.floatingFilterRenderer = new FloatingFilterRenderer<TRowData>(engine);
+		this.filterChipBarRenderer = new FilterChipBarRenderer<TRowData>(engine, this.headerMenu, this.filterPopover);
+		this.floatingFilterRenderer = new FloatingFilterRenderer<TRowData>(engine, this.filterPopover);
 		this.statusBarRenderer = new StatusBarRenderer<TRowData>(engine);
 		this.paginationBarRenderer = new PaginationBarRenderer<TRowData>(engine);
 		this.stickyGroupRenderer = new StickyGroupRenderer<TRowData>(engine, this.portalMountManager);

@@ -1,4 +1,4 @@
-import { createElement, memo, useSyncExternalStore } from 'react';
+import { createElement, memo, useSyncExternalStore, type ReactNode } from 'react';
 import { GridApi, GroupRenderContext, VisualRow } from '@eregister/wit-grid-core';
 import { createPortal } from 'react-dom';
 import { GridProvider } from './gridContext.js';
@@ -75,7 +75,7 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 	totalRowRenderer,
 }: RowMenuPortalPoolProps<TRowData>) {
 	const snapshot = useSyncExternalStore(store.subscribeRowsMenus, store.getRowMenuSnapshot, store.getRowMenuSnapshot);
-	const { rowPortalList, menuPortalList } = snapshot;
+	const { rowPortalList, menuPortalList, filterPortalList } = snapshot;
 
 	return (
 		<>
@@ -106,6 +106,7 @@ function RowMenuPortalPoolInner<TRowData = unknown>({
 				if (!CustomComponent) return null;
 				return createPortal(<CustomComponent colField={colField} column={column} api={api} close={close} />, container, `menu-${colField}`);
 			})}
+			{filterPortalList.map((fp) => createPortal(fp.node as ReactNode, fp.container, fp.key))}
 		</>
 	);
 }

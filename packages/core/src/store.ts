@@ -76,7 +76,6 @@ export type {
 	HeaderCellStyleRule,
 	GridStyleRule,
 } from './columnDef.js';
-export type { FloatingFilterRendererParams } from './renderer/floatingFilterRenderer.js';
 
 export {
 	isDataVisualRow,

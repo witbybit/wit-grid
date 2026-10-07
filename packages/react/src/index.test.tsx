@@ -2289,7 +2289,7 @@ describe('explicit React entrypoints', () => {
 		});
 
 		await waitFor(() => {
-			expect(screen.getByText('Name: contains "Ali"')).toBeTruthy();
+			expect(screen.getByText('Name: contains “Ali”')).toBeTruthy();
 		});
 	});
 

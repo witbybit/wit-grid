@@ -36,6 +36,10 @@ export interface CellOptionsSourceConfig {
 	resolveOptions?: CellOptionsResolver;
 	/** Page size asked of `loadOptions`. Default 50. */
 	pageSize?: number;
+	/** Wait this long after typing before asking `loadOptions` (grid scheduler). Default 250. */
+	debounceMs?: number;
+	/** Ask `loadOptions` only once this many characters are typed. Default 0. */
+	minQueryLength?: number;
 }
 
 /**
@@ -48,6 +52,8 @@ export interface CellOptionsStore {
 	/** The options given up front (all of them, for a column without a loader). */
 	readonly options: readonly CellOption[];
 	readonly pageSize: number;
+	readonly debounceMs: number;
+	readonly minQueryLength: number;
 	/** Present when options come from `loadOptions`. */
 	readonly fetch?: (query: CellOptionsQuery) => Promise<CellOptionsPage>;
 	get(value: string): CellOption | undefined;
@@ -111,6 +117,8 @@ export function createCellOptionsStore(options: readonly CellOption[], config: C
 	return {
 		options,
 		pageSize,
+		debounceMs: config.debounceMs ?? 250,
+		minQueryLength: config.minQueryLength ?? 0,
 		fetch: loader
 			? async (query) => {
 					const result = await loader(query);
