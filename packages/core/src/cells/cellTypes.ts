@@ -304,7 +304,8 @@ export function progressColumnType(options: ProgressCellOptions = {}): ColumnTyp
 	return {
 		renderer: { kind: 'dom', renderer: createProgressRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor({ min: 0, max, step: max / 20 }) },
-		filterDef: { type: 'number' },
+		// A 0–1 bar reads as a percent; its filter takes percents too.
+		filterDef: { type: 'number', min: 0, max, format: max === 1 ? { format: 'percent', decimals: 0 } : undefined },
 	};
 }
 

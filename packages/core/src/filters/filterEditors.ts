@@ -179,6 +179,13 @@ function dateInput(value: string, placeholder: string, onInput: (immediate: bool
 
 type ValueKind = 'text' | 'number' | 'date';
 
+/** Numbers are typed as shown: a percent column takes 25 for 0.25. */
+function numberScale(def: ColumnFilterDef): number {
+	return def.format?.format === 'percent' ? 100 : 1;
+}
+
+const toShown = (n: number, scale: number) => String(scale === 1 ? n : Math.round(n * scale * 1e6) / 1e6);
+
 /** The value inputs for an operator: none, one, or two (between). */
 function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCondition | null, onInput: (immediate: boolean) => void) {
 	const box = el('div', 'og-flt-values');
@@ -188,7 +195,10 @@ function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCon
 	const initial = (i: number): string => {
 		if (!first) return '';
 		if (first.type === 'date') return (i === 0 ? first.dateFrom : first.dateTo) ?? '';
-		if (first.type === 'number') return String((i === 0 ? first.value : first.valueTo) ?? '');
+		if (first.type === 'number') {
+			const n = i === 0 ? first.value : first.valueTo;
+			return n === undefined || !Number.isFinite(n) ? '' : toShown(n, numberScale(def));
+		}
 		if (first.type === 'text') return first.value ?? '';
 		return '';
 	};
@@ -212,7 +222,7 @@ function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCon
 				if (kind === 'number') {
 					input.inputMode = 'decimal';
 					input.setAttribute('data-numeric', '');
-					input.placeholder = meta.range ? (i === 0 ? 'Min' : 'Max') : 'Value';
+					input.placeholder = (meta.range ? (i === 0 ? 'Min' : 'Max') : 'Value') + (numberScale(def) === 100 ? ' %' : '');
 				} else input.placeholder = 'Value…';
 				input.value = initial(i);
 				input.addEventListener('input', () => onInput(false));
@@ -240,8 +250,10 @@ function buildCondition(kind: ValueKind, op: string, values: string[], def: Colu
 	}
 	if (kind === 'number') {
 		if (meta.noValue) return { type: 'number', operator: op as 'blank', value: 0 };
-		const a = values[0] === '' ? NaN : Number(values[0].replace(/[,\s]/g, ''));
-		const b = values[1] === undefined || values[1] === '' ? undefined : Number(values[1].replace(/[,\s]/g, ''));
+		const scale = numberScale(def);
+		const read = (text: string) => Number(text.replace(/[,\s%]/g, '')) / scale;
+		const a = values[0] === '' ? NaN : read(values[0]);
+		const b = values[1] === undefined || values[1] === '' ? undefined : read(values[1]);
 		if (Number.isNaN(a) && !(meta.range && b !== undefined)) return null;
 		if (meta.range) return { type: 'number', operator: 'inRange', value: Number.isNaN(a) ? (def.min ?? -Infinity) : a, valueTo: b };
 		return { type: 'number', operator: op as 'equals', value: a };
@@ -592,7 +604,9 @@ const dateRangeEditor: DomFilterEditor = {
 		const box = el('div', 'og-flt-values');
 		let from: ReturnType<typeof dateInput> | null = null;
 		let to: ReturnType<typeof dateInput> | null = null;
+		const typing = debouncer(TYPING_DEBOUNCE_MS);
 		const emit = () => {
+			typing.cancel();
 			const a = parseCellDate(from?.input.value);
 			const b = to ? parseCellDate(to.input.value) : null;
 			const operator = picker.value as 'overlaps' | 'within' | 'contains';
@@ -602,14 +616,15 @@ const dateRangeEditor: DomFilterEditor = {
 			}
 			params.onChange({ type: 'dateRange', operator, dateFrom: toIsoDay(a), dateTo: b && operator !== 'contains' ? toIsoDay(b) : undefined });
 		};
+		const onInput = (immediate: boolean) => (immediate ? emit() : typing.run(emit));
 		const build = (op: string) => {
 			box.textContent = '';
-			from = dateInput(existing?.dateFrom ?? '', op === 'contains' ? 'Date' : 'From', (immediate) => immediate && emit());
+			from = dateInput(existing?.dateFrom ?? '', op === 'contains' ? 'Date' : 'From', onInput);
 			box.appendChild(from.element);
 			to = null;
 			if (op !== 'contains') {
 				box.appendChild(el('span', 'og-flt-dash', '–'));
-				to = dateInput(existing?.dateTo ?? '', 'To', (immediate) => immediate && emit());
+				to = dateInput(existing?.dateTo ?? '', 'To', onInput);
 				box.appendChild(to.element);
 			}
 		};
@@ -631,6 +646,7 @@ const dateRangeEditor: DomFilterEditor = {
 		return {
 			focus: () => from?.input.focus({ preventScroll: true }),
 			destroy() {
+				typing.cancel();
 				picker.close();
 				from?.close();
 				to?.close();

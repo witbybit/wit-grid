@@ -83,7 +83,7 @@ function makeGrid(columns: TestColumn[]) {
 		filterModel = filter ? { ...(filterModel ?? {}), [field]: filter } : null;
 		renderer.repaint(plan);
 	};
-	return { renderer, grid, engine, setExternal };
+	return { renderer, grid, engine, setExternal, plan };
 }
 
 function input(grid: HTMLElement, field: string): HTMLInputElement {
@@ -115,6 +115,7 @@ describe('FloatingFilterRenderer', () => {
 		vi.useFakeTimers();
 		const { grid, engine } = makeGrid([{ field: 'name', lane: 'center' }]);
 		const field = input(grid, 'name');
+		field.focus();
 		field.value = 'ali';
 		field.dispatchEvent(new Event('input'));
 		expect(engine.setFilterModel).not.toHaveBeenCalled();
@@ -123,8 +124,25 @@ describe('FloatingFilterRenderer', () => {
 		field.value = 'alice';
 		field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
 		expect(engine.setFilterModel).toHaveBeenLastCalledWith({ name: { type: 'text', operator: 'contains', value: 'alice' } });
-		// Its own change does not rebuild the editor (the user keeps typing in the same field).
+		// Its own change does not rebuild or move the editor (the user keeps typing in the same field).
 		expect(input(grid, 'name')).toBe(field);
+		expect(document.activeElement).toBe(field);
+	});
+
+	it('columns scrolled into view get their editors', () => {
+		const { grid, renderer, plan } = makeGrid([
+			{ field: 'a', lane: 'center' },
+			{ field: 'b', lane: 'center' },
+			{ field: 'c', lane: 'center' },
+		]);
+		const at = (colStart: number, colEnd: number) =>
+			({ ...plan, columns: { ...plan.columns, colStart, colEnd } }) as GridLayoutPlan;
+		renderer.repaint(at(0, 0));
+		expect(grid.querySelector('[data-col-field="c"]')).toBeNull();
+		renderer.syncScrollLeft(at(1, 2));
+		expect([...grid.querySelectorAll<HTMLElement>('[data-col-field]')].map((el) => el.dataset.colField)).toEqual(['b', 'c']);
+		renderer.syncScrollLeft(at(0, 1));
+		expect([...grid.querySelectorAll<HTMLElement>('[data-col-field]')].map((el) => el.dataset.colField)).toEqual(['a', 'b']);
 	});
 
 	it('shows a filter set elsewhere, and lists as a summary chip opening the full editor', () => {

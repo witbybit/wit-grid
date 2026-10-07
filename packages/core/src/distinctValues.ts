@@ -1,3 +1,4 @@
+import { parseMultiValue } from './cells/format.js';
 import type { RowNode } from './rowNode.js';
 
 export interface GridDistinctValueSummary {
@@ -12,6 +13,8 @@ export interface DistinctValueComputationOptions {
 	readonly maxValues?: number;
 	/** Reads a node's value (the column's getter); default the field of its data. */
 	readonly getter?: (node: RowNode<any>) => unknown;
+	/** Cells hold lists (multi-select, tags, people): count each value, arrays and comma-separated alike. */
+	readonly listValues?: boolean;
 }
 
 /**
@@ -46,9 +49,10 @@ export function computeDistinctValueSummary<TRowData>(
 	};
 	for (const node of nodes) {
 		const raw = read(node);
-		if (Array.isArray(raw)) {
-			if (raw.length === 0) add(null);
-			for (const item of raw) add(item);
+		const list = Array.isArray(raw) ? raw : options?.listValues && typeof raw === 'string' && raw !== '' ? parseMultiValue(raw) : null;
+		if (list) {
+			if (list.length === 0) add(null);
+			for (const item of list) add(item);
 		} else add(raw);
 	}
 

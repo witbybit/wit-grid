@@ -108,6 +108,43 @@ describe('filter editors', () => {
 		expect(onChange).toHaveBeenLastCalledWith({ type: 'dateRange', operator: 'overlaps', dateFrom: '2026-03-01', dateTo: '2026-03-31' });
 	});
 
+	it('typed values apply after a pause: date range, text', () => {
+		vi.useFakeTimers();
+		try {
+			const range = mount({ type: 'dateRange' });
+			const [from, to] = range.container.querySelectorAll<HTMLInputElement>('.og-flt-input');
+			for (const [input, value] of [
+				[from, '2026-03-01'],
+				[to, '2026-03-31'],
+			] as const) {
+				input.value = value;
+				input.dispatchEvent(new Event('input', { bubbles: true }));
+			}
+			expect(range.onChange).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(400);
+			expect(range.onChange).toHaveBeenLastCalledWith({ type: 'dateRange', operator: 'overlaps', dateFrom: '2026-03-01', dateTo: '2026-03-31' });
+			expect(range.onClose).not.toHaveBeenCalled();
+
+			const text = mount({ type: 'text' });
+			const input = text.container.querySelector<HTMLInputElement>('.og-flt-input')!;
+			input.value = 'mig';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			vi.advanceTimersByTime(400);
+			expect(text.onChange).toHaveBeenLastCalledWith({ type: 'text', operator: 'contains', value: 'mig' });
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('percent numbers are typed as shown: 25 filters 0.25', () => {
+		const { container, onChange } = mount({ type: 'number', format: { format: 'percent' } }, { type: 'number', operator: 'equals', value: 0.29 });
+		const input = container.querySelector<HTMLInputElement>('.og-flt-input')!;
+		expect(input.value).toBe('29');
+		input.value = '25';
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+		expect(onChange).toHaveBeenLastCalledWith({ type: 'number', operator: 'equals', value: 0.25 });
+	});
+
 	it('path: a tree checklist where a parent covers its children', () => {
 		const def: ColumnFilterDef = {
 			type: 'path',

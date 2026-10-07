@@ -20,6 +20,10 @@ export interface CellPopover {
 	close(): void;
 }
 
+/** Popovers opened from inside other popovers, and the close functions of each popover's children. */
+const parentOf = new WeakMap<Element, HTMLElement>();
+const childrenOf = new WeakMap<Element, Set<() => void>>();
+
 const GAP = 4;
 const MARGIN = 8;
 
@@ -40,6 +44,15 @@ export function openCellPopover(options: CellPopoverOptions): CellPopover {
 	element.addEventListener('mousedown', (event) => event.stopPropagation());
 	element.appendChild(content);
 	document.body.appendChild(element);
+	// A popover opened from inside another (an operator list, a calendar) is its child: presses in it
+	// are presses in the parent, and closing the parent closes it.
+	const parent = anchor.closest<HTMLElement>('.og-ct-popover');
+	if (parent) {
+		parentOf.set(element, parent);
+		let siblings = childrenOf.get(parent);
+		if (!siblings) childrenOf.set(parent, (siblings = new Set()));
+		siblings.add(close);
+	}
 
 	let closed = false;
 	const reposition = () => {
@@ -69,6 +82,10 @@ export function openCellPopover(options: CellPopoverOptions): CellPopover {
 	const onPointerDown = (event: MouseEvent) => {
 		const target = event.target as Node | null;
 		if (target && (element.contains(target) || anchor.contains(target))) return;
+		// Inside one of this popover's child popovers (at any depth).
+		for (let node = (target as Element | null)?.closest?.('.og-ct-popover') ?? null; node; node = parentOf.get(node) ?? null) {
+			if (node === element) return;
+		}
 		dismiss('outside');
 	};
 	const onKeyDown = (event: KeyboardEvent) => {
@@ -97,6 +114,10 @@ export function openCellPopover(options: CellPopoverOptions): CellPopover {
 	function close() {
 		if (closed) return;
 		closed = true;
+		const children = childrenOf.get(element);
+		if (children) for (const closeChild of [...children]) closeChild();
+		childrenOf.delete(element);
+		if (parent) childrenOf.get(parent)?.delete(close);
 		document.removeEventListener('mousedown', onPointerDown, true);
 		window.removeEventListener('scroll', onScroll, true);
 		window.removeEventListener('resize', reposition);

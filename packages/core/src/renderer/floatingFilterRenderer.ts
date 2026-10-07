@@ -64,8 +64,10 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 		this.syncVisibleFilters(true, layoutPlan ?? computeGridLayoutPlan(this.engine));
 	}
 
-	public syncScrollLeft(_layoutPlan: GridLayoutPlan): void {
+	public syncScrollLeft(layoutPlan: GridLayoutPlan): void {
 		// Pin lanes use position: sticky; editor popovers follow their anchors on their own.
+		// Columns scrolled into view get their editors (a no-op while the column window holds).
+		this.syncVisibleFilters(false, layoutPlan);
 	}
 
 	private syncVisibleFilters(force: boolean, plan: GridLayoutPlan): void {
@@ -99,6 +101,9 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 
 		const colCount = columns.length;
 		const seen = new Set<string>();
+		// The last cell placed in each lane: cells keep display order, moved only when out of it
+		// (moving a node blurs the input inside it).
+		const lastInLane = new Map<HTMLElement, HTMLDivElement>();
 
 		for (let c = 0; c < colCount; c++) {
 			const col = columns[c];
@@ -118,6 +123,7 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 			const width = colWidths[c] ?? this.engine.stateManager.getState().defaultColWidth;
 			const currentFilter = (filterModel?.[col.field] ?? null) as ColumnFilter | null;
 
+			const targetParent = isPinLeft ? this.filterLeftLayer : isPinRight ? this.filterRightLayer : this.filterLayer;
 			let cell = this.cells.get(col.field);
 			if (!cell) {
 				cell = this.createCell(c, col, left, width, currentFilter, isPinLeft, isPinRight);
@@ -126,18 +132,17 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 				cell.style.left = `${left}px`;
 				cell.style.width = `${width}px`;
 				// Reparent if lane changed (pin/unpin relocation — move, do not destroy/recreate).
-				const targetParent = isPinLeft ? this.filterLeftLayer : isPinRight ? this.filterRightLayer : this.filterLayer;
-				if (targetParent && cell.parentNode !== targetParent) {
-					targetParent.appendChild(cell);
-					this.engine.instrumentation.increment(GridMetric.FLOATING_FILTER_VIEW_RELOCATED);
-				} else if (targetParent) {
-					// Appending in compiled display order keeps same-lane reorders in
-					// topology/DOM order without a layout read.
-					targetParent.appendChild(cell);
-				}
+				if (cell.parentNode !== targetParent) this.engine.instrumentation.increment(GridMetric.FLOATING_FILTER_VIEW_RELOCATED);
 				// A filter set elsewhere (another surface, the api): show it.
 				this.syncCellFilter(col.field, currentFilter);
 			}
+			const prev = lastInLane.get(targetParent) ?? null;
+			const inPlace = cell.parentNode === targetParent && (prev ? cell.previousElementSibling === prev : cell === targetParent.firstElementChild);
+			if (!inPlace) {
+				if (prev) prev.after(cell);
+				else targetParent.prepend(cell);
+			}
+			lastInLane.set(targetParent, cell);
 		}
 
 		// Remove cells that are no longer in the visible range
