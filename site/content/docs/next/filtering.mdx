@@ -27,7 +27,7 @@ cascading select by tree. Set `filterDef` on a column to choose one yourself; wi
 | ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | `text`           | Operator (contains, is, starts with…, is empty) + value; optional second condition (And / Or)           | `{ type: 'text', operator, value }`                 |
 | `number`         | Operator (=, ≥, between…) + value(s); `stars: 5` shows a star picker                                    | `{ type: 'number', operator, value, valueTo }`      |
-| `date`           | On, before, after, between, with a calendar                                                             | `{ type: 'date', operator, dateFrom, dateTo }`      |
+| `date`           | On, before, after, between (with a calendar); in the last / next N days, weeks…; a period (this week…)   | `{ type: 'date', operator, dateFrom, dateTo }`      |
 | `select`         | Searchable checklist with counts, Select all / Clear, “(Blanks)”; `listValues` adds Any / All / None of | `{ type: 'select', values, matchMode }`             |
 | `boolean`        | All · Yes · No                                                                                          | `{ type: 'boolean', value }`                        |
 | `dateRange`      | Overlaps / within / includes a date                                                                     | `{ type: 'dateRange', operator, dateFrom, dateTo }` |
@@ -90,6 +90,20 @@ cascading select by tree. Set `filterDef` on a column to choose one yourself; wi
 Server-loaded lists wait `debounceMs` after typing (250 by default, through the grid's scheduler), search only past
 `minQueryLength`, and keep one request in flight: a newer search waits for it, then the latest one runs. Typed text and
 number filters apply after a short pause, and at once on Enter.
+
+### Relative dates
+
+Date filters can roll with the calendar: they are stored relative, so a saved view or a persisted filter keeps meaning
+"the last 30 days" tomorrow. Cells match by local calendar day, today included.
+
+```typescript
+api.setFilterModel({
+	created: { type: 'date', operator: 'inLast', dateFrom: '', amount: 30, unit: 'day' }, // 'day' | 'week' | 'month' | 'year'
+	due: { type: 'date', operator: 'period', dateFrom: '', period: 'thisWeek' }, // today, lastMonth, thisQuarter, lastYear…
+});
+```
+
+"This week" starts on Monday; set `filterDef: { type: 'date', weekStartsOn: 0 }` for Sunday.
 
 ## Quick filter
 

@@ -8,6 +8,7 @@ import { formatCellNumber, isCheckedCellValue, parseMultiValue } from './cells/f
 import { isCellOptionsStore } from './cells/optionsStore.js';
 import type { ColumnFilter, FilterCondition, FilterModel } from './filterModel.js';
 import { resolveColumnFilterDef, type ColumnFilterDef, type FilterConfigColumn } from './filters/filterDef.js';
+import { describeRelativeDate, isDatePeriod, isRelativeDateUnit } from './filters/relativeDates.js';
 
 // ── Operators ────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,8 @@ export interface OpOption {
 	noValue?: boolean;
 	/** Two values needed (between). */
 	range?: boolean;
+	/** A relative date: an amount of units, or a named period. */
+	relative?: 'amount' | 'period';
 }
 
 export const TEXT_OPS: OpOption[] = [
@@ -54,6 +57,9 @@ export const DATE_OPS: OpOption[] = [
 	{ value: 'before', label: 'Before', symbol: '<', chipLabel: 'before' },
 	{ value: 'after', label: 'After', symbol: '>', chipLabel: 'after' },
 	{ value: 'inRange', label: 'Between', symbol: '↔', chipLabel: 'between', range: true },
+	{ value: 'period', label: 'In period', symbol: '◷', chipLabel: '', relative: 'period' },
+	{ value: 'inLast', label: 'In the last', symbol: '≤', chipLabel: 'in the last', relative: 'amount' },
+	{ value: 'inNext', label: 'In the next', symbol: '≥', chipLabel: 'in the next', relative: 'amount' },
 	{ value: 'blank', label: 'Is empty', symbol: '∅', chipLabel: 'is empty', noValue: true },
 	{ value: 'notBlank', label: 'Is not empty', symbol: '!∅', chipLabel: 'not empty', noValue: true },
 ];
@@ -183,6 +189,7 @@ function summarizeCondition(filter: FilterCondition, def: ColumnFilterDef | null
 		}
 		case 'date': {
 			const op = getOpMeta('date', filter.operator);
+			if (op.relative) return describeRelativeDate(filter);
 			const label = op.chipLabel ?? op.symbol;
 			if (op.noValue) return label;
 			return op.range ? `${filter.dateFrom} – ${filter.dateTo ?? '…'}` : `${label} ${filter.dateFrom}`;
@@ -240,8 +247,13 @@ function restoreCondition(raw: unknown): FilterCondition | null {
 			return NUMBER_OP_SET.has(c.operator as string) && isNumber(c.value) && (c.valueTo === undefined || isNumber(c.valueTo))
 				? (raw as FilterCondition)
 				: null;
-		case 'date':
-			return DATE_OP_SET.has(c.operator as string) && isString(c.dateFrom) && isOptionalString(c.dateTo) ? (raw as FilterCondition) : null;
+		case 'date': {
+			if (!DATE_OP_SET.has(c.operator as string) || !isString(c.dateFrom) || !isOptionalString(c.dateTo)) return null;
+			if (c.operator === 'period') return isDatePeriod(c.period) ? (raw as FilterCondition) : null;
+			if (c.operator === 'inLast' || c.operator === 'inNext')
+				return isNumber(c.amount) && c.amount >= 1 && isRelativeDateUnit(c.unit) ? (raw as FilterCondition) : null;
+			return raw as FilterCondition;
+		}
 		case 'select':
 			return Array.isArray(c.values) &&
 				c.values.every((v) => v === null || typeof v === 'string' || typeof v === 'number') &&

@@ -8,6 +8,7 @@ import { parseDateRange } from '../cells/dateRange.js';
 import { isCheckedCellValue, parseCellDate, parseMultiValue } from '../cells/format.js';
 import type { ColumnFilter, FilterCondition } from '../filterModel.js';
 import type { ColumnFilterDef } from './filterDef.js';
+import { relativeDateRange } from './relativeDates.js';
 
 /** Matches one cell value (plus its row, for custom filters). */
 export type PreparedFilterMatcher = (value: unknown, row: unknown) => boolean;
@@ -76,6 +77,18 @@ function prepareCondition(condition: FilterCondition, def: ColumnFilterDef<any> 
 			const op = condition.operator;
 			if (op === 'blank') return (v) => isBlank(v);
 			if (op === 'notBlank') return (v) => !isBlank(v);
+			if (op === 'inLast' || op === 'inNext' || op === 'period') {
+				// Resolved against today each time the filter is prepared.
+				const range = relativeDateRange(condition, new Date(), def?.weekStartsOn ?? 1);
+				if (!range) return null;
+				const lo = day(range.from);
+				const hi = day(range.to);
+				return (v) => {
+					const d = parseCellDate(v);
+					const n = d ? day(d) : NaN;
+					return n >= lo && n <= hi;
+				};
+			}
 			const from = parseCellDate(condition.dateFrom);
 			if (!from) return null;
 			const to = condition.dateTo ? parseCellDate(condition.dateTo) : null;
