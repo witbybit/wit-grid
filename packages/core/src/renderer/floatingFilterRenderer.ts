@@ -137,7 +137,8 @@ export class FloatingFilterRenderer<TRowData = unknown> {
 				this.syncCellFilter(col.field, currentFilter);
 			}
 			const prev = lastInLane.get(targetParent) ?? null;
-			const inPlace = cell.parentNode === targetParent && (prev ? cell.previousElementSibling === prev : cell === targetParent.firstElementChild);
+			const inPlace =
+				cell.parentNode === targetParent && (prev ? cell.previousElementSibling === prev : cell === targetParent.firstElementChild);
 			if (!inPlace) {
 				if (prev) prev.after(cell);
 				else targetParent.prepend(cell);

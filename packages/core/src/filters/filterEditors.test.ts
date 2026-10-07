@@ -122,7 +122,12 @@ describe('filter editors', () => {
 			}
 			expect(range.onChange).not.toHaveBeenCalled();
 			vi.advanceTimersByTime(400);
-			expect(range.onChange).toHaveBeenLastCalledWith({ type: 'dateRange', operator: 'overlaps', dateFrom: '2026-03-01', dateTo: '2026-03-31' });
+			expect(range.onChange).toHaveBeenLastCalledWith({
+				type: 'dateRange',
+				operator: 'overlaps',
+				dateFrom: '2026-03-01',
+				dateTo: '2026-03-31',
+			});
 			expect(range.onClose).not.toHaveBeenCalled();
 
 			const text = mount({ type: 'text' });

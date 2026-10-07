@@ -135,8 +135,7 @@ describe('FloatingFilterRenderer', () => {
 			{ field: 'b', lane: 'center' },
 			{ field: 'c', lane: 'center' },
 		]);
-		const at = (colStart: number, colEnd: number) =>
-			({ ...plan, columns: { ...plan.columns, colStart, colEnd } }) as GridLayoutPlan;
+		const at = (colStart: number, colEnd: number) => ({ ...plan, columns: { ...plan.columns, colStart, colEnd } }) as GridLayoutPlan;
 		renderer.repaint(at(0, 0));
 		expect(grid.querySelector('[data-col-field="c"]')).toBeNull();
 		renderer.syncScrollLeft(at(1, 2));
