@@ -271,7 +271,7 @@ ones included — `api.getDescendantSelection(id)` and `api.setDescendantsSelect
 For tree data, `treeData.selectDescendants` makes selecting a parent select its whole subtree.
 
 Copying a range that spans group or total rows copies what they show (the label and formatted aggregates).
-`api.exportCsv()` / `api.getCsv()` export the whole hierarchy — every group expanded — with group and total rows
+`api.exportExcel()` exports grouped grids as collapsible Excel outlines. `api.exportCsv()` / `api.getCsv()` export the whole hierarchy — every group expanded — with group and total rows
 (`includeGroups`, `includeTotals`) and the hierarchy column indented or as a path (`hierarchyText`).
 
 See [Events](/docs/next/events) for `groupingChanged`, `groupByChanged`, `groupColumnAdded/Removed/Moved`,

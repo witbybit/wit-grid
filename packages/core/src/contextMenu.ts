@@ -44,6 +44,7 @@ export interface GridContextMenuOptions<TRowData = unknown> {
 		| 'excludeValue'
 		| 'clearColumnFilter'
 		| 'exportAll'
+		| 'exportExcel'
 		| 'exportSelected'
 		| 'divider'
 	>;
@@ -246,6 +247,12 @@ export class GridContextMenuPlugin<TRowData = unknown> implements GridPlugin<TRo
 				label: 'Export All as CSV',
 				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
 				action: () => exportToCsv(this.runtime, { fileName: 'export.csv' }),
+			},
+			{
+				id: 'exportExcel',
+				label: 'Export All as Excel',
+				icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m8 13 4 5M12 13l-4 5"/></svg>`,
+				action: () => void this.runtime.exportExcel({ fileName: 'export.xlsx' }),
 			},
 			{
 				id: 'exportSelected',

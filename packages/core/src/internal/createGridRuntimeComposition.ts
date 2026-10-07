@@ -3,6 +3,7 @@ import { registerGridRuntimeComposition } from './apiInternalBridge.js';
 import { PUBLIC_ENGINE_FORWARD_NAMES } from './engineForwards.js';
 import { pickMembers } from './memberNames.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
+import { exportToXlsx, toXlsxBlob, type ExcelExportOptions } from '../export/xlsxExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
 import { EMPTY_WORKSPACE_STATE, type GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
@@ -86,6 +87,8 @@ export function createGridRuntimeComposition<TRowData>({
 		setDescendantsSelected: (id: string, selected: boolean) => runtime.setDescendantsSelected(id, selected),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
 		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
+		exportExcel: (options?: ExcelExportOptions) => exportToXlsx(runtime, runtime.engine.getState().columnWidths, options),
+		getExcel: (options?: ExcelExportOptions) => toXlsxBlob(runtime, runtime.engine.getState().columnWidths, options),
 		startEditing: (rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api') =>
 			runtime.startEditing(rowId, colFieldOrInstanceId, source),
 		updateEditDraft: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.updateEditDraft(rowId, colFieldOrInstanceId, value),

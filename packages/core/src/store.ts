@@ -36,6 +36,7 @@ import type { RenderStats } from './renderer/renderTelemetry.js';
 import type { GridRowNode } from './publicRowNode.js';
 import type { AggregationDef } from './rows/stages/aggregateStage.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from './export/csvExport.js';
+import { exportToXlsx, toXlsxBlob, type ExcelExportOptions } from './export/xlsxExport.js';
 import { createHierarchyTextResolver } from './rows/hierarchyText.js';
 import { isHierarchyActive } from './rows/hierarchyConfig.js';
 import type { PersistenceStatus, PersistedGridState } from './persistence/statePersistence.js';
@@ -540,6 +541,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
+	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, this.state.columnWidths, options);
+	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, this.state.columnWidths, options);
 
 	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
 	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {

@@ -23,7 +23,7 @@ const PLUGIN_RUNTIME_MEMBERS = `
 	stopEditing commitEdit getColumnState applyColumnState getGridState applyGridState subscribe subscribeToKey
 	subscribeToSnapshotSelector subscribeToIntegrity subscribeToCell subscribeToDomainVersions subscribeDomain
 	getColumnIndex getColumnField getColumnDef undo redo canUndo canRedo openPanel closePanel togglePanel
-	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv hasPersistence clearPersistedState
+	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv exportExcel getExcel hasPersistence clearPersistedState
 	setAutoSave isAutoSaveEnabled getPersistenceStatus subscribeToPersistenceStatus saveNow hasWorkspace
 	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView revertView deleteView duplicateView
 	renameView setDefaultView getRuntimeFaults clearRuntimeFaults flushCellUpdatesSync getInstrumentation

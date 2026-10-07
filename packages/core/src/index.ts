@@ -230,6 +230,7 @@ export {
 	restoreFilterModel,
 } from './filterOperations.js';
 export type { CsvExportOptions } from './export/csvExport.js';
+export type { ExcelExportOptions } from './export/xlsxExport.js';
 export type { GridContextMenuItem, GridContextMenuOptions } from './contextMenu.js';
 export type { GridCellWrite, GridTransaction, GridTransactionOptions, GridTransactionResult } from './api/GridApi.js';
 export type {
