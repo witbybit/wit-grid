@@ -4,22 +4,39 @@ description: Use built-in themes, switch at runtime, or compose your own theme f
 icon: Palette
 ---
 
-Wit Grid ships a shadcn-style, CSS-variable theming system: eight built-in themes, runtime switching with no
+Wit Grid ships a shadcn-style, CSS-variable theming system: fourteen built-in themes, runtime switching with no
 flash of the wrong theme, and full custom theme composition. All theme interaction goes through `GridApi` — the
 same handle you get from `onGridReady` or `useGridApi()`. There's no separate theming object to construct.
 
 ## Built-in themes
 
-<Cards>
-	<Card title='dark' description='Default. High-contrast dark surface tuned for long sessions.' />
-	<Card title='light' description='Neutral light surface for bright environments.' />
-	<Card title='light-hc' description='High-contrast light theme for accessibility.' />
-	<Card title='dark-hc' description='High-contrast dark theme for accessibility.' />
-	<Card title='cool-blue' description='Modern tech aesthetic with a blue accent.' />
-	<Card title='warm-orange' description='Warm accent theme.' />
-	<Card title='minimal-monochrome' description='Greyscale theme with no accent color.' />
-	<Card title='spreadsheet' description='Excel/Google Sheets-style daylight theme.' />
-</Cards>
+Each theme has its own palette and typeface.
+
+| Theme              | Look                                              | Font              |
+| ------------------ | ------------------------------------------------- | ----------------- |
+| `dark` (default)   | Neutral graphite with an indigo accent            | Inter             |
+| `light`            | Crisp white with a blue accent                    | Inter             |
+| `ocean`            | Deep sea navy with a cyan glow                    | Plus Jakarta Sans |
+| `fjord`            | Arctic slate with frost-blue accents (Nord)       | IBM Plex Sans     |
+| `velvet`           | Midnight plum with a neon-pink accent             | DM Sans           |
+| `ember`            | Warm charcoal lit with amber                      | Space Grotesk     |
+| `forest`           | Deep pine with emerald highlights                 | Source Sans 3     |
+| `mono`             | A terminal: greys and a green cursor              | JetBrains Mono    |
+| `paper`            | Cream paper, ink and terracotta                   | Source Serif 4    |
+| `latte`            | Soft lavender-grey with a violet accent           | Lexend            |
+| `blossom`          | Rosewater and raspberry                           | Nunito            |
+| `spreadsheet`      | Excel / Google Sheets: hairlines, a green cursor  | Roboto            |
+| `dark-hc`          | Black, white and a bright blue focus              | System            |
+| `light-hc`         | White, black and a deep blue focus                | System            |
+
+The fonts come from Google Fonts; add `BUILT_IN_THEME_FONTS_URL` to your page to load them all, or load only the
+ones you use. Without them each theme falls back to a system font stack.
+
+```tsx
+import { BUILT_IN_THEME_FONTS_URL } from '@eregister/wit-grid-react';
+
+<link rel='stylesheet' href={BUILT_IN_THEME_FONTS_URL} />;
+```
 
 ## Setting a theme
 
@@ -40,7 +57,7 @@ first paint — no flash of the default theme.
 
     	host.switchTheme('light'); // Switch to light theme
     	host.switchTheme('dark-hc'); // Switch to high-contrast dark
-    	host.switchTheme('cool-blue'); // Modern tech aesthetic
+    	host.switchTheme('ocean'); // Navy with a cyan accent
     	```
     </Tab>
 
@@ -53,7 +70,7 @@ Get `api` from `onGridReady` (React) or the return value of `createClientGrid` /
 
 ```typescript
 api.switchTheme('dark');
-api.switchTheme('cool-blue');
+api.switchTheme('paper');
 
 const theme = api.getTheme();
 
@@ -64,7 +81,31 @@ const unsubscribe = api.onThemeChange((theme) => {
 
 ## Composing a custom theme
 
-`ThemeTokens` is a plain flat object — a themed variant of a built-in theme is just a spread, no helper function
+The quickest way is a palette: `createTheme` turns a dozen colours and a font into every token (selection,
+popovers, group rows, skeletons, pinned-column shadows), and picks dark or light text for the accent so labels on
+it stay readable.
+
+```typescript
+import { createTheme } from '@eregister/wit-grid-core';
+
+export const acmeTheme = createTheme({
+	appearance: 'dark',
+	font: "'Inter', system-ui, sans-serif",
+	background: '#101418',
+	surface: '#0b0e11',
+	raised: '#171c22',
+	text: '#e8edf2',
+	muted: '#93a1b0',
+	border: '#1f2730',
+	borderStrong: '#2d3844',
+	accent: '#00d4ff',
+	hover: '#161c22',
+	error: '#ff6b6b',
+	radius: '10px',
+});
+```
+
+`ThemeTokens` is also a plain flat object — a themed variant of a built-in theme is just a spread, no helper function
 required:
 
 ```typescript

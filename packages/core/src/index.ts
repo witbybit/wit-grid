@@ -276,20 +276,17 @@ export type { GridNavigationOptions } from './interaction/GridInteractionControl
 export {
 	LIGHT_THEME,
 	DARK_THEME,
-	HIGH_CONTRAST_LIGHT_THEME,
-	HIGH_CONTRAST_DARK_THEME,
-	COOL_BLUE_THEME,
-	WARM_ORANGE_THEME,
-	MINIMAL_MONOCHROME_THEME,
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,
 	BUILT_IN_THEME_METADATA,
+	BUILT_IN_THEME_FONTS_URL,
+	createTheme,
 	ThemeManager,
 	getBuiltInTheme,
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from './renderer/themes.js';
-export type { ThemeTokens, BuiltInThemeName } from './renderer/themes.js';
+export type { ThemeTokens, ThemePalette, BuiltInThemeName } from './renderer/themes.js';
 export type { RowAnimationOptions } from './renderer/rowAnimation.js';
 export type { GridDomainVersions } from './state/GridDomainVersions.js';
 export type { GridInstrumentation, GridInstrumentationSnapshot, FrameMetrics, FallbackMetric } from './diagnostics/GridInstrumentation.js';

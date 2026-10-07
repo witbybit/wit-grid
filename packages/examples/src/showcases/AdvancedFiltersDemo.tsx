@@ -351,7 +351,7 @@ const SEED_VIEWS: GridViewDefinition[] = [
 		'team',
 		{ level: { type: 'select', values: ['IC4', 'IC5'], labels: ['IC4', 'IC5'] } },
 		[{ colId: 'salary', sort: 'desc' }],
-		'warm-orange'
+		'ember'
 	),
 	makeView('contractors', 'All Contractors', 'External contractors — useful for billing and access reviews', 'personal', {
 		status: { type: 'select', values: ['Contractor'], labels: ['Contractor'] },

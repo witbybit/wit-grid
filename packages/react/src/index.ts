@@ -15,10 +15,13 @@ export {
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,
 	BUILT_IN_THEME_METADATA,
+	BUILT_IN_THEME_FONTS_URL,
+	createTheme,
 	getBuiltInTheme,
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from '@eregister/wit-grid-core';
+export type { ThemePalette } from '@eregister/wit-grid-core';
 
 // ─── Built-in cell types (core, DOM-based) ───────────────────────────────────
 export {

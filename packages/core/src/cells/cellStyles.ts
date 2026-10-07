@@ -16,7 +16,7 @@ export const CELL_STYLES = `
   --og-ct-muted: color-mix(in srgb, var(--og-text-color) 58%, transparent);
   --og-ct-subtle: color-mix(in srgb, var(--og-text-color) 36%, transparent);
   --og-ct-accent: var(--og-focus-ring);
-  --og-ct-on-accent: #fff;
+  --og-ct-on-accent: var(--og-accent-contrast, #fff);
   --og-ct-control-border: color-mix(in srgb, var(--og-text-color) 30%, transparent);
   --og-ct-neutral-bg: color-mix(in srgb, var(--og-text-color) 9%, transparent);
   --og-ct-track: color-mix(in srgb, var(--og-text-color) 11%, transparent);

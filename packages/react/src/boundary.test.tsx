@@ -14,6 +14,7 @@ describe('React public boundary', () => {
 		expect(Object.keys(publicApi).sort()).toEqual([
 			'BUILTIN_COLUMN_TYPES',
 			'BUILT_IN_THEMES',
+			'BUILT_IN_THEME_FONTS_URL',
 			'BUILT_IN_THEME_METADATA',
 			'BUILT_IN_THEME_ORDER',
 			'CAPABILITY_ALLOWED',
@@ -41,6 +42,7 @@ describe('React public boundary', () => {
 			'createSelectEditor',
 			'createSelectRenderer',
 			'createSparklineRenderer',
+			'createTheme',
 			'currencyColumnType',
 			'customCellRule',
 			'date',

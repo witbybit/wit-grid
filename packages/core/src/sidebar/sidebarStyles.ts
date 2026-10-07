@@ -36,7 +36,7 @@ export const SIDEBAR_STYLES = `
 .og-sb-badge {
   position: absolute; top: 1px; right: 1px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px;
   display: none; align-items: center; justify-content: center; font-size: 9.5px; font-weight: 700; line-height: 1;
-  background: var(--og-sb-accent); color: #fff; box-shadow: 0 0 0 2px var(--og-header-bg); font-variant-numeric: tabular-nums;
+  background: var(--og-sb-accent); color: var(--og-ct-on-accent); box-shadow: 0 0 0 2px var(--og-header-bg); font-variant-numeric: tabular-nums;
 }
 .og-sb-tab[data-badged] .og-sb-badge { display: inline-flex; }
 
@@ -74,7 +74,7 @@ export const SIDEBAR_STYLES = `
   white-space: nowrap; transition: background-color .12s ease, color .12s ease, border-color .12s ease;
 }
 .og-sb-btn:hover { background: var(--og-sb-hover); color: var(--og-text-color); }
-.og-sb-btn[data-variant='primary'] { background: var(--og-sb-accent); color: #fff; }
+.og-sb-btn[data-variant='primary'] { background: var(--og-sb-accent); color: var(--og-ct-on-accent); }
 .og-sb-btn[data-variant='primary']:hover { background: color-mix(in srgb, var(--og-sb-accent) 88%, #000); }
 .og-sb-btn[data-variant='subtle'] { border: 1px dashed var(--og-ct-control-border); color: var(--og-text-color); }
 .og-sb-btn[data-variant='subtle']:hover { border-color: var(--og-sb-accent); color: var(--og-sb-accent); background: color-mix(in srgb, var(--og-sb-accent) 6%, transparent); }
@@ -174,7 +174,7 @@ export const SIDEBAR_STYLES = `
 .og-sb-theme-mode { font-size: 11px; color: var(--og-ct-muted); }
 .og-sb-theme-check {
   position: absolute; top: 10px; right: 10px; width: 18px; height: 18px; border-radius: 999px; display: none; place-items: center;
-  background: var(--og-sb-accent); color: #fff; box-shadow: 0 0 0 2px var(--og-bg-color);
+  background: var(--og-sb-accent); color: var(--og-ct-on-accent); box-shadow: 0 0 0 2px var(--og-bg-color);
 }
 .og-sb-theme[aria-checked='true'] .og-sb-theme-check { display: grid; }
 
@@ -318,7 +318,7 @@ export const SIDEBAR_STYLES = `
 .og-sb-view-main:focus-visible { outline: 2px solid var(--og-sb-accent); outline-offset: -2px; }
 .og-sb-view-mark {
   width: 18px; height: 18px; flex: none; display: grid; place-items: center; border-radius: 999px;
-  box-shadow: inset 0 0 0 1.5px var(--og-ct-control-border); color: #fff;
+  box-shadow: inset 0 0 0 1.5px var(--og-ct-control-border); color: var(--og-ct-on-accent);
 }
 .og-sb-view[data-active] .og-sb-view-mark { background: var(--og-sb-accent); box-shadow: none; }
 .og-sb-view-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
