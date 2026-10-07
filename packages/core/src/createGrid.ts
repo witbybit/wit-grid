@@ -9,9 +9,11 @@ import {
 	type GridPersistenceAdapter,
 	type PersistedGridState,
 	type PersistenceController,
+	PERSISTED_STATE_KEYS,
 	createLocalStorageAdapter,
 	createPersistenceSubscription,
 } from './persistence/statePersistence.js';
+import { defaultGridScheduler, type GridScheduler } from './renderer/gridScheduler.js';
 import { createGridRuntimeComposition } from './internal/createGridRuntimeComposition.js';
 import type { GridWorkspaceAdapter } from './workspace/workspaceTypes.js';
 import { type GridWorkspaceController, createWorkspaceController } from './workspace/GridWorkspaceController.js';
@@ -110,21 +112,27 @@ function withRowSelectionColumn<TRowData>(
 	return { columns: nextColumns, initialState: nextInitial };
 }
 
-function wireGridWorkspace<TRowData>(
-	options: { workspace?: GridWorkspaceAdapter },
-	runtime: GridRuntime<TRowData>,
-	persistenceController?: PersistenceController
-): GridWorkspaceController | undefined {
+function wireGridWorkspace<TRowData>(options: { workspace?: GridWorkspaceAdapter }, runtime: GridRuntime<TRowData>): GridWorkspaceController | undefined {
 	if (!options.workspace) return undefined;
-	const controller = createWorkspaceController(options.workspace);
-	if (persistenceController) {
-		persistenceController.onStatusChange((status) => {
-			if (status.status !== 'saved') return;
-			const activeId = controller.getActiveWritableViewId();
-			if (activeId) controller.updateView(activeId, runtime.getGridState()).catch(() => {});
-		});
-	}
-	controller.init().catch(() => {});
+	const controller = createWorkspaceController(options.workspace, (operation, error) =>
+		runtime.reportRuntimeFault({ source: 'persistence', operation: `workspace: ${operation}`, error })
+	);
+	// Whether the grid still matches the active view, checked after changes settle.
+	let timer: ReturnType<GridScheduler['timeout']> | null = null;
+	const sync = () => {
+		if (timer !== null) defaultGridScheduler.clearTimeout(timer);
+		timer = defaultGridScheduler.timeout(() => {
+			timer = null;
+			if (controller.getState().activeViewId) controller.syncCurrentState(runtime.getGridState());
+		}, 120);
+	};
+	const unsubscribe = PERSISTED_STATE_KEYS.map((key) => runtime.engine.subscribeToKey(key, sync));
+	const destroy = controller.destroy;
+	controller.destroy = () => {
+		if (timer !== null) defaultGridScheduler.clearTimeout(timer);
+		unsubscribe.forEach((off) => off());
+		destroy();
+	};
 	return controller;
 }
 
@@ -196,7 +204,7 @@ function createGridBootstrap<TRowData>(
 	);
 	const controller = createController(runtime, columns);
 	const persistenceController = wireGridPersistence({ persistence: adapter }, runtime);
-	const workspaceController = wireGridWorkspace(options, runtime, persistenceController);
+	const workspaceController = wireGridWorkspace(options, runtime);
 	let destroyed = false;
 	const api = createGridRuntimeComposition({
 		runtime,
@@ -212,14 +220,28 @@ function createGridBootstrap<TRowData>(
 		workspaceController,
 	});
 	if (loadedState) api.applyGridState(loadedState);
-	if (asyncLoad) {
-		asyncLoad
-			.then((saved) => {
-				if (!destroyed && saved) api.applyGridState(saved);
-			})
-			.catch(() => {
-				/* load failure â€” grid stays in default state */
-			});
+	const session = (asyncLoad ?? Promise.resolve(loadedState)).then(
+		(saved) => {
+			if (asyncLoad && !destroyed && saved) api.applyGridState(saved);
+			return saved;
+		},
+		(error: unknown) => {
+			// The grid keeps its default state.
+			runtime.reportRuntimeFault({ source: 'persistence', operation: 'load saved state', error });
+			return null;
+		}
+	);
+	// The default view opens the grid when there is no saved session to restore.
+	if (workspaceController) {
+		const views = workspaceController.init().then(
+			() => true,
+			() => false
+		);
+		void Promise.all([views, session]).then(([loaded, saved]) => {
+			const id = workspaceController.getState().defaultViewId;
+			if (destroyed || !loaded || saved || !id || !workspaceController.getState().views.some((v) => v.id === id)) return;
+			api.applyView(id).catch((error: unknown) => runtime.reportRuntimeFault({ source: 'persistence', operation: 'workspace: apply default view', error }));
+		});
 	}
 	return api;
 }

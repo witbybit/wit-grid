@@ -14,6 +14,7 @@ import { filtersPanel } from './panels/filtersPanel.js';
 import { queryPanel } from './panels/queryPanel.js';
 import { sortPanel } from './panels/sortPanel.js';
 import { themesPanel } from './panels/themesPanel.js';
+import { viewsPanel } from './panels/viewsPanel.js';
 import { sidebarIconSvg, type SidebarIconName } from './sidebarIcons.js';
 import type {
 	AdapterPanelMount,
@@ -42,6 +43,7 @@ const BUILTIN: Partial<Record<BuiltinSidebarPanelId, BuiltinPanel>> = {
 	sort: { label: 'Sort', icon: 'sort', panel: sortPanel },
 	themes: { label: 'Themes', icon: 'palette', panel: themesPanel },
 	query: { label: 'Query', icon: 'query', panel: queryPanel },
+	views: { label: 'Views', icon: 'views', panel: viewsPanel },
 };
 
 const BUILTIN_ICONS: Record<BuiltinSidebarPanelId, SidebarIconName> = {

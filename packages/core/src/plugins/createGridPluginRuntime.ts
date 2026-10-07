@@ -25,7 +25,7 @@ const PLUGIN_RUNTIME_MEMBERS = `
 	getColumnIndex getColumnField getColumnDef undo redo canUndo canRedo openPanel closePanel togglePanel
 	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv hasPersistence clearPersistedState
 	setAutoSave isAutoSaveEnabled getPersistenceStatus subscribeToPersistenceStatus saveNow hasWorkspace
-	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView deleteView duplicateView
+	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView revertView deleteView duplicateView
 	renameView setDefaultView getRuntimeFaults clearRuntimeFaults flushCellUpdatesSync getInstrumentation
 	setInstrumentation reportRuntimeFault getTheme getThemeName getAvailableThemes switchTheme mergeTheme
 	setTheme onThemeChange getContainer destroy getCellState getCheapDisplayValue getVisualRow getVisualRowCount

@@ -16,7 +16,7 @@ export interface GridWorkspaceState {
 	readonly views: readonly GridViewDefinition[];
 	readonly activeViewId: string | null;
 	readonly defaultViewId: string | null;
-	readonly autoSaveEnabled: boolean;
+	/** The grid no longer matches the active view (Save changes would update it). */
 	readonly dirty: boolean;
 	readonly lastSavedAt: number | null;
 	readonly lastError: string | null;

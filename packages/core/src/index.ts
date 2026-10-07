@@ -178,7 +178,6 @@ export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn, hierarchyColumnGroupColId } 
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';
 export type { ExpandAllOptions } from './rowModel.js';
 export { renderGroupToggle } from './renderer/hierarchyCell.js';
-export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
 export { isDomCellRenderer, isDomCellEditorSpec } from './columnDef.js';
 export {

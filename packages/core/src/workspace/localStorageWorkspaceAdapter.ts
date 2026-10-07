@@ -26,6 +26,10 @@ function parseViewDefinition(raw: unknown): GridViewDefinition | null {
 	}
 }
 
+/**
+ * Views in localStorage. Entries it cannot read are kept as they are (never erased by a later
+ * write); failed writes (quota, private mode) reject, so the workspace reports them.
+ */
 export function createLocalStorageWorkspaceAdapter(options: { storageKey: string }): GridWorkspaceAdapter {
 	const { storageKey } = options;
 	const defaultKey = `${storageKey}__default`;
@@ -38,81 +42,59 @@ export function createLocalStorageWorkspaceAdapter(options: { storageKey: string
 		}
 	}
 
-	function readAll(): GridViewDefinition[] {
+	/** Every stored entry, readable or not. */
+	function readRaw(): unknown[] {
 		try {
-			const storage = getStorage();
-			if (!storage) return [];
-			const raw = storage.getItem(storageKey);
+			const raw = getStorage()?.getItem(storageKey);
 			if (typeof raw !== 'string') return [];
 			const parsed: unknown = JSON.parse(raw);
-			if (!Array.isArray(parsed)) return [];
-			return parsed.map(parseViewDefinition).filter((view): view is GridViewDefinition => view !== null);
+			return Array.isArray(parsed) ? parsed : [];
 		} catch {
 			return [];
 		}
 	}
 
-	function writeAll(views: GridViewDefinition[]): void {
-		try {
-			const storage = getStorage();
-			if (!storage) return;
-			storage.setItem(storageKey, JSON.stringify(views));
-		} catch {
-			// localStorage may be unavailable (SSR, quota exceeded, private browsing)
-		}
+	function writeRaw(entries: unknown[]): void {
+		const storage = getStorage();
+		if (!storage) throw new Error('[wit-grid] workspace: localStorage is unavailable');
+		storage.setItem(storageKey, JSON.stringify(entries));
 	}
+
+	const idOf = (entry: unknown) => (isRecord(entry) && typeof entry.id === 'string' ? entry.id : null);
+	const readViews = () => readRaw().map(parseViewDefinition).filter((view): view is GridViewDefinition => view !== null);
 
 	return {
 		async listViews() {
-			return readAll();
+			return readViews();
 		},
 		async getView(id) {
-			return readAll().find((v) => v.id === id) ?? null;
+			return readViews().find((v) => v.id === id) ?? null;
 		},
 		async saveView(view) {
-			try {
-				const parsedView = parseViewDefinition(view);
-				if (!parsedView) return;
-				const views = readAll();
-				const idx = views.findIndex((v) => v.id === parsedView.id);
-				if (idx >= 0) {
-					views[idx] = parsedView;
-				} else {
-					views.push(parsedView);
-				}
-				writeAll(views);
-			} catch {
-				// Treat an invalid caller-supplied value like an unavailable storage write.
-			}
+			const parsed = parseViewDefinition(view);
+			if (!parsed) throw new Error(`[wit-grid] workspace: view "${view.id}" is not a valid view definition`);
+			const entries = readRaw();
+			const index = entries.findIndex((entry) => idOf(entry) === parsed.id);
+			if (index >= 0) entries[index] = parsed;
+			else entries.push(parsed);
+			writeRaw(entries);
 		},
 		async deleteView(id) {
-			try {
-				writeAll(readAll().filter((v) => v.id !== id));
-			} catch {
-				// Storage reads and writes are best-effort.
-			}
+			writeRaw(readRaw().filter((entry) => idOf(entry) !== id));
 		},
 		async getDefaultView() {
 			try {
-				const storage = getStorage();
-				const value = storage?.getItem(defaultKey);
+				const value = getStorage()?.getItem(defaultKey);
 				return typeof value === 'string' ? value : null;
 			} catch {
 				return null;
 			}
 		},
 		async setDefaultView(id) {
-			try {
-				const storage = getStorage();
-				if (!storage) return;
-				if (id === null) {
-					storage.removeItem(defaultKey);
-				} else {
-					storage.setItem(defaultKey, id);
-				}
-			} catch {
-				// ignore
-			}
+			const storage = getStorage();
+			if (!storage) throw new Error('[wit-grid] workspace: localStorage is unavailable');
+			if (id === null) storage.removeItem(defaultKey);
+			else storage.setItem(defaultKey, id);
 		},
 	};
 }

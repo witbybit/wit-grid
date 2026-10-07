@@ -79,19 +79,29 @@ describe('createLocalStorageWorkspaceAdapter', () => {
 		}
 	);
 
-	it('treats unavailable browser storage as an empty no-op adapter', async () => {
+	it('keeps entries it cannot read when it writes', async () => {
+		const unreadable = { ...createView('future'), state: { v: GRID_STATE_SCHEMA_VERSION + 1, state: {} } };
+		storage[STORAGE_KEY] = JSON.stringify([unreadable]);
+		const adapter = createLocalStorageWorkspaceAdapter({ storageKey: STORAGE_KEY });
+		await adapter.saveView(createView('new'));
+		expect(JSON.parse(storage[STORAGE_KEY]).map((v: { id: string }) => v.id)).toEqual(['future', 'new']);
+		await adapter.deleteView('new');
+		expect(JSON.parse(storage[STORAGE_KEY])).toEqual([unreadable]);
+	});
+
+	it('reads as empty without storage, and rejects writes it cannot make', async () => {
 		vi.stubGlobal('localStorage', undefined);
 		const adapter = createLocalStorageWorkspaceAdapter({ storageKey: STORAGE_KEY });
 
 		await expect(adapter.listViews()).resolves.toEqual([]);
-		await expect(adapter.saveView(createView())).resolves.toBeUndefined();
-		await expect(adapter.deleteView('view-1')).resolves.toBeUndefined();
 		await expect(adapter.getDefaultView?.()).resolves.toBeNull();
-		await expect(adapter.setDefaultView?.('view-1')).resolves.toBeUndefined();
+		await expect(adapter.saveView(createView())).rejects.toThrow('unavailable');
+		await expect(adapter.deleteView('view-1')).rejects.toThrow('unavailable');
+		await expect(adapter.setDefaultView?.('view-1')).rejects.toThrow('unavailable');
 	});
 
-	it('swallows unavailable-storage and quota failures across adapter methods', async () => {
-		const failure = new Error('storage unavailable');
+	it('reads through storage errors and rejects failed writes (quota, private mode)', async () => {
+		const failure = new Error('quota exceeded');
 		vi.stubGlobal('localStorage', {
 			getItem: vi.fn(() => {
 				throw failure;
@@ -107,10 +117,13 @@ describe('createLocalStorageWorkspaceAdapter', () => {
 
 		await expect(adapter.listViews()).resolves.toEqual([]);
 		await expect(adapter.getView('view-1')).resolves.toBeNull();
-		await expect(adapter.saveView(createView())).resolves.toBeUndefined();
-		await expect(adapter.deleteView('view-1')).resolves.toBeUndefined();
 		await expect(adapter.getDefaultView?.()).resolves.toBeNull();
-		await expect(adapter.setDefaultView?.('view-1')).resolves.toBeUndefined();
-		await expect(adapter.setDefaultView?.(null)).resolves.toBeUndefined();
+		await expect(adapter.saveView(createView())).rejects.toBe(failure);
+		await expect(adapter.setDefaultView?.(null)).rejects.toBe(failure);
+	});
+
+	it('rejects saving a malformed view', async () => {
+		const adapter = createLocalStorageWorkspaceAdapter({ storageKey: STORAGE_KEY });
+		await expect(adapter.saveView({ ...createView(), scope: 'nope' } as never)).rejects.toThrow('not a valid view');
 	});
 });

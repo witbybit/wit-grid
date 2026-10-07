@@ -4,7 +4,7 @@ import { PUBLIC_ENGINE_FORWARD_NAMES } from './engineForwards.js';
 import { pickMembers } from './memberNames.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
-import type { GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
+import { EMPTY_WORKSPACE_STATE, type GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { InfiniteDatasource } from '../infiniteRowModel.js';
@@ -39,16 +39,6 @@ interface GridRuntimeCompositionOptions<TRowData> {
 	workspaceController?: GridWorkspaceController;
 }
 
-const _EMPTY_WORKSPACE_STATE: GridWorkspaceState = {
-	views: [],
-	activeViewId: null,
-	defaultViewId: null,
-	autoSaveEnabled: true,
-	dirty: false,
-	lastSavedAt: null,
-	lastError: null,
-	loading: false,
-};
 
 export function createGridRuntimeComposition<TRowData>({
 	runtime,
@@ -145,7 +135,7 @@ export function createGridRuntimeComposition<TRowData>({
 
 		// ── Workspace / named views ───────────────────────────────────────────────
 		hasWorkspace: (): boolean => workspaceController !== undefined,
-		getWorkspaceState: (): GridWorkspaceState => workspaceController?.getState() ?? _EMPTY_WORKSPACE_STATE,
+		getWorkspaceState: (): GridWorkspaceState => workspaceController?.getState() ?? EMPTY_WORKSPACE_STATE,
 		subscribeToWorkspaceState: (listener: (state: GridWorkspaceState) => void): (() => void) =>
 			workspaceController?.onStateChange(listener) ?? (() => {}),
 		listViews: (): Promise<readonly GridViewDefinition[]> => Promise.resolve(workspaceController?.getState().views ?? []),
@@ -170,8 +160,17 @@ export function createGridRuntimeComposition<TRowData>({
 			} else {
 				runtime.applyGridState(view.state);
 			}
-			workspaceController.setActiveViewId(id);
+			workspaceController.setActiveView(id, runtime.getGridState());
 			runtime.dispatchEvent(GridEventName.viewApplied, { view });
+			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
+		},
+		revertView: async (): Promise<void> => {
+			const baseline = workspaceController?.getBaseline();
+			const id = workspaceController?.getState().activeViewId;
+			if (!workspaceController || !baseline || !id) return;
+			if (persistenceController) persistenceController.suspendAutoSave(() => runtime.applyGridState(baseline));
+			else runtime.applyGridState(baseline);
+			workspaceController.setActiveView(id, runtime.getGridState());
 			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
 		},
 		deleteView: async (id: string): Promise<void> => {

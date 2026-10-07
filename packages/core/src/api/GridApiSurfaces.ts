@@ -280,6 +280,8 @@ export interface GridPersistenceWorkspaceApi {
 	saveView(name: string, options?: SaveViewOptions): Promise<GridViewDefinition>;
 	updateView(id: string, state?: PersistedGridState): Promise<void>;
 	applyView(id: string): Promise<void>;
+	/** Puts the grid back as it was when the active view was applied, saved or updated. */
+	revertView(): Promise<void>;
 	deleteView(id: string): Promise<void>;
 	duplicateView(id: string, name: string): Promise<GridViewDefinition>;
 	renameView(id: string, name: string): Promise<void>;

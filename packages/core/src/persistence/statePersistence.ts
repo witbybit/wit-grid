@@ -3,18 +3,14 @@ import type { TotalPlacement } from '../visualRow.js';
 import type { ColumnDef } from '../columnDef.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
 import type { SortModel, FilterModel } from '../rowModel.js';
-import type { GridQueryModel } from '../query/GridQueryModel.js';
+import { restoreQueryModel, type GridQueryModel } from '../query/GridQueryModel.js';
+import { defaultGridScheduler, type GridScheduler } from '../renderer/gridScheduler.js';
 import { restoreFilterModel } from '../filterOperations.js';
 import { isBuiltInThemeName, type BuiltInThemeName } from '../renderer/themes.js';
 
 /**
- * Schema version for persisted grid state. Increment this when any field in
- * `PersistedGridState` changes shape (e.g. filter model operators added/removed,
- * field renamed). `applyPersistedState` and `applyPersistedStateToApi` reject
- * blobs whose `v` does not match this value.
- *
- * Migration path: add a `migrateV{N}toV{N+1}` function and call it in the
- * version-dispatch chain before incrementing this constant.
+ * Schema version of persisted grid state. Restores reject blobs of another version: bump it when
+ * `PersistedGridState` changes shape.
  */
 export const GRID_STATE_SCHEMA_VERSION = 3;
 
@@ -82,7 +78,7 @@ export function validateSchemaVersion(state: { v?: unknown } | null | undefined)
 	return (
 		`[wit-grid] persisted grid state schema version mismatch ` +
 		`(blob v=${state.v}, expected v=${GRID_STATE_SCHEMA_VERSION}). ` +
-		`State was not applied. Clear the persisted state or provide a migration function.`
+		`State was not applied.`
 	);
 }
 
@@ -385,110 +381,44 @@ export function extractPersistedState<TRowData>(state: InternalGridState<TRowDat
 	};
 }
 
-/**
- * Apply a persisted state blob onto the initial grid state.
- * Returns null if the blob is malformed or schema-incompatible.
- */
-export function applyPersistedState<TRowData>(
-	saved: PersistedGridState,
-	initial: Partial<GridInitialState<TRowData>>,
-	columns: ColumnDef<unknown>[]
-): Partial<GridInitialState<TRowData>> | null {
-	const parsed = parsePersistedGridState(saved);
-	if (!parsed.ok) {
-		return null;
-	}
-	const serializedState = parsed.value.state;
-	const knownFields = new Set(columns.map((c) => c.field));
-	const result: Partial<GridInitialState<TRowData>> = { ...initial };
-
-	// Column widths — merge, persisted overrides defaults
-	if (serializedState.columnWidths) {
-		const filtered: Record<string, number> = {};
-		for (const [field, width] of Object.entries(serializedState.columnWidths)) {
-			if (knownFields.has(field)) filtered[field] = width;
-		}
-		if (Object.keys(filtered).length > 0) {
-			result.columnWidths = { ...(initial.columnWidths ?? {}), ...filtered };
-		}
-	}
-
-	// Column order — only apply when saved order covers all current columns
-	const baseColumns = (result.columns ?? columns) as ColumnDef<unknown>[];
-	if (serializedState.columnOrder) {
-		const validOrder = serializedState.columnOrder.filter((f) => knownFields.has(f));
-		if (validOrder.length === columns.length) {
-			const colMap = new Map(baseColumns.map((c) => [c.field, c]));
-			const reordered = validOrder.map((f) => colMap.get(f)).filter((c): c is ColumnDef<unknown> => !!c);
-			if (reordered.length === columns.length) {
-				result.columns = reordered as unknown as GridInitialState<TRowData>['columns'];
-			}
-		}
-	}
-
-	// Column visibility — use col.hide (grid convention), not col.visible
-	if (serializedState.columnVisibility) {
-		const visBase = (result.columns ?? baseColumns) as ColumnDef<unknown>[];
-		result.columns = visBase.map((col) => {
-			const savedVis = serializedState.columnVisibility![col.field];
-			if (savedVis === false) return { ...col, hide: true };
-			if (savedVis === true && col.hide) return { ...col, hide: false };
-			return col;
-		}) as unknown as GridInitialState<TRowData>['columns'];
-	}
-
-	// Sort model
-	if (serializedState.sortModel !== undefined) {
-		const sm = serializedState.sortModel;
-		if (sm === null || (Array.isArray(sm) && sm.every((s) => knownFields.has(s.colId)))) {
-			result.sortModel = sm as GridInitialState<TRowData>['sortModel'];
-		}
-	}
-
-	// Filter model
-	if (serializedState.filterModel !== undefined) {
-		result.filterModel = restoreFilterModel(serializedState.filterModel, knownFields) as GridInitialState<TRowData>['filterModel'];
-	}
-	if (serializedState.queryModel !== undefined) {
-		result.queryModel = serializedState.queryModel as GridInitialState<TRowData>['queryModel'];
-	}
-
-	if (serializedState.themeName !== undefined && isBuiltInThemeName(serializedState.themeName)) {
-		result.themeName = serializedState.themeName as GridInitialState<TRowData>['themeName'];
-	}
-
-	// Grouping — merged over the configured grouping, restoring only columns that still exist.
-	if (serializedState.grouping !== undefined) result.grouping = restoreGrouping(serializedState.grouping, initial.grouping, knownFields);
-
-	// Column pin counts
-	if (serializedState.pinnedColumns !== undefined) result.pinnedColumns = serializedState.pinnedColumns;
-
-	return result;
-}
-
+/** Runs the latest call after a pause, through the grid scheduler. */
 function debounce(fn: () => void, ms: number): (() => void) & { flush(): void; cancel(): void } {
-	let timer: ReturnType<typeof setTimeout> | null = null;
+	let timer: ReturnType<GridScheduler['timeout']> | null = null;
+	const cancel = () => {
+		if (timer !== null) defaultGridScheduler.clearTimeout(timer);
+		timer = null;
+	};
 	const debounced = () => {
-		if (timer) clearTimeout(timer);
-		timer = setTimeout(() => {
+		cancel();
+		timer = defaultGridScheduler.timeout(() => {
 			timer = null;
 			fn();
 		}, ms);
 	};
 	debounced.flush = () => {
-		if (timer) {
-			clearTimeout(timer);
-			timer = null;
-			fn();
-		}
+		if (timer === null) return;
+		cancel();
+		fn();
 	};
-	debounced.cancel = () => {
-		if (timer) {
-			clearTimeout(timer);
-			timer = null;
-		}
-	};
+	debounced.cancel = cancel;
 	return debounced;
+}
+
+/**
+ * The saved column order over today's columns: columns that no longer exist drop out, and columns
+ * added since keep their place (after the column they follow today).
+ */
+function mergeColumnOrder<T extends { field: string }>(current: readonly T[], saved: readonly string[]): T[] {
+	const byField = new Map(current.map((column) => [column.field, column]));
+	const result = saved.filter((field, index) => byField.has(field) && saved.indexOf(field) === index).map((field) => byField.get(field)!);
+	const placed = new Set(result.map((column) => column.field));
+	current.forEach((column, index) => {
+		if (placed.has(column.field)) return;
+		const before = index > 0 ? result.findIndex((c) => c.field === current[index - 1].field) : -1;
+		result.splice(before + 1, 0, column);
+		placed.add(column.field);
+	});
+	return result;
 }
 
 /**
@@ -496,7 +426,7 @@ function debounce(fn: () => void, ms: number): (() => void) & { flush(): void; c
  * Scroll position, selection, active edit, etc. are intentionally excluded to
  * avoid flooding network adapters on every pointer event.
  */
-const PERSISTENCE_KEYS = ['columns', 'columnWidths', 'sortModel', 'filterModel', 'queryModel', 'themeName', 'grouping', 'pinnedColumns'];
+export const PERSISTED_STATE_KEYS = ['columns', 'columnWidths', 'sortModel', 'filterModel', 'queryModel', 'themeName', 'grouping', 'pinnedColumns'];
 
 /**
  * Wire persistence to the grid via key-specific subscriptions.
@@ -543,7 +473,7 @@ export function createPersistenceSubscription(
 	const debouncedSave = debounce(performSave, debounceMs);
 
 	// Subscribe only to keys that affect persisted state — not scroll, selection, viewport, etc.
-	const unsubs = PERSISTENCE_KEYS.map((key) => subscribeToKey(key, debouncedSave));
+	const unsubs = PERSISTED_STATE_KEYS.map((key) => subscribeToKey(key, debouncedSave));
 
 	return {
 		setAutoSave(enabled: boolean) {
@@ -618,14 +548,7 @@ export function preparePersistedGridStateRestore<TRowData>(
 	let columns = current.columns as ColumnDef<TRowData>[];
 	let columnWidths = { ...current.columnWidths };
 
-	if (s.columnOrder) {
-		const validOrder = s.columnOrder.filter((f) => knownFields.has(f));
-		if (validOrder.length === columns.length) {
-			const colMap = new Map(columns.map((c) => [c.field, c]));
-			const reordered = validOrder.map((f) => colMap.get(f)).filter((c): c is ColumnDef<TRowData> => !!c);
-			if (reordered.length === columns.length) columns = reordered;
-		}
-	}
+	if (s.columnOrder) columns = mergeColumnOrder(columns, s.columnOrder);
 
 	if (s.columnVisibility) {
 		columns = columns.map((col) => {
@@ -654,7 +577,7 @@ export function preparePersistedGridStateRestore<TRowData>(
 		stateMutation.filterModel = restoreFilterModel(s.filterModel, knownFields);
 	}
 	if (s.queryModel !== undefined) {
-		stateMutation.queryModel = s.queryModel ?? null;
+		stateMutation.queryModel = restoreQueryModel(s.queryModel, knownFields);
 	}
 	if (s.themeName !== undefined && isBuiltInThemeName(s.themeName)) {
 		stateMutation.themeName = s.themeName;
