@@ -1,0 +1,84 @@
+---
+title: Sidebar
+description: Columns, filters, sort, query, views, data integrity and themes in one panel beside the grid, plus panels of your own.
+icon: PanelRight
+---
+
+The sidebar is an icon rail beside the grid with one panel open at a time. The grid core draws it, so it follows
+the grid's theme and works the same in every adapter.
+
+```tsx
+<Grid
+	rows={rows}
+	columns={columns}
+	sidebar={{
+		panels: ['columns', 'filters', 'sort', 'query', 'views'],
+		defaultOpen: 'columns',
+		position: 'right', // or 'left'
+		width: 300,
+	}}
+/>
+```
+
+Open and close panels from code with `api.openPanel(id)`, `api.closePanel()` and `api.togglePanel(id)`; the open panel is
+`getStateSnapshot().sidebarOpenPanel`. The rail shows how many filters, sorts and query conditions are active. Arrow keys move
+between rail buttons and Escape closes the panel.
+
+## Built-in panels
+
+| Panel           | What it does                                                                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `columns`       | Row grouping (drop a column on it, drag the pills to reorder, subtotals, sticky headers); every column in its lane: show / hide, drag to reorder, pin |
+| `filters`       | Every filterable column with its filter editor, the same one as the header funnel; a collapsed section summarizes its filter                         |
+| `sort`          | The sort rules in priority order: drag (or ↑ / ↓) to reorder, flip direction, add a column from a searchable list                                    |
+| `query`         | Conditions across columns in nested All / Any groups, edited as a draft and applied with Apply                                                       |
+| `views`         | The view on the grid (save changes, revert, save as new) and the saved views; with persistence, Remember layout                                      |
+| `dataIntegrity` | The grid's status with Run checks; issues by severity, the diff (accept a change), conflicts (keep mine / take theirs)                                |
+| `themes`        | A card per built-in theme                                                                                                                            |
+
+### Views
+
+The Views panel needs a [workspace](/docs/next/persistence#workspace-views). It shows whether the grid still matches the active view:
+**Save changes** writes the grid into it, **Revert** puts the grid back as it was when the view was applied, and **Save as new** names
+the current layout. Each saved view applies in one click; its menu sets the default view, renames, duplicates and deletes.
+
+## Panels of your own
+
+A panel is an id, a label, an icon (SVG markup on a 24 × 24 view box) and either a React component or a DOM panel. The panel gets the
+grid api, a slot for actions in its header, `close()`, and `mountFilterEditor` to embed a column's filter editor.
+
+<Tabs items={['React', 'DOM']}>
+	<Tab value='React'>
+		```tsx
+		const notes: SidebarPanelDef<Order> = {
+			id: 'notes',
+			label: 'Notes',
+			icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h6"/></svg>',
+			renderPanel: ({ api }) => <NotesPanel api={api} />,
+		};
+
+		<Grid rows={rows} columns={columns} sidebar={{ panels: ['columns', notes] }} />;
+		```
+
+		The component renders inside the grid's React tree, so hooks such as `useGridKeySelector` work. When the config changes (say the
+		panel reads new props), the open panel updates in place.
+	</Tab>
+	<Tab value='DOM'>
+		```typescript
+		const notes: SidebarPanelDef<Order> = {
+			id: 'notes',
+			label: 'Notes',
+			panel: {
+				mount(container, { api, actions }) {
+					const count = document.createElement('p');
+					const sync = () => (count.textContent = `${api.rows().getAll().length} rows shown`);
+					sync();
+					container.appendChild(count);
+					const off = api.subscribeToKey('filterModel', sync);
+					return { destroy: off };
+				},
+			},
+		};
+		```
+	</Tab>
+</Tabs>
