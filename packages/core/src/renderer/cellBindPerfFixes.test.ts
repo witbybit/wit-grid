@@ -124,7 +124,7 @@ describe('CellCtrl / RowCtrl lifetime is bounded by the rendered window', () => 
 		expect(first.lifecycle.destroyed).toBe(true);
 		expect(store.cellCtrls.size()).toBe(1);
 
-		slot.unbindCold();
+		slot.destroy();
 		expect(second.lifecycle.destroyed).toBe(true);
 		expect(store.cellCtrls.size()).toBe(0);
 	});

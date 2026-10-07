@@ -23,8 +23,6 @@ export { createEmptyQueryModel, isQueryModelActive, countQueryNodes } from './qu
 export type { GridAnalysisStateSummary } from './analysis/analysisState.js';
 export { summarizeAnalysisState } from './analysis/analysisState.js';
 export type { GridDistinctValueSummary } from './distinctValues.js';
-export { getQueryOperator, getQueryOperatorsForType } from './query/queryOperatorRegistry.js';
-export type { QueryOperatorDefinition, QueryEvaluateParams } from './query/queryOperatorRegistry.js';
 export { evaluateQueryModel, applyQueryModelFilter, createQueryEvaluationContext } from './query/evaluateQueryModel.js';
 export type { QueryEvaluationContext } from './query/evaluateQueryModel.js';
 export type {
@@ -113,6 +111,10 @@ export type {
 	AggregateRendererParams,
 	DomCellRendererParams,
 	DomCellRendererRowRef,
+	DomCellEditor,
+	DomCellEditorHandle,
+	DomCellEditorParams,
+	ColumnCellEditorSpec,
 	ImperativeCellHandle,
 	RowStyleRule,
 	GroupRowStyleRule,
@@ -178,7 +180,7 @@ export type { ExpandAllOptions } from './rowModel.js';
 export { renderGroupToggle } from './renderer/hierarchyCell.js';
 export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
-export { isDomCellRenderer } from './columnDef.js';
+export { isDomCellRenderer, isDomCellEditorSpec } from './columnDef.js';
 export {
 	areCellPointersEqual,
 	areCanonicalCellPointersEqual,
@@ -194,7 +196,6 @@ export type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 	SelectFilterCondition,
 	CompoundFilterCondition,
 	TextFilterOperator,
@@ -206,14 +207,12 @@ export type {
 export type {
 	ColumnFilterDef,
 	ColumnFilterType,
-	FilterSelectOption,
-	FilterFetchParams,
-	FilterFetchResult,
-	FilterPageParams,
-	FilterPageResult,
-	CustomFilterRendererParams,
 	FilterSurface,
+	DomFilterEditor,
+	DomFilterEditorParams,
+	DomFilterEditorHandle,
 } from './filters/filterDef.js';
+export type { BooleanFilterCondition, DateRangeFilterCondition, PathFilterCondition, CustomFilterCondition } from './filterModel.js';
 export { resolveColumnFilterDef } from './filters/filterDef.js';
 export type { AggregationDef } from './rowModel.js';
 export type { OpOption } from './filterOperations.js';
@@ -221,13 +220,15 @@ export {
 	TEXT_OPS,
 	NUMBER_OPS,
 	DATE_OPS,
+	DATE_RANGE_OPS,
 	getOpsForType,
 	getOpMeta,
 	defaultOpForType,
 	isFilterableColumn,
 	applyFilterToModel,
 	buildFilterByValue,
-	getFilterChipText,
+	summarizeFilter,
+	restoreFilterModel,
 } from './filterOperations.js';
 export type { CsvExportOptions } from './export/csvExport.js';
 export type { GridContextMenuItem, GridContextMenuOptions } from './contextMenu.js';
@@ -269,7 +270,6 @@ export type {
 export { required, email, min, max, number, date, oneOf, regex, customCellRule } from './integrity.js';
 export { duplicateValueRule, missingRequiredRule } from './integrity.js';
 export type { TooltipParams, ValueFormatterParams } from './columnDef.js';
-export type { FloatingFilterRendererParams } from './renderer/floatingFilterRenderer.js';
 export { registerGridContextMenu, type GridContextMenuHandle } from './gridPlugins.js';
 export type { GridNavigationOptions } from './interaction/GridInteractionController.js';
 
@@ -298,3 +298,10 @@ export { GridMetric } from './diagnostics/GridInstrumentation.js';
 // ── Insight Layer ─────────────────────────────────────────────────────────────
 export type { GridInsightLayer, GridInsightLayerId, GridInsightSeverity, GridCellDecoration, GridRowDecoration } from './insights/insightTypes.js';
 export { GridInsightRegistry } from './insights/GridInsightRegistry.js';
+
+// ── Built-in cell types ───────────────────────────────────────────────────────
+export * from './cells/index.js';
+
+// ── Filter editors (every filter surface mounts these) ───────────────────────
+export { createFilterEditor } from './filters/filterEditors.js';
+export type { AdapterFilterMount } from './filters/filterEditors.js';

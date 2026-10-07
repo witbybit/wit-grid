@@ -2,6 +2,8 @@
 // Distinct from FilterModel (per-column) — this layer combines conditions
 // across columns in arbitrary nested groups.
 
+import type { ColumnFilter } from '../filterModel.js';
+
 export type GridQueryNode = GridQueryGroup | GridQueryCondition;
 
 export interface GridQueryGroup {
@@ -11,17 +13,17 @@ export interface GridQueryGroup {
 	readonly children: readonly GridQueryNode[];
 }
 
+/**
+ * One condition of the query: a column and a filter condition, the same conditions the filter
+ * model holds, matched by the same code.
+ */
 export interface GridQueryCondition {
 	readonly kind: 'condition';
 	readonly id: string;
 	/** Matches a column's `field` value. */
 	readonly columnId: string;
-	/** Operator string — see queryOperatorRegistry for valid values per column type. */
-	readonly operator: string;
-	/** Primary value for the condition. Not used for blank/notBlank operators. */
-	readonly value?: unknown;
-	/** Upper bound for range operators (inRange / between). */
-	readonly valueTo?: unknown;
+	/** The condition on that column; null while the user has not set one (matches every row). */
+	readonly filter: ColumnFilter | null;
 }
 
 export interface GridQueryModel {
@@ -33,7 +35,7 @@ export interface GridQueryModel {
 export interface QueryConditionDiagnostic {
 	readonly conditionId: string;
 	readonly columnId: string;
-	readonly reason: 'unknown-column' | 'unknown-operator' | 'invalid-value';
+	readonly reason: 'unknown-column' | 'invalid-value';
 	readonly message: string;
 }
 

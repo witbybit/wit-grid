@@ -158,7 +158,7 @@ function runAdversarialSequence(seed: number, steps: number): void {
 		} else if (op === OP_SET_FILTER) {
 			const threshold = lcgInt(rng, 150);
 			const filterModel: FilterModel = {
-				amount: { type: 'number', operator: 'greaterThan', value: threshold },
+				amount: { type: 'number', operator: 'gt', value: threshold },
 			};
 			store.setFilterModel(filterModel);
 		} else if (op === OP_CLEAR_FILTER) {
@@ -254,12 +254,12 @@ describe('ClientRowModelController — adversarial differential invariants', () 
 		});
 
 		// filter then sort — both applied in state, model rebuilt once
-		store.setFilterModel({ amount: { type: 'number', operator: 'greaterThan', value: 25 } });
+		store.setFilterModel({ amount: { type: 'number', operator: 'gt', value: 25 } });
 		store.setSortModel([{ colId: 'amount', sort: 'asc' }]);
 		checkInvariants(controller, store, 'filter+sort');
 
 		// change filter while sort is active
-		store.setFilterModel({ amount: { type: 'number', operator: 'lessThan', value: 60 } });
+		store.setFilterModel({ amount: { type: 'number', operator: 'lt', value: 60 } });
 		checkInvariants(controller, store, 'change-filter');
 
 		// add rows while filtered+sorted

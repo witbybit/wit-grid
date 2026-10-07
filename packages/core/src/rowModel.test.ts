@@ -1621,6 +1621,211 @@ describe('Aggregation input mutation correctness (Plan 092)', () => {
 		expect(full).toBe(0);
 		controller.dispose();
 	});
+
+	describe('adding and removing rows in a grouped grid', () => {
+		const BASE: AggRow[] = [
+			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
+			{ id: '2', name: 'Bob', category: 'Mkt', salary: 90, bonus: 5 },
+			{ id: '3', name: 'Cara', category: 'Eng', salary: 200, bonus: 30 },
+			{ id: '4', name: 'Dev', category: 'Mkt', salary: 50, bonus: 1 },
+		];
+		function setup() {
+			const inst = new RecordingGridInstrumentation();
+			const grid = makeAggStore(BASE.map((row) => ({ ...row })));
+			grid.store.setInstrumentation(inst);
+			inst.reset();
+			const ids = () =>
+				Array.from({ length: grid.controller.getVisualRowCount() }, (_, i) => grid.controller.getVisualRow(i)!).map((row) =>
+					row.kind === 'data' ? row.rowId : row.id
+				);
+			return { ...grid, ids, fullRebuilds: () => inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD) };
+		}
+
+		it('appends a row into its existing group without a full rebuild', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { add: [{ id: '5', name: 'Eve', category: 'Eng', salary: 1, bonus: 50 }] } });
+			expect(ids()).toEqual(['group:category=Eng', '1', '3', '5', 'group:category=Mkt', '2', '4']);
+			expect(getGroupAggregates(controller, 'group:category=Eng')).toMatchObject({ salary: 301, bonus: 30 });
+			expect(controller.getDataRowCount()).toBe(5);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('removes a row that is not the first of its group without a full rebuild', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { remove: [BASE[3]] } });
+			expect(ids()).toEqual(['group:category=Eng', '1', '3', 'group:category=Mkt', '2']);
+			expect(getGroupAggregates(controller, 'group:category=Mkt')).toMatchObject({ salary: 90, bonus: 5 });
+			expect(controller.getDataRowCount()).toBe(3);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('removes the first row of a group incrementally when a sort fixes the group order', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.setSortModel([{ colId: 'salary', sort: 'desc' }]);
+			const before = fullRebuilds();
+			store.transaction({ rows: { remove: [BASE[2]] } });
+			expect(ids().filter((id) => !id.startsWith('group:'))).toEqual(['1', '2', '4']);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(100);
+			expect(fullRebuilds()).toBe(before);
+			controller.dispose();
+		});
+
+		it('falls back to a full rebuild when a group is created or an unsorted group may reorder, and stays correct', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.transaction({ rows: { add: [{ id: '6', name: 'Fay', category: 'Ops', salary: 7, bonus: 7 }] } });
+			expect(ids()).toContain('group:category=Ops');
+			expect(fullRebuilds()).toBe(1);
+			// Eng's first row: Mkt could now appear first in source order.
+			store.transaction({ rows: { remove: [BASE[0]] } });
+			expect(ids()).toEqual(['group:category=Mkt', '2', '4', 'group:category=Eng', '3', 'group:category=Ops', '6']);
+			expect(fullRebuilds()).toBe(2);
+			controller.dispose();
+		});
+
+		it('adding a row the filter hides changes nothing shown and still counts the row', () => {
+			const { store, controller, ids, fullRebuilds } = setup();
+			store.setFilterModel({ salary: { type: 'number', operator: 'gt', value: 60 } });
+			const shown = ids();
+			const before = fullRebuilds();
+			store.transaction({ rows: { add: [{ id: '7', name: 'Gil', category: 'Eng', salary: 10, bonus: 1 }] } });
+			expect(ids()).toEqual(shown);
+			expect(controller.getDataRowCount()).toBe(5);
+			expect(fullRebuilds()).toBe(before);
+			controller.dispose();
+		});
+	});
+
+	describe('cell writes to aggregated columns stay on the incremental path', () => {
+		const ROWS: AggRow[] = [
+			{ id: '1', name: 'Alice', category: 'Eng', salary: 100, bonus: 10 },
+			{ id: '2', name: 'Bob', category: 'Eng', salary: 200, bonus: 30 },
+			{ id: '3', name: 'Cara', category: 'Mkt', salary: 90, bonus: 5 },
+		];
+		function setup() {
+			const inst = new RecordingGridInstrumentation();
+			const grid = makeAggStore(ROWS.map((row) => ({ ...row })));
+			grid.store.setInstrumentation(inst);
+			inst.reset();
+			return { ...grid, fullRebuilds: () => inst.get(GridMetric.ROW_MUTATION_FULL_REBUILD) };
+		}
+
+		it('setCellValue patches the group aggregates without a full rebuild', () => {
+			const { store, controller, fullRebuilds } = setup();
+			store.engine.setCellValue('1', 'salary', 150);
+			store.engine.setCellValue('2', 'bonus', 50);
+			expect(getGroupAggregates(controller, 'group:category=Eng')).toMatchObject({ salary: 350, bonus: 30 });
+			expect(getGroupAggregates(controller, 'group:category=Mkt')).toMatchObject({ salary: 90, bonus: 5 });
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('a batch of cell writes across groups, including two writes to one cell, patches each group once', () => {
+			const { store, controller, fullRebuilds } = setup();
+			store.engine.transaction({
+				cells: [
+					{ rowId: '1', colField: 'salary', value: 120 },
+					{ rowId: '3', colField: 'salary', value: 10 },
+					{ rowId: '1', colField: 'salary', value: 130 },
+				],
+			});
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(330);
+			expect(getGroupAggregates(controller, 'group:category=Mkt')?.salary).toBe(10);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('undo and redo of a cell edit restore the aggregates incrementally', () => {
+			const { store, controller, fullRebuilds } = setup();
+			store.engine.setCellValue('2', 'salary', 500);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(600);
+			store.engine.undo();
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(300);
+			store.engine.redo();
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(600);
+			expect(fullRebuilds()).toBe(0);
+			controller.dispose();
+		});
+
+		it('aggregates the value a valueSetter actually stored, not the value that was written', () => {
+			const store = new GridStore<AggRow>({
+				getRowId: (r) => r.id,
+				columns: [
+					{ field: 'category', header: 'Category' },
+					{
+						field: 'salary',
+						header: 'Salary',
+						valueSetter: ({ value, row }) => {
+							(row as AggRow).salary = Number(value) * 2;
+							return true;
+						},
+					},
+				],
+				grouping: { by: ['category'], defaultExpanded: true },
+			});
+			store.setAggregation([{ colId: 'salary', aggFunc: 'sum' }]);
+			const controller = new ClientRowModelController<AggRow>(store.getClientRowModelRuntime(), {
+				rows: ROWS.map((row) => ({ ...row })),
+				columns: store.getState().columns,
+			});
+			store.engine.setCellValue('1', 'salary', 40);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.salary).toBe(80 + 200);
+			controller.dispose();
+		});
+
+		it('a computed (valueGetter) aggregate column takes the full path and stays correct', () => {
+			const store = new GridStore<AggRow>({
+				getRowId: (r) => r.id,
+				columns: [
+					{ field: 'category', header: 'Category' },
+					{ field: 'salary', header: 'Salary' },
+					{ field: 'bonus', header: 'Bonus', valueGetter: ({ row }) => (row as AggRow).bonus * 10 },
+				],
+				grouping: { by: ['category'], defaultExpanded: true },
+			});
+			store.setAggregation([{ colId: 'bonus', aggFunc: 'sum' }]);
+			const controller = new ClientRowModelController<AggRow>(store.getClientRowModelRuntime(), {
+				rows: ROWS.map((row) => ({ ...row })),
+				columns: store.getState().columns,
+			});
+			store.engine.setCellValue('1', 'bonus', 20);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.bonus).toBe(200 + 300);
+			controller.dispose();
+		});
+
+		it.each([
+			['declared dependencies', ['salary', 'bonus']],
+			['an undeclared valueGetter', undefined],
+		] as const)('editing a field read by a computed aggregate column (%s) updates the group total', (_label, deps) => {
+			const store = new GridStore<AggRow>({
+				getRowId: (r) => r.id,
+				columns: [
+					{ field: 'category', header: 'Category' },
+					{ field: 'salary', header: 'Salary' },
+					{ field: 'bonus', header: 'Bonus' },
+					{
+						field: 'name',
+						header: 'Pay',
+						valueGetter: ({ row }) => (row as AggRow).salary + (row as AggRow).bonus,
+						...(deps ? { valueGetterDependencies: [...deps] } : {}),
+					},
+				],
+				grouping: { by: ['category'], defaultExpanded: true },
+			});
+			store.setAggregation([{ colId: 'name', aggFunc: 'sum' }]);
+			const controller = new ClientRowModelController<AggRow>(store.getClientRowModelRuntime(), {
+				rows: ROWS.map((row) => ({ ...row })),
+				columns: store.getState().columns,
+			});
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.name).toBe(110 + 230);
+			store.engine.setCellValue('1', 'salary', 1000);
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.name).toBe(1010 + 230);
+			store.engine.transaction({ rows: { update: [{ ...ROWS[1], bonus: 70 }] } });
+			expect(getGroupAggregates(controller, 'group:category=Eng')?.name).toBe(1010 + 270);
+			controller.dispose();
+		});
+	});
 });
 
 // ── Plan 099: Differential correctness tests ─────────────────────────────────

@@ -17,12 +17,9 @@ import {
 	type GridReadyEvent,
 	type FilterModel,
 	type ColumnFilterDef,
-	type FilterFetchParams,
-	type FilterFetchResult,
-	type FilterPageParams,
-	type FilterPageResult,
-	type CustomFilterRendererParams,
-	type SelectFilterCondition,
+	type CellOptionsPage,
+	type CellOptionsQuery,
+	type DomFilterEditorParams,
 	type GridWorkspaceAdapter,
 	type GridViewDefinition,
 	type GridWorkspaceState,
@@ -119,100 +116,96 @@ function jitter(base: number): number {
 	return base + Math.floor(Math.random() * base * 0.4);
 }
 
-async function fetchDepartmentOptions(params: FilterFetchParams, signal: AbortSignal): Promise<FilterFetchResult<string>> {
+/** Departments from a pretend server: searched there, with a row count per department. */
+async function loadDepartments({ search, signal }: CellOptionsQuery): Promise<CellOptionsPage> {
 	await fakeDelay(400, null);
 	if (signal.aborted) return { options: [] };
-	const q = params.query.toLowerCase();
+	const q = search.toLowerCase();
 	const matched = DEPARTMENTS.filter((d) => d.toLowerCase().includes(q));
 	return {
-		options: matched.map((d) => ({ label: d, value: d, count: ALL_ROWS.filter((r) => r.department === d).length })),
-		totalCount: matched.length,
+		options: matched.map((d) => ({ value: d, description: `${ALL_ROWS.filter((r) => r.department === d).length} people` })),
+		total: matched.length,
 	};
 }
 
-async function fetchSkillsPage(params: FilterPageParams, signal: AbortSignal): Promise<FilterPageResult<string>> {
+/** Skills a page at a time: the list loads more as it scrolls. */
+async function loadSkills({ search, offset, limit, signal }: CellOptionsQuery): Promise<CellOptionsPage> {
 	await fakeDelay(300, null);
-	if (signal.aborted) return { options: [], hasMore: false };
-	const q = params.query.toLowerCase();
+	if (signal.aborted) return { options: [] };
+	const q = search.toLowerCase();
 	const matched = ALL_SKILLS.filter((s) => s.toLowerCase().includes(q));
-	const page = matched.slice(params.page * params.pageSize, (params.page + 1) * params.pageSize);
 	return {
-		options: page.map((s) => ({ label: s, value: s })),
-		hasMore: (params.page + 1) * params.pageSize < matched.length,
-		totalCount: matched.length,
+		options: matched.slice(offset, offset + limit).map((s) => ({ value: s })),
+		hasMore: offset + limit < matched.length,
+		total: matched.length,
 	};
 }
 
 // ── Custom salary range filter ────────────────────────────────────────────────
+// A custom React filter: it renders on every filter surface (sidebar, header funnel and menu,
+// floating row) and emits a built-in number condition, so the grid matches it.
 
-function SalaryRangeFilter({ params }: { params: CustomFilterRendererParams }) {
-	const current = params.value?.type === 'select' ? (params.value as SelectFilterCondition) : null;
-	const [min, setMin] = useState(current ? String(current.values[0] ?? '') : '');
-	const [max, setMax] = useState(current ? String(current.values[1] ?? '') : '');
+function SalaryRangeFilter({ params }: { params: DomFilterEditorParams }) {
+	const current = params.filter?.type === 'number' && params.filter.operator === 'inRange' ? params.filter : null;
+	const [min, setMin] = useState(current ? String(current.value) : '');
+	const [max, setMax] = useState(current?.valueTo !== undefined ? String(current.valueTo) : '');
 
 	const commit = (minVal: string, maxVal: string) => {
-		const minN = minVal ? Number(minVal) : null;
-		const maxN = maxVal ? Number(maxVal) : null;
-		if (minN === null && maxN === null) {
-			params.onCommit(null);
+		if (!minVal && !maxVal) {
+			params.onChange(null);
 			return;
 		}
-		params.onCommit({ type: 'select', values: [minN, maxN], labels: [`$${minVal || 0}–$${maxVal || '∞'}`] });
+		params.onChange({ type: 'number', operator: 'inRange', value: minVal ? Number(minVal) : 0, valueTo: maxVal ? Number(maxVal) : undefined });
+	};
+	const field: React.CSSProperties = {
+		flex: 1,
+		minWidth: 0,
+		height: 30,
+		padding: '0 8px',
+		fontSize: 12,
+		background: 'var(--og-popover-input-bg)',
+		border: '1px solid var(--og-popover-input-border)',
+		borderRadius: 7,
+		color: 'var(--og-text-color)',
+		outline: 'none',
 	};
 
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
-			<div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+		<div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+			<div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
 				<input
 					type='number'
 					placeholder='Min salary'
 					value={min}
 					onChange={(e) => setMin(e.target.value)}
 					onBlur={() => commit(min, max)}
-					style={{
-						flex: 1,
-						height: 26,
-						padding: '0 8px',
-						fontSize: 11,
-						background: '#1e293b',
-						border: '1px solid #334155',
-						borderRadius: 4,
-						color: '#e2e8f0',
-						outline: 'none',
-					}}
+					style={field}
 				/>
-				<span style={{ fontSize: 10, color: '#64748b' }}>–</span>
+				<span style={{ fontSize: 11, opacity: 0.6 }}>–</span>
 				<input
 					type='number'
 					placeholder='Max'
 					value={max}
 					onChange={(e) => setMax(e.target.value)}
 					onBlur={() => commit(min, max)}
-					style={{
-						flex: 1,
-						height: 26,
-						padding: '0 8px',
-						fontSize: 11,
-						background: '#1e293b',
-						border: '1px solid #334155',
-						borderRadius: 4,
-						color: '#e2e8f0',
-						outline: 'none',
-					}}
+					style={field}
 				/>
 			</div>
-			{current && (
-				<button
-					onClick={() => {
-						setMin('');
-						setMax('');
-						params.onCommit(null);
-					}}
-					style={{ fontSize: 10, color: '#60a5fa', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}
-				>
-					Clear
-				</button>
-			)}
+			<div style={{ display: 'flex', gap: 6 }}>
+				{[50_000, 100_000, 150_000].map((floor) => (
+					<button
+						key={floor}
+						className='og-ct-btn'
+						onClick={() => {
+							setMin(String(floor));
+							setMax('');
+							commit(String(floor), '');
+						}}
+					>
+						{`$${floor / 1000}k+`}
+					</button>
+				))}
+			</div>
 		</div>
 	);
 }
@@ -228,28 +221,25 @@ const STATUS_COLORS: Record<string, string> = {
 
 function makeColumns(): ColumnDef<EmployeeRow>[] {
 	return [
-		{ field: 'id', header: 'ID', width: 100, filterType: 'none' },
-		{ field: 'name', header: 'Name', width: 180, filterType: 'text' },
+		{ field: 'id', header: 'ID', width: 100, filterDef: { type: 'none' } },
+		// No filterDef: text.
+		{ field: 'name', header: 'Name', width: 180 },
 		{
 			field: 'department',
 			header: 'Department',
 			width: 160,
 			filterDef: {
-				type: 'async-multi-select',
-				fetchOptions: fetchDepartmentOptions,
+				type: 'select',
+				loadOptions: loadDepartments,
 				placeholder: 'Search departments…',
-				showSelectAll: true,
 				debounceMs: 200,
-			} satisfies ColumnFilterDef<EmployeeRow, string>,
+			} satisfies ColumnFilterDef<EmployeeRow>,
 		},
 		{
 			field: 'location',
 			header: 'Location',
 			width: 150,
-			filterDef: { type: 'multi-select', options: LOCATIONS.map((l) => ({ label: l, value: l })), searchable: true } satisfies ColumnFilterDef<
-				EmployeeRow,
-				string
-			>,
+			filterDef: { type: 'select', options: LOCATIONS.map((value) => ({ value })), searchable: true },
 		},
 		{
 			field: 'status',
@@ -264,42 +254,36 @@ function makeColumns(): ColumnDef<EmployeeRow>[] {
 					</span>
 				),
 			},
-			filterDef: { type: 'single-select', options: STATUSES.map((s) => ({ label: s, value: s })) } satisfies ColumnFilterDef<
-				EmployeeRow,
-				string
-			>,
+			// One value at a time.
+			filterDef: { type: 'select', multiple: false, options: STATUSES.map((value) => ({ value })) },
 		},
 		{
 			field: 'level',
 			header: 'Level',
 			width: 100,
-			filterDef: { type: 'multi-select', options: LEVELS.map((l) => ({ label: l, value: l })), showSelectAll: true } satisfies ColumnFilterDef<
-				EmployeeRow,
-				string
-			>,
+			filterDef: { type: 'select', options: LEVELS.map((value) => ({ value })) },
 		},
 		{
 			field: 'salary',
 			header: 'Salary',
 			width: 130,
 			valueFormatter: ({ value }) => `$${Number(value).toLocaleString()}`,
-			filterDef: { type: 'custom', renderFilter: (params) => <SalaryRangeFilter params={params as any} /> } satisfies ColumnFilterDef<
-				EmployeeRow,
-				number
-			>,
+			filterDef: {
+				type: 'custom',
+				renderFilter: (params) => <SalaryRangeFilter params={params} />,
+				summarize: (filter) =>
+					filter.type === 'number'
+						? `$${filter.value.toLocaleString()} – ${filter.valueTo !== undefined ? `$${filter.valueTo.toLocaleString()}` : '∞'}`
+						: '',
+			},
 		},
-		{ field: 'startDate', header: 'Start Date', width: 130, filterType: 'date' },
+		{ field: 'startDate', header: 'Start Date', width: 130, filterDef: { type: 'date' } },
 		{
 			field: 'skills',
 			header: 'Skills',
 			width: 220,
-			filterDef: {
-				type: 'infinite-multi-select',
-				fetchPage: fetchSkillsPage,
-				pageSize: 6,
-				placeholder: 'Search skills…',
-				debounceMs: 150,
-			} satisfies ColumnFilterDef<EmployeeRow, string>,
+			// Cells list several skills: Any / All / None of, options paged from a server.
+			filterDef: { type: 'select', listValues: true, loadOptions: loadSkills, pageSize: 6, placeholder: 'Search skills…', debounceMs: 150 },
 		},
 	];
 }
@@ -379,7 +363,7 @@ const SEED_VIEWS: GridViewDefinition[] = [
 		'personal',
 		{
 			location: { type: 'select', values: ['San Francisco'], labels: ['San Francisco'] },
-			salary: { type: 'select', values: [100000, null], labels: ['$100,000–∞'] },
+			salary: { type: 'number', operator: 'inRange', value: 100000 },
 		},
 		[{ colId: 'salary', sort: 'desc' }]
 	),
@@ -856,12 +840,12 @@ export default function AdvancedFiltersDemo({ compact = false }: Props = {}) {
 					}}
 				>
 					{[
-						{ col: 'Department', type: 'async-multi-select', color: '#818cf8' },
-						{ col: 'Location', type: 'multi-select', color: '#34d399' },
-						{ col: 'Status', type: 'single-select', color: '#fbbf24' },
-						{ col: 'Level', type: 'multi-select', color: '#34d399' },
-						{ col: 'Salary', type: 'custom range', color: '#f472b6' },
-						{ col: 'Skills', type: 'infinite-multi-select', color: '#60a5fa' },
+						{ col: 'Department', type: 'select · server search', color: '#818cf8' },
+						{ col: 'Location', type: 'select', color: '#34d399' },
+						{ col: 'Status', type: 'select · single', color: '#fbbf24' },
+						{ col: 'Level', type: 'select', color: '#34d399' },
+						{ col: 'Salary', type: 'custom (React)', color: '#f472b6' },
+						{ col: 'Skills', type: 'select · list cells · paged', color: '#60a5fa' },
 					].map(({ col, type, color }) => (
 						<div key={col} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
 							<span

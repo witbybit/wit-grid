@@ -239,7 +239,12 @@ export class ClipboardController<TRowData = unknown> {
 		}
 		if (!result) return false;
 		data.setData('text/plain', result.text);
-		this.c.dispatchEvent(GridEventName.cellsCopied, { cells: result.cells, rowCount: result.rowCount, colCount: result.colCount, text: result.text });
+		this.c.dispatchEvent(GridEventName.cellsCopied, {
+			cells: result.cells,
+			rowCount: result.rowCount,
+			colCount: result.colCount,
+			text: result.text,
+		});
 		if (cut) this.clearCells(result.cells);
 		return true;
 	}

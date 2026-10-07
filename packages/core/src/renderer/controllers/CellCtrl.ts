@@ -1,6 +1,5 @@
 import type { ColumnInstanceId } from '../../columnDef.js';
-import type { CellDisplaySnapshot } from '../cellDisplaySnapshot.js';
-import type { CellContentMode } from '../cellSlot.js';
+import type { CellPresentationState } from '../cellPresentationStateMachine.js';
 import type { VisualFreshness } from '../visualFreshness.js';
 
 export type CellControllerKey = string & { readonly __brand: 'CellControllerKey' };
@@ -14,24 +13,6 @@ export interface ControllerWorkToken {
 	cellControllerKey: CellControllerKey;
 	rowId: string;
 	columnInstanceId: ColumnInstanceId;
-	freshness: VisualFreshness;
-}
-
-export interface CellCtrlPresentationState {
-	kind: 'buffered' | 'primitive' | 'loading' | 'checkbox-selector' | 'live-renderer' | 'dom-update' | 'frozen-portal' | 'stand-in';
-	className: string;
-	title?: string | null;
-	validationError?: string;
-	contentMode?: CellContentMode;
-	formattedValue?: string;
-	portalKey?: string;
-	requiresFidelity: boolean;
-	markDirty?: boolean;
-	isEditing?: boolean;
-	isFocused?: boolean;
-	forceLiveInteractive?: boolean;
-	keepVersionFresh?: boolean;
-	recordVersions?: VisualFreshness | CellDisplaySnapshot;
 	freshness: VisualFreshness;
 }
 
@@ -95,7 +76,7 @@ export interface CellCtrl {
 		stale: boolean;
 	};
 
-	presentationState: CellCtrlPresentationState;
+	presentationState: CellPresentationState;
 }
 
 export function deriveCellCtrlAccessibilityState(cellCtrl: CellCtrl): CellCtrlAccessibilityState {
@@ -175,7 +156,7 @@ export function createCellCtrl(inputOrRowId: CreateCellCtrlInput | string, colum
 			kind: 'primitive',
 			className: '',
 			title: null,
-			requiresFidelity: false,
+			needsPostScrollRepair: false,
 			freshness,
 			formattedValue: '',
 			contentMode: 'empty',
@@ -212,7 +193,7 @@ export function rekeyCellCtrl(cellCtrl: CellCtrl, input: CreateCellCtrlInput): v
 		kind: 'primitive',
 		className: '',
 		title: null,
-		requiresFidelity: false,
+		needsPostScrollRepair: false,
 		freshness: input.freshness ?? createDefaultFreshness(),
 		formattedValue: '',
 		contentMode: 'empty',

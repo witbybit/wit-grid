@@ -106,42 +106,114 @@ Return `false` to reject a commit. Return a promise when validation depends on a
 
 ## Column Types
 
-Wit Grid ships built-in type registry entries for:
+Wit Grid ships these types in the grid core, usable by name with no registration:
 
-| Type       | Behavior                                                           |
-| ---------- | ------------------------------------------------------------------ |
-| `checkbox` | Checkbox; a click selects the cell and toggles the value.          |
-| `date`     | Calendar icon and `DD/MM/YYYY` display, with a date-picker editor. |
-| `number`   | Monospace number display, with a number editor.                    |
+| Type                            | Behavior                                                      |
+| ------------------------------- | ------------------------------------------------------------- |
+| `checkbox`                      | Checkbox; a press selects the cell and toggles the value.     |
+| `date`, `datetime`              | Intl date (and time) display, with a calendar popover editor. |
+| `number`, `currency`, `percent` | Intl number formats, right-aligned, with a stepper editor.    |
+| `progress`, `rating`            | Progress bar with label; stars, click to rate.                |
+| `url`, `email`                  | Links; only http, https and mailto become links.              |
+| `tags`                          | Palette-coloured chips; type in the editor to create a tag.   |
 
-The built-in cells are DOM renderers: they draw without React, so they cost no more than plain text during
-scroll. `numberColumnType` uses the same renderer. The React versions (`CheckboxCellRenderer`,
-`DateCellRenderer`, `createNumberCellRenderer`) are still exported and look identical, if you want to wrap one
-in your own component; the DOM versions are exported as `CheckboxDomCellRenderer`, `DateDomCellRenderer` and
-`createNumberDomCellRenderer`.
+The cells are DOM renderers and editors: no React work per cell, so they cost no more than plain text during
+scroll. Their colours come from the grid theme (text, accent, popover tokens), so badges, chips and editor
+popovers follow built-in and custom themes. Set `--og-ct-accent`, `--og-ct-radius` or `--og-ct-rating` on the
+grid to adjust the cells alone.
 
-Register custom types with the `columnTypes` grid prop.
+Register types with options through the `columnTypes` grid prop.
 
 ```tsx
-import { Grid, numberColumnType, dropdownColumnType } from '@eregister/wit-grid-react';
+import { Grid, currencyColumnType, selectColumnType, comboboxColumnType } from '@eregister/wit-grid-react';
 
 const columnTypes = {
-	usd: numberColumnType({ prefix: '$', decimals: 2, locale: true }),
-	status: dropdownColumnType([
-		{ value: 'Active', color: 'emerald' },
-		{ value: 'Paused', color: 'amber' },
+	usd: currencyColumnType({ currency: 'USD' }),
+	status: selectColumnType(
+		[
+			{ value: 'active', label: 'Active', color: 'emerald' },
+			{ value: 'paused', label: 'Paused', color: 'amber' },
+		],
+		{ noneLabel: 'No status' }
+	),
+	team: comboboxColumnType([
+		{ value: 'fe', label: 'Frontend', group: 'Engineering' },
+		{ value: 'ui', label: 'UI Design', group: 'Design' },
 	]),
 };
 
 const columns = [
 	{ field: 'revenue', header: 'Revenue', type: 'usd' },
 	{ field: 'status', header: 'Status', type: 'status' },
+	{ field: 'team', header: 'Team', type: 'team' },
 ];
 
 <Grid rows={rows} columns={columns} columnTypes={columnTypes} />;
 ```
 
-Helper exports include `numberColumnType`, `multiSelectColumnType`, and `dropdownColumnType`.
+Factories: `selectColumnType`, `multiSelectColumnType`, `comboboxColumnType`, `tagsColumnType`,
+`personColumnType`, `numberColumnType`, `currencyColumnType`, `percentColumnType`, `dateColumnType`,
+`dateTimeColumnType`, `progressColumnType`, `ratingColumnType`, `checkboxColumnType`, `urlColumnType` and
+`emailColumnType`. Options are `{ value, label?, color?, icon?, description?, group?, disabled? }`, where
+`color` is a palette name (`gray`, `red`, `amber`, `emerald`, `blue`, `violet`, `rose`…) or any CSS colour.
+A type supplies `renderer`, `cellEditor`, `valueFormatter` and `filterDef`; whatever the column sets itself wins.
+
+### More cell types
+
+| Factory                                                    | Value                                             | Cell                                           | Editor                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `switchColumnType({ onLabel, offLabel })`                  | boolean (`'true'`, `1` keep shape)                | On / off switch, toggles on press              | Enter toggles                                                          |
+| `segmentedColumnType(options)`                             | option value                                      | All options inline; one press picks            | Enter opens them as a list                                             |
+| `colorColumnType({ swatches })`                            | `#rrggbb`                                         | Swatch and hex                                 | Palette (arrow keys), hex field, system picker, screen eyedropper      |
+| `longTextColumnType({ lines, maxLength })`                 | string                                            | One to three clamped lines, full text on hover | Textarea popover: Enter adds a line, Ctrl / ⌘ + Enter saves            |
+| `linkedRecordColumnType(records, { loadOptions, onOpen })` | record ids                                        | Record chips; pressing one calls `onOpen`      | Record picker (paged from your API with `loadOptions`)                 |
+| `cascadeColumnType({ options \| loadChildren })`           | path `['in', 'ka', 'blr']` or `'in/ka/blr'`       | “India › Karnataka › Bengaluru”                | One column per level, ← → ↑ ↓ Enter, search across paths, async levels |
+| `dateRangeColumnType({ presets })`                         | `{ start, end }`, `[start, end]` or `'start/end'` | “Mar 4 – 18, 2026” and its length              | Two-month range calendar with presets, Apply                           |
+| `sparklineColumnType(options)`                             | numbers (array, `'1,2,3'`, `{ values }`)          | Line, area, bar or win / loss chart            | (display only)                                                         |
+
+Sparklines take `type`, `color` or `colorBy: 'trend'`, `curve: 'smooth'`, `markers` (`last`, `minmax`, `all`),
+`reference` (a value, `'average'` or `'zero'`), `label` (`last`, `change`), `format`, fixed `min` / `max` for
+comparable rows, `height` and `strokeWidth`. They stretch to the column without measuring it and keep strokes
+and markers crisp.
+
+`cascadeColumnType` loads levels with `loadChildren(path, signal)` (mark leaves `isLeaf: true`), labels stored
+paths with `resolvePath(path)`, and searches a server with `searchPaths(query, signal)`; `changeOnSelect` allows
+picking a state as well as a city. Checkbox cells now toggle on Enter too.
+
+### Options from a server
+
+`selectColumnType`, `comboboxColumnType`, `multiSelectColumnType`, `tagsColumnType` and `personColumnType`
+can load their options instead of listing them:
+
+```tsx
+const columnTypes = {
+	account: comboboxColumnType([], {
+		// One page of matches. Return `hasMore: false` (or a plain array) on the last page.
+		loadOptions: async ({ search, offset, limit, signal, rowId }) => {
+			const res = await fetch(`/api/accounts?q=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`, { signal });
+			const { items, total } = await res.json();
+			return { options: items.map((a) => ({ value: a.id, label: a.name, description: a.region })), hasMore: offset + limit < total, total };
+		},
+		// Labels for the values cells show before any list has loaded them (one batched call).
+		resolveOptions: async (ids) => (await fetch(`/api/accounts?ids=${ids.join(',')}`).then((r) => r.json())).map(toOption),
+		pageSize: 50,
+	}),
+};
+```
+
+- The editor searches on the server after a pause in typing (`debounceMs`, default 250) and from
+  `minQueryLength` characters. One request is in flight at a time: a newer search waits for it, then the latest
+  runs. Closing the editor aborts the page still loading (`signal`).
+- The next page loads when the list is scrolled near its end, or when arrowing past the last option. The list
+  shows a loading row, a Retry row when a page fails, and "50 of 1,204" when the loader returns `total`.
+- Cells show a placeholder while `resolveOptions` looks a value up. Every option a page or lookup returns is
+  remembered, so its label appears in cells, exports and filters.
+- `rowId` and `colField` let options depend on the row (cities of the row's country, say).
+- The column's filter lists the same options (loaded the same way), so filters and cells agree on labels.
+
+The renderers and editors are also exported on their own (`createSelectRenderer`, `createSelectEditor`,
+`createDateEditor`…) for use on a column directly: `renderer: { kind: 'dom', renderer }` and
+`cellEditor: { kind: 'dom', editor }`. A `DomCellEditor` you write works the same way.
 
 ## Renderers And Editors
 
@@ -165,13 +237,14 @@ receive the cell's `value`, `node`, `col`, state flags and the grid `api` — th
 
 ```tsx
 const columns: ColumnDef<Person>[] = [
-	{ field: 'name', header: 'Name', sortable: true, filterType: 'text' },
-	{ field: 'score', header: 'Score', sortable: true, filterType: 'number' },
-	{ field: 'team', header: 'Team', filterType: 'set' },
+	{ field: 'name', header: 'Name', sortable: true }, // filters as text
+	{ field: 'score', header: 'Score', sortable: true, filterDef: { type: 'number' } },
+	{ field: 'team', header: 'Team', filterDef: { type: 'select' } },
+	{ field: 'id', header: 'ID', filterDef: { type: 'none' } },
 ];
 ```
 
-Prefer `filterDef` for new filter UI. `filterType` and `filterValues` are still supported and normalized internally.
+Column types choose a fitting filter on their own; `filterDef` overrides it. See [Filtering](/docs/next/filtering).
 
 ## Clipboard
 

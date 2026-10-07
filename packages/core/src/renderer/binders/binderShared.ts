@@ -7,6 +7,7 @@ import type { RowCellBinderDeps } from '../rowCellBinder.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
 import { deriveCellCtrlAccessibilityState, type CellCtrl } from '../controllers/CellCtrl.js';
 import { createCellRendererLifecycle, type CellRendererLifecycle } from '../lifecycle/cellRendererLifecycle.js';
+import type { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 const lifecyclesByDeps = new WeakMap<object, CellRendererLifecycle<any>>();
 
@@ -24,9 +25,20 @@ export function getCellRendererLifecycle<TRowData>(deps: RowCellBinderDeps<TRowD
 	return lifecycle;
 }
 
+export function markCellForPostScrollRepair<TRowData>(
+	deps: RowCellBinderDeps<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	reason: PostScrollRepairReason
+): void {
+	// Several causes can queue the same physical cell in one frame; the bits are diagnostics only.
+	// The repair lane is classified when the queue drains (classifyPostScrollRepairLane).
+	cellSlot.postScrollRepairReasons |= reason;
+	deps.markCellDirtyAfterScroll(cellSlot.element);
+}
+
 /**
  * Shared helpers used by every render-state binder (textCellBinder.ts, liveCellBinder.ts,
- * snapshotCellBinder.ts, checkboxCellBinder.ts); see CellRenderState in cellPresentationDispatcher.ts.
+ * snapshotCellBinder.ts, checkboxCellBinder.ts); routing is owned by cellPresentationStateMachine.ts.
  */
 
 export function buildCellPinClass(lane: 'left' | 'center' | 'right'): string {

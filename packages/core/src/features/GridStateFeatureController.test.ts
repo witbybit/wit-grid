@@ -12,7 +12,11 @@ describe('re-applying the current sort or filter model', () => {
 			{ id: '2', name: 'a' },
 		];
 		const store = new GridStore<Row>({ columns: [{ field: 'name' }] as never, getRowId: (r) => r.id });
-		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns, getRowId: (r) => r.id });
+		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), {
+			rows,
+			columns: store.getState().columns,
+			getRowId: (r) => r.id,
+		});
 		let runs = 0;
 		const refresh = model.refresh.bind(model);
 		model.refresh = (...args) => (runs++, refresh(...args));

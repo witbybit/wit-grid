@@ -43,7 +43,11 @@ describe('re-declaring columns with new inline formatters', () => {
 		const rows: Row[] = Array.from({ length: 200 }, (_, i) => ({ id: `r${i}`, group: `g${i % 4}`, price: i }));
 		const columns = () => [{ field: 'group' }, { field: 'price', valueFormatter: ({ value }: { value: unknown }) => `$${String(value)}` }];
 		const store = new GridStore<Row>({ columns: columns() as never, getRowId: (r) => r.id });
-		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), { rows, columns: store.getState().columns, getRowId: (r) => r.id });
+		const model = new ClientRowModelController<Row>(store.getClientRowModelRuntime(), {
+			rows,
+			columns: store.getState().columns,
+			getRowId: (r) => r.id,
+		});
 		store.setGrouping({ by: ['group'] } as never);
 		store.setAggregation({ defs: [{ colId: 'price', aggFunc: 'sum' }] } as never);
 		store.setSortModel([{ colId: 'price', sort: 'desc' }] as never);
@@ -53,7 +57,8 @@ describe('re-declaring columns with new inline formatters', () => {
 		let fullRuns = 0;
 		const refresh = model.refresh.bind(model);
 		model.refresh = (...args) => (fullRuns++, refresh(...args));
-		const invalidation = (store as unknown as { engine: { invalidation: { consume(): { full: boolean; columns: Set<string> } } } }).engine.invalidation;
+		const invalidation = (store as unknown as { engine: { invalidation: { consume(): { full: boolean; columns: Set<string> } } } }).engine
+			.invalidation;
 		invalidation.consume();
 
 		store.setColumns(columns() as never);

@@ -10,36 +10,32 @@ import { compilePathGetter } from '../columnDef.js';
 import { createGridRowDataRef } from '../publicRowRef.js';
 import type { RowNode } from '../rowNode.js';
 import type { GridQueryCondition, GridQueryGroup, GridQueryModel, GridQueryNode, QueryConditionDiagnostic } from './GridQueryModel.js';
-import { getQueryOperator } from './queryOperatorRegistry.js';
+import { resolveColumnFilterDef } from '../filters/filterDef.js';
+import { prepareColumnFilter, type PreparedFilterMatcher } from '../filters/matchFilter.js';
 
 export interface QueryEvaluationContext<TRowData = unknown> {
 	getCellValue(node: RowNode<TRowData>, columnId: string): unknown;
-	getColumnType(columnId: string): string | null;
+	/** The prepared matcher of a condition (cached per condition); null when it matches every row. */
+	getMatcher(condition: GridQueryCondition): PreparedFilterMatcher | null;
+	/** Whether a column exists. */
+	hasColumn(columnId: string): boolean;
 	reportDiagnostic?(diag: QueryConditionDiagnostic): void;
 }
 
 function evaluateNode<TRowData>(node: GridQueryNode, rowNode: RowNode<TRowData>, ctx: QueryEvaluationContext<TRowData>): boolean {
-	if (node.kind === 'condition') {
-		return evaluateCondition(node, rowNode, ctx);
-	}
+	if (node.kind === 'condition') return evaluateCondition(node, rowNode, ctx);
 	return evaluateGroup(node, rowNode, ctx);
 }
 
 function evaluateGroup<TRowData>(group: GridQueryGroup, rowNode: RowNode<TRowData>, ctx: QueryEvaluationContext<TRowData>): boolean {
-	const validChildren = group.children.filter((c): boolean => {
-		if (c.kind === 'group') return c.children.length > 0;
-		return true;
-	});
+	const validChildren = group.children.filter((c): boolean => (c.kind === 'group' ? c.children.length > 0 : true));
 	if (validChildren.length === 0) return true;
-	if (group.operator === 'and') {
-		return validChildren.every((child) => evaluateNode(child, rowNode, ctx));
-	}
+	if (group.operator === 'and') return validChildren.every((child) => evaluateNode(child, rowNode, ctx));
 	return validChildren.some((child) => evaluateNode(child, rowNode, ctx));
 }
 
 function evaluateCondition<TRowData>(condition: GridQueryCondition, rowNode: RowNode<TRowData>, ctx: QueryEvaluationContext<TRowData>): boolean {
-	const columnType = ctx.getColumnType(condition.columnId);
-	if (columnType === null) {
+	if (!ctx.hasColumn(condition.columnId)) {
 		ctx.reportDiagnostic?.({
 			conditionId: condition.id,
 			columnId: condition.columnId,
@@ -48,20 +44,9 @@ function evaluateCondition<TRowData>(condition: GridQueryCondition, rowNode: Row
 		});
 		return true;
 	}
-
-	const opDef = getQueryOperator(columnType, condition.operator);
-	if (!opDef) {
-		ctx.reportDiagnostic?.({
-			conditionId: condition.id,
-			columnId: condition.columnId,
-			reason: 'unknown-operator',
-			message: `Unknown operator "${condition.operator}" for column type "${columnType}"`,
-		});
-		return true;
-	}
-
-	const cellValue = ctx.getCellValue(rowNode, condition.columnId);
-	return opDef.evaluate({ cellValue, value: condition.value, valueTo: condition.valueTo });
+	const match = ctx.getMatcher(condition);
+	if (!match) return true;
+	return match(ctx.getCellValue(rowNode, condition.columnId), rowNode.data);
 }
 
 /** Evaluate a query model against a single row node. Returns true when the row passes. */
@@ -70,8 +55,8 @@ export function evaluateQueryModel<TRowData>(queryModel: GridQueryModel, rowNode
 }
 
 /**
- * Build an evaluation context from a columns array.
- * Looks up column types by field name, gets cell values via valueGetter or path.
+ * An evaluation context over a columns array: cell values through each column's getter, and
+ * conditions matched with the column's filter definition (as the filter model is).
  */
 export function createQueryEvaluationContext<TRowData>(
 	columns: ColumnDef<TRowData>[],
@@ -81,6 +66,7 @@ export function createQueryEvaluationContext<TRowData>(
 	for (const col of columns) columnMap.set(col.field, col);
 
 	const getterCache = new Map<string, (node: RowNode<TRowData>) => unknown>();
+	const matcherCache = new WeakMap<GridQueryCondition, PreparedFilterMatcher | null>();
 
 	function getCellValue(node: RowNode<TRowData>, columnId: string): unknown {
 		const col = columnMap.get(columnId);
@@ -99,13 +85,23 @@ export function createQueryEvaluationContext<TRowData>(
 		return getter(node);
 	}
 
-	function getColumnType(columnId: string): string | null {
-		const col = columnMap.get(columnId);
-		if (!col) return null;
-		return (col.filterType as string | null | undefined) ?? 'text';
+	function getMatcher(condition: GridQueryCondition): PreparedFilterMatcher | null {
+		if (matcherCache.has(condition)) return matcherCache.get(condition)!;
+		const col = columnMap.get(condition.columnId);
+		const match = condition.filter && col ? prepareColumnFilter(condition.filter, resolveColumnFilterDef(col)) : null;
+		if (condition.filter && !match) {
+			reportDiagnostic?.({
+				conditionId: condition.id,
+				columnId: condition.columnId,
+				reason: 'invalid-value',
+				message: `Query condition on "${condition.columnId}" has a value that cannot be matched`,
+			});
+		}
+		matcherCache.set(condition, match);
+		return match;
 	}
 
-	return { getCellValue, getColumnType, reportDiagnostic };
+	return { getCellValue, getMatcher, hasColumn: (id) => columnMap.has(id), reportDiagnostic };
 }
 
 /**

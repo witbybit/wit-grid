@@ -36,8 +36,8 @@ export function samePipelineColumns<TData>(a: readonly ColumnDef<TData>[], b: re
 		const x = a[i];
 		const y = b[i];
 		if (x === y) continue;
-		if (x.field !== y.field || x.valueGetter !== y.valueGetter || x.type !== y.type || x.filterType !== y.filterType) return false;
-		if (!samePlain(x.valueGetterDependencies, y.valueGetterDependencies) || !samePlain(x.filterValues, y.filterValues)) return false;
+		if (x.field !== y.field || x.valueGetter !== y.valueGetter || x.type !== y.type) return false;
+		if (!samePlain(x.valueGetterDependencies, y.valueGetterDependencies)) return false;
 		if (!samePlain(x.filterDef, y.filterDef)) return false;
 	}
 	return true;

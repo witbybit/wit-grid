@@ -140,7 +140,7 @@ describe('DOM renderers during scroll (live presentation)', () => {
 		grid.store.destroy();
 	});
 
-	it('shows a stand-in only for cells the frame budget refuses, then repairs them after scroll', async () => {
+	it('draws every visible cell even with no budget left; only off-screen cells wait for the repair', async () => {
 		const grid = mountGrid({ rendererOptions: { live: { maxMsPerFrame: 0 } } });
 		await nextFrame();
 		grid.renderer.resetRenderStats();
@@ -148,9 +148,18 @@ describe('DOM renderers during scroll (live presentation)', () => {
 		grid.viewport.dispatchEvent(new Event('scroll'));
 		await nextFrame();
 
+		// A row entering the viewport is drawn whole inside the scroll frame, whatever the budget.
+		const inFrame = visibleDomCells(grid.container).filter(([rowId]) => {
+			const row = grid.container.querySelector<HTMLElement>(`.og-row[data-row-id="row:${rowId}"]`);
+			const top = row ? Number(/translateY\(([-\d.]+)px\)/.exec(row.style.transform)?.[1] ?? NaN) - 400_000 : NaN;
+			return top >= 0 && top < 400;
+		});
+		expect(inFrame.length).toBeGreaterThan(0);
+		for (const [rowId, text] of inFrame) expect(text).toBe(`v${rowId.slice(1)}`);
 		const stats = grid.renderer.getRenderStats() as unknown as Record<string, number>;
+		expect(stats.domUpdatesDuringScroll ?? 0).toBeGreaterThan(0);
+		// The budget still bounds the overscan rows below the fold.
 		expect(stats.domUpdatesDeferredDuringScroll).toBeGreaterThan(0);
-		expect(stats.domUpdatesDuringScroll ?? 0).toBe(0);
 
 		for (let i = 0; i < 12; i++) await nextFrame();
 		const cells = visibleDomCells(grid.container);

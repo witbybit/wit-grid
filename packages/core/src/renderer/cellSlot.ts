@@ -7,6 +7,12 @@ import { createCellInstanceRendererKey } from './identityKeys.js';
 import { isHierarchyColumn } from '../rows/hierarchyColumn.js';
 import type { CellCtrl, CellCtrlAccessibilityState } from './controllers/CellCtrl.js';
 import type { HierarchyCellParts } from './hierarchyCell.js';
+import {
+	CellSlotLifecycleEvent,
+	CellSlotLifecycleState,
+	isLegalCellSlotLifecycleTransition,
+	transitionCellSlotLifecycle,
+} from './cellSlotLifecycle.js';
 
 /** The store side of CellSlot → CellCtrl ownership — see RowCtrlStore.releaseDetachedCellCtrl. */
 export interface CellCtrlOwner {
@@ -32,13 +38,13 @@ let _cellInstanceCounter = 0;
  * Dataset attributes mirror binding for debug/DevTools inspection only.
  */
 export interface CellBinding {
-	readonly rowSlotId: string;
-	readonly rowId: string;
-	readonly rowIndex: number;
-	readonly colId: string;
-	readonly colIndex: number;
-	readonly cellKey: string;
-	readonly contentMode: CellContentMode;
+	rowSlotId: string;
+	rowId: string;
+	rowIndex: number;
+	colId: string;
+	colIndex: number;
+	cellKey: string;
+	contentMode: CellContentMode;
 }
 
 // Intern common pixel strings — avoids a string allocation on every DOM write.
@@ -54,6 +60,8 @@ export const cellSlotWriteStats = {
 	cellWidthWrites: 0,
 	cellLeftWrites: 0,
 	cellDomReadsAvoided: 0,
+	/** Ownership events on a destroyed slot (a stray bind or release after destroy); always a bug. */
+	cellSlotLifecycleViolations: 0,
 };
 
 export function resetCellSlotWriteStats(): void {
@@ -63,6 +71,7 @@ export function resetCellSlotWriteStats(): void {
 	cellSlotWriteStats.cellWidthWrites = 0;
 	cellSlotWriteStats.cellLeftWrites = 0;
 	cellSlotWriteStats.cellDomReadsAvoided = 0;
+	cellSlotWriteStats.cellSlotLifecycleViolations = 0;
 }
 
 export function recordCellSlotMountedVisualVersions(cellSlot: CellSlot, versions: CellSlotMountedVisualVersions): void {
@@ -155,6 +164,7 @@ export function isDirectTextColumn(
 }
 
 export class CellSlot<TRowData = unknown> {
+	public lifecycleState: CellSlotLifecycleState = CellSlotLifecycleState.Vacant;
 	public readonly element: HTMLDivElement;
 	/** Text lives directly in `element` (a text-only column); there is no content wrapper. */
 	public readonly directText: boolean;
@@ -211,7 +221,8 @@ export class CellSlot<TRowData = unknown> {
 	 * Null when the slot is unbound. Logic that needs cell identity (portal key, row/col
 	 * association) must read from binding, not from element.dataset.
 	 */
-	public binding: CellBinding | null = null;
+	public binding: Readonly<CellBinding> | null = null;
+	private bindingRecord: CellBinding | null = null;
 
 	// Position — also reflected in binding when bound
 	public colIndex = -1;
@@ -235,6 +246,8 @@ export class CellSlot<TRowData = unknown> {
 	public lastAriaInvalid: boolean | undefined = undefined;
 	public lastClassName = '';
 	public lastContentMode: CellContentMode = 'empty';
+	/** Diagnostics bitset (PostScrollRepairReason) of why this cell is queued for post-scroll repair. */
+	public postScrollRepairReasons = 0;
 	public lastPortalKey: string | undefined = undefined;
 	// Cached so unbindHot can skip the hasAttribute DOM read in the hot path.
 	public hasTabIndex = false;
@@ -259,9 +272,10 @@ export class CellSlot<TRowData = unknown> {
 	/** Horizontal-retention recency stamp (see cellSlotRetention.ts); larger = touched more recently. */
 	public retentionStamp = 0;
 
-	/** Cached row-selector checkbox (checkbox-selection columns) — see checkboxCellBinder.ts. */
-
+	/** The selection checkbox in a checkbox-selection column (row or group) — see checkboxCellBinder.ts. */
 	public rowCheckbox: HTMLInputElement | null = null;
+	/** rowIndex * 4 + checked state the checkbox's aria-label was last written for; -1 = never. */
+	public rowCheckboxLabelKey = -1;
 	/**
 	 * The cell's text was written for a group / total row (an aggregate). A data bind clears it first:
 	 * renderer cells keep their text as the scroll-time placeholder, which must be the row's own.
@@ -388,51 +402,6 @@ export class CellSlot<TRowData = unknown> {
 		return new CellSlot<TRowData>(element);
 	}
 
-	public reset(): void {
-		this.binding = null;
-		this.lastRawValue = undefined;
-		this.lastFormattedValue = undefined;
-		this.lastLeft = -1;
-		this.lastRight = -1;
-		this.lastWidth = -1;
-		if (this.lastShift !== 0) {
-			this.lastShift = 0;
-			this.element.style.transform = '';
-		}
-		if (this.lastAriaSelected !== undefined) {
-			this.lastAriaSelected = undefined;
-			this.element.removeAttribute('aria-selected');
-		}
-		if (this.lastAriaReadOnly !== undefined) {
-			this.lastAriaReadOnly = undefined;
-			this.element.removeAttribute('aria-readonly');
-		}
-		if (this.lastAriaInvalid !== undefined) {
-			this.lastAriaInvalid = undefined;
-			this.element.removeAttribute('aria-invalid');
-		}
-		if (this.hasTabIndex) {
-			this.element.removeAttribute('tabindex');
-		}
-		if (this.element.style.visibility) {
-			this.element.style.visibility = '';
-		}
-		this.lastClassName = '';
-		this.lastContentMode = 'empty';
-		this.lastPortalKey = undefined;
-		this.hasTabIndex = false;
-		this.lastMountedRowVersion = -1;
-		this.lastMountedGlobalVersion = -1;
-		this.lastMountedInsightVersion = -1;
-		this.lastMountedStyleVersion = -1;
-		this.lastMountedLoadingVersion = -1;
-		this.lastMountedSelectionVersion = -1;
-		this.colIndex = -1;
-		this.colField = '';
-		this.rowIndex = -1;
-		this.rowId = '';
-	}
-
 	public syncAccessibilityState(input: CellCtrlAccessibilityState): boolean {
 		let domUpdated = false;
 
@@ -496,6 +465,9 @@ export class CellSlot<TRowData = unknown> {
 		dragShift = 0
 	): boolean {
 		let domUpdated = false;
+		if (this.lifecycleState !== CellSlotLifecycleState.Bound) {
+			this.transitionLifecycle(CellSlotLifecycleEvent.Bind);
+		}
 
 		if (this.colIndex !== colIndex) {
 			this.colIndex = colIndex;
@@ -522,6 +494,9 @@ export class CellSlot<TRowData = unknown> {
 			this.rowId = rowId;
 			this.element.setAttribute('data-row-id', rowId);
 			domUpdated = true;
+			// Paths that draw a row without committing a binding (group, total and loading rows) must
+			// not leave the previous row's identity behind for pointer resolution to find.
+			if (this.binding !== null && this.binding.rowId !== rowId) this.binding = null;
 			// A stale inline visibility can only be left over from before this identity was bound
 			// (nothing sets it on a bound cell), so the style read is limited to rebinds.
 			if (this.element.style.visibility) {
@@ -650,7 +625,7 @@ export class CellSlot<TRowData = unknown> {
 	 * Called by RowRenderer when it binds a cell to a new physical row slot.
 	 * Dataset attributes remain as debug mirrors; logic must read from binding.
 	 */
-	public setBinding(
+	public commitBinding(
 		rowSlotId: string,
 		rowId: string,
 		rowIndex: number,
@@ -659,10 +634,45 @@ export class CellSlot<TRowData = unknown> {
 		cellKey: string,
 		contentMode: CellContentMode
 	): void {
-		this.binding = { rowSlotId, rowId, rowIndex, colId, colIndex, cellKey, contentMode };
+		if (this.lifecycleState !== CellSlotLifecycleState.Bound) {
+			this.transitionLifecycle(CellSlotLifecycleEvent.Bind);
+		}
+		let binding = this.bindingRecord;
+		if (
+			binding &&
+			this.binding === binding &&
+			binding.rowSlotId === rowSlotId &&
+			binding.rowId === rowId &&
+			binding.rowIndex === rowIndex &&
+			binding.colId === colId &&
+			binding.colIndex === colIndex &&
+			binding.cellKey === cellKey &&
+			binding.contentMode === contentMode
+		) {
+			return;
+		}
+		if (!binding) {
+			binding = { rowSlotId, rowId, rowIndex, colId, colIndex, cellKey, contentMode };
+			this.bindingRecord = binding;
+		} else {
+			binding.rowSlotId = rowSlotId;
+			binding.rowId = rowId;
+			binding.rowIndex = rowIndex;
+			binding.colId = colId;
+			binding.colIndex = colIndex;
+			binding.cellKey = cellKey;
+			binding.contentMode = contentMode;
+		}
+		this.binding = binding;
+	}
+
+	private transitionLifecycle(event: CellSlotLifecycleEvent): void {
+		if (!isLegalCellSlotLifecycleTransition(this.lifecycleState, event)) cellSlotWriteStats.cellSlotLifecycleViolations++;
+		this.lifecycleState = transitionCellSlotLifecycle(this.lifecycleState, event);
 	}
 
 	public unbindHot(): void {
+		this.transitionLifecycle(CellSlotLifecycleEvent.HotRelease);
 		this.rowBindingGeneration++;
 		this.binding = null;
 		this.colIndex = -1;
@@ -718,7 +728,8 @@ export class CellSlot<TRowData = unknown> {
 		this.boundCellCtrlOwner = null;
 	}
 
-	public unbindCold(): void {
+	public releaseCold(): void {
+		this.transitionLifecycle(CellSlotLifecycleEvent.ColdRelease);
 		this.detachCellCtrl();
 		this.releaseContentMount();
 		if (this.renderer !== null) {
@@ -748,8 +759,10 @@ export class CellSlot<TRowData = unknown> {
 			this.lastAriaInvalid = undefined;
 			this.element.removeAttribute('aria-invalid');
 		}
+		if (this.hasTabIndex) this.element.removeAttribute('tabindex');
 		this.lastClassName = '';
 		this.lastContentMode = 'empty';
+		this.postScrollRepairReasons = 0;
 		this.lastPortalKey = undefined;
 		this.hasTabIndex = false;
 		this.lastMountedRowVersion = -1;
@@ -773,5 +786,11 @@ export class CellSlot<TRowData = unknown> {
 		delete this.element.dataset.rowId;
 		delete this.element.dataset.cellKey;
 		delete this.element.dataset.contentMode;
+	}
+
+	public destroy(): void {
+		if (this.lifecycleState === CellSlotLifecycleState.Destroyed) return;
+		this.releaseCold();
+		this.transitionLifecycle(CellSlotLifecycleEvent.Destroy);
 	}
 }

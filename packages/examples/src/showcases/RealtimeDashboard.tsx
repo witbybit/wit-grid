@@ -314,7 +314,10 @@ function BuildingBadge({ building, isLight }: { building: { count: number; done:
 			}`}
 		>
 			<span className='relative h-1.5 w-16 overflow-hidden rounded-full bg-slate-500/25'>
-				<span className='absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-[width] duration-150' style={{ width: `${pct}%` }} />
+				<span
+					className='absolute inset-y-0 left-0 rounded-full bg-emerald-500 transition-[width] duration-150'
+					style={{ width: `${pct}%` }}
+				/>
 			</span>
 			Preparing {building.count.toLocaleString('en-US')} instruments · {pct}%
 		</div>

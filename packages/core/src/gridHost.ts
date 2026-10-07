@@ -1,3 +1,4 @@
+import type { AdapterFilterMount } from './filters/filterEditors.js';
 import { RenderEngine } from './renderer/renderEngine.js';
 import type { RenderStats } from './renderer/renderTelemetry.js';
 import type {
@@ -53,6 +54,8 @@ export interface GridHostOptions<TRowData = unknown> {
 	cellContent?: GridCellContentAdapter<TRowData>;
 	rowContent?: GridRowContentAdapter<TRowData>;
 	headerMenu?: GridHeaderMenuAdapter<TRowData>;
+	/** Renders adapter filter components (`filterDef.renderFilter`) on the grid's own filter surfaces. */
+	mountFilter?: AdapterFilterMount;
 	autoRowHeight?: boolean;
 }
 
@@ -174,6 +177,7 @@ export function mountGridHost<TRowData>(
 	renderEngine.portalMountManager.rendersRow = options.rowContent?.rendersRow;
 	renderEngine.onMountHeaderMenu = options.headerMenu?.mountHeaderMenu;
 	renderEngine.onUnmountHeaderMenu = options.headerMenu?.unmountHeaderMenu;
+	renderEngine.filterPopover.mountAdapterFilter = options.mountFilter;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);
 
 	// Bind live runtime ports — exclusive: only one host may be active at a time.

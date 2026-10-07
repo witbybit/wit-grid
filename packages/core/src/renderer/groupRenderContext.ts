@@ -26,6 +26,7 @@ export function createGroupRenderContext<TData>(
 		isStuck,
 		path: row.kind === 'group' ? row.path : NO_PATH,
 		indentPx: model.indentPx,
+		selection: row.kind === 'data' ? (api.isRowNodeSelected(row.rowId) ? 'all' : 'none') : api.getDescendantSelection(id).state,
 		label: model.label,
 		count: model.count,
 		api,
@@ -67,6 +68,7 @@ export function isSameGroupRenderContext<TData>(a: GroupRenderContext<TData>, b:
 		a.id === b.id &&
 		a.kind === b.kind &&
 		a.isStuck === b.isStuck &&
+		a.selection === b.selection &&
 		a.expanded === b.expanded &&
 		a.hasChildren === b.hasChildren &&
 		a.level === b.level &&

@@ -5,8 +5,8 @@ import { InfiniteRowModelController, type InfiniteDatasource } from '../infinite
 import { ServerSideRowModelController, type ServerSideDatasource } from '../serverSideRowModel.js';
 import { GridEventName } from '../api/GridEvents.js';
 import { createEmptyQueryModel, isQueryModelActive, countQueryNodes } from './GridQueryModel.js';
+import type { FilterCondition } from '../filterModel.js';
 import { evaluateQueryModel, applyQueryModelFilter, createQueryEvaluationContext } from './evaluateQueryModel.js';
-import { getQueryOperatorsForType } from './queryOperatorRegistry.js';
 import type { GridQueryGroup, GridQueryModel } from './GridQueryModel.js';
 import type { ColumnDef } from '../columnDef.js';
 import { RowNode } from '../rowNode.js';
@@ -23,10 +23,10 @@ interface TestRow {
 
 const COLUMNS: ColumnDef<TestRow>[] = [
 	{ field: 'id', header: 'ID' },
-	{ field: 'name', header: 'Name', filterType: 'text' },
-	{ field: 'salary', header: 'Salary', filterType: 'number' },
-	{ field: 'hireDate', header: 'Hire Date', filterType: 'date' },
-	{ field: 'dept', header: 'Dept', filterType: 'set' },
+	{ field: 'name', header: 'Name', filterDef: { type: 'text' } },
+	{ field: 'salary', header: 'Salary', filterDef: { type: 'number' } },
+	{ field: 'hireDate', header: 'Hire Date', filterDef: { type: 'date' } },
+	{ field: 'dept', header: 'Dept', filterDef: { type: 'select' } },
 ];
 
 const ROWS: TestRow[] = [
@@ -72,8 +72,16 @@ function orGroup(children: GridQueryGroup['children']): GridQueryGroup {
 	return { kind: 'group', id: uid(), operator: 'or', children };
 }
 
+/** A condition on a test column, as a filter condition of that column's filter type. */
 function cond(columnId: string, operator: string, value?: unknown, valueTo?: unknown): GridQueryGroup['children'][number] {
-	return { kind: 'condition', id: uid(), columnId, operator, value, valueTo };
+	let filter: FilterCondition;
+	if (columnId === 'salary')
+		filter = { type: 'number', operator: operator as 'gt', value: value as number, valueTo: valueTo as number | undefined };
+	else if (columnId === 'hireDate')
+		filter = { type: 'date', operator: operator as 'after', dateFrom: String(value ?? ''), dateTo: valueTo as string | undefined };
+	else if (columnId === 'dept') filter = { type: 'select', values: value as string[], matchMode: operator === 'notIn' ? 'none' : 'any' };
+	else filter = { type: 'text', operator: operator as 'contains', value: String(value ?? '') };
+	return { kind: 'condition', id: uid(), columnId, filter };
 }
 
 function makeQuery(root: GridQueryGroup): GridQueryModel {

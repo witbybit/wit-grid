@@ -13,6 +13,9 @@ import type { SelectionPaintManager } from './selectionPaintManager.js';
 import { getMemoizedColumnTopology } from './columnTopology.js';
 import { doesCanonicalCellPointerMatchColumn } from '../interaction/cellPointer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
+import type { CellSlot } from './cellSlot.js';
+import { reportRendererFault } from './rendererFaults.js';
+import { classifyPostScrollRepairLane, type PostScrollRepairLaneKind } from './cellPresentationStateMachine.js';
 
 export interface RowCellBindRequest<TRowData = unknown> {
 	cellSlot: {
@@ -152,19 +155,28 @@ function isDirtyRepairQueueCurrent(
 	return true;
 }
 
-function classifyDirtyCellLane<TRowData>(cell: HTMLDivElement, columns: readonly ColumnDef<TRowData>[]): Exclude<PostScrollRepairLane, 'all'> {
-	const cs = (
-		cell as unknown as {
-			__cellSlot?: { colIndex: number; lastContentMode?: string };
-		}
-	).__cellSlot;
-	const colIndex = cs?.colIndex ?? -1;
-	const col = colIndex >= 0 ? columns[colIndex] : undefined;
-	if (col?.checkboxSelection) return 'fidelity';
-	if ((col as ColumnDef<TRowData> & { cellRenderer?: unknown })?.cellRenderer) return 'fidelity';
-	const lastContentMode = cs?.lastContentMode;
-	if (lastContentMode === 'portal' || lastContentMode === 'custom') return 'fidelity';
-	return 'motion';
+function getDirtyCellSlot(cell: HTMLDivElement): CellSlot | undefined {
+	return (cell as unknown as { __cellSlot?: CellSlot }).__cellSlot;
+}
+
+/**
+ * The dirty set holds physical elements that may be rebound or cold-released (column scrolled
+ * out, retention trim, pool shrink) while queued, so the lane is classified from what the slot
+ * presents now. A released slot classifies as motion and is dropped by the identity checks below.
+ */
+export function classifyDirtyCellLane<TRowData>(cell: HTMLDivElement, columns: readonly ColumnDef<TRowData>[]): PostScrollRepairLaneKind {
+	const cs = getDirtyCellSlot(cell);
+	const col = cs && cs.colIndex >= 0 ? (columns[cs.colIndex] as InternalColumnDef<TRowData> | undefined) : undefined;
+	return classifyPostScrollRepairLane({
+		hasCustomRenderer: !!col?.cellRenderer,
+		isCheckbox: !!col?.checkboxSelection,
+		contentMode: cs?.lastContentMode ?? 'empty',
+	});
+}
+
+function clearDirtyCellRepair(cell: HTMLDivElement): void {
+	const cs = getDirtyCellSlot(cell);
+	if (cs) cs.postScrollRepairReasons = 0;
 }
 
 function getDisplayedColumnIndexesForField<TRowData>(columns: readonly ColumnDef<TRowData>[], colField: string): number[] {
@@ -228,6 +240,15 @@ export function repaintInvalidatedRows<TRowData>(deps: RowRenderMaintenanceDeps<
 				isScrollFrameActive: false,
 				phase: 'initial',
 			});
+		}
+	}
+
+	// A group row's selection checkbox summarises rows that may be hidden beneath it (collapsed or
+	// filtered into a closed branch), so any row-selection change rebinds the visible group rows.
+	if (deps.rebindHierarchyRow && frame.reasons.includes('selection')) {
+		for (const [rowIndex, slot] of deps.activeRows) {
+			const row = rowModel.getVisualRow(rowIndex);
+			if (row?.kind === 'group' || row?.kind === 'total') deps.rebindHierarchyRow(slot, row, rowIndex);
 		}
 	}
 }
@@ -324,6 +345,7 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 
 	const rowModel = deps.engine.getVisualRowModel();
 	if (!rowModel) {
+		for (const cell of deps.dirtyCellsAfterScroll) clearDirtyCellRepair(cell);
 		deps.dirtyCellsAfterScroll.clear();
 		deps.dirtyRowsAfterScroll.clear();
 		return { remaining: 0, processed: 0, remainingMotion: 0, remainingFidelity: 0 };
@@ -417,17 +439,10 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 			continue;
 		}
 		deps.dirtyCellsAfterScroll.delete(cell);
-		const cs = (
-			cell as unknown as {
-				__cellSlot?: {
-					rowIndex: number;
-					colField?: string;
-					colIndex: number;
-					element: HTMLDivElement;
-				};
-			}
-		).__cellSlot;
-		if (!cs || cs.rowIndex < 0 || !cs.colField) continue;
+		const cs = getDirtyCellSlot(cell);
+		if (!cs) continue;
+		clearDirtyCellRepair(cell);
+		if (cs.rowIndex < 0 || !cs.colField) continue;
 
 		const rowIndex = cs.rowIndex;
 		const visualRow = rowModel.getVisualRow(rowIndex);
@@ -441,21 +456,27 @@ export function decorateDirtyCellsAfterScroll<TRowData>(
 
 			const laneCol = columns[colIndex] as InternalColumnDef<TRowData> | undefined;
 			const lane = (laneCol ? columnTopology.byColumnId.get(laneCol.instanceId) : undefined)?.lane ?? 'center';
-			deps.bindCellFull({
-				cellSlot,
-				slotId: slot.id,
-				slotGeneration: slot.generation,
-				node: visualRow.node,
-				rowIndex,
-				colIndex,
-				col: columns[colIndex],
-				lane,
-				pinRightBaseLeft,
-				plan,
-				state,
-				isScrollFrameActive: false,
-				phase: 'scroll-idle',
-			});
+			// The cell already left the queue, so a failing bind is reported once and the drain moves
+			// on: an exception escaping this idle slice would strand every repair queued behind it.
+			try {
+				deps.bindCellFull({
+					cellSlot,
+					slotId: slot.id,
+					slotGeneration: slot.generation,
+					node: visualRow.node,
+					rowIndex,
+					colIndex,
+					col: columns[colIndex],
+					lane,
+					pinRightBaseLeft,
+					plan,
+					state,
+					isScrollFrameActive: false,
+					phase: 'scroll-idle',
+				});
+			} catch (error) {
+				reportRendererFault(deps.engine, 'post-scroll-repair', error, { rowIndex, colIndex });
+			}
 			deps.incrementPostScrollDirtyCellsDecorated();
 			processed++;
 		} else if (visualRow?.kind === 'loading' && colIndex >= 0) {

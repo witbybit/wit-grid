@@ -22,8 +22,10 @@ import {
 	type WarmVisibleCellStatusDeps,
 } from './warmCellStatus.js';
 import { createRowCtrl, type RowCtrl } from './controllers/RowCtrl.js';
-import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell } from './binders/binderShared.js';
+import { applyCellTitlesAndValidation, buildCellPinClass, isOverscanLiveCell, markCellForPostScrollRepair } from './binders/binderShared.js';
+import { PostScrollRepairReason } from './cellPresentationStateMachine.js';
 import { reportRendererFault } from './rendererFaults.js';
+import { clearSelectionCheckbox, syncSelectionCheckbox } from './binders/checkboxCellBinder.js';
 
 /** Minimal mutable sink for cell-slot retention counters — see renderTelemetry.ts RenderRuntimeStats. */
 export interface CellSlotRetentionTelemetrySink {
@@ -172,6 +174,7 @@ function reconcileTopology<TRowData>(
 	for (const [instanceId, cell] of slot.cellsByColumnInstanceId) {
 		if (!newInstanceIds.has(instanceId)) {
 			releaseFn(cell);
+			cell.destroy();
 			if (cell.element.parentNode) cell.element.remove();
 			slot.cellsByColumnInstanceId.delete(instanceId);
 			instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);
@@ -549,7 +552,9 @@ function bindDataCell<TRowData>(
 		}
 	}
 	if (skip) {
-		if (needsVisibleRefresh) deps.markCellDirtyAfterScroll(cellSlot.element);
+		if (needsVisibleRefresh) {
+			markCellForPostScrollRepair(deps.cellBinderDeps, cellSlot, PostScrollRepairReason.WarmCell);
+		}
 		return;
 	}
 
@@ -786,11 +791,13 @@ function bindLoadingCell<TRowData>(row: LoadingRowBindState<TRowData>, cellSlot:
 	if (isScrollFrameActive) deps.onScrollCellVisited();
 	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
 	const cellWidth = plan.colWidths[c];
+	// A loading row has nothing to select yet; a recycled slot must not keep the previous row's box.
+	if (cellSlot.rowCheckbox) clearSelectionCheckbox(cellSlot);
 	const decorationSuffix = applyLoadingInsightState(deps, cellSlot, rowId, col.field);
 	const cellClassName = decorationSuffix ? LOADING_CELL_BASE_CLASS + decorationSuffix : LOADING_CELL_BASE_CLASS;
 	if (isScrollFrameActive) {
 		deps.onScrollCellPatched();
-		deps.markCellDirtyAfterScroll(cellSlot.element);
+		markCellForPostScrollRepair(deps.cellBinderDeps, cellSlot, PostScrollRepairReason.Loading);
 	} else {
 		deps.ensureLoadingSkeleton(cellSlot.element);
 	}
@@ -872,6 +879,37 @@ export function bindAllHierarchyRowCells<TRowData>(deps: RowCellBindingLaneDeps<
 	}
 }
 
+/**
+ * The checkbox-selection column on a group or total row. A group row gets a tri-state checkbox over
+ * every data row beneath it (nested and collapsed groups included); a click selects or deselects
+ * them all. Totals, and grids in single-selection mode, show no checkbox.
+ */
+function bindGroupSelectionCell<TRowData>(
+	deps: RowCellBindingLaneDeps<TRowData>,
+	request: BindAllHierarchyRowCellsRequest<TRowData>,
+	cellSlot: CellSlot<TRowData>,
+	colIndex: number,
+	lane: 'left' | 'center' | 'right',
+	left: number,
+	width: number
+): void {
+	const { row, rowIndex, columns, state, isScrollFrameActive } = request;
+	const col = columns[colIndex];
+	cellSlot.releaseContentMount();
+	cellSlot.hasAggregateText = false;
+	const selectable = row.kind === 'group' && state.rowSelection?.mode === 'multiple';
+	if (selectable) {
+		syncSelectionCheckbox(cellSlot, 'group', deps.engine.groupingFeature.getDescendantSelection(row.id).state, rowIndex);
+	} else {
+		clearSelectionCheckbox(cellSlot);
+	}
+	const focusClass = applyHierarchyCellFocus(deps, cellSlot, row.id, rowIndex, colIndex, col, state);
+	const className = `${buildCellPinClass(lane)} og-cell-row-selector og-cell-group-selector${focusClass}`;
+	const didWrite = cellSlot.update(colIndex, col.field, rowIndex, row.id, left, -1, width, className, 'custom', undefined, '', undefined);
+	cellSlot.lastMountedRowVersion = -1;
+	if (isScrollFrameActive && didWrite) deps.onScrollCellWritten();
+}
+
 function bindHierarchyRowCell<TRowData>(
 	deps: RowCellBindingLaneDeps<TRowData>,
 	request: BindAllHierarchyRowCellsRequest<TRowData>,
@@ -890,6 +928,10 @@ function bindHierarchyRowCell<TRowData>(
 	}
 	if (isScrollFrameActive) deps.onScrollCellVisited();
 	if (cellSlot.lastPortalKey) deps.releaseCellPortal(cellSlot.element);
+	if (col.checkboxSelection) {
+		bindGroupSelectionCell(deps, request, cellSlot, colIndex, lane, left, width);
+		return;
+	}
 	const value = row.aggregates[col.field];
 	let text = '';
 	if (value !== undefined && !col.checkboxSelection) {

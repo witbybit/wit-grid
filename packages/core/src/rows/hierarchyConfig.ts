@@ -1,3 +1,4 @@
+import type { DescendantSelectionState } from './hierarchyIndex.js';
 import type { GridRowDataRef } from '../publicRowRef.js';
 import type { GridApi } from '../api/GridApiSurfaces.js';
 import type { TotalPlacement, VisualRow } from '../visualRow.js';
@@ -191,7 +192,13 @@ export interface GroupRenderContext<TData = unknown> extends HierarchyCellContex
 	expandAll(): void;
 	/** Closes this group and every group beneath it. */
 	collapseAll(): void;
-	/** Selects or deselects every data row beneath this group (or tree parent). Read the state with `api.getDescendantSelection(ctx.id)`. */
+	/**
+	 * How much of this row is selected: for a group or tree parent, `all` / `some` / `none` of the data
+	 * rows beneath it (collapsed ones included); for a leaf, `all` or `none`. A renderer drawing its own
+	 * checkbox shows `some` as indeterminate. A new context is handed over when it changes.
+	 */
+	selection: DescendantSelectionState;
+	/** Selects or deselects every data row beneath this group (or tree parent). */
 	selectChildren(selected: boolean): void;
 }
 

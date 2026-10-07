@@ -141,6 +141,26 @@ describe('PortalMountManager', () => {
 		expect(mountRow).toHaveBeenCalledTimes(2);
 	});
 
+	it('a brand-new container whose first mount is deferred shows the label, never a blank cell', () => {
+		const manager = new PortalMountManager();
+		manager.maxRowMountsPerScrollFrame = 0;
+		manager.onMountRowContent = vi.fn();
+		manager.setRuntimeState(makeScrollingRuntimeState());
+		const container = document.createElement('div');
+		manager.mountRow({
+			rowKey: 'hierarchy-cell:7',
+			container,
+			visualRow: { kind: 'group', id: 'group:a', depth: 0, height: 40 } as never,
+			context: { label: 'EMEA' } as never,
+		});
+		expect(container.classList.contains('og-row-content-pending')).toBe(true);
+		expect(container.getAttribute('data-stand-in')).toBe('EMEA');
+
+		manager.flushDeferredRowMount('hierarchy-cell:7');
+		expect(container.classList.contains('og-row-content-pending')).toBe(false);
+		expect(manager.onMountRowContent).toHaveBeenCalledTimes(1);
+	});
+
 	it('defers row portal mounts and releases while scrolling when the budget is spent', () => {
 		const manager = new PortalMountManager();
 		manager.maxRowMountsPerScrollFrame = 0;

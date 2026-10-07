@@ -35,7 +35,7 @@ describe('HeaderPopoverMenu', () => {
 			columns: [
 				{ field: 'id', header: 'ID' },
 				{ field: 'name', header: 'Name' },
-				{ field: 'price', header: 'Price', filterType: 'number' },
+				{ field: 'price', header: 'Price', filterDef: { type: 'number' } },
 			],
 		});
 
@@ -128,60 +128,54 @@ describe('HeaderPopoverMenu', () => {
 		expect(store.getDataRowAtVisualIndex(2)?.name).toBe('Product A');
 	});
 
-	it('should apply and clear column filters', async () => {
+	it('applies a filter from the header menu, shows it on the funnel, and clears it from the funnel popover', async () => {
 		const priceCell = Array.from(container.querySelectorAll('.og-header-cell')).find(
 			(el) => (el as HTMLElement).dataset.colField === 'price'
 		) as HTMLElement;
 		const menuBtn = priceCell.querySelector('.og-header-menu-button') as HTMLDivElement;
 
-		// Open popover
+		// The menu embeds the column's filter editor: operator picker and value field.
 		menuBtn.click();
 		const popover = document.querySelector('.og-header-popover') as HTMLDivElement;
-
-		const select = popover.querySelector('.og-popover-select') as HTMLSelectElement;
-		const input = popover.querySelector('.og-popover-input') as HTMLInputElement;
-		const applyBtn = Array.from(popover.querySelectorAll('.og-popover-btn')).find((el) => el.textContent === 'Apply') as HTMLButtonElement;
-
-		expect(select).not.toBeNull();
-		expect(input).not.toBeNull();
-		expect(applyBtn).not.toBeNull();
-
-		// Filter for price > 150
-		select.value = 'gt';
+		const operator = popover.querySelector('.og-popover-filter-body .og-flt-op') as HTMLButtonElement;
+		expect(operator.textContent).toBe('Equals');
+		operator.click();
+		const greater = [...document.querySelectorAll<HTMLElement>('.og-ct-popover .og-ct-option')].find((el) =>
+			el.textContent?.includes('Greater than')
+		)!;
+		greater.click();
+		expect(operator.textContent).toBe('Greater than');
+		const input = popover.querySelector('.og-flt-input') as HTMLInputElement;
 		input.value = '150';
-		applyBtn.click();
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
 		await flushPendingPaint();
 
 		// Rows should be filtered: only C (300) and B (200) match
 		expect(store.getVisualRowCount()).toBe(2);
 		expect(store.getDataRowAtVisualIndex(0)?.price).toBe(300);
 		expect(store.getDataRowAtVisualIndex(1)?.price).toBe(200);
+		expect(store.getState().filterModel).toEqual({ price: { type: 'number', operator: 'gt', value: 150 } });
 
-		// The header's active-filter indicator must reflect the new filter as soon as the render
-		// pipeline's own paint scheduling flushes — no unrelated event (a later click, a focus
-		// change) should be required to nudge a repaint.
-		const filterIndicator = priceCell.querySelector('.og-header-filter-indicator') as HTMLDivElement;
-		expect(filterIndicator).not.toBeNull();
-		expect(filterIndicator.style.display).toBe('flex');
+		// The funnel shows the active filter as soon as the paint pipeline flushes.
+		const funnel = priceCell.querySelector('.og-header-filter-button') as HTMLDivElement;
+		expect(funnel.style.display).toBe('flex');
+		expect(funnel.hasAttribute('data-active')).toBe(true);
 
-		// Open popover again and verify existing query is populated
+		// Reopening the menu shows the filter as set.
 		menuBtn.click();
 		const nextPopover = document.querySelector('.og-header-popover') as HTMLDivElement;
-		const nextSelect = nextPopover.querySelector('.og-popover-select') as HTMLSelectElement;
-		const nextInput = nextPopover.querySelector('.og-popover-input') as HTMLInputElement;
-		expect(nextSelect.value).toBe('gt');
-		expect(nextInput.value).toBe('150');
+		expect(nextPopover.querySelector('.og-flt-op')!.textContent).toBe('Greater than');
+		expect((nextPopover.querySelector('.og-flt-input') as HTMLInputElement).value).toBe('150');
+		menuBtn.click();
 
-		// Click clear filter
-		const clearBtn = Array.from(nextPopover.querySelectorAll('.og-popover-btn')).find((el) => el.textContent === 'Clear') as HTMLButtonElement;
-		expect(clearBtn).not.toBeNull();
-		clearBtn.click();
+		// The funnel opens the filter popover; its Clear removes the filter.
+		funnel.click();
+		const panel = document.querySelector('.og-flt-panel') as HTMLElement;
+		expect(panel.querySelector('.og-flt-panel-title')!.textContent).toBe('Filter · Price');
+		[...panel.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === 'Clear')!.click();
 		await flushPendingPaint();
-
-		// Rows should be restored
 		expect(store.getVisualRowCount()).toBe(3);
-		// Indicator must clear as soon as the paint pipeline flushes — same requirement as above.
-		expect(filterIndicator.style.display).toBe('none');
+		expect(funnel.hasAttribute('data-active')).toBe(false);
 	});
 
 	it('should support custom headerMenuRenderer in ColumnDef', () => {

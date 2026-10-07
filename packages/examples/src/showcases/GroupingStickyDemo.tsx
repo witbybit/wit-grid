@@ -6,11 +6,13 @@
  *   - rows pinned to the top / bottom (api.transaction({ pins })) stay put natively too
  *   - one group renderer for full-width rows, the hierarchy cell and the stuck copy (ctx.isStuck)
  *   - display: 'column' | 'columns' | 'row', depth 1-3, aggregates and a grand total
+ *   - checkbox selection across groups: a group's tri-state checkbox selects every order beneath it,
+ *     nested and collapsed groups included; ctx.selection drives the custom renderer's Select toggle
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Grid, GroupCount, GroupToggle } from '@eregister/wit-grid-react';
 import type { AggregationDef, ColumnDef, GridApi, GridInitialState, GridReadyEvent, GroupRenderContext } from '@eregister/wit-grid-react';
-import { ChevronsDownUp, ChevronsUpDown, Layers, Pin, Sparkles } from 'lucide-react';
+import { CheckSquare, ChevronsDownUp, ChevronsUpDown, Layers, Pin, Sparkles, X } from 'lucide-react';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
 
@@ -89,6 +91,9 @@ function levelMaxRevenue(rows: OrderRow[]): number[] {
 
 const ORDERS = generateOrders(ROW_COUNT);
 const LEVEL_MAX = levelMaxRevenue(ORDERS);
+const REGIONS = Object.keys(COUNTRIES);
+const REGION_OF = new Map(ORDERS.map((order) => [order.id, order.region]));
+const JAPAN_ORDER_IDS = ORDERS.filter((order) => order.country === 'Japan').map((order) => order.id);
 
 const money = (value: unknown) => (typeof value === 'number' ? `$${Math.round(value).toLocaleString('en-US')}` : '');
 const compactMoney = (value: unknown) => {
@@ -145,6 +150,11 @@ function GroupRenderer(ctx: GroupRenderContext<OrderRow>) {
 				<GroupToggle ctx={ctx} />
 				<span className={`h-2 w-2 rounded-full ${LEVEL_TINT[ctx.level % 3]}`} />
 				<span className='font-bold text-slate-100'>{ctx.label}</span>
+				{ctx.selection !== 'none' && (
+					<span className='rounded bg-purple-600/30 px-1 text-[9px] font-bold uppercase tracking-wider text-purple-200'>
+						{ctx.selection === 'all' ? 'selected' : 'partly'}
+					</span>
+				)}
 				<span className='ml-auto font-mono font-bold text-slate-300'>{compactMoney(revenue)}</span>
 			</div>
 		);
@@ -168,8 +178,13 @@ function GroupRenderer(ctx: GroupRenderContext<OrderRow>) {
 				<button type='button' className={btn} onClick={onClick(ctx.collapseAll)}>
 					Collapse
 				</button>
-				<button type='button' className={btn} onClick={onClick(() => ctx.selectChildren(true))}>
-					Select
+				<button
+					type='button'
+					aria-pressed={ctx.selection === 'all'}
+					className={`${btn} ${ctx.selection === 'all' ? '!border-purple-500 !bg-purple-600 !text-white' : ctx.selection === 'some' ? '!border-purple-500/70 !text-purple-200' : ''}`}
+					onClick={onClick(() => ctx.selectChildren(ctx.selection !== 'all'))}
+				>
+					{ctx.selection === 'all' ? 'Selected' : ctx.selection === 'some' ? 'Select rest' : 'Select'}
 				</button>
 			</div>
 		</div>
@@ -231,7 +246,17 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 	const [pinTop, setPinTop] = useState(0);
 	const [pinBottom, setPinBottom] = useState(1);
 	const [custom, setCustom] = useState(true);
+	const [groupBox, setGroupBox] = useState(false);
+	const [selectedIds, setSelectedIds] = useState<readonly string[]>([]);
 	const apiRef = useRef<GridApi<OrderRow> | null>(null);
+	// The grid remounts per display mode, so the selection readout follows whichever grid is current.
+	const [readyApi, setReadyApi] = useState<GridApi<OrderRow> | null>(null);
+	useEffect(() => {
+		if (!readyApi) return;
+		const read = () => setSelectedIds(readyApi.getStateSnapshot().selectedRowIds);
+		read();
+		return readyApi.subscribeToKey('selectedRowIds', read);
+	}, [readyApi]);
 
 	const grouping = useMemo<NonNullable<Partial<GridInitialState<OrderRow>>['grouping']>>(
 		() => ({
@@ -251,10 +276,10 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 			header: 'Group',
 			width: 320,
 			indentPerLevel: 18,
-			show: { toggle: true, checkbox: false, count: true },
+			show: { toggle: true, checkbox: groupBox, count: true },
 			...(display !== 'row' && custom ? { renderer: REACT_RENDERER } : {}),
 		}),
-		[display, custom]
+		[display, custom, groupBox]
 	);
 
 	// What the grid was built with: later changes are applied live, without remounting.
@@ -276,10 +301,20 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 
 	const handleReady = useCallback((e: GridReadyEvent<OrderRow>) => {
 		apiRef.current = e.api;
+		setReadyApi(e.api);
 		apiDisplay.current = latest.current.display;
 		applied.current = { grouping: latest.current.grouping, hierarchyColumn: latest.current.hierarchyColumn };
 		e.api.transaction({ pins: { top: latest.current.pinTop, bottom: latest.current.pinBottom } });
 	}, []);
+
+	const selectedByRegion = useMemo(() => {
+		const counts = new Map<string, number>();
+		for (const id of selectedIds) {
+			const region = REGION_OF.get(id);
+			if (region) counts.set(region, (counts.get(region) ?? 0) + 1);
+		}
+		return counts;
+	}, [selectedIds]);
 
 	useEffect(() => {
 		const api = apiRef.current;
@@ -327,6 +362,15 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 					options={[
 						{ value: false, label: 'Built-in' },
 						{ value: true, label: 'Custom React' },
+					]}
+				/>
+				<Segmented
+					label='Group checkbox'
+					value={groupBox}
+					onChange={setGroupBox}
+					options={[
+						{ value: false, label: 'Selection column' },
+						{ value: true, label: '+ Group column' },
 					]}
 				/>
 				<div className='flex items-center gap-1.5 border-l border-slate-800 pl-5'>
@@ -399,6 +443,54 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 				</div>
 			</div>
 
+			<div className='flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-900 bg-slate-950/60 px-4 py-2'>
+				<span className='flex items-center gap-1.5 text-[11px] font-bold text-slate-200'>
+					<CheckSquare className='h-3.5 w-3.5 text-purple-400' />
+					<span className='font-mono tabular-nums'>{selectedIds.length.toLocaleString('en-US')}</span>
+					<span className='font-medium text-slate-500'>of {ROW_COUNT.toLocaleString('en-US')} orders selected</span>
+				</span>
+				<div className='flex flex-wrap items-center gap-1.5'>
+					{REGIONS.map((region) => {
+						const count = selectedByRegion.get(region) ?? 0;
+						return (
+							<span
+								key={region}
+								className={`rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold tabular-nums ${
+									count > 0 ? 'border-purple-500/40 bg-purple-500/10 text-purple-200' : 'border-slate-800 text-slate-600'
+								}`}
+							>
+								{region} {count.toLocaleString('en-US')}
+							</span>
+						);
+					})}
+				</div>
+				<div className='ml-auto flex flex-wrap items-center gap-1.5'>
+					{[
+						{ label: 'Select all', run: () => apiRef.current?.selectAllRows({ scope: 'filtered' }) },
+						{ label: 'Select EMEA group', run: () => apiRef.current?.setDescendantsSelected('group:region=EMEA', true) },
+						{ label: 'Add Japan orders', run: () => apiRef.current?.selectRows(JAPAN_ORDER_IDS) },
+					].map((action) => (
+						<button
+							key={action.label}
+							type='button'
+							onClick={action.run}
+							className='rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-[11px] font-bold text-slate-300 transition hover:border-purple-500/50 hover:text-white'
+						>
+							{action.label}
+						</button>
+					))}
+					<button
+						type='button'
+						onClick={() => apiRef.current?.clearRowSelection()}
+						disabled={selectedIds.length === 0}
+						className='flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1 text-[11px] font-bold text-slate-400 transition hover:text-white disabled:opacity-40'
+					>
+						<X className='h-3 w-3' />
+						Clear
+					</button>
+				</div>
+			</div>
+
 			{!compact && (
 				<div className='flex shrink-0 items-start gap-2 rounded-lg border border-slate-900 bg-slate-950/40 px-3 py-2 text-[11px] leading-relaxed text-slate-400'>
 					<Sparkles className='mt-0.5 h-3.5 w-3.5 shrink-0 text-purple-400' />
@@ -407,7 +499,10 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 						with its parents, and is pushed up when its group ends. This is native sticky positioning, so it moves with the scroll on the
 						GPU with no JavaScript per frame. Pinned rows sit above and below the stack. The custom renderer is one component for
 						full-width rows, the group column and the stuck copy, which gets a compact layout through{' '}
-						<code className='text-indigo-300'>ctx.isStuck</code>.
+						<code className='text-indigo-300'>ctx.isStuck</code>. Selection works across groups: tick a group to select every order
+						beneath it, nested and collapsed groups included. A partly selected group shows a dash, and the renderer reads it from{' '}
+						<code className='text-indigo-300'>ctx.selection</code>. Shift-click selects a range across group headers; Ctrl/Cmd-click
+						toggles one order.
 					</span>
 				</div>
 			)}
@@ -419,7 +514,7 @@ export default function GroupingStickyDemo({ compact = false }: Props = {}) {
 					rows={ORDERS}
 					columns={COLUMNS}
 					getRowId={(row) => row.id}
-					rowSelection='multiple'
+					rowSelection={{ mode: 'multiple', selectAllScope: 'filtered' }}
 					initialState={initialState}
 					pinTopRows={pinTop}
 					pinBottomRows={pinBottom}

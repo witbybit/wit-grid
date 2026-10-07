@@ -7,6 +7,7 @@ import type { ScrollCellPresentation } from '../scrollCellPresentation.js';
 import { dispatchCellPresentation } from './cellPresentationDispatcher.js';
 import { createCellCtrl } from '../controllers/CellCtrl.js';
 import { getColumnInstanceIdentity } from '../../columnDef.js';
+import { PostScrollRepairReason, presentationNeedsPostScrollRepair } from '../cellPresentationStateMachine.js';
 
 /**
  * One golden test per mode per lane (4 modes x 3 lanes = 12) — proves cellPresentationDispatcher.ts
@@ -127,13 +128,11 @@ function makeDispatchInput(
 		className: presentation.className,
 		title: 'title' in presentation ? (presentation.title ?? null) : null,
 		validationError: 'validationError' in presentation ? presentation.validationError : undefined,
-		requiresFidelity: false,
+		needsPostScrollRepair: presentationNeedsPostScrollRepair(presentation.kind, 'markDirty' in presentation ? presentation.markDirty : false),
 		freshness: cellCtrl.freshness!,
 		contentMode: 'contentMode' in presentation ? presentation.contentMode : undefined,
 		formattedValue: 'formattedValue' in presentation ? presentation.formattedValue : undefined,
 		portalKey: 'portalCellKey' in presentation ? presentation.portalCellKey : 'portalKey' in presentation ? presentation.portalKey : undefined,
-		markDirty:
-			'markDirty' in presentation ? presentation.markDirty : 'shouldMarkDirty' in presentation ? presentation.shouldMarkDirty : undefined,
 		isEditing: 'isEditing' in presentation ? presentation.isEditing : false,
 		isFocused: 'isFocused' in presentation ? presentation.isFocused : false,
 		forceLiveInteractive: 'forceLiveInteractive' in presentation ? presentation.forceLiveInteractive : undefined,
@@ -209,9 +208,11 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			};
 			dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 			expect(request.cellSlot.lastContentMode).toBe('text');
+			expect(request.cellSlot.binding).toMatchObject({ rowSlotId: 'slot-1', rowId: 'r1', rowIndex: 0, colId: 'name', colIndex: 0 });
 			expect(request.cellSlot.lastFormattedValue).toBe('hello');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
+			expect(request.cellSlot.postScrollRepairReasons).toBe(PostScrollRepairReason.Presentation);
 		});
 
 		it(`live mode (${lane}): mounts the real renderer immediately`, () => {
@@ -271,6 +272,7 @@ describe('cellPresentationDispatcher — one golden test per mode per lane', () 
 			};
 			dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1));
 			expect(deps.markCellDirtyAfterScroll).toHaveBeenCalledWith(request.cellSlot.element);
+			expect(request.cellSlot.postScrollRepairReasons).toBe(PostScrollRepairReason.Presentation);
 			expect(deps.portalMountManager.mountCellImmediately).not.toHaveBeenCalled();
 			expect(request.cellSlot.lastFormattedValue).toBe('★ chip');
 			expect(request.cellSlot.lastClassName).toBe(laneClass[lane]);
@@ -402,6 +404,91 @@ describe('cellPresentationDispatcher — editing/focused/loading/rebind flag thr
 		dispatchCellPresentation(makeDispatchInput(deps, request, presentation, 1, { dragShift: 24 }));
 		expect(request.cellSlot.lastShift).toBe(24);
 		expect(request.cellSlot.element.style.transform).toContain('translateX(24px)');
+	});
+});
+
+describe('cellPresentationDispatcher — seeded physical transition sequences', () => {
+	it('keeps DOM mode, portal ownership, and repair intent aligned through rebinds', () => {
+		const kinds = ['primitive', 'stand-in', 'frozen-portal', 'live-renderer'] as const;
+		for (let seed = 1; seed <= 16; seed++) {
+			const deps = makeDeps();
+			const request = makeRequest('center');
+			let random = seed;
+			let heldPortalKey: string | undefined;
+			let expectedReleaseCount = 0;
+
+			for (let step = 0; step < 32; step++) {
+				random = (random * 1103515245 + 12345) >>> 0;
+				const kind = kinds[random % kinds.length];
+				const portalKey = kind === 'live-renderer' || kind === 'frozen-portal' ? `portal-${(random >>> 9) % 3}` : undefined;
+				if ((random & 8) !== 0) {
+					request.cellSlot.unbindHot();
+					request.rowIndex = step;
+					request.node = { id: `r${step}`, data: { id: `r${step}`, name: `Name ${step}` } } as any;
+				}
+
+				let state: ScrollCellPresentation;
+				if (kind === 'primitive') {
+					state = {
+						kind,
+						className: 'og-cell',
+						contentMode: 'text',
+						formattedValue: `value-${step}`,
+						markDirty: true,
+						title: null,
+						validationError: undefined,
+						recordVersionsFrom: undefined,
+					};
+				} else if (kind === 'stand-in') {
+					state = {
+						kind,
+						className: 'og-cell',
+						contentMode: 'fallback',
+						formattedValue: `fallback-${step}`,
+						recordVersions: undefined,
+						title: null,
+						validationError: undefined,
+					};
+				} else if (kind === 'frozen-portal') {
+					state = {
+						kind,
+						className: 'og-cell',
+						portalCellKey: portalKey!,
+						title: null,
+						validationError: undefined,
+						markDirty: true,
+						keepVersionFresh: false,
+						recordVersionsFrom: undefined,
+					};
+				} else {
+					state = {
+						kind,
+						className: 'og-cell',
+						portalCellKey: portalKey!,
+						isEditing: (random & 16) !== 0,
+						isFocused: (random & 32) !== 0,
+						forceLiveInteractive: false,
+						recordVersionsFrom: undefined,
+						title: null,
+						validationError: undefined,
+					};
+				}
+
+				if (heldPortalKey && heldPortalKey !== portalKey) expectedReleaseCount++;
+				dispatchCellPresentation(makeDispatchInput(deps, request, state, step + 1));
+
+				expect(request.cellSlot.lastContentMode, `seed ${seed}, step ${step}`).toBe(
+					portalKey ? 'portal' : kind === 'stand-in' ? 'fallback' : 'text'
+				);
+				expect(request.cellSlot.lastPortalKey, `seed ${seed}, step ${step}`).toBe(portalKey);
+				expect(deps.releaseCellPortal, `seed ${seed}, step ${step}`).toHaveBeenCalledTimes(expectedReleaseCount);
+				// The slot records why it was queued; it never stores a lane that could go stale.
+				expect(request.cellSlot.postScrollRepairReasons !== 0, `seed ${seed}, step ${step}`).toBe(
+					deps.markCellDirtyAfterScroll.mock.calls.length > 0
+				);
+				heldPortalKey = portalKey;
+			}
+		}
 	});
 });
 

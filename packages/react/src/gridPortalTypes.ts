@@ -68,6 +68,14 @@ export interface CellPortalSnapshot<TRowData = unknown> {
 export interface RowMenuPortalSnapshot<TRowData = unknown> {
 	rowPortalList: RowPortalData<TRowData>[];
 	menuPortalList: MenuPortalData<TRowData>[];
+	filterPortalList: FilterPortalData[];
+}
+
+/** A custom filter component (`filterDef.renderFilter`) shown on one of the grid's filter surfaces. */
+export interface FilterPortalData {
+	key: string;
+	container: HTMLElement;
+	node: unknown;
 }
 
 export interface RowPortalData<TRowData = unknown> {

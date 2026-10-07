@@ -1,6 +1,13 @@
 import { recordCellSlotMountedVisualVersions, type CellContentMode } from '../cellSlot.js';
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	markCellForPostScrollRepair,
+	recordDispatchWrite,
+	stampMountedVersions,
+} from './binderShared.js';
+import { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 /**
  * The `text` render state: every outcome that writes a string (or a placeholder mode) into the
@@ -18,7 +25,6 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 	let text = presentation.formattedValue ?? '';
 	let value: unknown = undefined;
 	let portalKey: string | undefined = undefined;
-	let markDirty: boolean;
 	/** stamp: versions from a snapshot/freshness; mounted: record this bind as the mounted version. */
 	let versions: 'stamp' | 'mounted' | 'none';
 
@@ -26,31 +32,29 @@ export function applyTextCellPresentation<TRowData>(input: DispatchCellPresentat
 		case 'buffered':
 			contentMode = presentation.contentMode ?? 'empty';
 			portalKey = presentation.portalKey;
-			markDirty = false;
 			versions = 'stamp';
 			break;
 		case 'primitive':
 			contentMode = presentation.contentMode ?? 'text';
-			markDirty = !!presentation.markDirty;
 			versions = 'stamp';
 			break;
 		case 'loading':
 			deps.cellRenderer.ensureLoadingSkeleton(cellSlot.element);
 			contentMode = 'loading';
 			value = cellCtrl.valueState.value;
-			markDirty = false;
 			versions = 'none';
 			break;
 		case 'stand-in':
 			contentMode = presentation.contentMode ?? 'fallback';
-			markDirty = true;
 			versions = 'mounted';
 			break;
 		default:
 			throw new Error(`applyTextCellPresentation: '${presentation.kind}' is not a text render state`);
 	}
 
-	if (isScroll && markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
+	if (isScroll && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
+	}
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
 	const didWrite = cellSlot.update(

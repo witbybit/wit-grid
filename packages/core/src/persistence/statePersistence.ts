@@ -4,6 +4,7 @@ import type { ColumnDef } from '../columnDef.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
 import type { SortModel, FilterModel } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
+import { restoreFilterModel } from '../filterOperations.js';
 import { isBuiltInThemeName, type BuiltInThemeName } from '../renderer/themes.js';
 
 /**
@@ -446,7 +447,7 @@ export function applyPersistedState<TRowData>(
 
 	// Filter model
 	if (serializedState.filterModel !== undefined) {
-		result.filterModel = serializedState.filterModel as GridInitialState<TRowData>['filterModel'];
+		result.filterModel = restoreFilterModel(serializedState.filterModel, knownFields) as GridInitialState<TRowData>['filterModel'];
 	}
 	if (serializedState.queryModel !== undefined) {
 		result.queryModel = serializedState.queryModel as GridInitialState<TRowData>['queryModel'];
@@ -650,7 +651,7 @@ export function preparePersistedGridStateRestore<TRowData>(
 		}
 	}
 	if (s.filterModel !== undefined) {
-		stateMutation.filterModel = s.filterModel as FilterModel | null;
+		stateMutation.filterModel = restoreFilterModel(s.filterModel, knownFields);
 	}
 	if (s.queryModel !== undefined) {
 		stateMutation.queryModel = s.queryModel ?? null;

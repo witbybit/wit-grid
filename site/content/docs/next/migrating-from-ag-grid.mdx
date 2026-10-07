@@ -45,23 +45,23 @@ Two shape differences that trip people up on the first pass:
 
 ## Column definitions
 
-| AG Grid                                 | Wit Grid                                     | Notes                                                                                                 |
-| --------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `field`                                 | `field`                                      | Same. Dot paths for nested data work the same way.                                                    |
-| `headerName`                            | `header`                                     | Renamed.                                                                                              |
-| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`            | Same.                                                                                                 |
-| `sortable`                              | `sortable`                                   | Same.                                                                                                 |
-| `filter: true \| 'agTextColumnFilter'`  | `filterType: 'text'` or `filterDef: {...}`   | `filterDef` is the rich version — multi-select, async, custom. See [Filtering](/docs/next/filtering). |
-| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`  | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api).          |
-| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`  | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form.        |
-| `cellEditor`                            | `cellEditor`                                 | Same idea — a component, not a class.                                                                 |
-| `valueGetter`                           | `valueGetter`                                | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                                  |
-| `valueFormatter`                        | `valueFormatter`                             | Same idea.                                                                                            |
-| `valueSetter`                           | `valueSetter`                                | Return `false` to reject a commit (same convention as AG Grid).                                       |
-| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                  | Same.                                                                                                 |
-| `checkboxSelection`                     | `checkboxSelection`                          | Same.                                                                                                 |
-| `rowGroup: true` (per column)           | `initialState.grouping.by` (grid-level)      | **Different model** — see [Grouping](#row-grouping--aggregation) below.                               |
-| `aggFunc` (per column)                  | `initialState.aggregation.defs` (grid-level) | Same built-in names (`sum`/`avg`/`min`/`max`/`count`/`first`/`last`), different location.             |
+| AG Grid                                 | Wit Grid                                     | Notes                                                                                                                                                  |
+| --------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `field`                                 | `field`                                      | Same. Dot paths for nested data work the same way.                                                                                                     |
+| `headerName`                            | `header`                                     | Renamed.                                                                                                                                               |
+| `width` / `minWidth` / `maxWidth`       | `width` / `minWidth` / `maxWidth`            | Same.                                                                                                                                                  |
+| `sortable`                              | `sortable`                                   | Same.                                                                                                                                                  |
+| `filter: true \| 'agTextColumnFilter'`  | `filterDef: { type: 'text' }` (the default)  | Also `number`, `date`, `select` (options, server-loaded, list cells), `boolean`, `dateRange`, `path`, `custom`. See [Filtering](/docs/next/filtering). |
+| `editable: boolean \| (params) => bool` | `canEdit: (params) => GridCapabilityResult`  | Capability-callback shaped, not a plain boolean return. See [Grid API](/docs/next/grid-api).                                                           |
+| `cellRenderer`                          | `cellRenderer` or `renderer: { kind, ... }`  | `cellRenderer` takes a component with the same shape; `renderer` is the lower-level spec form.                                                         |
+| `cellEditor`                            | `cellEditor`                                 | Same idea — a component, not a class.                                                                                                                  |
+| `valueGetter`                           | `valueGetter`                                | Same idea; params shape differs slightly (`{ row }` not `{ data }`).                                                                                   |
+| `valueFormatter`                        | `valueFormatter`                             | Same idea.                                                                                                                                             |
+| `valueSetter`                           | `valueSetter`                                | Return `false` to reject a commit (same convention as AG Grid).                                                                                        |
+| `pinned: 'left' \| 'right'`             | `pinned: 'left' \| 'right'`                  | Same.                                                                                                                                                  |
+| `checkboxSelection`                     | `checkboxSelection`                          | Same.                                                                                                                                                  |
+| `rowGroup: true` (per column)           | `initialState.grouping.by` (grid-level)      | **Different model** — see [Grouping](#row-grouping--aggregation) below.                                                                                |
+| `aggFunc` (per column)                  | `initialState.aggregation.defs` (grid-level) | Same built-in names (`sum`/`avg`/`min`/`max`/`count`/`first`/`last`), different location.                                                              |
 
 See the full column shape in [Columns](/docs/next/columns).
 

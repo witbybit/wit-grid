@@ -1,5 +1,12 @@
 import type { DispatchCellPresentationInput } from './cellPresentationDispatcher.js';
-import { applyCellAccessibilityState, applyCellTitlesAndValidation, recordDispatchWrite, stampMountedVersions } from './binderShared.js';
+import {
+	applyCellAccessibilityState,
+	applyCellTitlesAndValidation,
+	markCellForPostScrollRepair,
+	recordDispatchWrite,
+	stampMountedVersions,
+} from './binderShared.js';
+import { PostScrollRepairReason } from '../cellPresentationStateMachine.js';
 
 /**
  * The `snapshot` render state: the cell shows its last rendered custom content without a live
@@ -16,7 +23,9 @@ export function applySnapshotCellPresentation<TRowData>(input: DispatchCellPrese
 	deps.cellRenderer.showPortalContent(cellSlot.element);
 	applyCellTitlesAndValidation(cellSlot, presentation.title ?? null, '', presentation.validationError);
 	applyCellAccessibilityState(cellSlot, cellCtrl);
-	if (input.phase === 'scroll' && presentation.markDirty) deps.markCellDirtyAfterScroll(cellSlot.element);
+	if (input.phase === 'scroll' && presentation.needsPostScrollRepair) {
+		markCellForPostScrollRepair(deps, cellSlot, PostScrollRepairReason.Presentation);
+	}
 
 	const didWrite = cellSlot.update(
 		geometry.colIndex,

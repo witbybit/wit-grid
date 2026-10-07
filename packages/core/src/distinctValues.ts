@@ -1,15 +1,26 @@
+import { parseMultiValue } from './cells/format.js';
 import type { RowNode } from './rowNode.js';
 
 export interface GridDistinctValueSummary {
 	readonly values: readonly (string | number | null)[];
+	/** Rows holding each value, parallel to `values`. */
+	readonly counts: readonly number[];
 	readonly truncated: boolean;
 	readonly limit: number | null;
 }
 
 export interface DistinctValueComputationOptions {
 	readonly maxValues?: number;
+	/** Reads a node's value (the column's getter); default the field of its data. */
+	readonly getter?: (node: RowNode<any>) => unknown;
+	/** Cells hold lists (multi-select, tags, people): count each value, arrays and comma-separated alike. */
+	readonly listValues?: boolean;
 }
 
+/**
+ * The distinct values of a column with how many rows hold each, sorted (blank first). A list cell
+ * (an array: multi-select, tags, people) counts once for each value it holds.
+ */
 export function computeDistinctValueSummary<TRowData>(
 	nodes: readonly RowNode<TRowData>[],
 	colField: string,
@@ -17,36 +28,39 @@ export function computeDistinctValueSummary<TRowData>(
 ): GridDistinctValueSummary {
 	const rawLimit = options?.maxValues;
 	const limit = rawLimit !== undefined && Number.isFinite(rawLimit) && rawLimit > 0 ? Math.floor(rawLimit) : null;
-	const seen = new Set<string>();
-	const values: (string | number | null)[] = [];
+	const read =
+		options?.getter ?? ((node: RowNode<TRowData>) => node.getCellValue(colField, (d: unknown) => (d as Record<string, unknown>)[colField]));
+	const counts = new Map<string, { value: string | number | null; count: number }>();
 	let truncated = false;
 
-	for (const node of nodes) {
-		const raw = node.getCellValue(colField, (d: unknown) => (d as Record<string, unknown>)[colField]);
-		const key = raw == null || raw === '' ? '\0null' : String(raw);
-		if (seen.has(key)) continue;
-		seen.add(key);
-
-		if (limit !== null && values.length >= limit) {
+	const add = (raw: unknown) => {
+		const blank = raw == null || raw === '';
+		const key = blank ? '\0null' : String(raw);
+		const entry = counts.get(key);
+		if (entry) {
+			entry.count++;
+			return;
+		}
+		if (limit !== null && counts.size >= limit) {
 			truncated = true;
-			break;
+			return;
 		}
-
-		if (raw == null || raw === '') {
-			values.push(null);
-		} else {
-			values.push(typeof raw === 'number' ? raw : String(raw));
-		}
+		counts.set(key, { value: blank ? null : typeof raw === 'number' ? raw : String(raw), count: 1 });
+	};
+	for (const node of nodes) {
+		const raw = read(node);
+		const list = Array.isArray(raw) ? raw : options?.listValues && typeof raw === 'string' && raw !== '' ? parseMultiValue(raw) : null;
+		if (list) {
+			if (list.length === 0) add(null);
+			for (const item of list) add(item);
+		} else add(raw);
 	}
 
-	return {
-		values: values.sort((a, b) => {
-			if (a === null) return -1;
-			if (b === null) return 1;
-			if (typeof a === 'number' && typeof b === 'number') return a - b;
-			return String(a).localeCompare(String(b));
-		}),
-		truncated,
-		limit,
-	};
+	const entries = [...counts.values()].sort((a, b) => {
+		if (a.value === null) return -1;
+		if (b.value === null) return 1;
+		if (typeof a.value === 'number' && typeof b.value === 'number') return a.value - b.value;
+		return String(a.value).localeCompare(String(b.value));
+	});
+	return { values: entries.map((e) => e.value), counts: entries.map((e) => e.count), truncated, limit };
 }

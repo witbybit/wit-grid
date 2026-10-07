@@ -553,7 +553,10 @@ describe('native clipboard events (Ctrl+C / Ctrl+X / Ctrl+V)', () => {
 		store.selectCell({ rowId: '1', colField: 'name' });
 		store.selectRange({ rowId: '1', colField: 'name' }, { rowId: '2', colField: 'price' });
 		const dispatch = (event: ReturnType<typeof fakeEvent>) =>
-			(store as unknown as { interactionController: { dispatchInput(c: unknown): void } }).interactionController.dispatchInput({ kind: 'clipboard', event });
+			(store as unknown as { interactionController: { dispatchInput(c: unknown): void } }).interactionController.dispatchInput({
+				kind: 'clipboard',
+				event,
+			});
 		const values = () => (store.rows().getAll() as TestRow[]).map((row) => `${row.name}|${row.price}`);
 		return { store, dispatch, values };
 	}

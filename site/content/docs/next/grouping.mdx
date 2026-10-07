@@ -148,7 +148,10 @@ Group rows (`grouping.rowRenderer`, or the React adapter's `groupRowRenderer` / 
 (`hierarchyColumn.renderer`) and the stuck copy of a sticky header are all drawn with the same `GroupRenderContext`:
 the fields above plus `row`, `isTotal`, `isStuck`, `path`, `indentPx`, `label` and `count` (what the built-in cell would
 show), `api`, and actions bound to the row: `toggle()`, `setExpanded(open)`, `expandAll()` / `collapseAll()` for the
-group's subtree, and `selectChildren(selected)`. Read the selection state with `api.getDescendantSelection(ctx.id)`.
+group's subtree, and `selectChildren(selected)`. `ctx.selection` is how much of the row is selected: `'all'`, `'some'` or
+`'none'` of the data rows beneath a group (collapsed ones included), so a renderer can draw its own tri-state control;
+the renderer gets a new context when it changes. In a grouped grid the renderer draws group and total rows only: leaf
+rows keep the built-in cell. Tree rows are data rows, so tree grids draw every row with it.
 
 A renderer is either `{ kind: 'dom', renderer }` (`mount(container, ctx)` returns `{ update?(ctx), destroy? }` and runs
 synchronously in the grid) or `{ kind: 'react', component }`, rendered with the context as its props. A sticky header
@@ -178,7 +181,7 @@ function GroupRow(ctx: GroupRenderContext<Order>) {
 			<strong>{revenue.toLocaleString()}</strong>
 			<button onClick={ctx.expandAll}>Expand below</button>
 			<button onClick={ctx.collapseAll}>Collapse</button>
-			<button onClick={() => ctx.selectChildren(true)}>Select all</button>
+			<button onClick={() => ctx.selectChildren(ctx.selection !== 'all')}>{ctx.selection === 'all' ? 'Deselect' : 'Select all'}</button>
 		</div>
 	);
 }

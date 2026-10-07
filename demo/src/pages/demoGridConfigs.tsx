@@ -1,7 +1,7 @@
 import {
-	dropdownColumnType,
 	multiSelectColumnType,
 	numberColumnType,
+	selectColumnType,
 	type ColumnDef,
 	type FilterModel,
 	type GridApi,
@@ -531,11 +531,11 @@ export function createNativeColumns(): ColumnDef<any>[] {
 
 export function createNativeColumnTypes() {
 	return {
-		skills: multiSelectColumnType(['React', 'TypeScript', 'Node', 'Design', 'Testing', 'Data'], 2),
-		statusBadge: dropdownColumnType([
+		skills: multiSelectColumnType(['React', 'TypeScript', 'Node', 'Design', 'Testing', 'Data'], { maxVisible: 2 }),
+		statusBadge: selectColumnType([
 			{ value: 'Active', color: 'emerald' },
 			{ value: 'Pending', color: 'amber' },
-			{ value: 'Inactive', color: 'default' },
+			{ value: 'Inactive', color: 'gray' },
 		]),
 		score: numberColumnType({ min: 0, max: 100, step: 1, suffix: ' pts' }),
 	};

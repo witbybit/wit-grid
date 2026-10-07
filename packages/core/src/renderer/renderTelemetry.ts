@@ -4,6 +4,7 @@ import type { GridInvalidation } from './invalidationManager.js';
 import type { RowRenderer } from './rowRenderer.js';
 import { cellSlotWriteStats, resetCellSlotWriteStats } from './cellSlot.js';
 import { resetRowSlotWriteStats, rowSlotWriteStats } from './rowSlot.js';
+import { classifyDirtyCellLane } from './rowRenderMaintenance.js';
 
 export interface RenderStats {
 	rowSlotAssigns?: number;
@@ -87,6 +88,9 @@ export interface RenderStats {
 	cellClassComputesDuringScroll: number;
 	dirtyCellsMarkedDuringScroll: number;
 	postScrollDirtyCellsDecorated: number;
+	pendingPostScrollMotionRepairs: number;
+	pendingPostScrollFidelityRepairs: number;
+	pendingPostScrollRepairReasonBits: number;
 	reusableCellsSkippedDuringScroll: number;
 	styleHookCallsDuringScroll: number;
 	hotDomReleases: number;
@@ -230,6 +234,9 @@ export function createEmptyRenderStats(): RenderStats {
 		cellClassComputesDuringScroll: 0,
 		dirtyCellsMarkedDuringScroll: 0,
 		postScrollDirtyCellsDecorated: 0,
+		pendingPostScrollMotionRepairs: 0,
+		pendingPostScrollFidelityRepairs: 0,
+		pendingPostScrollRepairReasonBits: 0,
 		reusableCellsSkippedDuringScroll: 0,
 		styleHookCallsDuringScroll: 0,
 		integrityComputesDuringScroll: 0,
@@ -431,6 +438,17 @@ void everyRuntimeCounterIsReported;
 export function collectRenderStats<TRowData>(deps: RenderTelemetrySnapshotDeps<TRowData>): RenderStats {
 	const runtime = deps.runtimeStats;
 	const portalScrollStats = deps.portalMountManager.getScrollStats();
+	let pendingPostScrollMotionRepairs = 0;
+	let pendingPostScrollFidelityRepairs = 0;
+	let pendingPostScrollRepairReasonBits = 0;
+	const dirtyCells = deps.rowRenderer.dirtyCellsAfterScroll;
+	const columns = dirtyCells.size > 0 ? deps.engine.columns.getDisplayedColumns() : [];
+	for (const element of dirtyCells) {
+		if (classifyDirtyCellLane(element, columns) === 'fidelity') pendingPostScrollFidelityRepairs++;
+		else pendingPostScrollMotionRepairs++;
+		pendingPostScrollRepairReasonBits |=
+			(element as unknown as { __cellSlot?: { postScrollRepairReasons?: number } }).__cellSlot?.postScrollRepairReasons ?? 0;
+	}
 	return {
 		...runtime,
 		cellsPatchedPerScrollFrame: runtime.cellsPatchedPerScrollFrame.slice(),
@@ -449,6 +467,9 @@ export function collectRenderStats<TRowData>(deps: RenderTelemetrySnapshotDeps<T
 			deps.rowRenderer.currentScrollPortalOps + portalScrollStats.portalMountsDuringScroll + portalScrollStats.portalReleasesDuringScroll,
 		dirtyCellsMarkedDuringScroll: deps.rowRenderer.dirtyCellsMarkedDuringScroll,
 		postScrollDirtyCellsDecorated: deps.rowRenderer.postScrollDirtyCellsDecorated,
+		pendingPostScrollMotionRepairs,
+		pendingPostScrollFidelityRepairs,
+		pendingPostScrollRepairReasonBits,
 		compiledPlanVersion: deps.engine.columns.getCompiledPlanVersion(),
 		getCellValueCallsDuringScroll: deps.engine.getCellValueCallsDuringScroll,
 		valueGetterCallsDuringScroll: deps.engine.valueGetterCallsDuringScroll,

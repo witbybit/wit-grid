@@ -15,7 +15,6 @@ import type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 	CompoundFilterCondition,
 	TextFilterOperator,
 	NumberFilterOperator,
@@ -60,9 +59,9 @@ import type {
 	ServerSideGetRowsResult,
 	ServerSideStoreSnapshot,
 } from '@eregister/wit-grid-core';
-import type { ColumnTypeDefinition } from './renderers/CellTypes.js';
+import type { ColumnTypeDefinition } from '@eregister/wit-grid-core';
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from '@eregister/wit-grid-core';
-export type { ColumnTypeDefinition } from './renderers/CellTypes.js';
+export type { ColumnTypeDefinition } from '@eregister/wit-grid-core';
 export type { RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from '@eregister/wit-grid-core';
 export type {
 	GroupDef,
@@ -91,7 +90,6 @@ export type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 	CompoundFilterCondition,
 	TextFilterOperator,
 	NumberFilterOperator,
@@ -142,10 +140,9 @@ export type {
 	QueryDiagnostics,
 	QueryConditionDiagnostic,
 	QueryEvaluationContext,
-	QueryOperatorDefinition,
 	GridDistinctValueSummary,
 } from '@eregister/wit-grid-core';
-export { createEmptyQueryModel, isQueryModelActive, countQueryNodes, getQueryOperator, getQueryOperatorsForType } from '@eregister/wit-grid-core';
+export { createEmptyQueryModel, isQueryModelActive, countQueryNodes } from '@eregister/wit-grid-core';
 
 export type {
 	GridCapabilityAction,

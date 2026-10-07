@@ -46,7 +46,7 @@ export const PUBLIC_ENGINE_FORWARDS = forwardTable(
 	moveColumn setColumnReorderEnabled setSortModel setFilterModel setGroupBy addGroupBy removeGroupBy
 	moveGroupBy setShowGroupPanel setRowAnimation setShowFloatingFilters setShowFilterChipBar setStyleRules addEventListener
 	dispatchEvent setRowOrder flushTransactions subscribeToDomainVersions subscribeDomain getColumnIndex
-	getColumnField getColumnDef flushCellUpdatesSync undo redo`,
+	getColumnField getColumnDef flushCellUpdatesSync undo redo setQueryModel`,
 	{
 		getCellValue: 'getCellDisplayValue',
 		setColumnWidth: 'resizeColumn',
@@ -83,7 +83,7 @@ export const PUBLIC_ENGINE_FORWARDS = forwardTable(
 
 /** Forwards the store keeps for the renderer, the plugin runtime and the interaction controller only. */
 export const INTERNAL_ENGINE_FORWARDS = forwardTable(
-	`getState getCachedDisplayValue getCheapDisplayValue getComputedCellValue setRowOverscanPx setQueryModel
+	`getState getCachedDisplayValue getCheapDisplayValue getComputedCellValue setRowOverscanPx
 	registerRowModel getRowModel registerCellSubscription unregisterCellSubscription updateCellSubscription`,
 	{}
 );

@@ -6,12 +6,13 @@ import type { RowCellBinderDeps } from '../rowCellBinder.js';
 import type { RowNode } from '../../rowNode.js';
 import type { ViewportPlan } from '../viewportPlanner.js';
 import type { CellSlot } from '../cellSlot.js';
-import type { CellCtrlPresentationState } from '../controllers/CellCtrl.js';
 import { applyTextCellPresentation } from './textCellBinder.js';
 import { applyLiveCellPresentation } from './liveCellBinder.js';
 import { applySnapshotCellPresentation } from './snapshotCellBinder.js';
 import { applyCheckboxCellPresentation } from './checkboxCellBinder.js';
 import { getCellRendererLifecycle } from './binderShared.js';
+import { createCellPresentationTransition, planCellPresentationTransitionInto } from '../cellPresentationStateMachine.js';
+import { reportRendererFault } from '../rendererFaults.js';
 
 export interface CellBindGeometry {
 	rowIndex: number;
@@ -37,10 +38,9 @@ export interface CellBindRuntime<TRowData> {
 		isSelected: boolean;
 		renderPhase: CellRendererPhase;
 	};
+	/** Present for checkbox-selection columns on every bind phase, scroll included. */
 	checkbox?: {
 		checked: boolean;
-		ariaLabel: string;
-		title: string;
 	};
 }
 
@@ -56,45 +56,9 @@ export interface DispatchCellPresentationInput<TRowData> {
 	rowVersion: number;
 }
 
-/**
- * The four render states a cell can be in. Every presentation kind (a descriptive label the
- * resolver and telemetry use) belongs to exactly one:
- *  - text:     writes a string or placeholder; holds no portal.
- *  - live:     a portal (React) or DOM renderer mounted and updating.
- *  - snapshot: the last rendered content kept without a live update (frozen portal).
- *  - checkbox: the row-selection checkbox.
- */
-export type CellRenderState = 'text' | 'live' | 'snapshot' | 'checkbox';
-
-const RENDER_STATE: Record<CellCtrlPresentationState['kind'], CellRenderState> = {
-	buffered: 'text',
-	primitive: 'text',
-	loading: 'text',
-	'stand-in': 'text',
-	'live-renderer': 'live',
-	'dom-update': 'live',
-	'frozen-portal': 'snapshot',
-	'checkbox-selector': 'checkbox',
-};
-
-export function getCellRenderState(kind: CellCtrlPresentationState['kind']): CellRenderState {
-	return RENDER_STATE[kind];
-}
-
-/** The portal key the next presentation keeps mounted in this cell, if any. */
-function portalKeptBy(presentation: CellCtrlPresentationState): string | undefined {
-	switch (presentation.kind) {
-		case 'live-renderer':
-		case 'dom-update':
-		case 'frozen-portal':
-			return presentation.portalKey;
-		case 'buffered':
-			// Off-screen buffered cells may preserve an already-rendered portal as-is.
-			return presentation.contentMode === 'portal' ? presentation.portalKey : undefined;
-		default:
-			return undefined;
-	}
-}
+// Dispatch is synchronous and consumes this record before invoking renderer code. Reusing it keeps
+// the per-cell transition decision allocation-free in scroll and realtime update paths.
+const transitionScratch = createCellPresentationTransition();
 
 /**
  * Dispatch only. Presentation authority lives on CellCtrl; binders receive the controller and apply
@@ -114,20 +78,51 @@ export function dispatchCellPresentation<TRowData>(input: DispatchCellPresentati
 		(host ? deps.portalMountManager.getMountedKeyForContainer?.(host) : undefined) ??
 		(existing instanceof PortalRendererHandle ? existing.portalKey : undefined) ??
 		cellSlot.lastPortalKey;
-	if (heldPortalKey && portalKeptBy(nextPresentation) !== heldPortalKey) {
-		getCellRendererLifecycle(deps).release({ reason: 'invalidated', cellElement: cellSlot.element, portalKey: heldPortalKey });
+	const transition = transitionScratch;
+	planCellPresentationTransitionInto(transition, heldPortalKey, nextPresentation);
+	// A resolver bug must not abort the frame: report it and render the presentation with only the
+	// portal ownership it is allowed (the planner already dropped a disallowed key).
+	if (transition.violation) {
+		reportRendererFault(deps.engine, 'cell-presentation-invariant', new Error(transition.violation), {
+			kind: nextPresentation.kind,
+			rowId: cellCtrl.rowId,
+			field: cellCtrl.field,
+		});
+	}
+	// Release may cross an adapter boundary. Capture the decision before that call so a re-entrant
+	// dispatch cannot overwrite the shared scratch record before this dispatch reaches its binder.
+	const nextRoute = transition.nextRoute;
+	if (transition.releasePortalKey) {
+		getCellRendererLifecycle(deps).release({
+			reason: 'invalidated',
+			cellElement: cellSlot.element,
+			portalKey: transition.releasePortalKey,
+		});
 		// Scroll binds never reassign the handle; a stale one would re-request this release later.
 		if (existing instanceof PortalRendererHandle) cellSlot.renderer = null;
 	}
 
-	switch (RENDER_STATE[nextPresentation.kind]) {
+	switch (nextRoute) {
 		case 'text':
-			return applyTextCellPresentation(input);
+			applyTextCellPresentation(input);
+			break;
 		case 'live':
-			return applyLiveCellPresentation(input);
+			applyLiveCellPresentation(input);
+			break;
 		case 'snapshot':
-			return applySnapshotCellPresentation(input);
+			applySnapshotCellPresentation(input);
+			break;
 		case 'checkbox':
-			return applyCheckboxCellPresentation(input);
+			applyCheckboxCellPresentation(input);
+			break;
 	}
+	cellSlot.commitBinding(
+		input.runtime.rowSlotId,
+		cellCtrl.rowId,
+		input.geometry.rowIndex,
+		cellCtrl.colId,
+		input.geometry.colIndex,
+		cellCtrl.key,
+		cellSlot.lastContentMode
+	);
 }

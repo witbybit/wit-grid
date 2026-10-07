@@ -8,9 +8,9 @@ import { createGridRowDataRef } from './publicRowRef.js';
 import type { RowNode } from './rowNode.js';
 import type { InternalRowNodeTransaction } from './rowTransactions.js';
 import type { AsyncRowModelRequestIdentity } from './asyncRowModelRequestIdentity.js';
-import { RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
+import { computeGroupMeta, RowPipeline, type RowPipelineInput } from './rows/RowPipeline.js';
 import { groupByColIds, isGroupingActive, normalizeGroupDefs } from './rows/hierarchyConfig.js';
-import { findTreeNode, resolveNodeExpanded } from './rows/stages/flattenStage.js';
+import { findTreeNode, flattenSubtree, resolveNodeExpanded } from './rows/stages/flattenStage.js';
 import type { RowTreeNode } from './rows/stages/types.js';
 import { HierarchyIndex } from './rows/hierarchyIndex.js';
 import { samePipelineColumns } from './columns/columnDiff.js';
@@ -23,17 +23,18 @@ import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
 import { rowIdFromDataVisualRowId, toDataVisualRowId, toTotalVisualRowId } from './rows/visualRowIds.js';
 import { FLAT_HIERARCHY, type VisualRow } from './visualRow.js';
-import {
-	type FilterModel,
-	type QuickFilterModel,
-	type TextFilterCondition,
-	type NumberFilterCondition,
-	type DateFilterCondition,
-	type SetFilterCondition,
-	type FilterCondition,
-	type CompoundFilterCondition,
-	type ColumnFilter,
+import type {
+	FilterModel,
+	QuickFilterModel,
+	TextFilterCondition,
+	NumberFilterCondition,
+	DateFilterCondition,
+	FilterCondition,
+	CompoundFilterCondition,
+	ColumnFilter,
 } from './filterModel.js';
+import { resolveColumnFilterDef } from './filters/filterDef.js';
+import { prepareColumnFilter, type PreparedFilterMatcher } from './filters/matchFilter.js';
 import type { RowTransactionMutation } from './engine/GridDomainMutation.js';
 import type { InfiniteDatasource } from './infiniteRowModel.js';
 import type { ServerSideDatasource, ServerSideRefreshOptions, ServerSideStoreSnapshot } from './serverSideRowModel.js';
@@ -47,7 +48,6 @@ export type {
 	TextFilterCondition,
 	NumberFilterCondition,
 	DateFilterCondition,
-	SetFilterCondition,
 };
 export type { TextFilterOperator, NumberFilterOperator, DateFilterOperator, SelectFilterCondition } from './filterModel.js';
 
@@ -525,48 +525,11 @@ export interface GroupRowMeta {
 
 // ── Filter preparation ────────────────────────────────────────────────────────
 
-interface PreparedBase<TData> {
+/** A column filter, prepared by the shared matcher: read the cell, then match it. */
+interface PreparedColumnCondition<TData> {
+	kind: 'column';
 	getter: (node: RowNode<TData>) => unknown;
-}
-
-interface PreparedTextFilter<TData> extends PreparedBase<TData> {
-	kind: 'text';
-	operator: TextFilterCondition['operator'];
-	textValue: string;
-}
-
-interface PreparedNumberFilter<TData> extends PreparedBase<TData> {
-	kind: 'number';
-	operator: NumberFilterCondition['operator'];
-	value: number;
-	valueTo?: number;
-}
-
-interface PreparedDateFilter<TData> extends PreparedBase<TData> {
-	kind: 'date';
-	operator: DateFilterCondition['operator'];
-	dateFrom: Date;
-	dateTo?: Date;
-}
-
-interface PreparedSetFilter<TData> extends PreparedBase<TData> {
-	kind: 'set';
-	valueSet: Set<string>;
-	includeNull: boolean;
-}
-
-interface PreparedSelectFilter<TData> extends PreparedBase<TData> {
-	kind: 'select';
-	valueSet: Set<string>;
-	includeNull: boolean;
-	matchMode: 'any' | 'all';
-}
-
-interface PreparedCompoundFilter<TData> {
-	kind: 'compound';
-	logicalOp: 'AND' | 'OR';
-	left: PreparedColumnFilter<TData>;
-	right: PreparedColumnFilter<TData>;
+	match: PreparedFilterMatcher;
 }
 
 /** A single search string matched (OR) across every targeted column's getter. */
@@ -580,33 +543,7 @@ interface PreparedQuickFilter<TData> {
 	signature: string;
 }
 
-type PreparedColumnFilter<TData> =
-	| PreparedTextFilter<TData>
-	| PreparedNumberFilter<TData>
-	| PreparedDateFilter<TData>
-	| PreparedSetFilter<TData>
-	| PreparedSelectFilter<TData>
-	| PreparedCompoundFilter<TData>
-	| PreparedQuickFilter<TData>;
-
-function parseFilterDate(raw: string): Date | null {
-	const d = new Date(raw);
-	return isNaN(d.getTime()) ? null : d;
-}
-
-function stripTime(d: Date): Date {
-	return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-
-function parseCellDate(value: unknown): Date | null {
-	if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
-	if (typeof value === 'number') return new Date(value);
-	if (typeof value === 'string') {
-		const d = new Date(value);
-		return isNaN(d.getTime()) ? null : d;
-	}
-	return null;
-}
+type PreparedColumnFilter<TData> = PreparedColumnCondition<TData> | PreparedQuickFilter<TData>;
 
 export function getColumnValue<TData>(node: RowNode<TData>, column: ColumnDef<TData> | undefined): unknown {
 	if (!column) return undefined;
@@ -615,111 +552,9 @@ export function getColumnValue<TData>(node: RowNode<TData>, column: ColumnDef<TD
 	return node.getCellValue(column.field, getter);
 }
 
-function matchTextFilter(value: unknown, pf: PreparedTextFilter<unknown>): boolean {
-	const isBlank = value == null || value === '';
-	if (pf.operator === 'blank') return isBlank;
-	if (pf.operator === 'notBlank') return !isBlank;
-	const text = String(value ?? '').toLowerCase();
-	switch (pf.operator) {
-		case 'equals':
-			return text === pf.textValue;
-		case 'notEquals':
-			return text !== pf.textValue;
-		case 'startsWith':
-			return text.startsWith(pf.textValue);
-		case 'endsWith':
-			return text.endsWith(pf.textValue);
-		case 'notContains':
-			return !text.includes(pf.textValue);
-		case 'contains':
-		default:
-			return text.includes(pf.textValue);
-	}
-}
-
-function matchNumberFilter(value: unknown, pf: PreparedNumberFilter<unknown>): boolean {
-	const isBlank = value == null || value === '';
-	if (pf.operator === 'blank') return isBlank;
-	if (pf.operator === 'notBlank') return !isBlank;
-	if (isBlank) return false;
-	const n = Number(value);
-	if (isNaN(n)) return false;
-	switch (pf.operator) {
-		case 'equals':
-			return n === pf.value;
-		case 'notEquals':
-			return n !== pf.value;
-		case 'gt':
-			return n > pf.value;
-		case 'gte':
-			return n >= pf.value;
-		case 'lt':
-			return n < pf.value;
-		case 'lte':
-			return n <= pf.value;
-		case 'inRange':
-			return pf.valueTo !== undefined ? n >= pf.value && n <= pf.valueTo : n >= pf.value;
-	}
-}
-
-function matchDateFilter(value: unknown, pf: PreparedDateFilter<unknown>): boolean {
-	const isBlank = value == null || value === '';
-	if (pf.operator === 'blank') return isBlank;
-	if (pf.operator === 'notBlank') return !isBlank;
-	const cellDate = parseCellDate(value);
-	if (!cellDate) return false;
-	switch (pf.operator) {
-		case 'equals':
-			return stripTime(cellDate).getTime() === stripTime(pf.dateFrom).getTime();
-		case 'before':
-			return cellDate < pf.dateFrom;
-		case 'after':
-			return cellDate > pf.dateFrom;
-		case 'inRange':
-			return pf.dateTo !== undefined ? cellDate >= pf.dateFrom && cellDate <= pf.dateTo : cellDate >= pf.dateFrom;
-	}
-}
-
-function matchSetFilter(value: unknown, pf: PreparedSetFilter<unknown>): boolean {
-	if (pf.valueSet.size === 0 && !pf.includeNull) return false;
-	if (value == null || value === '') return pf.includeNull;
-	return pf.valueSet.has(String(value).toLowerCase());
-}
-
-function matchSelectFilter(value: unknown, pf: PreparedSelectFilter<unknown>): boolean {
-	if (pf.valueSet.size === 0 && !pf.includeNull) return false;
-	if (value == null || value === '') return pf.includeNull;
-	const strVal = String(value).toLowerCase();
-	if (pf.matchMode === 'all') {
-		// Unusual: cell value must equal every selected value (useful for multi-valued cells)
-		return pf.valueSet.has(strVal) && pf.valueSet.size === 1;
-	}
-	// Default: OR — any selected value matches
-	return pf.valueSet.has(strVal);
-}
-
 function matchPreparedFilter<TData>(node: RowNode<TData>, pf: PreparedColumnFilter<TData>): boolean {
-	if (pf.kind === 'compound') {
-		const l = matchPreparedFilter(node, pf.left);
-		const r = matchPreparedFilter(node, pf.right);
-		return pf.logicalOp === 'AND' ? l && r : l || r;
-	}
-	if (pf.kind === 'quick') {
-		return matchQuickFilter(node, pf);
-	}
-	const value = pf.getter(node);
-	switch (pf.kind) {
-		case 'text':
-			return matchTextFilter(value, pf as PreparedTextFilter<unknown>);
-		case 'number':
-			return matchNumberFilter(value, pf as PreparedNumberFilter<unknown>);
-		case 'date':
-			return matchDateFilter(value, pf as PreparedDateFilter<unknown>);
-		case 'set':
-			return matchSetFilter(value, pf as PreparedSetFilter<unknown>);
-		case 'select':
-			return matchSelectFilter(value, pf as PreparedSelectFilter<unknown>);
-	}
+	if (pf.kind === 'quick') return matchQuickFilter(node, pf);
+	return pf.match(pf.getter(node), node.data);
 }
 
 function fieldsAffectColumn(fields: Set<string>, columnField: string): boolean {
@@ -763,14 +598,16 @@ function describeVisualRowDiff<TData>(
 ): RowModelRefreshResult {
 	let prefix = 0;
 	const minLength = Math.min(previousRows.length, nextRows.length);
-	while (prefix < minLength && sameVisualRowIdentity(previousRows[prefix], nextRows[prefix])) {
+	// Unchanged rows are usually the same object (flatten reuses them), so identity is checked first.
+	while (prefix < minLength && (previousRows[prefix] === nextRows[prefix] || sameVisualRowIdentity(previousRows[prefix], nextRows[prefix]))) {
 		prefix++;
 	}
 
 	let suffix = 0;
 	while (
 		suffix < minLength - prefix &&
-		sameVisualRowIdentity(previousRows[previousRows.length - 1 - suffix], nextRows[nextRows.length - 1 - suffix])
+		(previousRows[previousRows.length - 1 - suffix] === nextRows[nextRows.length - 1 - suffix] ||
+			sameVisualRowIdentity(previousRows[previousRows.length - 1 - suffix], nextRows[nextRows.length - 1 - suffix]))
 	) {
 		suffix++;
 	}
@@ -781,7 +618,7 @@ function describeVisualRowDiff<TData>(
 	// Rows that kept their place (the identical prefix and suffix) may still carry new aggregates.
 	let aggregateChangedIndices: number[] | undefined;
 	const noteAggregateChange = (prev: VisualRow<TData>, next: VisualRow<TData>, index: number) => {
-		if (!sameRowAggregates(prev, next)) (aggregateChangedIndices ??= []).push(index);
+		if (prev !== next && !sameRowAggregates(prev, next)) (aggregateChangedIndices ??= []).push(index);
 	};
 	for (let i = 0; i < prefix; i++) noteAggregateChange(previousRows[i], nextRows[i], i);
 	for (let k = suffix - 1; k >= 0; k--) {
@@ -809,46 +646,6 @@ function makeGetter<TData>(column: ColumnDef<TData>): (node: RowNode<TData>) => 
 	return (node) => node.getCellValue(column.field, pg);
 }
 
-function prepareCondition<TData>(condition: FilterCondition, getter: (node: RowNode<TData>) => unknown): PreparedColumnFilter<TData> | null {
-	if (condition.type === 'text') {
-		return { kind: 'text', getter, operator: condition.operator, textValue: condition.value.toLowerCase() };
-	}
-	if (condition.type === 'number') {
-		return { kind: 'number', getter, operator: condition.operator, value: condition.value, valueTo: condition.valueTo };
-	}
-	if (condition.type === 'date') {
-		if (condition.operator === 'blank' || condition.operator === 'notBlank') {
-			return { kind: 'date', getter, operator: condition.operator, dateFrom: new Date(0) };
-		}
-		const dateFrom = parseFilterDate(condition.dateFrom);
-		if (!dateFrom) return null;
-		const dateTo = condition.dateTo ? (parseFilterDate(condition.dateTo) ?? undefined) : undefined;
-		return { kind: 'date', getter, operator: condition.operator, dateFrom, dateTo };
-	}
-	if (condition.type === 'set') {
-		const hasNull = condition.values.includes(null);
-		const valueSet = new Set(condition.values.filter((v): v is string | number => v !== null).map((v) => String(v).toLowerCase()));
-		return { kind: 'set', getter, valueSet, includeNull: hasNull };
-	}
-	if (condition.type === 'select') {
-		const hasNull = condition.values.includes(null);
-		const valueSet = new Set(condition.values.filter((v): v is string | number => v !== null).map((v) => String(v).toLowerCase()));
-		return { kind: 'select', getter, valueSet, includeNull: hasNull, matchMode: condition.matchMode ?? 'any' };
-	}
-	return null;
-}
-
-function prepareColumnFilter<TData>(columnFilter: ColumnFilter, getter: (node: RowNode<TData>) => unknown): PreparedColumnFilter<TData> | null {
-	if (columnFilter.type === 'compound') {
-		const [c1, c2] = columnFilter.conditions;
-		const left = prepareCondition<TData>(c1, getter);
-		const right = prepareCondition<TData>(c2, getter);
-		if (!left || !right) return null;
-		return { kind: 'compound', logicalOp: columnFilter.operator, left, right };
-	}
-	return prepareCondition(columnFilter, getter);
-}
-
 function prepareQuickFilter<TData>(
 	columns: Array<ColumnDef<TData>>,
 	quickFilterModel: QuickFilterModel | null | undefined
@@ -862,7 +659,13 @@ function prepareQuickFilter<TData>(
 	if (targetColumns.length === 0) return null;
 	return {
 		kind: 'quick',
-		getters: targetColumns.map((column) => makeGetter(column)),
+		// Plain fields are read straight from the data: the row caches the joined text itself, so
+		// going through the per-node cell cache would only fill a Map entry per row and column.
+		getters: targetColumns.map((column) => {
+			if (column.valueGetter) return makeGetter(column);
+			const read = compilePathGetter(column.field) as (data: TData) => unknown;
+			return (node: RowNode<TData>) => read(node.data);
+		}),
 		textValue: quickFilterModel.text.trim().toLowerCase(),
 		// Plain-field columns read node-cached values that only change with node.data, so their
 		// lowercased text can be cached per row. valueGetter columns may be impure: never cached.
@@ -871,36 +674,35 @@ function prepareQuickFilter<TData>(
 	};
 }
 
-interface QuickFilterTextCacheEntry {
-	data: unknown;
-	signature: string;
-	lowered: Array<string | undefined>;
-}
+/** Joins a row's column texts: a control character no typed text contains, so a match never spans two columns. */
+const QUICK_FILTER_SEPARATOR = '';
 
 /**
- * Per-row lowercased quick-filter text, so each keystroke does not re-run
- * `String().toLowerCase()` for rows × columns. An entry is valid while the row's data
- * reference (rows are replaced immutably) and the target column set are unchanged.
+ * Each row keeps its plain-field column texts lowercased and joined (RowNode.quickText), so a
+ * keystroke is one `includes` per row instead of `String().toLowerCase()` for rows × columns. The
+ * text is valid for its column set (`quickTextSignature`) until the row's data changes.
  */
-const quickFilterTextCache = new WeakMap<RowNode<unknown>, QuickFilterTextCacheEntry>();
-
 function matchQuickFilter<TData>(node: RowNode<TData>, pf: PreparedQuickFilter<TData>): boolean {
 	const getters = pf.getters;
-	let entry = quickFilterTextCache.get(node as RowNode<unknown>);
-	if (!entry || entry.data !== node.data || entry.signature !== pf.signature) {
-		entry = { data: node.data, signature: pf.signature, lowered: new Array(getters.length) };
-		quickFilterTextCache.set(node as RowNode<unknown>, entry);
-	}
-	const lowered = entry.lowered;
-	for (let i = 0; i < getters.length; i++) {
-		let text: string;
-		if (pf.cacheable[i]) {
-			const cached = lowered[i];
-			text = cached !== undefined ? cached : (lowered[i] = String(getters[i](node) ?? '').toLowerCase());
-		} else {
-			text = String(getters[i](node) ?? '').toLowerCase();
+	let joined = node.quickText;
+	if (joined === undefined || node.quickTextSignature !== pf.signature) {
+		joined = '';
+		for (let i = 0; i < getters.length; i++) {
+			if (pf.cacheable[i]) joined += String(getters[i](node) ?? '').toLowerCase() + QUICK_FILTER_SEPARATOR;
 		}
-		if (text.includes(pf.textValue)) return true;
+		node.quickText = joined;
+		node.quickTextSignature = pf.signature;
+	}
+	if (joined.includes(pf.textValue)) return true;
+	// valueGetter columns may be impure: evaluated on every check, never cached.
+	for (let i = 0; i < getters.length; i++) {
+		if (
+			!pf.cacheable[i] &&
+			String(getters[i](node) ?? '')
+				.toLowerCase()
+				.includes(pf.textValue)
+		)
+			return true;
 	}
 	return false;
 }
@@ -918,9 +720,8 @@ function prepareFilters<TData>(
 			if (!item) continue;
 			const column = columnById.get(colId);
 			if (!column) continue;
-			const getter = makeGetter(column);
-			const prepared = prepareColumnFilter(item, getter);
-			if (prepared) result.push(prepared);
+			const match = prepareColumnFilter(item, resolveColumnFilterDef(column));
+			if (match) result.push({ kind: 'column', getter: makeGetter(column), match });
 		}
 	}
 
@@ -1112,6 +913,8 @@ export class ClientRowModelController<TData = unknown>
 	 * else needs them.
 	 */
 	private rowIndexStale = false;
+	/** While stale, rows before this index still carry correct positions (an expansion splice). */
+	private rowIndexStaleFrom = 0;
 	private rowIdToVisualRowIds: Map<string, string[]> | undefined;
 	private dataRowCount = 0;
 	private unsubscribers: Array<() => void> = [];
@@ -1169,7 +972,12 @@ export class ClientRowModelController<TData = unknown>
 	private ensureRowPositions(): void {
 		if (!this.rowIndexStale) return;
 		this.rowIndexStale = false;
-		this.stampRowPositions(0);
+		this.stampRowPositions(this.rowIndexStaleFrom);
+	}
+
+	private markRowPositionsStale(from: number): void {
+		this.rowIndexStaleFrom = this.rowIndexStale ? Math.min(this.rowIndexStaleFrom, from) : from;
+		this.rowIndexStale = true;
 	}
 
 	/**
@@ -1230,8 +1038,123 @@ export class ClientRowModelController<TData = unknown>
 		}
 		if (this.isExpanded(id) === expanded) return { changed: false };
 		this.runtime.updateExpansion((expansion) => ({ ...expansion, rows: { ...expansion.rows, [id]: expanded } }));
-		return this.refresh('expansion', id);
+		return this.trySpliceGroupExpansion(id) ?? this.refresh('expansion', id);
 	};
+
+	/** Group tree nodes by id, built once per row tree, walking group levels only. */
+	private groupNodesFor: { roots: RowTreeNode<TData>[]; byId: Map<string, Extract<RowTreeNode<TData>, { kind: 'group' }>> } | null = null;
+
+	private findGroupNode(id: string): Extract<RowTreeNode<TData>, { kind: 'group' }> | undefined {
+		const roots = this._roots;
+		if (!roots) return undefined;
+		if (this.groupNodesFor?.roots !== roots) {
+			const byId = new Map<string, Extract<RowTreeNode<TData>, { kind: 'group' }>>();
+			const stack: RowTreeNode<TData>[] = [...roots];
+			while (stack.length > 0) {
+				const node = stack.pop()!;
+				if (node.kind !== 'group') continue;
+				byId.set(node.id, node);
+				if (node.children[0]?.kind === 'group') for (const child of node.children) stack.push(child);
+			}
+			this.groupNodesFor = { roots, byId };
+		}
+		return this.groupNodesFor.byId.get(id);
+	}
+
+	/**
+	 * One group opened or closed: replace that group's rows (its row, children and totals) in place
+	 * instead of flattening every row. Valid only while the row tree is exactly what the pipeline
+	 * would reuse; otherwise (data changed since, pagination, detail rows, tree data) returns null and
+	 * the caller refreshes.
+	 */
+	private trySpliceGroupExpansion(id: string): RowModelRefreshResult | null {
+		const state = this.runtime.getState();
+		if (this._pageWindow !== null || state.pagination || state.detail || state.treeData || !isGroupingActive(state.grouping)) return null;
+		if (!this.pipeline.isTreeCurrent(this.buildPipelineInput(state, true), this._roots)) return null;
+		const index = this.visualRowIdToIndex.get(id);
+		const previousRows = this.visualRows;
+		const groupRow = index === undefined ? undefined : previousRows[index];
+		if (index === undefined || groupRow?.kind !== 'group') return null;
+		const node = this.findGroupNode(id);
+		if (!node) return null;
+
+		// Everything the group shows sits after it at a deeper level (its totals included).
+		const level = groupRow.hierarchy.level;
+		let end = index + 1;
+		while (end < previousRows.length && previousRows[end].hierarchy.level > level) end++;
+		const removedCount = end - index;
+
+		const subtreeSticky = new Map<number, number>();
+		const inserted = flattenSubtree(
+			node,
+			{
+				expansion: state.expansion,
+				groupDefaultExpanded: state.grouping?.defaultExpanded,
+				defaultRowHeight: state.defaultRowHeight,
+				rowHeightsRecord: state.rowHeights,
+				getRowHeight: this.getRowHeight,
+				groupRowHeight: state.grouping?.rowHeight,
+				totals: state.grouping?.totals,
+			},
+			{ parentId: groupRow.hierarchy.parentId, level, posInSet: groupRow.hierarchy.posInSet, setSize: groupRow.hierarchy.setSize },
+			subtreeSticky
+		);
+		const delta = inserted.length - removedCount;
+
+		const nextRows: VisualRow<TData>[] = new Array(previousRows.length + delta);
+		for (let i = 0; i < index; i++) nextRows[i] = previousRows[i];
+		for (let i = 0; i < inserted.length; i++) nextRows[index + i] = inserted[i];
+		for (let i = end; i < previousRows.length; i++) nextRows[i + delta] = previousRows[i];
+
+		// Group / total ids: removed ones leave the index, later ones shift, inserted ones are added.
+		// O(group rows); data-row positions are stamped lazily from `index` on first read.
+		const idIndex = this.visualRowIdToIndex;
+		for (let i = index; i < end; i++) {
+			const row = previousRows[i];
+			if (row.kind !== 'data') idIndex.delete(row.id);
+		}
+		if (delta !== 0) for (const [rowId, at] of idIndex) if (at >= end) idIndex.set(rowId, at + delta);
+		for (let i = 0; i < inserted.length; i++) if (inserted[i].kind !== 'data') idIndex.set(inserted[i].id, index + i);
+
+		// Sticky ranges: groups before the splice keep their key (an ancestor's end moves by delta),
+		// the subtree brings its own, and everything after shifts. Kept in row order.
+		const sticky = new Map<number, number>();
+		for (const [start, last] of this._stickyGroupMeta) {
+			if (start >= index) break;
+			sticky.set(start, last >= end - 1 ? last + delta : last);
+		}
+		for (const [start, last] of subtreeSticky) sticky.set(start + index, last + index);
+		for (const [start, last] of this._stickyGroupMeta) if (start >= end) sticky.set(start + delta, last + delta);
+
+		this.visualRows = nextRows;
+		this._stickyGroupMeta = sticky;
+		const meta = computeGroupMeta(nextRows);
+		this._groupMeta = meta.byId;
+		this._groupMetaByVisualIndex = meta.byVisualIndex;
+		this.markRowPositionsStale(index);
+		this._incremental = undefined;
+		this._flatTotals = undefined;
+		if (this._uniformHeight != null && inserted.some((row) => row.height !== this._uniformHeight)) this._uniformHeight = undefined;
+		this._incrementalSeed = this.captureIncrementalSeed(state);
+		this.runtime.bumpGlobalVersion();
+
+		// What describeVisualRowDiff reports for this change, without walking every row: the group row
+		// keeps its identity and its aggregates, rows outside the splice are the same objects, so the
+		// change spans from the first row after the group to the end of the spliced region.
+		if (removedCount === 1 && inserted.length === 1) {
+			return { changed: false, reason: 'expansion', previousRowCount: previousRows.length, nextRowCount: nextRows.length, groupId: id };
+		}
+		const suffix = previousRows.length - end;
+		return {
+			changed: true,
+			reason: 'expansion',
+			previousRowCount: previousRows.length,
+			nextRowCount: nextRows.length,
+			changedStartIndex: index + 1,
+			changedEndIndex: Math.max(previousRows.length, nextRows.length) - suffix - 1,
+			groupId: id,
+		};
+	}
 
 	/** `base` replaces every explicit choice, so this is O(1) however many rows the tree holds. */
 	public expandAll = (options?: ExpandAllOptions): RowModelRefreshResult => {
@@ -1250,7 +1173,8 @@ export class ClientRowModelController<TData = unknown>
 		if (!this._roots) return null;
 		const input = this.buildPipelineInput(this.runtime.getState(), false);
 		// A separate pipeline: the live one's version and caches are untouched.
-		return new RowPipeline<TData>().run({ ...input, detail: undefined, expansion: { rows: {}, details: {}, base: true } }).visualRows;
+		return new RowPipeline<TData>().run({ ...input, dataVersion: undefined, detail: undefined, expansion: { rows: {}, details: {}, base: true } })
+			.visualRows;
 	};
 
 	public isDetailOpen = (rowId: string): boolean => {
@@ -1580,6 +1504,7 @@ export class ClientRowModelController<TData = unknown>
 		}
 
 		node.setData(updatedRow);
+		this.dataStore.markDataChanged();
 
 		return {
 			updatedNodes: [node],
@@ -1608,6 +1533,8 @@ export class ClientRowModelController<TData = unknown>
 					changedEndIndex: Math.max(changedStartIndex, this.visualRows.length - 1),
 				};
 			}
+			const grouped = this.tryIncrementalGroupedMembership(added, removed);
+			if (grouped) return grouped;
 			inst.increment(GridMetric.ROW_MUTATION_FULL_REBUILD);
 			return this.refresh('bulk');
 		}
@@ -1732,25 +1659,26 @@ export class ClientRowModelController<TData = unknown>
 	 * inputs, sort keys) by patching the tree and flat list, instead of a full pipeline run.
 	 * Null when the update needs the full run.
 	 */
-	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
-		const nodes = writeResult.updatedNodes;
-		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
-		const state = this.runtime.getState();
+	/**
+	 * The grouped incremental index, created on first use, when the grid is one it can patch: grouped
+	 * client rows with no tree, detail, pagination, query or row-height callback, and the same
+	 * configuration it was keyed on. `checkFilter`: the write may move rows in or out of the filter,
+	 * which needs filters decided by plain row data.
+	 */
+	private acquireGroupedIndex(state: ReturnType<ClientRowModelRuntime<TData>['getState']>, checkFilter: boolean): boolean {
 		const seed = this._incrementalSeed;
-		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return null;
+		if (!seed || this._incremental === null || !this._roots || this._pageWindow !== null || this.getRowHeight) return false;
 		const now = this.captureIncrementalSeed(state);
 		for (const key of Object.keys(now)) {
 			if (now[key] === seed[key]) continue;
 			// A re-declared column list that reads the same values (new formatters, headers, widths) keeps the index.
 			if (key === 'columns' && samePipelineColumns(now[key] as ColumnDef<TData>[], seed[key] as ColumnDef<TData>[])) continue;
-			return null;
+			return false;
 		}
-		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return null;
-		if (state.queryModel && state.queryModel.root.children.length > 0) return null;
-		// A row may change group or enter / leave the filter only when those are decided by plain row data.
-		const checkFilter = impact === 'group-key' || impact === 'filter-key';
+		if (state.treeData || state.detail || state.pagination || !isGroupingActive(state.grouping)) return false;
+		if (state.queryModel && state.queryModel.root.children.length > 0) return false;
 		const hasFilter = !!state.quickFilterModel?.text.trim() || (!!state.filterModel && Object.keys(state.filterModel).length > 0);
-		if (checkFilter && hasFilter && state.columns.some((column) => column.valueGetter)) return null;
+		if (checkFilter && hasFilter && state.columns.some((column) => column.valueGetter)) return false;
 		if (this._incremental === undefined) {
 			const expansionBase: unknown = state.expansion.base;
 			this._incremental = IncrementalRowIndex.create<TData>({
@@ -1767,10 +1695,62 @@ export class ClientRowModelController<TData = unknown>
 				rowHeights: state.rowHeights,
 				countSensitiveExpansion: typeof state.grouping.defaultExpanded === 'function' || typeof expansionBase === 'function',
 			});
-			if (!this._incremental) return null;
 		}
+		return !!this._incremental;
+	}
+
+	/**
+	 * Rows added to or removed from a grouped grid: patched into their existing groups by the
+	 * incremental index instead of re-running the pipeline. Null when it cannot (a group created or
+	 * emptied, an unsupported configuration); the caller refreshes.
+	 */
+	private tryIncrementalGroupedMembership(added: RowNode<TData>[], removed: RowNode<TData>[]): RowModelRefreshResult | null {
+		const state = this.runtime.getState();
+		if (!this.acquireGroupedIndex(state, true)) return null;
 		const previousRowCount = this.visualRows.length;
-		const result = this._incremental.apply(
+		const result = this._incremental!.applyMembership(added, removed, {
+			visualRows: this.visualRows,
+			visualRowIdToIndex: this.visualRowIdToIndex,
+			groupMeta: this._groupMeta,
+			groupMetaByVisualIndex: this._groupMetaByVisualIndex,
+			stickyGroupMeta: this._stickyGroupMeta,
+		});
+		if (!result) {
+			this._incremental = undefined;
+			return null;
+		}
+		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
+		// Every data node, filtered-out ones included, as a full run's stats.totalDataRows counts them.
+		this.dataRowCount = this.dataStore.getRowCount();
+		if (!result.membershipChanged) return { changed: false };
+		this._hierarchyIndex = null;
+		this.groupNodesFor = null;
+		this.markRowPositionsStale(0);
+		this.runtime.bumpGlobalVersion();
+		if (Object.keys(state.rowHeights).length > 0) this._uniformHeight = undefined;
+		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
+		return {
+			changed: true,
+			reason: 'bulk',
+			previousRowCount,
+			nextRowCount: this.visualRows.length,
+			changedStartIndex: result.changedStartIndex,
+			changedEndIndex: result.changedEndIndex,
+			changedRanges: result.changedRanges.length > 0 ? result.changedRanges : undefined,
+			aggregateChangedIndices: aggregates,
+		};
+	}
+
+	private tryIncrementalGroupedUpdate(writeResult: RowModelWriteResult<TData>, impact: RowWriteImpact): RowModelRefreshResult | null {
+		const nodes = writeResult.updatedNodes;
+		if (!nodes || nodes.length === 0 || (writeResult.addedNodes?.length ?? 0) > 0 || (writeResult.removedNodes?.length ?? 0) > 0) return null;
+		const state = this.runtime.getState();
+		// A row may change group or enter / leave the filter only when those are decided by plain row data.
+		const checkFilter = impact === 'group-key' || impact === 'filter-key';
+		if (!this.acquireGroupedIndex(state, checkFilter)) return null;
+		const index = this._incremental!;
+		const previousRowCount = this.visualRows.length;
+		const result = index.apply(
 			nodes,
 			writeResult.changedValuesByRow,
 			{
@@ -1787,7 +1767,7 @@ export class ClientRowModelController<TData = unknown>
 			return null;
 		}
 		this.runtime.getInstrumentation().increment(GridMetric.ROW_MUTATION_INCREMENTAL);
-		if (result.moved || result.listChanged) this.rowIndexStale = true;
+		if (result.moved || result.listChanged) this.markRowPositionsStale(0);
 		if (result.membershipChanged) this._hierarchyIndex = null;
 		const aggregates = result.aggregateChangedIndices.length > 0 ? result.aggregateChangedIndices : undefined;
 		const hasRange = result.changedStartIndex !== undefined;
@@ -2131,7 +2111,9 @@ export class ClientRowModelController<TData = unknown>
 				}
 				return ids;
 			}
-			const result = this.pipeline.run(this.buildPipelineInput(state, false));
+			// A side run over its own tree: the live tree's row back-pointers (which the incremental
+			// index follows) must keep pointing into the live visual rows.
+			const result = new RowPipeline<TData>().run({ ...this.buildPipelineInput(state, false), dataVersion: undefined });
 			return result.visualRows.flatMap((row) => (row.kind === 'data' ? [row.rowId] : []));
 		}
 		const ids: string[] = [];
@@ -2144,6 +2126,7 @@ export class ClientRowModelController<TData = unknown>
 	private buildPipelineInput(state: ReturnType<ClientRowModelRuntime<TData>['getState']>, paginate: boolean): RowPipelineInput<TData> {
 		return {
 			nodes: this.dataStore.getAllNodes(),
+			dataVersion: this.dataStore.dataVersion,
 			columns: state.columns,
 			sortModel: state.sortModel,
 			filterModel: state.filterModel,
@@ -2170,6 +2153,14 @@ export class ClientRowModelController<TData = unknown>
 
 		const result = this.pipeline.run(this.buildPipelineInput(state, true));
 		const { visualRows } = result;
+		if (visualRows === previousRows && result.pageWindow === undefined && this._pageWindow === null) {
+			// The very same rows (a keystroke or filter change that matched the same rows): every
+			// position and index is still right. Only the incremental index, built for the previous
+			// filter and configuration, is dropped and re-keyed.
+			this._incremental = undefined;
+			this._incrementalSeed = this.captureIncrementalSeed(state);
+			return { changed: false, reason, previousRowCount: previousRows.length, nextRowCount: visualRows.length, groupId };
+		}
 		const refreshResult = describeVisualRowDiff(previousRows, visualRows, reason, groupId);
 
 		this.visualRows = visualRows;

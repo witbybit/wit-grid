@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, memo, createElement, type ComponentType } from 'react';
 import {
 	ColumnDef,
 	doesCanonicalCellPointerMatchColumn,
@@ -8,6 +8,9 @@ import {
 	type CellRendererProps,
 	type ImperativeCellHandle,
 	isDomCellRenderer,
+	isDomCellEditorSpec,
+	type DomCellEditor,
+	type DomCellEditorParams,
 } from '@eregister/wit-grid-core';
 import { hasImperativeRendererCapability } from './reactHostBridge.js';
 import { useGridApi } from './hooks.js';
@@ -52,6 +55,33 @@ function getRendererColumnIds<TRowData>(col: ColumnDef<TRowData>): { colId: stri
 function formatCellValue<TRowData>(col: ColumnDef<TRowData>, value: unknown, node: PortalRowNodeLike<TRowData>): string {
 	if (col.valueFormatter) return col.valueFormatter({ value, rowData: node.data, colDef: col, rowId: node.id });
 	return value == null ? '' : String(value);
+}
+
+// ─── DomCellEditorHost ───────────────────────────────────────────────────────
+
+/**
+ * Mounts a core DOM editor (`cellEditor: { kind: 'dom', editor }`) for the life of the edit. The
+ * callbacks read the latest props, so the editor is mounted once however often the host re-renders.
+ */
+function DomCellEditorHost<TRowData>({ editor, params }: { editor: DomCellEditor<TRowData>; params: DomCellEditorParams<TRowData> }) {
+	const ref = useRef<HTMLDivElement>(null);
+	const paramsRef = useRef(params);
+	paramsRef.current = params;
+	useLayoutEffect(() => {
+		const initial = paramsRef.current;
+		const handle = editor.mount(ref.current!, {
+			...initial,
+			onChange: (value) => paramsRef.current.onChange(value),
+			onCommit: (value) => paramsRef.current.onCommit(value),
+			onCancel: () => paramsRef.current.onCancel(),
+		});
+		return () => {
+			handle.destroy?.();
+			// Remount-safe (StrictMode runs effects twice): the next mount starts from an empty host.
+			ref.current?.replaceChildren();
+		};
+	}, [editor]);
+	return <div ref={ref} style={FILL_STYLE} />;
 }
 
 // ─── ActiveCellEditor ────────────────────────────────────────────────────────
@@ -128,11 +158,39 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 		api.stopEditing(true);
 	}, [api]);
 
-	const CustomEditor = col?.cellEditor as ComponentType<Record<string, unknown>> | undefined;
+	const handleChange = useCallback(
+		(val: unknown) => {
+			setLocalValue(val);
+			localValueRef.current = val;
+			api.updateEditDraft(rowId, editColumnKey, val);
+		},
+		[api, rowId, editColumnKey]
+	);
+
+	const domEditor = isDomCellEditorSpec<TRowData>(col?.cellEditor) ? col.cellEditor.editor : undefined;
+	const CustomEditor = domEditor ? undefined : (col?.cellEditor as ComponentType<Record<string, unknown>> | undefined);
 
 	return (
 		<>
-			{CustomEditor ? (
+			{domEditor ? (
+				<div style={FILL_STYLE} onMouseDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
+					<DomCellEditorHost<TRowData>
+						editor={domEditor}
+						params={{
+							rowId,
+							colField,
+							colId,
+							columnInstanceId: columnInstanceId as DomCellEditorParams<TRowData>['columnInstanceId'],
+							value,
+							col,
+							api,
+							onChange: handleChange,
+							onCommit: handleCommit,
+							onCancel: handleCancel,
+						}}
+					/>
+				</div>
+			) : CustomEditor ? (
 				<div
 					style={FILL_STYLE}
 					onMouseDown={(e) => e.stopPropagation()}
@@ -154,11 +212,7 @@ function ActiveCellEditorInner<TRowData = unknown>({ rowId, colField, colId, col
 						colId,
 						columnInstanceId,
 						value: localValue,
-						onChange: (val: unknown) => {
-							setLocalValue(val);
-							localValueRef.current = val;
-							api.updateEditDraft(rowId, editColumnKey, val);
-						},
+						onChange: handleChange,
 						api,
 						onCommit: handleCommit,
 						onCancel: handleCancel,

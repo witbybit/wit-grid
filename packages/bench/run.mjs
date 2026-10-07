@@ -672,10 +672,10 @@ if (gate) {
 		const exact = r.grid !== 'wit-react' || scenario?.reactMode === 'live';
 		const fail = (why) => failures.push(`${r.scenario} (${r.grid}): ${why}`);
 		if (r.spread.blankPct.max > 0) fail(`blank cells ${fmt(r.spread.blankPct.max, 3)}%`);
-		// Edits at rest: an edited cell may be one sample behind (the sampler's frame callback can run
-		// before the grid's), but never more than that.
-		const staleLimit = r.scenario === 'react-edits-at-rest' ? 0.5 : 0.05;
-		if (r.spread.otherContentPct.max > staleLimit) fail(`stale or other-row content ${fmt(r.spread.otherContentPct.max, 3)}%`);
+		// The sampler already allows an edited cell its previous value in the one sample after the edit
+		// (an edit handed over between the grid's frame and the sample cannot be drawn yet); anything
+		// staler, or another row's content, counts here, edits at rest and during scroll alike.
+		if (r.spread.otherContentPct.max > 0.05) fail(`stale or other-row content ${fmt(r.spread.otherContentPct.max, 3)}%`);
 		if (r.spread.wrongAtRest.max > 0) fail(`${r.spread.wrongAtRest.max} wrong cells at rest`);
 		if (r.spread.settleMs.max < 0 || r.spread.settleMs.max > 1000) fail(`settle ${fmt(r.spread.settleMs.max, 0)} ms`);
 		if (exact && !r.scenario.startsWith('react-edits') && r.spread.wrongCellPct.max > 0.25)

@@ -263,7 +263,7 @@ export class RowSlot<TRowData = unknown> {
 		for (const cell of this.leftCells) allCells.add(cell);
 		for (const cell of this.centerCells) allCells.add(cell);
 		for (const cell of this.rightCells) allCells.add(cell);
-		for (const cell of allCells) cell.unbindCold();
+		for (const cell of allCells) cell.destroy();
 		this.cellsByColumnInstanceId.clear();
 		this.recycledCells.length = 0;
 		this.leftCells.length = 0;

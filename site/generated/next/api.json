@@ -19,6 +19,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "BooleanFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "BUILT_IN_THEME_METADATA",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -36,7 +41,7 @@
 		{
 			"name": "BUILTIN_COLUMN_TYPES",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "BuiltinSidebarPanelId",
@@ -59,9 +64,79 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "CascadeCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "cascadeColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CascadeOption",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CELL_HUES",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellColor",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "CellEditorProps",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "CellOption",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionInput",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionsLoader",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionsPage",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionsQuery",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionsResolver",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellOptionsStore",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellPopover",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "CellPopoverOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "CellRendererCapabilities",
@@ -84,14 +159,19 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "CheckboxCellRenderer",
+			"name": "checkboxColumnType",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "CheckboxDomCellRenderer",
+			"name": "ColorCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "colorColumnType",
 			"kind": "value",
-			"source": "./renderers/domCellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "ColumnDef",
@@ -111,7 +191,12 @@
 		{
 			"name": "ColumnTypeDefinition",
 			"kind": "type",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "comboboxColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "ConflictResolutionResult",
@@ -119,14 +204,24 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createDropdownCellEditor",
+			"name": "createCellOptionsStore",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createDropdownCellRenderer",
+			"name": "createCheckboxRenderer",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createDateEditor",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createDateRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "createLocalStorageAdapter",
@@ -139,29 +234,39 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "createMultiSelectCellEditor",
+			"name": "createMultiSelectEditor",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createMultiSelectCellRenderer",
+			"name": "createMultiSelectRenderer",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createNumberCellEditor",
+			"name": "createNumberEditor",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createNumberCellRenderer",
+			"name": "createNumberRenderer",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "createNumberDomCellRenderer",
+			"name": "createSelectEditor",
 			"kind": "value",
-			"source": "./renderers/domCellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createSelectRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createSparklineRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "CsvExportOptions",
@@ -169,12 +274,17 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "currencyColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "customCellRule",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "CustomFilterRendererParams",
+			"name": "CustomFilterCondition",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -189,19 +299,49 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "DateCellEditor",
-			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"name": "DateCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "DateCellRenderer",
+			"name": "dateColumnType",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "DateDomCellRenderer",
+			"name": "DateRange",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangeCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "dateRangeColumnType",
 			"kind": "value",
-			"source": "./renderers/domCellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangeFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DateRangePreset",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "dateTimeColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "defaultDateRangePresets",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "DetailRowStyleRule",
@@ -212,6 +352,16 @@
 			"name": "DetailVisualRow",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "DomCellEditor",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DomCellEditorParams",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "DomCellRenderer",
@@ -234,24 +384,24 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "DomGroupRenderer",
+			"name": "DomFilterEditor",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "dropdownColumnType",
-			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"name": "DomFilterEditorHandle",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "DropdownOption",
+			"name": "DomFilterEditorParams",
 			"kind": "type",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "DropdownOptionColor",
+			"name": "DomGroupRenderer",
 			"kind": "type",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "duplicateValueRule",
@@ -264,19 +414,14 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "emailColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "FailedVisualRow",
 			"kind": "type",
 			"source": "./types.js"
-		},
-		{
-			"name": "FilterFetchParams",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterFetchResult",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "FilterModel",
@@ -284,27 +429,7 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "FilterPageParams",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterPageResult",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FilterSelectOption",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
 			"name": "FilterSurface",
-			"kind": "type",
-			"source": "@eregister/wit-grid-core"
-		},
-		{
-			"name": "FloatingFilterRendererParams",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -659,9 +784,29 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "linkedRecordColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "LinkedRecordOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "LoadingVisualRow",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "LongTextCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "longTextColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "max",
@@ -679,14 +824,14 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "MultiSelectCellRenderer",
-			"kind": "value",
-			"source": "./renderers/CellTypes.js"
-		},
-		{
 			"name": "multiSelectColumnType",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "MultiSelectRendererOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "normalizeCapabilityResult",
@@ -699,19 +844,14 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
-			"name": "NumberCellEditorOptions",
+			"name": "NumberCellOptions",
 			"kind": "type",
-			"source": "./renderers/CellTypes.js"
-		},
-		{
-			"name": "NumberCellRendererOptions",
-			"kind": "type",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "numberColumnType",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "oneOf",
@@ -719,9 +859,24 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "openCellPopover",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "parseMultiValue",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "PathFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "percentColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "PersistedGridState",
@@ -739,14 +894,49 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "PersonCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "personColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "PersonOption",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "PlaceholderVisualRow",
 			"kind": "type",
 			"source": "./types.js"
 		},
 		{
+			"name": "ProgressCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "progressColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "QuickFilterModel",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "RatingCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ratingColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "regex",
@@ -804,12 +994,37 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "SegmentedCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "segmentedColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "SelectAllRowsOptions",
 			"kind": "type",
 			"source": "./types.js"
 		},
 		{
+			"name": "selectColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "SelectEditorOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "SelectFilterCondition",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "SelectRendererOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -854,6 +1069,16 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "SparklineCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "sparklineColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "StickyHeadersOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -864,9 +1089,24 @@
 			"source": "./types.js"
 		},
 		{
-			"name": "TagsCellRenderer",
+			"name": "summarizeFilter",
 			"kind": "value",
-			"source": "./renderers/CellTypes.js"
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "SwitchCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "switchColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "tagsColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "themeToCSSVariables",
@@ -887,6 +1127,11 @@
 			"name": "TotalVisualRow",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "urlColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "useGridApi",
@@ -1400,7 +1645,7 @@
 					"name": "groupRowRenderer",
 					"optional": true,
 					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
-					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\r\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
 				},
 				{
 					"name": "detailRowRenderer",

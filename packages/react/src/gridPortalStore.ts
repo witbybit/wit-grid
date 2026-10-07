@@ -4,6 +4,7 @@ import type {
 	PortalData,
 	RowPortalData,
 	MenuPortalData,
+	FilterPortalData,
 	CellPortalSnapshot,
 	RowMenuPortalSnapshot,
 	ImperativeUpdaterFn,
@@ -37,6 +38,8 @@ export function createPortalStore<TRowData = unknown>() {
 	const portals = new Map<string, PortalData<TRowData>>();
 	const rowPortals = new Map<string, RowPortalData<TRowData>>();
 	const menuPortals = new Map<string, MenuPortalData<TRowData>>();
+	const filterPortals = new Map<HTMLElement, FilterPortalData>();
+	let filterPortalSeq = 0;
 	const cellPortalKeyByContainer = new Map<HTMLElement, string>();
 	const rowPortalKeyByContainer = new Map<HTMLElement, string>();
 
@@ -54,7 +57,7 @@ export function createPortalStore<TRowData = unknown>() {
 	// bails out on data updates (cellSnapshot reference unchanged) so only structural changes
 	// cause the pool to re-render. Per-cell data flows through PortalCellWrapper's useState.
 	let cellSnapshot: CellPortalSnapshot<TRowData> = { cellPortalList: [] };
-	let rowMenuSnapshot: RowMenuPortalSnapshot<TRowData> = { rowPortalList: [], menuPortalList: [] };
+	let rowMenuSnapshot: RowMenuPortalSnapshot<TRowData> = { rowPortalList: [], menuPortalList: [], filterPortalList: [] };
 
 	// Coalescing flags — one microtask per notification type
 	let cellStructuralScheduled = false;
@@ -215,6 +218,7 @@ export function createPortalStore<TRowData = unknown>() {
 						(p) => !p.container.classList.contains('og-row-portal-host') || p.container.dataset.rowKey === p.rowKey
 					),
 					menuPortalList: Array.from(menuPortals.values()),
+					filterPortalList: Array.from(filterPortals.values()),
 				};
 			}
 			return rowMenuSnapshot;
@@ -396,10 +400,24 @@ export function createPortalStore<TRowData = unknown>() {
 			notifyRowMenuStructural();
 		},
 
+		// ── Custom filter mounts ─────────────────────────────────────────────────
+		mountFilter(container: HTMLElement, node: unknown) {
+			filterPortals.set(container, { key: `filter-${++filterPortalSeq}`, container, node });
+			rebuildRowMenuSnapshot();
+			notifyRowMenuStructural();
+		},
+
+		unmountFilter(container: HTMLElement) {
+			if (!filterPortals.delete(container)) return;
+			rebuildRowMenuSnapshot();
+			notifyRowMenuStructural();
+		},
+
 		clear(silent = false) {
 			portals.clear();
 			rowPortals.clear();
 			menuPortals.clear();
+			filterPortals.clear();
 			cellPortalKeyByContainer.clear();
 			rowPortalKeyByContainer.clear();
 			cellDataListeners.clear();

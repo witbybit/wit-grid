@@ -4,7 +4,7 @@ import { collectRenderStats, createRenderRuntimeStats, type RenderRuntimeStats }
 function makeDeps(runtimeStats: RenderRuntimeStats) {
 	return {
 		engine: {
-			columns: { getCompiledPlanVersion: () => 0 },
+			columns: { getCompiledPlanVersion: () => 0, getDisplayedColumns: () => [{ field: 'name' }, { field: 'risk', cellRenderer: () => null }] },
 			rowCtrls: { stats: { created: 0, reused: 0, evicted: 0, cellCtrlsCreated: 0, cellCtrlsReused: 0 } },
 		},
 		portalMountManager: {
@@ -19,7 +19,9 @@ function makeDeps(runtimeStats: RenderRuntimeStats) {
 			getStats: () => ({ cells: 0, rows: 0, menus: 0 }),
 			customRendererManager: { getStats: () => ({}) },
 		},
-		rowRenderer: {},
+		rowRenderer: {
+			dirtyCellsAfterScroll: new Set(),
+		},
 		runtimeStats,
 	} as any;
 }
@@ -51,5 +53,21 @@ describe('collectRenderStats', () => {
 		expect(stats.cellsPatchedPerScrollFrame).toEqual([3]);
 		expect(stats.lastInvalidationReasons).toEqual(['sort']);
 		expect(stats.lastInvalidationReasons).not.toBe(runtime.lastInvalidationReasons);
+	});
+
+	it('reports the current repair backlog and its combined causes', () => {
+		const runtime = createRenderRuntimeStats();
+		const deps = makeDeps(runtime);
+		// Lanes are classified from the column and the slot's current content, never stored.
+		const motion = { __cellSlot: { colIndex: 0, lastContentMode: 'text', postScrollRepairReasons: 1 } } as unknown as HTMLDivElement;
+		const fidelity = { __cellSlot: { colIndex: 1, lastContentMode: 'fallback', postScrollRepairReasons: 6 } } as unknown as HTMLDivElement;
+		const released = { __cellSlot: { colIndex: -1, lastContentMode: 'empty', postScrollRepairReasons: 0 } } as unknown as HTMLDivElement;
+		deps.rowRenderer.dirtyCellsAfterScroll = new Set([motion, fidelity, released]);
+
+		const stats = collectRenderStats(deps);
+
+		expect(stats.pendingPostScrollMotionRepairs).toBe(2);
+		expect(stats.pendingPostScrollFidelityRepairs).toBe(1);
+		expect(stats.pendingPostScrollRepairReasonBits).toBe(7);
 	});
 });

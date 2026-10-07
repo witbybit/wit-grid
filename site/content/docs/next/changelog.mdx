@@ -11,6 +11,32 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Added — checkbox selection across groups
+
+With `rowSelection: 'multiple'`, group rows get a tri-state checkbox in the selection column: it selects or deselects
+every order beneath the group, nested and collapsed groups included, and shows a dash while the group is partly
+selected. Ancestor groups update as their rows are selected. `GroupRenderContext.selection` (`'all'`, `'some'`,
+`'none'`) lets a custom group renderer draw the same state.
+
+### Fixed — editing grouped, aggregated grids
+
+- Adding or removing a row in a grouped grid re-ran the whole pipeline (130–195 ms at 200k rows). A row added to an existing group, or removed from a group that stays non-empty, is now patched in place (about 15–50 ms). Without a sort, an add must land after its group's first row and a remove must not be a group's first row, since those could reorder groups; anything else, and any add that creates a group, still rebuilds.
+
+- Each quick-filter keystroke re-filtered and rebuilt every row (130–330 ms at 200k rows). Typing now narrows from the previous matches, recent results are cached (backspace is instant), a keystroke that matches the same rows rebuilds nothing, and clearing the box reuses the unfiltered rows: typically 15–25 ms, 0–3 ms when cached. The first keystroke after loading still builds each row's search text once.
+
+- Expanding or collapsing a group, opening a detail row or changing pages re-ran filtering, grouping, sorting and aggregation over every row. Opening or closing one group now replaces only that group's rows (about 5 ms on 200k grouped rows, was 100–160 ms); expand/collapse all, detail rows and page changes reuse the row tree and only re-flatten.
+
+- Editing a cell in a column that feeds a group aggregate re-ran the whole row pipeline (about 200 ms at 200k rows) and threw away the incremental index. Cell edits, cell transactions and undo/redo now patch the group totals incrementally, like row updates (about 3 ms).
+- Editing a field that a computed (`valueGetter`) aggregate column reads left the group totals stale. Declare `valueGetterDependencies` on the computed column to keep such edits incremental; without them, any edit in a grid with that aggregate re-aggregates in full, since the getter could read any field.
+
+### Fixed — checkbox selection
+
+- Ctrl/Cmd+click toggled a row twice, selecting and immediately deselecting it. It now toggles once and leaves the cell cursor where it is.
+- A checkbox in a recycled row could show the previous row's checked state and, if clicked before scrolling settled, toggle that hidden row. Checkboxes are now correct on every scroll frame, and a click acts on the row the cell shows.
+- Group rows in the selection column kept a leftover row checkbox from a recycled slot.
+- `hierarchyColumn.renderer` was also drawn on a grouped grid's leaf rows. Leaf rows now keep the built-in cell, which also keeps React work during scroll to group rows.
+- A React group renderer could show a blank cell while scrolling: a deferred first mount now shows the group label until it mounts, and stuck sticky headers mount immediately.
+
 ### Added — row animation styles
 
 `rowAnimation` (React prop; `rendererOptions.rowAnimation` and `api.setRowAnimation` in core) chooses how rows

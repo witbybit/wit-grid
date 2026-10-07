@@ -20,59 +20,101 @@ export {
 	themeToCSSVariables,
 } from '@eregister/wit-grid-core';
 
-// ─── Built-in cell renderers & editors ───────────────────────────────────────
+// ─── Built-in cell types (core, DOM-based) ───────────────────────────────────
 export {
-	// Checkbox
-	CheckboxCellRenderer,
-	// Multi-select
-	MultiSelectCellRenderer,
-	createMultiSelectCellRenderer,
-	createMultiSelectCellEditor,
-	// Date
-	DateCellRenderer,
-	DateCellEditor,
-	// Dropdown / enum badge
-	createDropdownCellRenderer,
-	createDropdownCellEditor,
-	// Number
-	createNumberCellRenderer,
-	createNumberCellEditor,
-	// Utilities
-	parseMultiValue,
-	TagsCellRenderer,
-	// Column type registry
 	BUILTIN_COLUMN_TYPES,
-	// Column type helpers
+	CELL_HUES,
+	checkboxColumnType,
 	numberColumnType,
+	currencyColumnType,
+	percentColumnType,
+	dateColumnType,
+	dateTimeColumnType,
+	selectColumnType,
+	comboboxColumnType,
 	multiSelectColumnType,
-	dropdownColumnType,
-} from './renderers/CellTypes.js';
-// DOM versions of the built-in cells (what the built-in column types use)
-export { CheckboxDomCellRenderer, DateDomCellRenderer, createNumberDomCellRenderer } from './renderers/domCellTypes.js';
+	tagsColumnType,
+	ratingColumnType,
+	progressColumnType,
+	urlColumnType,
+	emailColumnType,
+	personColumnType,
+	createCheckboxRenderer,
+	createNumberRenderer,
+	createDateRenderer,
+	createSelectRenderer,
+	createMultiSelectRenderer,
+	createNumberEditor,
+	createDateEditor,
+	createSelectEditor,
+	createMultiSelectEditor,
+	parseMultiValue,
+	createCellOptionsStore,
+	openCellPopover,
+	switchColumnType,
+	segmentedColumnType,
+	colorColumnType,
+	longTextColumnType,
+	dateRangeColumnType,
+	cascadeColumnType,
+	linkedRecordColumnType,
+	sparklineColumnType,
+	createSparklineRenderer,
+	defaultDateRangePresets,
+} from '@eregister/wit-grid-core';
 export type {
-	DropdownOption,
-	DropdownOptionColor,
-	NumberCellRendererOptions,
-	NumberCellEditorOptions,
+	CellOption,
+	CellOptionInput,
 	ColumnTypeDefinition,
-} from './renderers/CellTypes.js';
+	CellColor,
+	NumberCellOptions,
+	DateCellOptions,
+	SelectEditorOptions,
+	SelectRendererOptions,
+	MultiSelectRendererOptions,
+	RatingCellOptions,
+	ProgressCellOptions,
+	PersonOption,
+	PersonCellOptions,
+	DomCellEditor,
+	DomCellEditorParams,
+	CellOptionsStore,
+	CellOptionsQuery,
+	CellOptionsPage,
+	CellOptionsLoader,
+	CellOptionsResolver,
+	CellPopover,
+	CellPopoverOptions,
+	LinkedRecordOptions,
+	SparklineCellOptions,
+	DateRange,
+	DateRangePreset,
+	DateRangeCellOptions,
+	CascadeOption,
+	CascadeCellOptions,
+	ColorCellOptions,
+	LongTextCellOptions,
+	SegmentedCellOptions,
+	SwitchCellOptions,
+} from '@eregister/wit-grid-core';
 
 // ─── Advanced filter API ──────────────────────────────────────────────────────
 export type {
 	ColumnFilterDef,
 	ColumnFilterType,
-	FilterSelectOption,
-	FilterFetchParams,
-	FilterFetchResult,
-	FilterPageParams,
-	FilterPageResult,
-	CustomFilterRendererParams,
 	FilterSurface,
+	DomFilterEditor,
+	DomFilterEditorParams,
+	DomFilterEditorHandle,
 	SelectFilterCondition,
+	BooleanFilterCondition,
+	DateRangeFilterCondition,
+	PathFilterCondition,
+	CustomFilterCondition,
 } from '@eregister/wit-grid-core';
 export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
 export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
-export { resolveColumnFilterDef } from '@eregister/wit-grid-core';
+export { resolveColumnFilterDef, summarizeFilter } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
 export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js';
@@ -138,7 +180,6 @@ export type {
 	TooltipParams,
 	AutoSizeColumnOptions,
 	AutoSizeAllColumnsOptions,
-	FloatingFilterRendererParams,
 } from '@eregister/wit-grid-core';
 
 // ── Data Integrity Pipeline types ─────────────────────────────────────────────

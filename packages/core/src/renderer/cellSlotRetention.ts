@@ -103,7 +103,10 @@ export function applyCellSlotRetentionPolicy<TRowData>(
 			if (cell.element.parentNode) cell.element.remove();
 			cells.delete(instanceId);
 			if (recyclable) slot.recycledCells.push(cell);
-			else instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);
+			else {
+				cell.destroy();
+				instrumentation?.increment(GridMetric.CELL_VIEW_DESTROYED);
+			}
 			evicted++;
 		}
 	}

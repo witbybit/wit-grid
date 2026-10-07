@@ -51,7 +51,7 @@ const promotedShowcases = [
 	{
 		id: 'native-cell-types',
 		title: 'Native cell types',
-		description: 'Built-in checkbox, multi-select, date, dropdown, number, and tag-style cells with editors.',
+		description: 'Every built-in cell type (select, multi-select, combobox, person, date, number, progress, rating) with themed editors.',
 		category: 'Editing',
 		level: 'intermediate',
 		tags: ['cell types', 'editors', 'renderers'],

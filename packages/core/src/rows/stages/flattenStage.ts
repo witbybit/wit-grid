@@ -62,6 +62,29 @@ export function flattenStage<TData>(
 	return result;
 }
 
+/**
+ * Flattens one node and everything it shows (a group row with its children and totals), exactly as
+ * flattenStage would at this position. `stickyGroupMeta` receives indexes relative to the returned
+ * array. Used to splice a single group's expansion change into existing visual rows.
+ */
+export function flattenSubtree<TData>(
+	node: RowTreeNode<TData>,
+	config: FlattenConfig<TData>,
+	position: { parentId: string | null; level: number; posInSet: number; setSize: number },
+	stickyGroupMeta?: Map<number, number>
+): VisualRow<TData>[] {
+	const result: VisualRow<TData>[] = [];
+	const state: FlattenState<TData> = {
+		config,
+		result,
+		stickyGroupMeta,
+		totalsHeight: config.groupRowHeight || config.defaultRowHeight,
+		recordedHeights: hasKeys(config.rowHeightsRecord) ? config.rowHeightsRecord : null,
+	};
+	flattenNode(node, state, position.parentId, position.level, position.posInSet, position.setSize);
+	return result;
+}
+
 type ExpansionConfig<TData> = Pick<FlattenConfig<TData>, 'expansion' | 'groupDefaultExpanded' | 'treeDefaultExpanded'>;
 
 /** A group's or tree row's expansion: its explicit override, else `expansion.base`, else the configured default. */
@@ -154,6 +177,33 @@ function countLeaves<TData>(node: RowTreeNode<TData>): number {
 	return count;
 }
 
+/** The detail row under a data row, when its detail is open. */
+function pushDetailRow<TData>(node: Extract<RowTreeNode<TData>, { kind: 'data' }>, state: FlattenState<TData>, id: string, level: number): void {
+	const { config, result } = state;
+	const rowId = node.rowId;
+	const detail = config.detail;
+	if (detail && config.expansion.details[rowId] && (!detail.isMaster || detail.isMaster(node.node.data, rowId))) {
+		result.push({
+			kind: 'detail',
+			id: toDetailVisualRowId(rowId),
+			parentId: rowId,
+			parentRowId: rowId,
+			hierarchy: {
+				level: level + 1,
+				parentId: id,
+				hasChildren: false,
+				expanded: false,
+				childCount: 0,
+				leafCount: 0,
+				posInSet: 0,
+				setSize: 0,
+			},
+			height: resolveDetailHeight(detail, node.node.data, rowId, config.rowHeightsRecord),
+			render: detail.renderer,
+		});
+	}
+}
+
 function flattenNode<TData>(
 	node: RowTreeNode<TData>,
 	state: FlattenState<TData>,
@@ -170,6 +220,27 @@ function flattenNode<TData>(
 		const explicitHeight = state.recordedHeights?.[rowId] ?? config.getRowHeight?.(node.node.data, rowId);
 		const children = node.children;
 		const hasChildren = !!children && children.length > 0;
+		const height = explicitHeight !== undefined ? explicitHeight : config.defaultRowHeight;
+		// A leaf drawn exactly as last time keeps its row object (the pipeline reuses its tree while only
+		// expansion, detail or heights change): no allocation, and consumers see an unchanged row.
+		const previous = node.row;
+		if (
+			!hasChildren &&
+			previous !== undefined &&
+			previous.kind === 'data' &&
+			previous.node === node.node &&
+			previous.height === height &&
+			previous.hierarchy.level === level &&
+			previous.hierarchy.parentId === parentId &&
+			previous.hierarchy.posInSet === posInSet &&
+			previous.hierarchy.setSize === setSize &&
+			!previous.hierarchy.hasChildren &&
+			(previous as { aggregates?: Record<string, unknown> }).aggregates === node.aggregates
+		) {
+			result.push(previous);
+			pushDetailRow(node, state, id, level);
+			return;
+		}
 		const expanded = hasChildren && resolveNodeExpanded(node, level, config);
 		const row: VisualRow<TData> = {
 			kind: 'data',
@@ -186,7 +257,7 @@ function flattenNode<TData>(
 				posInSet,
 				setSize,
 			},
-			height: explicitHeight !== undefined ? explicitHeight : config.defaultRowHeight,
+			height,
 			selectable: true,
 			editable: true,
 		};
@@ -198,27 +269,7 @@ function flattenNode<TData>(
 			for (let i = 0; i < children!.length; i++) flattenNode(children![i], state, id, level + 1, i + 1, children!.length);
 		}
 
-		const detail = config.detail;
-		if (detail && config.expansion.details[rowId] && (!detail.isMaster || detail.isMaster(node.node.data, rowId))) {
-			result.push({
-				kind: 'detail',
-				id: toDetailVisualRowId(rowId),
-				parentId: rowId,
-				parentRowId: rowId,
-				hierarchy: {
-					level: level + 1,
-					parentId: id,
-					hasChildren: false,
-					expanded: false,
-					childCount: 0,
-					leafCount: 0,
-					posInSet: 0,
-					setSize: 0,
-				},
-				height: resolveDetailHeight(detail, node.node.data, rowId, config.rowHeightsRecord),
-				render: detail.renderer,
-			});
-		}
+		pushDetailRow(node, state, id, level);
 		return;
 	}
 

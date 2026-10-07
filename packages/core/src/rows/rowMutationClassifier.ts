@@ -12,7 +12,7 @@ import type { AggregationDef } from './stages/aggregateStage.js';
  *
  * Priority order (most to least structural):
  *   group-key > filter-key > sort-key > tree-parent > height >
- *   formula-dependent > value-only
+ *   aggregation-input > formula-dependent > value-only
  *
  * 'insert', 'remove', and 'full-rebuild' are caller-supplied for structural
  * mutations that bypass field-level classification entirely.
@@ -66,6 +66,8 @@ export class RowDependencyRegistry<TData = unknown> {
 	readonly groupKeys = new Set<string>();
 	/** Fields that feed aggregation functions (AggregationDef.field). */
 	readonly aggregationFields = new Set<string>();
+	/** An aggregated column computes its value with an undeclared valueGetter. */
+	opaqueAggregationDependency = false;
 	/** Fields whose columns declare a valueGetter — computed/formula cells. */
 	readonly formulaFields = new Set<string>();
 	/** Whether tree-parent resolution is active for this grid. */
@@ -138,8 +140,19 @@ export class RowDependencyRegistry<TData = unknown> {
 			}
 		}
 
+		// A computed aggregate column depends on the fields its valueGetter reads: declared ones are
+		// tracked precisely; an undeclared getter could read anything, so every write may move it.
 		this.aggregationFields.clear();
-		for (const agg of aggDefs ?? []) this.aggregationFields.add(agg.colId);
+		this.opaqueAggregationDependency = false;
+		for (const agg of aggDefs ?? []) {
+			this.aggregationFields.add(agg.colId);
+			const col = colByField.get(agg.colId);
+			if (col?.valueGetterDependencies) {
+				for (const dep of col.valueGetterDependencies) this.aggregationFields.add(dep);
+			} else if (col?.valueGetter) {
+				this.opaqueAggregationDependency = true;
+			}
+		}
 
 		this.formulaFields.clear();
 		for (const col of columns) {
@@ -215,11 +228,14 @@ export function classifyMutation(
 		return 'tree-parent';
 	}
 
-	if (registry.formulaFields.size > 0 && anyFieldMatchesSet(changedFields, registry.formulaFields)) return 'formula-dependent';
-
-	// Aggregation input: a leaf field that feeds a group aggregate. Requires full
-	// grouped-model refresh so ancestor group totals stay consistent with leaf data.
+	// Aggregation input: a leaf field that feeds a group aggregate, directly or through a computed
+	// aggregate column. Ancestor group totals must follow (incrementally when the index can, else a
+	// full grouped refresh). Ranked above formula-dependent: a formula field that is aggregated
+	// changes group rows, not just its own cells.
+	if (registry.opaqueAggregationDependency) return 'aggregation-input';
 	if (registry.aggregationFields.size > 0 && anyFieldMatchesSet(changedFields, registry.aggregationFields)) return 'aggregation-input';
+
+	if (registry.formulaFields.size > 0 && anyFieldMatchesSet(changedFields, registry.formulaFields)) return 'formula-dependent';
 
 	// Opaque active operation: an undeclared computed sort/filter/group column means
 	// this change might affect it — return the conservative structural impact.

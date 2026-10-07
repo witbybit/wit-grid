@@ -21,13 +21,14 @@ describe('RowSlot & CellSlot Controllers', () => {
 		expect(updated2).toBe(false);
 	});
 
-	it('setBinding() records all identity fields and unbindHot() clears them', () => {
+	it('commitBinding() records all identity fields and unbindHot() clears them', () => {
 		const div = document.createElement('div');
 		const cell = new CellSlot(div);
 
 		expect(cell.binding).toBeNull();
 
-		cell.setBinding('slot-1', 'row-42', 42, 'price', 3, 'slot-1::price', 'portal');
+		cell.update(3, 'price', 42, 'row-42', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'slot-1::price');
+		cell.commitBinding('slot-1', 'row-42', 42, 'price', 3, 'slot-1::price', 'portal');
 		expect(cell.binding).toEqual({
 			rowSlotId: 'slot-1',
 			rowId: 'row-42',
@@ -42,21 +43,26 @@ describe('RowSlot & CellSlot Controllers', () => {
 		expect(cell.binding).toBeNull();
 	});
 
-	it('setBinding() can rebind the same slot to a different cell', () => {
+	it('commitBinding() reuses its identity record across physical rebinds', () => {
 		const div = document.createElement('div');
 		const cell = new CellSlot(div);
 
-		cell.setBinding('slot-1', 'row-1', 0, 'name', 0, 'slot-1::name', 'text');
-		cell.setBinding('slot-1', 'row-2', 1, 'name', 0, 'slot-1::name', 'portal');
+		cell.update(0, 'name', 0, 'row-1', 0, -1, 100, 'og-cell', 'text', 'one', 'one');
+		cell.commitBinding('slot-1', 'row-1', 0, 'name', 0, 'slot-1::name', 'text');
+		const firstBindingRecord = cell.binding;
+		cell.update(0, 'name', 1, 'row-2', 0, -1, 100, 'og-cell', 'portal', undefined, '', 'slot-1::name');
+		cell.commitBinding('slot-1', 'row-2', 1, 'name', 0, 'slot-1::name', 'portal');
 
 		expect(cell.binding?.rowId).toBe('row-2');
 		expect(cell.binding?.contentMode).toBe('portal');
+		expect(cell.binding).toBe(firstBindingRecord);
 	});
 
-	it('unbindCold() clears binding and resets cached DOM state', () => {
+	it('destroy() clears binding and resets cached DOM state', () => {
 		const div = document.createElement('div');
 		const cell = new CellSlot(div);
-		cell.setBinding('slot-1', 'row-1', 0, 'name', 0, 'slot-1::name', 'text');
+		cell.update(0, 'name', 0, 'row-1', 0, -1, 100, 'og-cell', 'text', 'one', 'one');
+		cell.commitBinding('slot-1', 'row-1', 0, 'name', 0, 'slot-1::name', 'text');
 		cell.lastMountedRowVersion = 5;
 		cell.lastMountedGlobalVersion = 3;
 		cell.lastMountedInsightVersion = 2;
@@ -64,7 +70,7 @@ describe('RowSlot & CellSlot Controllers', () => {
 		cell.lastMountedLoadingVersion = 1;
 		cell.lastMountedSelectionVersion = 6;
 
-		cell.unbindCold();
+		cell.destroy();
 
 		expect(cell.binding).toBeNull();
 		expect(cell.lastMountedRowVersion).toBe(-1);

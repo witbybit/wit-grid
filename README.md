@@ -449,52 +449,59 @@ export const StatusHeaderFilter = ({ colField, api, close }: CustomFilterProps) 
 
 ### 5. Built-in Cell Types & Column Type Registry
 
-`@eregister/wit-grid-react` ships six ready-to-use cell types — checkbox, date, number, multi-select, dropdown, and tags. Attach them to a column with `type: 'name'` and the grid resolves the renderer and editor automatically, with no component imports needed in your column definitions.
+The grid core ships a set of cell types — select, multi-select, combobox, tags, person, date, number, currency, percent, progress, rating, checkbox, url and email. They are DOM renderers and editors (no React work per cell), styled from the grid theme, so badges, chips and editor popovers follow any built-in or custom theme. Attach one to a column with `type: 'name'`.
 
 #### Built-in types (no configuration required)
 
-| `type` value | Renderer           | Editor                              |
-| :----------- | :----------------- | :---------------------------------- |
-| `'checkbox'` | Toggle checkbox    | Toggles on click — no editor needed |
-| `'date'`     | DD/MM/YYYY display | Native date picker                  |
-| `'number'`   | Mono number        | Stepper with ↑↓ keys                |
+| `type` value                          | Renderer                               | Editor                                |
+| :------------------------------------ | :------------------------------------- | :------------------------------------ |
+| `'checkbox'`                          | Checkbox                               | Toggles on press, no editor needed    |
+| `'date'` / `'datetime'`               | Intl date (and time)                   | Calendar popover, keyboard navigation |
+| `'number'`, `'currency'`, `'percent'` | Intl number formats, right-aligned     | Field with stepper, ↑↓ to step        |
+| `'progress'`, `'rating'`              | Bar with label / stars (click to rate) | Number field                          |
+| `'url'`, `'email'`                    | Safe links (http, https, mailto only)  | Text                                  |
+| `'tags'`                              | Palette-coloured chips                 | Search or create tags                 |
 
 ```tsx
 const columns: ColumnDef<Row>[] = [
 	{ field: 'isActive', header: 'Active', width: 70, type: 'checkbox' },
 	{ field: 'startDate', header: 'Start Date', width: 145, type: 'date' },
-	{ field: 'quantity', header: 'Qty', width: 100, type: 'number' },
+	{ field: 'price', header: 'Price', width: 110, type: 'currency' },
 ];
 ```
 
 #### Parameterised types via `columnTypes`
 
-Types that need runtime config (options list, formatting, bounds) are registered in the `columnTypes` prop using the helper factories. The type name is then referenced in `ColumnDef.type` exactly like a built-in.
+Types that need options or formatting are registered in the `columnTypes` prop with the factories, then referenced by name in `ColumnDef.type`.
 
 ```tsx
 import {
 	Grid,
+	selectColumnType,
 	multiSelectColumnType,
-	dropdownColumnType,
+	comboboxColumnType,
+	currencyColumnType,
 	numberColumnType,
 	type ColumnDef,
 	type ColumnTypeDefinition,
-	type DropdownOption,
 } from '@eregister/wit-grid-react';
-
-const STATUS_OPTIONS: DropdownOption[] = [
-	{ value: 'Active', color: 'emerald' },
-	{ value: 'Pending', color: 'amber' },
-	{ value: 'Inactive', color: 'default' },
-];
-
-const SKILLS_OPTIONS = ['React', 'TypeScript', 'Node', 'Go', 'Rust'];
 
 // Registered once at module level — references are stable
 const MY_COLUMN_TYPES: Record<string, ColumnTypeDefinition<EmployeeRow>> = {
-	status: dropdownColumnType(STATUS_OPTIONS),
-	skills: multiSelectColumnType(SKILLS_OPTIONS, 3),
-	salary: numberColumnType({ prefix: '$', decimals: 2, locale: true }),
+	status: selectColumnType(
+		[
+			{ value: 'active', label: 'Active', color: 'emerald' },
+			{ value: 'pending', label: 'Pending', color: 'amber' },
+			{ value: 'inactive', label: 'Inactive', color: 'gray' },
+		],
+		{ noneLabel: 'No status' }
+	),
+	skills: multiSelectColumnType(['React', 'TypeScript', 'Node', 'Go', 'Rust'], { maxVisible: 3 }),
+	team: comboboxColumnType([
+		{ value: 'fe', label: 'Frontend', group: 'Engineering' },
+		{ value: 'ui', label: 'UI Design', group: 'Design' },
+	]),
+	salary: currencyColumnType({ currency: 'EUR' }),
 	yearsExp: numberColumnType({ suffix: ' yrs', min: 0, max: 50, step: 1 }),
 };
 
@@ -502,6 +509,7 @@ const columns: ColumnDef<EmployeeRow>[] = [
 	{ field: 'name', header: 'Name', width: 180 },
 	{ field: 'status', header: 'Status', width: 130, type: 'status' },
 	{ field: 'skills', header: 'Skills', width: 260, type: 'skills' },
+	{ field: 'team', header: 'Team', width: 150, type: 'team' },
 	{ field: 'salary', header: 'Salary', width: 130, type: 'salary' },
 	{ field: 'yearsExp', header: 'Experience', width: 120, type: 'yearsExp' },
 	{ field: 'joinDate', header: 'Joined', width: 145, type: 'date' },
@@ -513,15 +521,76 @@ export function EmployeesGrid({ rows }: { rows: EmployeeRow[] }) {
 }
 ```
 
-Column-level `renderer` / `cellEditor` always override a type — so you can use a type as a default and override on specific columns.
+A type fills in `renderer`, `cellEditor`, `valueFormatter` (export, tooltips) and `filterDef`; anything the column sets itself wins, so a type can be a default you override per column.
 
-#### Helper factory reference
+#### Factory reference
 
-| Factory                                       | Options                                                        | Description                                |
-| :-------------------------------------------- | :------------------------------------------------------------- | :----------------------------------------- |
-| `numberColumnType(opts?)`                     | `prefix`, `suffix`, `decimals`, `locale`, `min`, `max`, `step` | Formatted number renderer + stepper editor |
-| `multiSelectColumnType(options, maxVisible?)` | `string[]` option list, visible cap                            | Pill-tag renderer + search dropdown editor |
-| `dropdownColumnType(options)`                 | `DropdownOption[]` with `value`, `label`, `color`              | Badge renderer + `<select>` editor         |
+| Factory                                  | Highlights                                                                     |
+| :--------------------------------------- | :----------------------------------------------------------------------------- |
+| `selectColumnType(options, opts?)`       | Badge (`variant`: soft, dot, outline, plain), searchable list, `noneLabel`     |
+| `multiSelectColumnType(options, opts?)`  | Chips with +N past `maxVisible`, checkbox list, `creatable`                    |
+| `comboboxColumnType(options, opts?)`     | Searchable list with `group` headings, value shown as text with its dot / icon |
+| `tagsColumnType(options?, opts?)`        | Free tags, created by typing, coloured from the palette                        |
+| `personColumnType({ people, multiple })` | Avatar and name or stacked avatars, people picker                              |
+| `numberColumnType(opts?)`                | `format` (number, currency, percent), `decimals`, `locale`, `min`/`max`/`step` |
+| `dateColumnType(opts?)`                  | `dateStyle`, `withTime`, `locale`, `weekStartsOn`                              |
+| `progressColumnType(opts?)`              | `max`, `color` or `traffic`                                                    |
+| `ratingColumnType(opts?)`                | `max`, `interactive`                                                           |
+
+Options are `{ value, label?, color?, icon?, description?, group?, disabled? }`; `color` is a palette name (`gray`, `red`, `amber`, `emerald`, `blue`, `violet`, `rose`…) or any CSS colour. To restyle cells alone, set `--og-ct-accent`, `--og-ct-radius` or `--og-ct-rating` on the grid.
+
+#### More cell types
+
+| Factory                                                    | Value                                             | Cell                                           | Editor                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `switchColumnType({ onLabel, offLabel })`                  | boolean (`'true'`, `1` keep shape)                | On / off switch, toggles on press              | Enter toggles                                                          |
+| `segmentedColumnType(options)`                             | option value                                      | All options inline; one press picks            | Enter opens them as a list                                             |
+| `colorColumnType({ swatches })`                            | `#rrggbb`                                         | Swatch and hex                                 | Palette (arrow keys), hex field, system picker, screen eyedropper      |
+| `longTextColumnType({ lines, maxLength })`                 | string                                            | One to three clamped lines, full text on hover | Textarea popover: Enter adds a line, Ctrl / ⌘ + Enter saves            |
+| `linkedRecordColumnType(records, { loadOptions, onOpen })` | record ids                                        | Record chips; pressing one calls `onOpen`      | Record picker (paged from your API with `loadOptions`)                 |
+| `cascadeColumnType({ options \| loadChildren })`           | path `['in', 'ka', 'blr']` or `'in/ka/blr'`       | “India › Karnataka › Bengaluru”                | One column per level, ← → ↑ ↓ Enter, search across paths, async levels |
+| `dateRangeColumnType({ presets })`                         | `{ start, end }`, `[start, end]` or `'start/end'` | “Mar 4 – 18, 2026” and its length              | Two-month range calendar with presets, Apply                           |
+| `sparklineColumnType(options)`                             | numbers (array, `'1,2,3'`, `{ values }`)          | Line, area, bar or win / loss chart            | (display only)                                                         |
+
+Sparklines take `type`, `color` or `colorBy: 'trend'`, `curve: 'smooth'`, `markers` (`last`, `minmax`, `all`),
+`reference` (a value, `'average'` or `'zero'`), `label` (`last`, `change`), `format`, fixed `min` / `max` for
+comparable rows, `height` and `strokeWidth`. They stretch to the column without measuring it and keep strokes
+and markers crisp.
+
+`cascadeColumnType` loads levels with `loadChildren(path, signal)` (mark leaves `isLeaf: true`), labels stored
+paths with `resolvePath(path)`, and searches a server with `searchPaths(query, signal)`; `changeOnSelect` allows
+picking a state as well as a city. Checkbox cells now toggle on Enter too.
+
+#### Options from a server
+
+`selectColumnType`, `comboboxColumnType`, `multiSelectColumnType`, `tagsColumnType` and `personColumnType`
+can load their options instead of listing them:
+
+```tsx
+const columnTypes = {
+	account: comboboxColumnType([], {
+		// One page of matches. Return `hasMore: false` (or a plain array) on the last page.
+		loadOptions: async ({ search, offset, limit, signal, rowId }) => {
+			const res = await fetch(`/api/accounts?q=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`, { signal });
+			const { items, total } = await res.json();
+			return { options: items.map((a) => ({ value: a.id, label: a.name, description: a.region })), hasMore: offset + limit < total, total };
+		},
+		// Labels for the values cells show before any list has loaded them (one batched call).
+		resolveOptions: async (ids) => (await fetch(`/api/accounts?ids=${ids.join(',')}`).then((r) => r.json())).map(toOption),
+		pageSize: 50,
+	}),
+};
+```
+
+- The editor searches on the server after a pause in typing (`debounceMs`, default 250) and from
+  `minQueryLength` characters. One request is in flight at a time: a newer search waits for it, then the latest
+  runs. Closing the editor aborts the page still loading (`signal`).
+- The next page loads when the list is scrolled near its end, or when arrowing past the last option. The list
+  shows a loading row, a Retry row when a page fails, and "50 of 1,204" when the loader returns `total`.
+- Cells show a placeholder while `resolveOptions` looks a value up. Every option a page or lookup returns is
+  remembered, so its label appears in cells, exports and filters.
+- `rowId` and `colField` let options depend on the row (cities of the row's country, say).
+- The column's filter lists the same options (loaded the same way), so filters and cells agree on labels.
 
 ---
 

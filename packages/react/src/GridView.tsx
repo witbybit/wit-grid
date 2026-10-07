@@ -8,9 +8,10 @@ import {
 	registerGridContextMenu,
 	VisualRow,
 	GroupRenderContext,
+	type AdapterFilterMount,
 } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { GridAdapterContext } from './gridContext.js';
+import { GridAdapterContext, GridFilterMountContext } from './gridContext.js';
 import {
 	GridHostWithAdapter,
 	GridAdapterHandle,
@@ -84,6 +85,14 @@ export function GridView<TRowData = unknown>({
 	autoRowHeight,
 }: GridViewProps<TRowData>) {
 	const portalStore = useMemo(() => createPortalStore<TRowData>(), []);
+	// Custom filter components render through the portal tree, so they keep the grid's React context.
+	const filterMount = useMemo<AdapterFilterMount>(
+		() => (container, render, params) => {
+			portalStore.mountFilter(container, render(params));
+			return () => portalStore.unmountFilter(container);
+		},
+		[portalStore]
+	);
 	// Which full-width rows React draws: only kinds the user gave a renderer for. Core draws the rest.
 	const userRowRenderersRef = useRef({ group: false, detail: false, total: false });
 	userRowRenderersRef.current = { group: !!groupRowRenderer, detail: !!detailRowRenderer, total: !!totalRowRenderer };
@@ -174,6 +183,7 @@ export function GridView<TRowData = unknown>({
 					portalStore.unmountRow(unmount.rowKey, unmount.container);
 				},
 			},
+			mountFilter: filterMount,
 			headerMenu: {
 				mountHeaderMenu: (mount) => {
 					portalStore.mountMenu(mount.colField, mount.container, mount.column, mount.close);
@@ -323,22 +333,24 @@ export function GridView<TRowData = unknown>({
 
 	return (
 		<GridAdapterContext.Provider value={adapterHandle}>
-			{hasSidebar ? (
-				<div
-					style={{
-						width: '100%',
-						height: '100%',
-						display: 'flex',
-						flexDirection: sidebarPosition === 'left' ? 'row-reverse' : 'row',
-					}}
-				>
-					{gridPane}
-					<GridSidebar<TRowData> api={api} config={sidebar!} />
-				</div>
-			) : (
-				gridPane
-			)}
-			{enableChart && <GridChartOverlay api={api} />}
+			<GridFilterMountContext.Provider value={filterMount}>
+				{hasSidebar ? (
+					<div
+						style={{
+							width: '100%',
+							height: '100%',
+							display: 'flex',
+							flexDirection: sidebarPosition === 'left' ? 'row-reverse' : 'row',
+						}}
+					>
+						{gridPane}
+						<GridSidebar<TRowData> api={api} config={sidebar!} />
+					</div>
+				) : (
+					gridPane
+				)}
+				{enableChart && <GridChartOverlay api={api} />}
+			</GridFilterMountContext.Provider>
 		</GridAdapterContext.Provider>
 	);
 }

@@ -36,17 +36,10 @@ describe('CellSlot.cellInstanceId — Plan 118 physical identity', () => {
 		expect(slot.cellInstanceId).toBe(id);
 	});
 
-	it('is stable across unbindCold()', () => {
+	it('is stable across destroy()', () => {
 		const slot = new CellSlot(document.createElement('div'));
 		const id = slot.cellInstanceId;
-		slot.unbindCold();
-		expect(slot.cellInstanceId).toBe(id);
-	});
-
-	it('is stable across reset()', () => {
-		const slot = new CellSlot(document.createElement('div'));
-		const id = slot.cellInstanceId;
-		slot.reset();
+		slot.destroy();
 		expect(slot.cellInstanceId).toBe(id);
 	});
 
@@ -84,19 +77,11 @@ describe('CellSlot.rowBindingGeneration — Plan 118 WS1 per-cell row binding tr
 		expect(slot.rowBindingGeneration).toBe(0);
 	});
 
-	it('does not change on unbindCold() — cold unbind is destroy, not rebind', () => {
+	it('does not change on destroy()', () => {
 		const slot = new CellSlot(document.createElement('div'));
 		slot.unbindHot();
 		const gen = slot.rowBindingGeneration;
-		slot.unbindCold();
-		expect(slot.rowBindingGeneration).toBe(gen);
-	});
-
-	it('does not change on reset()', () => {
-		const slot = new CellSlot(document.createElement('div'));
-		slot.unbindHot();
-		const gen = slot.rowBindingGeneration;
-		slot.reset();
+		slot.destroy();
 		expect(slot.rowBindingGeneration).toBe(gen);
 	});
 
@@ -123,11 +108,11 @@ describe('CellSlot WS2 — columnInstanceId stable column ownership', () => {
 		expect(slot.columnInstanceId).toBe('price');
 	});
 
-	it('is cleared by unbindCold() — cold destroy resets all ownership', () => {
+	it('is retained through destroy because it is physical lifetime identity', () => {
 		const slot = new CellSlot(document.createElement('div'));
 		slot.columnInstanceId = 'price' as any;
-		slot.unbindCold();
-		// columnInstanceId is not cleared by unbindCold (physical column association persists
+		slot.destroy();
+		// columnInstanceId is not cleared by destroy (physical column association persists
 		// until the element is destroyed — cleared only when cell is fully released)
 		// This matches the plan: columnInstanceId is set at construction and stable for the
 		// cell's lifetime, which ends at destroyCold().
@@ -141,13 +126,13 @@ describe('CellSlot WS2 — renderer handle ownership', () => {
 		expect(slot.renderer).toBeNull();
 	});
 
-	it('unbindCold() calls destroy() on active renderer and nulls it', () => {
+	it('destroy() destroys the active renderer and nulls it', () => {
 		const slot = new CellSlot(document.createElement('div'));
 		const handle = new TextRendererHandle('$42');
 		const destroySpy = vi.spyOn(handle, 'destroy');
 		slot.renderer = handle;
 
-		slot.unbindCold();
+		slot.destroy();
 
 		expect(destroySpy).toHaveBeenCalledTimes(1);
 		expect(slot.renderer).toBeNull();
@@ -165,9 +150,10 @@ describe('CellSlot WS2 — renderer handle ownership', () => {
 		expect(slot.renderer).toBe(handle);
 	});
 
-	it('unbindCold() with null renderer is a no-op', () => {
+	it('destroy() with null renderer is idempotent', () => {
 		const slot = new CellSlot(document.createElement('div'));
-		expect(() => slot.unbindCold()).not.toThrow();
+		expect(() => slot.destroy()).not.toThrow();
+		expect(() => slot.destroy()).not.toThrow();
 		expect(slot.renderer).toBeNull();
 	});
 });
@@ -301,7 +287,7 @@ describe('CellSlot accessibility sync - Plan 157 kernel-derived cell ARIA state'
 		expect(slot.element.hasAttribute('aria-invalid')).toBe(false);
 	});
 
-	it('clears synced accessibility attributes on hot unbind and reset', () => {
+	it('clears synced accessibility attributes on hot and cold release', () => {
 		const slot = new CellSlot(document.createElement('div'));
 		slot.syncAccessibilityState({ focused: true, selected: true, readOnly: true, invalid: true });
 
@@ -312,7 +298,7 @@ describe('CellSlot accessibility sync - Plan 157 kernel-derived cell ARIA state'
 		expect(slot.element.hasAttribute('aria-invalid')).toBe(false);
 
 		slot.syncAccessibilityState({ focused: true, selected: true, readOnly: true, invalid: true });
-		slot.reset();
+		slot.destroy();
 		expect(slot.element.hasAttribute('tabindex')).toBe(false);
 		expect(slot.element.hasAttribute('aria-selected')).toBe(false);
 		expect(slot.element.hasAttribute('aria-readonly')).toBe(false);
