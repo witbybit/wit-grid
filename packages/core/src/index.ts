@@ -305,3 +305,13 @@ export * from './cells/index.js';
 // ── Filter editors (every filter surface mounts these) ───────────────────────
 export { createFilterEditor } from './filters/filterEditors.js';
 export type { AdapterFilterMount } from './filters/filterEditors.js';
+export type {
+	AdapterPanelMount,
+	BuiltinSidebarPanelId,
+	GridSidebarConfig,
+	SidebarPanel,
+	SidebarPanelContext,
+	SidebarPanelDef,
+	SidebarPanelHandle,
+} from './sidebar/sidebarTypes.js';
+export { sidebarIconSvg, type SidebarIconName } from './sidebar/sidebarIcons.js';

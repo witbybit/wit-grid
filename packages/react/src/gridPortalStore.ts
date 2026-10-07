@@ -400,9 +400,11 @@ export function createPortalStore<TRowData = unknown>() {
 			notifyRowMenuStructural();
 		},
 
-		// ── Custom filter mounts ─────────────────────────────────────────────────
+		// ── Adapter mounts (custom filters, sidebar panels) ─────────────────────
+		// Mounting the same container again updates its node in place (same key: React keeps its state).
 		mountFilter(container: HTMLElement, node: unknown) {
-			filterPortals.set(container, { key: `filter-${++filterPortalSeq}`, container, node });
+			const key = filterPortals.get(container)?.key ?? `filter-${++filterPortalSeq}`;
+			filterPortals.set(container, { key, container, node });
 			rebuildRowMenuSnapshot();
 			notifyRowMenuStructural();
 		},

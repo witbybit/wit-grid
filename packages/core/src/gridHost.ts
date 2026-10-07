@@ -1,4 +1,6 @@
 import type { AdapterFilterMount } from './filters/filterEditors.js';
+import { GridSidebar } from './sidebar/gridSidebar.js';
+import type { AdapterPanelMount, GridSidebarConfig } from './sidebar/sidebarTypes.js';
 import { RenderEngine } from './renderer/renderEngine.js';
 import type { RenderStats } from './renderer/renderTelemetry.js';
 import type {
@@ -56,10 +58,21 @@ export interface GridHostOptions<TRowData = unknown> {
 	headerMenu?: GridHeaderMenuAdapter<TRowData>;
 	/** Renders adapter filter components (`filterDef.renderFilter`) on the grid's own filter surfaces. */
 	mountFilter?: AdapterFilterMount;
+	/**
+	 * The sidebar (columns, filters, sort, views, query…). With it the container holds the grid and
+	 * the sidebar side by side, and the grid itself is `host.gridElement`.
+	 */
+	sidebar?: GridSidebarConfig<TRowData>;
+	/** Renders adapter sidebar panels (`renderPanel`). */
+	mountPanel?: AdapterPanelMount;
 	autoRowHeight?: boolean;
 }
 
 export interface GridHost {
+	/** The grid's own element: the container, or the grid beside the sidebar inside it. */
+	readonly gridElement: HTMLElement;
+	/** Updates the sidebar (when the host was mounted with one); `null` removes it. */
+	setSidebar(config: GridSidebarConfig<any> | null): void;
 	setViewportPins(pins: NonNullable<GridHostOptions['pins']>): void;
 	schedulePaint(): void;
 	scheduleFullPaint(reason?: string): void;
@@ -180,13 +193,22 @@ export function mountGridHost<TRowData>(
 	renderEngine.filterPopover.mountAdapterFilter = options.mountFilter;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);
 
+	// With a sidebar the container becomes a shell: the grid and the sidebar side by side.
+	const shell = !!options.sidebar;
+	const gridElement = shell ? document.createElement('div') : container;
+	if (shell) {
+		gridElement.className = 'og-shell-grid';
+		container.classList.add('og-shell');
+		container.appendChild(gridElement);
+	}
+
 	// Bind live runtime ports — exclusive: only one host may be active at a time.
 	const bindResult = internalApi.bindRuntimePorts({
 		renderer: {
 			requestRender: () => {},
 			getStats: () => renderEngine.getRenderStats(),
 			resetStats: () => renderEngine.resetRenderStats(),
-			getContainer: () => container,
+			getContainer: () => gridElement,
 			scrollCellIntoView: (rowId, colField) => renderEngine.scrollCellIntoView(rowId, colField),
 			scrollRowIntoView: (rowId) => renderEngine.scrollRowIntoView(rowId),
 		},
@@ -220,8 +242,33 @@ export function mountGridHost<TRowData>(
 		internalApi.setViewportPins(options.pins);
 	}
 
-	host.setContainerElement(container);
-	renderEngine.mount(container);
+	host.setContainerElement(gridElement);
+	renderEngine.mount(gridElement);
+
+	let sidebar: GridSidebar<TRowData> | null = null;
+	const setSidebar = (config: GridSidebarConfig<TRowData> | null) => {
+		if (!shell) return;
+		if (!config) {
+			sidebar?.destroy();
+			sidebar = null;
+			return;
+		}
+		container.dataset.ogSidebar = config.position ?? 'right';
+		if (sidebar) {
+			sidebar.setConfig(config);
+			return;
+		}
+		sidebar = new GridSidebar(api, config, {
+			mountFilterEditor: (target, colField, surface, onApplied) =>
+				renderEngine.filterPopover.mountEditor(target, colField, surface, undefined, onApplied),
+			mountPanel: options.mountPanel,
+		});
+		// The sidebar wears the grid's theme scope, so it follows the grid's theme.
+		const scope = gridElement.dataset.ogThemeScope;
+		if (scope) sidebar.element.dataset.ogThemeScope = scope;
+		container.appendChild(sidebar.element);
+	};
+	setSidebar(options.sidebar ?? null);
 
 	const observer = new ResizeObserver((entries) => {
 		if (!internalApi.isBindingCurrent(binding)) return;
@@ -232,7 +279,7 @@ export function mountGridHost<TRowData>(
 			renderEngine.scheduleGeometryPaint('resize');
 		}
 	});
-	observer.observe(container);
+	observer.observe(gridElement);
 
 	const adapterHandle: GridAdapterHandle<TRowData> = {
 		getCellPointerFromElement(element: Element) {
@@ -278,6 +325,8 @@ export function mountGridHost<TRowData>(
 	};
 
 	return {
+		gridElement,
+		setSidebar,
 		setViewportPins(pins) {
 			internalApi.setViewportPins(pins);
 			internalApi.updateVisibleRanges();
@@ -328,8 +377,15 @@ export function mountGridHost<TRowData>(
 		},
 		destroy() {
 			observer.disconnect();
+			sidebar?.destroy();
+			sidebar = null;
 			renderEngine.unmount();
 			internalApi.unbindRuntimePorts(binding);
+			if (shell) {
+				gridElement.remove();
+				container.classList.remove('og-shell');
+				delete container.dataset.ogSidebar;
+			}
 		},
 		adapterHandle,
 	};

@@ -10,7 +10,7 @@ export type {
 } from './types.js';
 export { GroupToggle, GroupCount } from './GroupParts.js';
 export { useGridApi, useGridSelector, useGridKeySelector } from './hooks.js';
-export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelDef } from './sidebar/GridSidebar.js';
+export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelContext, SidebarPanelDef } from './sidebar/sidebarConfig.js';
 export {
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,

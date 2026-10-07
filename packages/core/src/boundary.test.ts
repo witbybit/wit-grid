@@ -189,6 +189,7 @@ describe('Public/internal boundary', () => {
 				'restoreFilterModel',
 				'segmentedColumnType',
 				'selectColumnType',
+				'sidebarIconSvg',
 				'sparklineColumnType',
 				'summarizeAnalysisState',
 				'summarizeFilter',

@@ -49,18 +49,18 @@ function setup(panel: 'filters' | 'query', renderFilter?: () => React.ReactNode)
 	return api;
 }
 
-describe('sidebar filter surfaces host the core filter editors', () => {
+describe('the sidebar hosts the core filter editors', () => {
 	it('Filters panel: a column section shows its editor, with counts, and filters the grid', async () => {
 		const api = setup('filters');
 		await waitFor(() => expect(screen.getAllByText('Status').some((el) => el.closest('[aria-expanded]'))).toBe(true));
 		fireEvent.click(screen.getAllByText('Status').find((el) => el.closest('[aria-expanded]'))!);
 		const editor = await waitFor(() => {
-			const host = document.querySelector('.og-flt-host') as HTMLElement;
+			const host = document.querySelector('.og-sb-section-body') as HTMLElement;
 			expect(host).toBeTruthy();
 			return host;
 		});
-		// The grid's theme scope travels with the editor outside the grid.
-		expect(editor.dataset.ogThemeScope).toBe(api.getContainer()?.dataset.ogThemeScope);
+		// The sidebar wears the grid's theme scope, so it follows the grid's theme.
+		expect((document.querySelector('.og-sb') as HTMLElement).dataset.ogThemeScope).toBe(api.getContainer()?.dataset.ogThemeScope);
 		const active = [...editor.querySelectorAll('.og-ct-option')].find((el) => el.textContent?.includes('Active')) as HTMLElement;
 		expect(active.querySelector('.og-ct-option-count')!.textContent).toBe('2');
 		act(() => active.click());

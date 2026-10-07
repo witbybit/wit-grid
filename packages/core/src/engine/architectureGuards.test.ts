@@ -2073,7 +2073,7 @@ describe('Architecture guardrails', () => {
 		expect(content).toContain('resolveGridRuntimeComposition(api)');
 		expect(content).toContain('const host = runtime.host;');
 		expect(content).toContain('const internalApi = host.api;');
-		expect(content).toContain('host.setContainerElement(container);');
+		expect(content).toContain('host.setContainerElement(gridElement);');
 		expect(content).not.toContain('resolveGridInternalStore(api)');
 		expect(content).not.toContain('const store =');
 	});
