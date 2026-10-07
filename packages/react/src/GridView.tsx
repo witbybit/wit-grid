@@ -10,6 +10,7 @@ import {
 	GroupRenderContext,
 	type AdapterFilterMount,
 	type AdapterPanelMount,
+	type GridSidebarConfig as CoreGridSidebarConfig,
 } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GridAdapterContext, GridFilterMountContext } from './gridContext.js';
@@ -23,7 +24,7 @@ import {
 } from './reactHostBridge.js';
 import { PortalManager, createPortalStore } from './GridPortal.js';
 import { flashCopiedCells } from './cellFlash.js';
-import { toCoreSidebarConfig, type GridSidebarConfig } from './sidebar/sidebarConfig.js';
+import type { GridSidebarConfig } from './sidebar/sidebarConfig.js';
 import { GridChartOverlay } from './chart/GridChartOverlay.js';
 
 export interface GridViewProps<TRowData = unknown> {
@@ -196,7 +197,7 @@ export function GridView<TRowData = unknown>({
 				},
 			},
 			mountFilter: filterMount,
-			sidebar: sidebarRef.current ? toCoreSidebarConfig(sidebarRef.current) : undefined,
+			sidebar: sidebarRef.current as CoreGridSidebarConfig<TRowData> | undefined,
 			mountPanel: panelMount,
 			headerMenu: {
 				mountHeaderMenu: (mount) => {
@@ -241,7 +242,7 @@ export function GridView<TRowData = unknown>({
 	}, [api, portalStore, hasSidebar]);
 
 	useEffect(() => {
-		if (sidebar) hostRef.current?.setSidebar(toCoreSidebarConfig(sidebar));
+		if (sidebar) hostRef.current?.setSidebar(sidebar as CoreGridSidebarConfig<TRowData>);
 	}, [sidebar]);
 
 	const contextMenuOptionsRef = useRef(contextMenuOptions);

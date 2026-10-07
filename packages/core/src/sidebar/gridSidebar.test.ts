@@ -15,8 +15,14 @@ interface Row {
 /** The last draft editor's change callback (query conditions). */
 let draftChange: ((filter: ColumnFilter | null) => void) | null = null;
 
-function setup(config: GridSidebarConfig<Row>, mountPanel = vi.fn(() => () => {}), wrap?: (api: GridApi<Row>) => GridApi<Row>) {
+function setup(
+	config: GridSidebarConfig<Row>,
+	mountPanel = vi.fn(() => () => {}),
+	wrap?: (api: GridApi<Row>) => GridApi<Row>,
+	gridOptions: Partial<Parameters<typeof createClientGrid<Row>>[0]> = {}
+) {
 	const api = createClientGrid<Row>({
+		...gridOptions,
 		rows: [
 			{ id: '1', name: 'Ava', age: 31 },
 			{ id: '2', name: 'Liam', age: 24 },
@@ -175,6 +181,32 @@ describe('GridSidebar', () => {
 		// A query set elsewhere shows in the panel.
 		api.setQueryModel(null);
 		expect(body().textContent).toContain('No query yet');
+	});
+
+	it('data integrity: status, issues by severity (click goes to the cell), and an empty diff', () => {
+		const { api, tab, body, byText } = setup({ panels: ['dataIntegrity'] }, undefined, undefined, { dataIntegrity: { validation: true } });
+		tab('dataIntegrity').click();
+		expect(body().querySelector('.og-sb-health-label')!.textContent).toBe('All clear');
+		const issue = (id: string, severity: 'error' | 'warning', blocking = false) => ({
+			id,
+			source: 'validation' as const,
+			type: 'invalidValue' as const,
+			severity,
+			blocking,
+			rowId: '2',
+			colField: 'age',
+			message: `${id} message`,
+			createdAt: 1,
+		});
+		api.integrity.publishIssues('validation', [issue('a', 'error', true), issue('b', 'warning')]);
+		expect(body().querySelector('.og-sb-health')!.getAttribute('data-status')).toBe('blocked');
+		expect(body().querySelectorAll('.og-sb-issue')).toHaveLength(2);
+		byText('Warnings 1').click();
+		expect([...body().querySelectorAll('.og-sb-issue-message')].map((m) => m.textContent)).toEqual(['b message']);
+		body().querySelector<HTMLElement>('.og-sb-issue')!.click();
+		expect(api.getStateSnapshot().selection?.ranges?.[0] ?? api.getStateSnapshot().selection).toBeTruthy();
+		[...body().querySelectorAll<HTMLElement>('.og-sb-tabs-btn')].find((t) => t.textContent?.startsWith('Changes'))!.click();
+		expect(body().textContent).toContain('No comparison');
 	});
 
 	it('themes: a card per theme; picking one switches the grid', () => {

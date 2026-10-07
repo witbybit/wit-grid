@@ -11,6 +11,7 @@ import { defaultGridScheduler, type GridScheduler } from '../renderer/gridSchedu
 import { disposables, el, iconButton } from './panelKit.js';
 import { columnsPanel } from './panels/columnsPanel.js';
 import { filtersPanel } from './panels/filtersPanel.js';
+import { integrityPanel } from './panels/integrityPanel.js';
 import { queryPanel } from './panels/queryPanel.js';
 import { sortPanel } from './panels/sortPanel.js';
 import { themesPanel } from './panels/themesPanel.js';
@@ -44,6 +45,7 @@ const BUILTIN: Partial<Record<BuiltinSidebarPanelId, BuiltinPanel>> = {
 	themes: { label: 'Themes', icon: 'palette', panel: themesPanel },
 	query: { label: 'Query', icon: 'query', panel: queryPanel },
 	views: { label: 'Views', icon: 'views', panel: viewsPanel },
+	dataIntegrity: { label: 'Data integrity', icon: 'integrity', panel: integrityPanel },
 };
 
 const BUILTIN_ICONS: Record<BuiltinSidebarPanelId, SidebarIconName> = {
