@@ -5,7 +5,9 @@ import {
 	type GridReadyEvent,
 	type ColumnDef,
 	type FilterModel,
-	type FloatingFilterRendererParams,
+	type DomFilterEditor,
+	resolveColumnFilterDef,
+	summarizeFilter,
 	type CellRendererProps,
 } from '@eregister/wit-grid-react';
 import { Filter, X, ToggleLeft, ToggleRight, Zap, Code2 } from 'lucide-react';
@@ -58,51 +60,38 @@ function generateDeals(count: number): DealRow[] {
 	});
 }
 
-// ── Custom floating filter: probability range slider ──────────────────────────
+// ── Custom filter: probability slider ─────────────────────────────────────────
+// A custom DOM filter editor: shown in the floating row, the header funnel and menu, and the
+// sidebar alike. It emits a built-in number condition, so the grid matches it without `matches`.
 
-function buildProbabilityFloatingFilter(params: FloatingFilterRendererParams<DealRow>): void {
-	const { eCell, currentFilter, setFilter } = params;
-
-	const wrap = document.createElement('div');
-	wrap.style.cssText = 'display:flex;align-items:center;gap:5px;width:100%;overflow:hidden;';
-
-	const label = document.createElement('span');
-	label.style.cssText = 'font-size:10px;color:var(--og-text-color);opacity:0.5;white-space:nowrap;flex-shrink:0;font-family:var(--og-font-family);';
-	label.textContent = '≥';
-
-	const slider = document.createElement('input');
-	slider.type = 'range';
-	slider.min = '0';
-	slider.max = '100';
-	slider.step = '5';
-	slider.style.cssText = 'flex:1;min-width:0;cursor:pointer;accent-color:var(--og-focus-ring);';
-
-	const val = document.createElement('span');
-	val.style.cssText =
-		'font-size:10px;font-weight:600;color:var(--og-text-color);font-family:var(--og-font-family);white-space:nowrap;flex-shrink:0;min-width:28px;text-align:right;font-variant-numeric:tabular-nums;';
-
-	const getMin = (): number => {
-		if (currentFilter?.type === 'number' && currentFilter.operator === 'gte') {
-			return currentFilter.value ?? 0;
-		}
-		return 0;
-	};
-	const initial = getMin();
-	slider.value = String(initial);
-	val.textContent = `${initial}%`;
-
-	slider.addEventListener('input', () => {
-		const n = Number(slider.value);
-		val.textContent = `${n}%`;
-		if (n === 0) setFilter(null);
-		else setFilter({ type: 'number', operator: 'gte', value: n });
-	});
-
-	wrap.appendChild(label);
-	wrap.appendChild(slider);
-	wrap.appendChild(val);
-	eCell.appendChild(wrap);
-}
+const probabilityFilter: DomFilterEditor = {
+	mount(container, params) {
+		const wrap = document.createElement('div');
+		wrap.style.cssText = 'display:flex;align-items:center;gap:6px;width:100%;min-width:0;padding:0 4px;';
+		const label = document.createElement('span');
+		label.style.cssText = 'font-size:11px;opacity:.6;flex-shrink:0;';
+		label.textContent = '≥';
+		const slider = document.createElement('input');
+		slider.type = 'range';
+		slider.min = '0';
+		slider.max = '100';
+		slider.step = '5';
+		slider.style.cssText = 'flex:1;min-width:0;cursor:pointer;accent-color:var(--og-focus-ring);';
+		const val = document.createElement('span');
+		val.style.cssText = 'font-size:11px;font-weight:600;min-width:30px;text-align:right;font-variant-numeric:tabular-nums;';
+		const initial = params.filter?.type === 'number' && params.filter.operator === 'gte' ? params.filter.value : 0;
+		slider.value = String(initial);
+		val.textContent = `${initial}%`;
+		slider.addEventListener('input', () => {
+			const n = Number(slider.value);
+			val.textContent = `${n}%`;
+			params.onChange(n === 0 ? null : { type: 'number', operator: 'gte', value: n });
+		});
+		wrap.append(label, slider, val);
+		container.appendChild(wrap);
+		return { focus: () => slider.focus() };
+	},
+};
 
 // ── Stage badge colors ────────────────────────────────────────────────────────
 
@@ -146,54 +135,48 @@ function buildColumns(): ColumnDef<DealRow>[] {
 			field: 'id',
 			header: 'Deal ID',
 			width: 110,
-			filterType: 'text',
 		},
 		{
 			field: 'dealName',
 			header: 'Deal Name',
 			width: 180,
-			filterType: 'text',
 		},
 		{
 			field: 'stage',
 			header: 'Stage',
 			width: 140,
-			filterType: 'set',
-			filterValues: STAGES as string[],
+			filterDef: { type: 'select', options: STAGES.map((value) => ({ value })) },
 			renderer: { kind: 'react', component: StageBadgeRenderer },
 		},
 		{
 			field: 'region',
 			header: 'Region',
 			width: 140,
-			filterType: 'set',
-			filterValues: REGIONS as string[],
+			filterDef: { type: 'select', options: REGIONS.map((value) => ({ value })) },
 		},
 		{
 			field: 'value',
 			header: 'Deal Value ($)',
 			width: 140,
-			filterType: 'number',
+			filterDef: { type: 'number', format: { format: 'currency', currency: 'USD', decimals: 0 } },
 			valueFormatter: ({ value }) => `$${Number(value).toLocaleString()}`,
 		},
 		{
 			field: 'probability',
 			header: 'Probability (%)',
 			width: 155,
-			filterType: 'number',
-			floatingFilterRenderer: buildProbabilityFloatingFilter as any,
+			filterDef: { type: 'custom', editor: probabilityFilter, summarize: (f) => (f.type === 'number' ? `≥ ${f.value}%` : '') },
 		},
 		{
 			field: 'closeDate',
 			header: 'Close Date',
 			width: 130,
-			filterType: 'date',
+			filterDef: { type: 'date' },
 		},
 		{
 			field: 'owner',
 			header: 'Owner',
 			width: 140,
-			filterType: 'text',
 		},
 	];
 }
@@ -288,13 +271,7 @@ export default function FloatingFiltersDemo({ editTrigger, arrowKeyNavigationEdi
 			{activeFilterCount > 0 && (
 				<div className='shrink-0 flex flex-wrap gap-2 px-1'>
 					{Object.entries(filterModel ?? {}).map(([field, filter]) => {
-						let desc = '';
-						if (filter.type === 'text') desc = `"${filter.value ?? ''}"`;
-						else if (filter.type === 'number') {
-							const opMap: Record<string, string> = { gte: '≥', lte: '≤', gt: '>', lt: '<', equals: '=', inRange: 'in range' };
-							desc = `${opMap[filter.operator] ?? filter.operator} ${filter.value}`;
-						} else if (filter.type === 'date') desc = `≥ ${filter.dateFrom ?? ''}`;
-						else if (filter.type === 'set') desc = `${filter.values.length} value${filter.values.length !== 1 ? 's' : ''}`;
+						const desc = summarizeFilter(filter, resolveColumnFilterDef(columns.find((c) => c.field === field) ?? { field }));
 						return (
 							<div
 								key={field}
@@ -339,9 +316,10 @@ export default function FloatingFiltersDemo({ editTrigger, arrowKeyNavigationEdi
 				<Code2 className='w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5' />
 				<div className='text-[9px] text-slate-500 leading-relaxed font-medium space-y-0.5'>
 					<p>
-						<span className='text-slate-400 font-bold'>Default inputs:</span> text → debounced contains, number → equals, date → on date.{' '}
-						<span className='text-slate-400 font-bold'>Custom renderer:</span> Probability column uses a range slider via{' '}
-						<code className='text-emerald-400 bg-emerald-500/10 px-1 rounded'>floatingFilterRenderer</code> on the column def.
+						<span className='text-slate-400 font-bold'>One editor per column:</span> the row shows each column's filter editor in compact
+						form (text contains, number and date operators, a chip for lists) — the same editor as the header funnel and sidebar.{' '}
+						<span className='text-slate-400 font-bold'>Custom editor:</span> Probability uses a slider via{' '}
+						<code className='text-emerald-400 bg-emerald-500/10 px-1 rounded'>{"filterDef: { type: 'custom', editor }"}</code>.
 					</p>
 					<p>
 						<span className='text-slate-400 font-bold'>Scroll sync:</span> center columns virtualise horizontally; pinned lanes stay

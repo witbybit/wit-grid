@@ -1,69 +1,85 @@
 ---
 title: Filtering
-description: Column filter UI, quick filter, and the query model.
+description: One filter config per column, shown on every filter surface; quick filter; the query builder.
 icon: ListFilter
 ---
 
-Show filter UI with `showFilterChipBar` (active-filter chips above the header) and `showFloatingFilters`
-(always-visible inline filter inputs below the header):
+Every filter surface reads the same per-column config, `filterDef`, and shows the same editor:
+
+- **Header funnel**: appears on hover, stays visible in the accent colour while the column is filtered, and opens the column's filter popover.
+- **Header menu**: the column menu's Filter section.
+- **Floating filter row** (`showFloatingFilters`): compact editors under the headers. Typed values filter inline; lists, trees and ranges show a summary chip that opens the full editor.
+- **Sidebar Filters panel**: every filterable column, its filter summarized when collapsed.
+- **Query builder** (sidebar Query panel): each condition picks a column and edits it with that column's editor.
+- **Filter chips** (`showFilterChipBar`): one per active filter; clicking a chip opens its popover.
 
 ```tsx
 <Grid rows={rows} columns={columns} showFilterChipBar showFloatingFilters />
 ```
 
-## Column filter types
+## Choosing a column's filter
 
-Use `filterDef` on a column to configure rich filter UI — the same definition renders consistently across the
-sidebar panel, the header 3-dot menu, and the floating filter row.
+[Column types](/docs/next/columns#column-types) bring a filter that fits them: a select column filters by its options (row
+counts beside each), a multi-select by any / all / none of its values, a checkbox by Yes / No, a date range by overlap, a
+cascading select by tree. Set `filterDef` on a column to choose one yourself; without either a column filters as text.
 
-<Tabs items={['Static options', 'Async (server-fetched)', 'Custom']}>
-	<Tab value='Static options'>
+| `filterDef.type` | Editor                                                                                                  | Condition                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `text`           | Operator (contains, is, starts with…, is empty) + value; optional second condition (And / Or)           | `{ type: 'text', operator, value }`                 |
+| `number`         | Operator (=, ≥, between…) + value(s); `stars: 5` shows a star picker                                    | `{ type: 'number', operator, value, valueTo }`      |
+| `date`           | On, before, after, between, with a calendar                                                             | `{ type: 'date', operator, dateFrom, dateTo }`      |
+| `select`         | Searchable checklist with counts, Select all / Clear, “(Blanks)”; `listValues` adds Any / All / None of | `{ type: 'select', values, matchMode }`             |
+| `boolean`        | All · Yes · No                                                                                          | `{ type: 'boolean', value }`                        |
+| `dateRange`      | Overlaps / within / includes a date                                                                     | `{ type: 'dateRange', operator, dateFrom, dateTo }` |
+| `path`           | Tree checklist; a node covers everything under it                                                       | `{ type: 'path', paths }`                           |
+| `custom`         | Your editor                                                                                             | anything (often a built-in condition)               |
+| `none`           | No filter                                                                                               | —                                                   |
+
+<Tabs items={['Options', 'From a server', 'Custom']}>
+	<Tab value='Options'>
 		```typescript
 		const columns: ColumnDef<Person>[] = [
-			{
-				field: 'team',
-				header: 'Team',
-				filterDef: {
-					type: 'multi-select',
-					options: [
-						{ label: 'Compute', value: 'compute' },
-						{ label: 'Flight', value: 'flight', count: 12 },
-					],
-				},
-			},
+			{ field: 'team', header: 'Team', filterDef: { type: 'select', options: [{ value: 'compute', label: 'Compute', color: 'blue' }, { value: 'flight', label: 'Flight' }] } },
+			// Without options, the choices are the column's distinct values with row counts.
+			{ field: 'region', header: 'Region', filterDef: { type: 'select' } },
+			{ field: 'tags', header: 'Tags', filterDef: { type: 'select', listValues: true } },
+			{ field: 'salary', header: 'Salary', filterDef: { type: 'number', format: { format: 'currency', currency: 'USD' } } },
 		];
 		```
 	</Tab>
-	<Tab value='Async (server-fetched)'>
+	<Tab value='From a server'>
 		```typescript
 		const columns: ColumnDef<Person>[] = [
 			{
 				field: 'assignee',
 				header: 'Assignee',
 				filterDef: {
-					type: 'async-multi-select',
-					debounceMs: 250,
-					async fetchOptions({ query }, signal) {
-						const res = await fetch(`/api/users?q=${encodeURIComponent(query)}`, { signal });
-						const users = await res.json();
-						return { options: users.map((u: any) => ({ label: u.name, value: u.id })) };
+					type: 'select',
+					// The same loader shape as server-loaded cell editors: a page per call, searched on the server.
+					async loadOptions({ search, offset, limit, signal }) {
+						const res = await fetch(`/api/users?q=${encodeURIComponent(search)}&offset=${offset}&limit=${limit}`, { signal });
+						const { items, total } = await res.json();
+						return { options: items.map((u: any) => ({ value: u.id, label: u.name })), hasMore: offset + limit < total, total };
 					},
+					debounceMs: 250,
+					minQueryLength: 0,
 				},
 			},
 		];
 		```
 	</Tab>
 	<Tab value='Custom'>
-		```typescript
+		```tsx
 		const columns: ColumnDef<Person>[] = [
 			{
-				field: 'status',
-				header: 'Status',
+				field: 'salary',
+				header: 'Salary',
 				filterDef: {
 					type: 'custom',
-					renderFilter: ({ value, onChange, onCommit }) => (
-						<StatusPicker value={value} onChange={onChange} onCommit={onCommit} />
-					),
+					// A React component (or `editor`, a DOM editor). It renders on every surface.
+					renderFilter: ({ filter, onChange }) => <SalaryRange filter={filter} onChange={onChange} />,
+					// Emit a built-in condition and the grid matches it; for your own condition shape, add `matches`.
+					summarize: (f) => (f.type === 'number' ? `≥ $${f.value}` : ''),
 				},
 			},
 		];
@@ -71,13 +87,13 @@ sidebar panel, the header 3-dot menu, and the floating filter row.
 	</Tab>
 </Tabs>
 
-`type: 'infinite-multi-select'` pairs with `fetchPage` instead of `fetchOptions` for a server-paginated,
-virtually-scrolled option list. `filterDef` supersedes the legacy `filterType`/`filterValues` fields, which are
-still supported and normalized internally.
+Server-loaded lists wait `debounceMs` after typing (250 by default, through the grid's scheduler), search only past
+`minQueryLength`, and keep one request in flight: a newer search waits for it, then the latest one runs. Typed text and
+number filters apply after a short pause, and at once on Enter.
 
 ## Quick filter
 
-A single search string matched across multiple columns (or every column):
+A single search string matched across multiple columns (or every column), combined with column filters:
 
 ```typescript
 api.setQuickFilter('nvda', ['symbol', 'name']); // scoped to these columns
@@ -85,11 +101,38 @@ api.setQuickFilter('nvda'); // every column
 const current = api.getQuickFilter();
 ```
 
-## Reading and setting filter state directly
+## Reading and setting filter state
 
 ```typescript
-api.setFilterModel({ team: { type: 'equals', filter: 'compute' } });
+api.setFilterModel({
+	team: { type: 'select', values: ['compute', 'flight'] },
+	tags: { type: 'select', values: ['urgent'], matchMode: 'all' },
+	salary: { type: 'number', operator: 'gte', value: 100000 },
+});
 api.setFilterModel(null); // clear all
+```
+
+Filters are plain objects, so they persist with the grid state and saved views, and server-side row models receive them
+as they are.
+
+## Query builder
+
+The query model combines conditions across columns in nested AND / OR groups. Each condition holds a column and one of
+the filter conditions above, matched by the same code as column filters:
+
+```typescript
+api.setQueryModel({
+	version: 1,
+	root: {
+		kind: 'group',
+		id: 'root',
+		operator: 'or',
+		children: [
+			{ kind: 'condition', id: 'a', columnId: 'team', filter: { type: 'select', values: ['compute'] } },
+			{ kind: 'condition', id: 'b', columnId: 'salary', filter: { type: 'number', operator: 'gt', value: 200000 } },
+		],
+	},
+});
 ```
 
 ## Events
@@ -100,8 +143,3 @@ import { GridEventName } from '@eregister/wit-grid-react';
 api.addEventListener(GridEventName.filterChanged, () => console.log(api.getState().filterModel));
 api.addEventListener(GridEventName.quickFilterChanged, () => console.log(api.getQuickFilter()));
 ```
-
-<Callout title='Query model' type='info'>
-	For filter logic that doesn't fit the column filter model (cross-column expressions, saved searches), use `api.setQueryModel()` /
-	`api.getQueryModel()` / `api.evaluateQueryForRow(rowId)` instead — see [Grid API](/docs/next/grid-api).
-</Callout>

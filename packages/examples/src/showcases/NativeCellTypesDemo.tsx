@@ -39,7 +39,7 @@ import type {
 	GridReadyEvent,
 	PersonOption,
 } from '@eregister/wit-grid-react';
-import { Box, Code2, ChevronRight, Palette } from 'lucide-react';
+import { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';
 import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -414,6 +414,10 @@ const TYPE_REFERENCE: { name: string; text: string }[] = [
 	{ name: 'longTextColumnType', text: 'Notes in a textarea popover; Ctrl/⌘+Enter saves (Notes).' },
 	{ name: 'colorColumnType', text: 'Palette, hex field and the system picker (Colour).' },
 	{ name: "'checkbox' · switchColumnType", text: 'Toggle on press or Enter, keeping the value’s own shape (Billing).' },
+	{
+		name: 'filters',
+		text: 'Every column filters with an editor that fits its type: funnel in the header, the header menu, the filter row, the sidebar and the query builder all share it.',
+	},
 	{ name: "'url' · 'email'", text: 'Safe links (http, https, mailto only).' },
 ];
 
@@ -465,6 +469,8 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 	const theme = controlledTheme ?? ownTheme;
 	const themeRef = useRef(theme);
 	const [showSnippet, setShowSnippet] = useState(false);
+	// The floating filter row: compact filter editors under the headers (on by default on the page).
+	const [filterRow, setFilterRow] = useState(!compact);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
 	const initialState = useMemo(() => ({ themeName: themeRef.current }), []);
 
@@ -492,6 +498,8 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			initialState={initialState}
 			navigationOptions={{ editTrigger: 'doubleClick' }}
 			pinLeftColumns={2}
+			showFloatingFilters={filterRow}
+			showFilterChipBar
 			onGridReady={handleReady}
 			rendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}
 		/>
@@ -505,8 +513,18 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 					<div className='flex items-center gap-2 text-[11px] text-slate-300 font-semibold'>
 						<Box className='w-4 h-4 text-violet-400' />
 						Native cell types
-						<span className='text-slate-500 font-normal'>· double-click or press Enter on a cell to edit</span>
+						<span className='text-slate-500 font-normal'>· double-click or press Enter to edit · funnel in a header to filter</span>
 					</div>
+					<button
+						onClick={() => setFilterRow((v) => !v)}
+						aria-pressed={filterRow}
+						className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${
+							filterRow ? 'border-slate-500 bg-slate-800 text-slate-100' : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'
+						}`}
+					>
+						<Filter className='w-3.5 h-3.5' />
+						Filter row
+					</button>
 					{!controlledTheme && (
 						<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>
 							<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />

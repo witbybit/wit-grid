@@ -74,6 +74,7 @@ describe('React public boundary', () => {
 			'segmentedColumnType',
 			'selectColumnType',
 			'sparklineColumnType',
+			'summarizeFilter',
 			'switchColumnType',
 			'tagsColumnType',
 			'themeToCSSVariables',

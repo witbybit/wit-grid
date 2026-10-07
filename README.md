@@ -582,14 +582,15 @@ const columnTypes = {
 };
 ```
 
-- The editor searches on the server. A new search aborts the page still loading (`signal`), and a stale
-  response is dropped. Debounce in the loader if your API needs it.
+- The editor searches on the server after a pause in typing (`debounceMs`, default 250) and from
+  `minQueryLength` characters. One request is in flight at a time: a newer search waits for it, then the latest
+  runs. Closing the editor aborts the page still loading (`signal`).
 - The next page loads when the list is scrolled near its end, or when arrowing past the last option. The list
   shows a loading row, a Retry row when a page fails, and "50 of 1,204" when the loader returns `total`.
 - Cells show a placeholder while `resolveOptions` looks a value up. Every option a page or lookup returns is
   remembered, so its label appears in cells, exports and filters.
 - `rowId` and `colField` let options depend on the row (cities of the row's country, say).
-- The column's filter uses the same loader, as an infinite multi-select list.
+- The column's filter lists the same options (loaded the same way), so filters and cells agree on labels.
 
 ---
 

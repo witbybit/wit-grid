@@ -46,7 +46,7 @@ function buildHierarchy(display: GroupDisplay, compact: boolean): HierarchyConfi
 	};
 }
 
-const sectorFilterModel = (sector: string | null) => (sector ? { sector: { type: 'set' as const, values: [sector] } } : null);
+const sectorFilterModel = (sector: string | null) => (sector ? { sector: { type: 'select' as const, values: [sector] } } : null);
 
 // Stable rule objects (module scope): the grid never sees a new styleRules array.
 const STYLE_RULES: StyleRule<MarketRow>[] = [
