@@ -63,13 +63,12 @@ body {
 }
 
 .wg-hero-grid {
-	height: 480px;
-	min-height: 360px;
+	height: clamp(520px, 78vh, 720px);
 }
 
 @media (max-width: 640px) {
 	.wg-hero-grid {
-		height: 360px;
+		height: 460px;
 	}
 }
 
