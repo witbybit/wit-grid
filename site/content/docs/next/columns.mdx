@@ -50,6 +50,12 @@ const columns = [
 
 `width` must be a positive finite number. `minWidth` and `maxWidth` constrain user resizing. `pinned` is an initial setting; use the grid API for runtime pin changes.
 
+Users hide a column by dragging its header out of the grid (the drag preview reads **Hide** before they let go;
+Escape cancels; the last visible column stays), from the sidebar's Columns panel, or with
+`api.setColumnVisible(field, false)`. Turn the drag off with `dragOutHidesColumns={false}` (core:
+`mountGridHost(api, el, { dragOutHidesColumns: false })`). A hidden column keeps its filter, which keeps filtering,
+and a pinned column stays pinned: shown again, it is back in its lane.
+
 ## Values
 
 By default, the grid reads `row[field]`. Dot paths read nested data.

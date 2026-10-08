@@ -1972,10 +1972,13 @@ describe('Architecture guardrails', () => {
 		expect(content).not.toContain('this.engine.stateManager.setState({ showFloatingFilters: enabled })');
 	});
 
-	it('store hidden-column filter cleanup routes through engine.setFilterModel (Plan 103)', () => {
+	it('hiding columns leaves their filters alone (a hidden column keeps filtering)', () => {
 		const content = readFileSync(resolve(CORE_ROOT, 'src', 'store.ts'), 'utf-8');
-		expect(content).toContain('this.engine.setFilterModel(Object.keys(newModel).length > 0 ? newModel : null, false);');
-		expect(content).not.toContain('this.engine.stateManager.setState({ filterModel: Object.keys(newModel).length > 0 ? newModel : null })');
+		const start = content.indexOf('public setColumnsVisible');
+		const body = content.slice(start, content.indexOf('public getColumns', start));
+		expect(start).toBeGreaterThan(-1);
+		expect(body).not.toContain('setFilterModel');
+		expect(body).not.toContain('filterModel');
 	});
 
 	it('store bulk row-height APIs route through GridEngine stateFeature wrappers (Plan 103)', () => {

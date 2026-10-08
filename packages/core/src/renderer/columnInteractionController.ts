@@ -71,7 +71,14 @@ export interface ColumnInteractionControllerOptions<TRowData> {
 	getLayoutPlan: () => GridLayoutPlan | null;
 	schedulePaint: () => void;
 	gridScheduler: GridScheduler;
+	/** Dragging a column out of the grid hides it (default true). */
+	dragOutHides?: () => boolean;
+	/** Hides a column (the api's setColumnVisible). */
+	hideColumn?: (colField: string) => void;
 }
+
+/** How far past the grid's edge a column is dragged before letting go hides it. */
+const DRAG_OUT_HIDE_PX = 36;
 
 const COLUMN_DRAG_SCROLL_EDGE_PX = 50;
 const COLUMN_DRAG_SCROLL_MAX_PX = 14;
@@ -107,6 +114,10 @@ export class ColumnInteractionController<TRowData = unknown> {
 	private autoScrollRateX = 0;
 	private lastDragClientX: number | null = null;
 	private lastDragClientY: number | null = null;
+	/** The column is dragged out of the grid: letting go hides it. */
+	private columnDragHides = false;
+	private readonly dragOutHides: () => boolean;
+	private readonly hideColumn: ((colField: string) => void) | undefined;
 
 	constructor(options: ColumnInteractionControllerOptions<TRowData>) {
 		this.engine = options.engine;
@@ -115,6 +126,8 @@ export class ColumnInteractionController<TRowData = unknown> {
 		this.getLayoutPlan = options.getLayoutPlan;
 		this.schedulePaint = options.schedulePaint;
 		this.gridScheduler = options.gridScheduler;
+		this.dragOutHides = options.dragOutHides ?? (() => true);
+		this.hideColumn = options.hideColumn;
 	}
 
 	public onHeaderResizeMouseDown = (e: MouseEvent): void => {
@@ -176,8 +189,35 @@ export class ColumnInteractionController<TRowData = unknown> {
 
 		window.addEventListener('mousemove', this.onHeaderColumnDragMove);
 		window.addEventListener('mouseup', this.onHeaderColumnDragMouseUp);
-		window.addEventListener('blur', this.onHeaderColumnDragMouseUp);
+		window.addEventListener('blur', this.cancelColumnDrag);
+		window.addEventListener('keydown', this.onColumnDragKeyDown, true);
 	};
+
+	/** Escape, or the window losing focus, drops the drag without moving or hiding anything. */
+	private cancelColumnDrag = (): void => {
+		if (this.groupPanel?.isHeaderDragActive()) this.groupPanel.onHeaderDragEnd(false);
+		this.cleanup();
+		this.schedulePaint();
+	};
+
+	private onColumnDragKeyDown = (e: KeyboardEvent): void => {
+		if (e.key !== 'Escape' || !this.isColumnReordering) return;
+		e.preventDefault();
+		e.stopPropagation();
+		this.cancelColumnDrag();
+	};
+
+	/** The pointer is far enough outside the grid that letting go hides the column. */
+	private isOutsideGrid(e: MouseEvent): boolean {
+		if (!this.hideColumn || !this.dragOutHides()) return false;
+		const container = this.getScrollViewport()?.closest('.og-grid-container');
+		if (!container) return false;
+		const state = this.engine.stateManager.getState();
+		// The last shown column stays.
+		if (state.columns.filter((c) => !c.hide).length <= 1) return false;
+		const r = container.getBoundingClientRect();
+		return e.clientX < r.left - DRAG_OUT_HIDE_PX || e.clientX > r.right + DRAG_OUT_HIDE_PX || e.clientY < r.top - DRAG_OUT_HIDE_PX || e.clientY > r.bottom + DRAG_OUT_HIDE_PX;
+	}
 
 	/** Called by RenderEngine to wire up the group panel for drag-to-group support. */
 	public setGroupPanel(panel: GroupPanelRenderer<TRowData> | null): void {
@@ -187,7 +227,9 @@ export class ColumnInteractionController<TRowData = unknown> {
 	public cleanup(): void {
 		window.removeEventListener('mousemove', this.onHeaderColumnDragMove);
 		window.removeEventListener('mouseup', this.onHeaderColumnDragMouseUp);
-		window.removeEventListener('blur', this.onHeaderColumnDragMouseUp);
+		window.removeEventListener('blur', this.cancelColumnDrag);
+		window.removeEventListener('keydown', this.onColumnDragKeyDown, true);
+		this.columnDragHides = false;
 
 		if (this.columnDragOverGroupPanel && this.groupPanel) {
 			this.groupPanel.onHeaderDragLeave();
@@ -277,6 +319,21 @@ export class ColumnInteractionController<TRowData = unknown> {
 			}
 		}
 
+		// Out of the grid: letting go hides the column (the ghost says so); back in, it moves again.
+		const hides = this.isOutsideGrid(e);
+		if (hides !== this.columnDragHides) {
+			this.columnDragHides = hides;
+			this.columnDragGhost?.toggleAttribute('data-hide', hides);
+			if (this.columnDropIndicator) this.columnDropIndicator.style.display = hides ? 'none' : '';
+			if (hides) {
+				this.dragShifts = null;
+				this.shiftInsertionIndex = -2;
+				this.stopAutoScroll();
+				this.schedulePaint();
+			}
+		}
+		if (hides) return;
+
 		this.updateHorizontalAutoScroll(e.clientX);
 		this.updateColumnDropTarget(e);
 	};
@@ -293,6 +350,7 @@ export class ColumnInteractionController<TRowData = unknown> {
 		const insertionIndex = this.columnDropInsertionIndex;
 		const colField = this.columnDragField;
 		const wasOverGroupPanel = this.columnDragOverGroupPanel;
+		const wasHiding = this.columnDragHides;
 
 		// Finalise group-panel drop before cleanup() clears drag state
 		if (wasOverGroupPanel && this.groupPanel) {
@@ -325,6 +383,11 @@ export class ColumnInteractionController<TRowData = unknown> {
 
 		// Group panel drop was handled above — don't also reorder columns.
 		if (wasOverGroupPanel) return;
+
+		if (wasReordering && wasHiding && colField) {
+			this.hideColumn?.(colField);
+			return;
+		}
 
 		if (!wasReordering || !colField || fromIndex < 0 || insertionIndex < 0) {
 			this.schedulePaint();
@@ -374,6 +437,13 @@ export class ColumnInteractionController<TRowData = unknown> {
 		const labelSpan = document.createElement('span');
 		labelSpan.textContent = label;
 		this.columnDragGhost.appendChild(labelSpan);
+		// Shown while the column is out of the grid: letting go hides it.
+		const hideHint = document.createElement('span');
+		hideHint.className = 'og-drag-ghost-hide';
+		hideHint.innerHTML =
+			'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-2.2 3.2M6.6 6.6A16.6 16.6 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6M2 2l20 20M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+		hideHint.appendChild(document.createTextNode('Hide'));
+		this.columnDragGhost.appendChild(hideHint);
 
 		const scrollViewport = this.getScrollViewport();
 		const container = scrollViewport?.closest('.og-grid-container') as HTMLElement | null;

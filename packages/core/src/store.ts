@@ -462,32 +462,35 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public pasteFromClipboard = (): Promise<void> => this.interactionController.pasteFromClipboard();
 	public setColumnVisible = (colField: string, visible: boolean): void => this.setColumnsVisible([colField], visible);
 
+	/**
+	 * Shows or hides columns. A hidden column's filter stays (and keeps filtering, like any active
+	 * filter); pinned columns stay pinned, and hiding one does not pin its neighbour.
+	 */
 	public setColumnsVisible = (colFields: string[], visible: boolean): void => {
 		const fieldSet = new Set(colFields);
 		if (fieldSet.size === 0) return;
+		// Pins are counts of displayed columns: keep the same columns pinned across the change. A
+		// pinned column remembers its lane while hidden (`pinned`), so showing it pins it again.
+		const before = this.getDisplayedColumns().map((c) => c.field);
+		const pins = this.getPinnedColumns();
+		const pinnedLeft = new Set(before.slice(0, pins.left));
+		const pinnedRight = new Set(pins.right > 0 ? before.slice(before.length - pins.right) : []);
 		let changed = false;
 		const columns = this.state.columns.map((column) => {
 			if (!fieldSet.has(column.field) || column.hide === !visible) return column;
 			changed = true;
-			return { ...column, hide: !visible };
+			if (visible) return { ...column, hide: false };
+			const pinned: ColumnDef<TRowData>['pinned'] = pinnedLeft.has(column.field) ? 'left' : pinnedRight.has(column.field) ? 'right' : undefined;
+			return { ...column, hide: true, pinned };
 		});
-		if (changed) {
-			this.engine.setColumns(columns, false);
-			// Clear filters for columns being hidden so stale filter state doesn't accumulate
-			if (!visible && this.state.filterModel) {
-				const newModel = { ...this.state.filterModel };
-				let filterChanged = false;
-				for (const field of fieldSet) {
-					if (field in newModel) {
-						delete newModel[field];
-						filterChanged = true;
-					}
-				}
-				if (filterChanged) {
-					this.engine.setFilterModel(Object.keys(newModel).length > 0 ? newModel : null, false);
-				}
-			}
-		}
+		if (!changed) return;
+		this.engine.setColumns(columns, false);
+		const lane = new Map(columns.map((c) => [c.field, c.pinned]));
+		const after = this.getDisplayedColumns().map((c) => c.field);
+		const shown = (field: string) => visible && fieldSet.has(field);
+		const left = after.filter((f) => pinnedLeft.has(f) || (shown(f) && lane.get(f) === 'left')).length;
+		const right = after.filter((f) => pinnedRight.has(f) || (shown(f) && lane.get(f) === 'right')).length;
+		if (left !== pins.left || right !== pins.right) this.setPinnedColumns({ left, right });
 	};
 
 	public getColumns = (): ColumnDef<TRowData>[] => {

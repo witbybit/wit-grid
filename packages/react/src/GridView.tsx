@@ -54,6 +54,8 @@ export interface GridViewProps<TRowData = unknown> {
 	totalRowRenderer?: (ctx: GroupRenderContext<TRowData>) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
 	enableChart?: boolean;
+	/** Dragging a column header out of the grid hides the column. Default true. */
+	dragOutHidesColumns?: boolean;
 	autoRowHeight?: boolean;
 }
 
@@ -83,6 +85,7 @@ export function GridView<TRowData = unknown>({
 	totalRowRenderer,
 	sidebar,
 	enableChart = false,
+	dragOutHidesColumns = true,
 	autoRowHeight,
 }: GridViewProps<TRowData>) {
 	const portalStore = useMemo(() => createPortalStore<TRowData>(), []);
@@ -199,6 +202,7 @@ export function GridView<TRowData = unknown>({
 			sidebar: sidebarRef.current as CoreGridSidebarConfig<TRowData> | undefined,
 			mountPanel: panelMount,
 			chart: enableChart,
+			dragOutHidesColumns,
 			headerMenu: {
 				mountHeaderMenu: (mount) => {
 					portalStore.mountMenu(mount.colField, mount.container, mount.column, mount.close);
@@ -239,7 +243,7 @@ export function GridView<TRowData = unknown>({
 			host.destroy();
 			portalStore.clear(true);
 		};
-	}, [api, portalStore, hasSidebar, enableChart]);
+	}, [api, portalStore, hasSidebar, enableChart, dragOutHidesColumns]);
 
 	useEffect(() => {
 		if (sidebar) hostRef.current?.setSidebar(sidebar as CoreGridSidebarConfig<TRowData>);

@@ -1765,6 +1765,29 @@ export const CORE_STYLES = `
     to { opacity: 1; }
   }
 
+  /* Out of the grid: letting go hides the column. */
+  .og-drag-ghost-hide {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--og-text-color) 12%, transparent);
+    color: var(--og-text-color);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+  }
+  .og-column-drag-ghost[data-hide] {
+    border-color: color-mix(in srgb, var(--og-text-color) 30%, transparent);
+    background: color-mix(in srgb, var(--og-header-bg) 92%, var(--og-text-color));
+  }
+  .og-column-drag-ghost[data-hide] > span:not(.og-drag-ghost-hide) {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+  .og-column-drag-ghost[data-hide] .og-drag-ghost-hide { display: inline-flex; }
+
   /* SVG drag-handle icon injected by JS */
   .og-drag-ghost-icon {
     width: 10px;
