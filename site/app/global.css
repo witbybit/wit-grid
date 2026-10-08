@@ -979,7 +979,7 @@ body {
 	}
 	100% {
 		background: #fff;
-		box-shadow: inset 0 0 0 0.032em #6d7cff, 0 0 0 transparent;
+		box-shadow: inset 0 0 0 0.016em #6d7cff, 0 0 0 transparent;
 	}
 }
 
@@ -1075,7 +1075,7 @@ body {
 	border-radius: 0.03em;
 	/* The spreadsheet fill handle: a white cell with an accent border. */
 	background: #fff;
-	box-shadow: inset 0 0 0 0.032em #6d7cff;
+	box-shadow: inset 0 0 0 0.016em #6d7cff;
 }
 
 .wg-nav-brand {
