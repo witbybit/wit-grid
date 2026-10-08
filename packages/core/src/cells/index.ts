@@ -71,7 +71,7 @@ export {
 	linkedRecordColumnType,
 	sparklineColumnType,
 } from './cellTypes.js';
-export type { ColumnTypeDefinition, CellOptionInput, LinkedRecordOptions } from './cellTypes.js';
+export type { ColumnTypeDefinition, CellOptionInput, LinkedRecordOptions, OptionSortConfig } from './cellTypes.js';
 export { createToggleEditor } from './editors.js';
 export { createSparklineRenderer } from './sparkline.js';
 export { createTimelineRenderer } from './timeline.js';

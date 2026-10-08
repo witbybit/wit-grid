@@ -338,6 +338,12 @@ export interface ColumnDef<TRowData = unknown> {
 	hide?: boolean;
 	loading?: boolean;
 	valueGetter?: (params: ValueGetterParams<TRowData>) => unknown;
+	/**
+	 * What the column sorts by, from its value: an option's position, a label, a date's time. Every
+	 * client sort uses it (sorting, grouped sorting, re-sorting after an edit) and so do group rows
+	 * of this column. Default: the value itself.
+	 */
+	sortValue?: (value: unknown) => unknown;
 	valueGetterDependencies?: string[];
 	/**
 	 * Converts the raw cell value (from field, valueGetter, or formula) into a display string.

@@ -52,7 +52,7 @@ import {
 } from './renderers.js';
 
 /** The column settings a type supplies; the column's own settings win over them. */
-export type ColumnTypeDefinition<TRowData = unknown> = Partial<Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef'>>;
+export type ColumnTypeDefinition<TRowData = unknown> = Partial<Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef' | 'sortValue'>>;
 
 /** Options as objects or bare values. */
 export type CellOptionInput = CellOption | string;
@@ -69,6 +69,30 @@ function selectFilter(store: CellOptionsStore, listValues = false): ColumnTypeDe
 function labelOf(store: CellOptionsStore, value: string): string {
 	const option = store.get(value);
 	return option ? optionLabel(option) : value;
+}
+
+export interface OptionSortConfig {
+	/**
+	 * How the column sorts: 'options' in the order the options are listed (workflows, priorities,
+	 * sizes), unknown values after them; 'label' alphabetically by the label shown. Default 'options'.
+	 */
+	sortBy?: 'options' | 'label';
+}
+
+/** Option columns sort by what the user sees: option order, or the label (never the stored value). */
+function optionSortValue(store: CellOptionsStore, sortBy: OptionSortConfig['sortBy']): (value: unknown) => unknown {
+	if (sortBy === 'label') return (value) => (value == null ? null : labelOf(store, String(value)).toLocaleLowerCase());
+	let positions = new Map<string, number>();
+	let indexed = -1;
+	return (value) => {
+		if (value == null) return null;
+		// Options remembered later (created, loaded) join the order where they were added.
+		if (indexed !== store.options.length) {
+			positions = new Map(store.options.map((option, i) => [String(option.value), i]));
+			indexed = store.options.length;
+		}
+		return positions.get(String(value)) ?? store.options.length;
+	};
 }
 
 /**
@@ -100,12 +124,13 @@ export function switchColumnType(options: SwitchCellOptions = {}): ColumnTypeDef
 }
 
 /** Two to four options inline as a segmented control: one press picks. Enter opens them as a list. */
-export function segmentedColumnType(input: readonly CellOptionInput[], config: SegmentedCellOptions = {}): ColumnTypeDefinition<any> {
+export function segmentedColumnType(input: readonly CellOptionInput[], config: SegmentedCellOptions & OptionSortConfig = {}): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, {});
 	return {
 		renderer: { kind: 'dom', renderer: createSegmentedRenderer(store.options, config) },
 		cellEditor: { kind: 'dom', editor: createSelectEditor(store) },
 		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
+		sortValue: optionSortValue(store, config.sortBy),
 		filterDef: selectFilter(store),
 	};
 }
@@ -226,13 +251,14 @@ export function dateTimeColumnType(options: DateCellOptions = {}): ColumnTypeDef
  */
 export function selectColumnType(
 	input: readonly CellOptionInput[],
-	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
+	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig & OptionSortConfig = {}
 ): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, config);
 	return {
 		renderer: { kind: 'dom', renderer: createSelectRenderer(store, config) },
 		cellEditor: { kind: 'dom', editor: createSelectEditor(store, config) },
 		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
+		sortValue: optionSortValue(store, config.sortBy),
 		filterDef: selectFilter(store),
 	};
 }
@@ -243,7 +269,7 @@ export function selectColumnType(
  */
 export function comboboxColumnType(
 	input: readonly CellOptionInput[],
-	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig = {}
+	config: SelectRendererOptions & SelectEditorOptions & CellOptionsSourceConfig & OptionSortConfig = {}
 ): ColumnTypeDefinition<any> {
 	return selectColumnType(input, { variant: 'plain', searchable: true, ...config });
 }
