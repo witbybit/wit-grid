@@ -1,4 +1,5 @@
 import { computeDistinctValueSummary, type DistinctValueComputationOptions } from './distinctValues.js';
+import type { DatePeriod, RelativeDateUnit } from './filters/relativeDates.js';
 
 // V2 discriminated-union filter model.
 
@@ -6,7 +7,8 @@ export type TextFilterOperator = 'contains' | 'notContains' | 'equals' | 'notEqu
 
 export type NumberFilterOperator = 'equals' | 'notEquals' | 'gt' | 'gte' | 'lt' | 'lte' | 'inRange' | 'blank' | 'notBlank';
 
-export type DateFilterOperator = 'equals' | 'before' | 'after' | 'inRange' | 'blank' | 'notBlank';
+/** `inLast` / `inNext` (an amount of units) and `period` (this week, last month…) roll with the calendar. */
+export type DateFilterOperator = 'equals' | 'before' | 'after' | 'inRange' | 'inLast' | 'inNext' | 'period' | 'blank' | 'notBlank';
 
 export interface TextFilterCondition {
 	type: 'text';
@@ -30,6 +32,12 @@ export interface DateFilterCondition {
 	dateFrom: string;
 	/** Upper bound for inRange operator (ISO 8601). */
 	dateTo?: string;
+	/** `inLast` / `inNext`: how many units. */
+	amount?: number;
+	/** `inLast` / `inNext`: days, weeks, months or years. */
+	unit?: RelativeDateUnit;
+	/** `period`: which one. */
+	period?: DatePeriod;
 }
 
 /**

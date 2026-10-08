@@ -9,6 +9,8 @@ import {
 	VisualRow,
 	GroupRenderContext,
 	type AdapterFilterMount,
+	type AdapterPanelMount,
+	type GridSidebarConfig as CoreGridSidebarConfig,
 } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GridAdapterContext, GridFilterMountContext } from './gridContext.js';
@@ -22,8 +24,7 @@ import {
 } from './reactHostBridge.js';
 import { PortalManager, createPortalStore } from './GridPortal.js';
 import { flashCopiedCells } from './cellFlash.js';
-import { GridSidebar, GridSidebarConfig } from './sidebar/GridSidebar.js';
-import { GridChartOverlay } from './chart/GridChartOverlay.js';
+import type { GridSidebarConfig } from './sidebar/sidebarConfig.js';
 
 export interface GridViewProps<TRowData = unknown> {
 	api: GridApi<TRowData>;
@@ -93,6 +94,17 @@ export function GridView<TRowData = unknown>({
 		},
 		[portalStore]
 	);
+	// Custom sidebar panels (`renderPanel`) render through the portal tree too.
+	const panelMount = useMemo<AdapterPanelMount>(
+		() => (container, render, context) => {
+			portalStore.mountFilter(container, render(context));
+			return () => portalStore.unmountFilter(container);
+		},
+		[portalStore]
+	);
+	const sidebarRef = useRef(sidebar);
+	sidebarRef.current = sidebar;
+	const hasSidebar = sidebar != null;
 	// Which full-width rows React draws: only kinds the user gave a renderer for. Core draws the rest.
 	const userRowRenderersRef = useRef({ group: false, detail: false, total: false });
 	userRowRenderersRef.current = { group: !!groupRowRenderer, detail: !!detailRowRenderer, total: !!totalRowRenderer };
@@ -184,6 +196,9 @@ export function GridView<TRowData = unknown>({
 				},
 			},
 			mountFilter: filterMount,
+			sidebar: sidebarRef.current as CoreGridSidebarConfig<TRowData> | undefined,
+			mountPanel: panelMount,
+			chart: enableChart,
 			headerMenu: {
 				mountHeaderMenu: (mount) => {
 					portalStore.mountMenu(mount.colField, mount.container, mount.column, mount.close);
@@ -197,7 +212,7 @@ export function GridView<TRowData = unknown>({
 		hostRef.current = host;
 		setAdapterHandle(host.adapterHandle as GridAdapterHandle<unknown>);
 		const interactionBinding = bindGridInteractionSurface(api, {
-			container,
+			container: host.gridElement,
 			adapterHandle: host.adapterHandle,
 			getNavigationEnabled: () => !!enableNavigationRef.current,
 			isContextMenuEnabled: () => !!enableContextMenuRef.current && !!contextMenuRef.current,
@@ -224,7 +239,11 @@ export function GridView<TRowData = unknown>({
 			host.destroy();
 			portalStore.clear(true);
 		};
-	}, [api, portalStore]);
+	}, [api, portalStore, hasSidebar, enableChart]);
+
+	useEffect(() => {
+		if (sidebar) hostRef.current?.setSidebar(sidebar as CoreGridSidebarConfig<TRowData>);
+	}, [sidebar]);
 
 	const contextMenuOptionsRef = useRef(contextMenuOptions);
 	contextMenuOptionsRef.current = contextMenuOptions;
@@ -268,7 +287,7 @@ export function GridView<TRowData = unknown>({
 	useEffect(() => {
 		let cancelFlash: (() => void) | undefined;
 		const unsub = api.addEventListener(GridEventName.cellsCopied, ({ payload }) => {
-			const container = containerRef.current;
+			const container = hostRef.current?.gridElement ?? containerRef.current;
 			if (!container) return;
 			cancelFlash?.();
 			cancelFlash = flashCopiedCells(container, payload.cells);
@@ -294,10 +313,6 @@ export function GridView<TRowData = unknown>({
 	}, [api, onCellValueChanged]);
 
 	useEffect(() => {
-		if (sidebarDefaultOpenRef.current != null) api.openPanel(sidebarDefaultOpenRef.current);
-	}, [api]);
-
-	useEffect(() => {
 		const initialValue = sidebarDefaultOpenRef.current;
 		const currentValue = sidebar?.defaultOpen;
 		if (Object.is(initialValue, currentValue)) return;
@@ -306,20 +321,11 @@ export function GridView<TRowData = unknown>({
 		warnInitialOnlyGridViewProp('sidebar.defaultOpen');
 	}, [api, sidebar?.defaultOpen]);
 
-	const hasSidebar = sidebar != null;
-	const sidebarPosition = sidebar?.position ?? 'right';
-
 	const gridPane = (
 		<div
 			ref={containerRef}
 			tabIndex={-1}
-			style={{
-				flex: hasSidebar ? 1 : undefined,
-				width: hasSidebar ? undefined : '100%',
-				height: '100%',
-				position: 'relative',
-				minWidth: hasSidebar ? 0 : undefined,
-			}}
+			style={{ width: '100%', height: '100%', position: 'relative' }}
 		>
 			<PortalManager
 				store={portalStore}
@@ -334,22 +340,7 @@ export function GridView<TRowData = unknown>({
 	return (
 		<GridAdapterContext.Provider value={adapterHandle}>
 			<GridFilterMountContext.Provider value={filterMount}>
-				{hasSidebar ? (
-					<div
-						style={{
-							width: '100%',
-							height: '100%',
-							display: 'flex',
-							flexDirection: sidebarPosition === 'left' ? 'row-reverse' : 'row',
-						}}
-					>
-						{gridPane}
-						<GridSidebar<TRowData> api={api} config={sidebar!} />
-					</div>
-				) : (
-					gridPane
-				)}
-				{enableChart && <GridChartOverlay api={api} />}
+				{gridPane}
 			</GridFilterMountContext.Provider>
 		</GridAdapterContext.Provider>
 	);

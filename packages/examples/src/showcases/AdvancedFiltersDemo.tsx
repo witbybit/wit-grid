@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
 	Grid,
 	GridEventName,
+	GRID_STATE_SCHEMA_VERSION,
 	type ColumnDef,
 	type GridApi,
 	type GridReadyEvent,
@@ -289,7 +290,6 @@ function makeColumns(): ColumnDef<EmployeeRow>[] {
 }
 
 // ── Pre-seeded workspace views ────────────────────────────────────────────────
-// v:2 matches the current GRID_STATE_SCHEMA_VERSION.
 // Each view embeds a PersistedGridState with a real filter / sort model.
 
 const _T = Date.now();
@@ -312,7 +312,7 @@ function makeView(
 		updatedAt: _T - 600_000,
 		version: 1,
 		state: {
-			v: 2,
+			v: GRID_STATE_SCHEMA_VERSION,
 			state: {
 				filterModel: filterModel ?? null,
 				sortModel: sortModel ?? null,
@@ -351,7 +351,7 @@ const SEED_VIEWS: GridViewDefinition[] = [
 		'team',
 		{ level: { type: 'select', values: ['IC4', 'IC5'], labels: ['IC4', 'IC5'] } },
 		[{ colId: 'salary', sort: 'desc' }],
-		'warm-orange'
+		'ember'
 	),
 	makeView('contractors', 'All Contractors', 'External contractors — useful for billing and access reviews', 'personal', {
 		status: { type: 'select', values: ['Contractor'], labels: ['Contractor'] },

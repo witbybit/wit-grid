@@ -53,6 +53,30 @@ export class FilterPopoverController<TRowData = unknown> {
 		});
 	}
 
+	/**
+	 * Mounts a column's filter editor on a draft (the query builder): it reports each filter to
+	 * `onChange` and applies nothing.
+	 */
+	public mountDraftEditor(
+		container: HTMLElement,
+		colField: string,
+		surface: FilterSurface,
+		filter: ColumnFilter | null,
+		onChange: (filter: ColumnFilter | null) => void
+	): DomFilterEditorHandle | null {
+		const column = this.engine.columns.getColumnDef(colField);
+		const def = column ? resolveColumnFilterDef(column) : null;
+		if (!def) return null;
+		return createFilterEditor(def, surface, this.mountAdapterFilter).mount(container, {
+			colField,
+			filterDef: def,
+			filter,
+			surface,
+			onChange,
+			distinctValues: () => this.engine.getColumnDistinctValueSummary(colField),
+		});
+	}
+
 	public apply(colField: string, filter: ColumnFilter | null): void {
 		const model = this.engine.stateManager.getState().filterModel ?? null;
 		this.engine.setFilterModel(applyFilterToModel(colField, filter, model));

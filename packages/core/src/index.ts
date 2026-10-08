@@ -178,7 +178,6 @@ export { HIERARCHY_COLUMN_FIELD, isHierarchyColumn, hierarchyColumnGroupColId } 
 export type { DescendantSelection, DescendantSelectionState } from './rows/hierarchyIndex.js';
 export type { ExpandAllOptions } from './rowModel.js';
 export { renderGroupToggle } from './renderer/hierarchyCell.js';
-export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
 export { isDomCellRenderer, isDomCellEditorSpec } from './columnDef.js';
 export {
@@ -231,6 +230,7 @@ export {
 	restoreFilterModel,
 } from './filterOperations.js';
 export type { CsvExportOptions } from './export/csvExport.js';
+export type { ExcelExportOptions } from './export/xlsxExport.js';
 export type { GridContextMenuItem, GridContextMenuOptions } from './contextMenu.js';
 export type { GridCellWrite, GridTransaction, GridTransactionOptions, GridTransactionResult } from './api/GridApi.js';
 export type {
@@ -276,20 +276,17 @@ export type { GridNavigationOptions } from './interaction/GridInteractionControl
 export {
 	LIGHT_THEME,
 	DARK_THEME,
-	HIGH_CONTRAST_LIGHT_THEME,
-	HIGH_CONTRAST_DARK_THEME,
-	COOL_BLUE_THEME,
-	WARM_ORANGE_THEME,
-	MINIMAL_MONOCHROME_THEME,
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,
 	BUILT_IN_THEME_METADATA,
+	BUILT_IN_THEME_FONTS_URL,
+	createTheme,
 	ThemeManager,
 	getBuiltInTheme,
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from './renderer/themes.js';
-export type { ThemeTokens, BuiltInThemeName } from './renderer/themes.js';
+export type { ThemeTokens, ThemePalette, BuiltInThemeName } from './renderer/themes.js';
 export type { RowAnimationOptions } from './renderer/rowAnimation.js';
 export type { GridDomainVersions } from './state/GridDomainVersions.js';
 export type { GridInstrumentation, GridInstrumentationSnapshot, FrameMetrics, FallbackMetric } from './diagnostics/GridInstrumentation.js';
@@ -305,3 +302,17 @@ export * from './cells/index.js';
 // ── Filter editors (every filter surface mounts these) ───────────────────────
 export { createFilterEditor } from './filters/filterEditors.js';
 export type { AdapterFilterMount } from './filters/filterEditors.js';
+export type {
+	AdapterPanelMount,
+	BuiltinSidebarPanelId,
+	GridSidebarConfig,
+	SidebarPanel,
+	SidebarFilterEditorOptions,
+	SidebarPanelContext,
+	SidebarPanelDef,
+	SidebarPanelHandle,
+} from './sidebar/sidebarTypes.js';
+export { sidebarIconSvg, type SidebarIconName } from './sidebar/sidebarIcons.js';
+// ── Charts ───────────────────────────────────────────────────────────────────
+export { createGridChart, type GridChartHandle } from './charts/gridChart.js';
+export type { ChartAggregate, ChartData, ChartSeries, ChartSource, ChartSpec, ChartType } from './charts/chartTypes.js';

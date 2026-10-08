@@ -1028,6 +1028,10 @@ export class GridEngine<TRowData = unknown> {
 	public isRowLoading(rowId: string): boolean {
 		return this.data.isRowLoading(rowId);
 	}
+	/** Some cell of the column holds a formula (its values are not just the row data's). */
+	public fieldHasFormulas(colField: string): boolean {
+		return this.formulas.hasFormulasInField(colField);
+	}
 	public getCellDisplayValue(rowId: string, colField: string): unknown {
 		return this.data.getCellValue(rowId, colField);
 	}

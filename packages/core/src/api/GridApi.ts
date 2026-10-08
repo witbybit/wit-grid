@@ -225,6 +225,8 @@ export interface GridStateSnapshot<TRowData = unknown> {
 	readonly loading?: boolean;
 	readonly pagination?: { pageSize: number; page?: number };
 	readonly enableColumnReorder: boolean;
+	/** How many displayed columns are pinned to each side. */
+	readonly pinnedColumns?: { readonly left: number; readonly right: number };
 	readonly themeName?: BuiltInThemeName;
 	readonly sidebarOpenPanel?: string | null;
 	readonly chartOpen?: boolean;

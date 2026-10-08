@@ -27,7 +27,7 @@ export interface CsvExportOptions {
 }
 
 // Minimal duck-typed interface — avoids a circular import with store.ts
-interface Exportable<TRowData> {
+export interface Exportable<TRowData> {
 	getDisplayedColumns(): Array<{
 		field: string;
 		header: string;
@@ -65,15 +65,7 @@ export function toCsv<TRowData>(api: Exportable<TRowData>, options: CsvExportOpt
 		return lines.join('\n');
 	}
 
-	const allRows = api.rows().getAll();
-	// By id, in the given order — rows inside collapsed groups included.
-	const dataRows = rowIds
-		? rowIds.map((id) => api.rows().getById(id)).filter((row): row is TRowData => row != null)
-		: onlySelected
-			? api.rows().getSelected()
-			: allRows;
-
-	for (const row of dataRows) {
+	for (const row of exportDataRows(api, { rowIds, onlySelected })) {
 		const rowId = api.getRowId(row);
 		lines.push(
 			cols
@@ -87,6 +79,12 @@ export function toCsv<TRowData>(api: Exportable<TRowData>, options: CsvExportOpt
 	}
 
 	return lines.join('\n');
+}
+
+/** The data rows an export writes: by id in the given order (rows inside collapsed groups too), the selected ones, or all shown. */
+export function exportDataRows<TRowData>(api: Exportable<TRowData>, options: { rowIds?: string[]; onlySelected?: boolean }): TRowData[] {
+	if (options.rowIds) return options.rowIds.map((id) => api.rows().getById(id)).filter((row): row is TRowData => row != null);
+	return options.onlySelected ? api.rows().getSelected() : api.rows().getAll();
 }
 
 function writeHierarchyRows<TRowData>(
@@ -138,7 +136,7 @@ function escapeCell(value: string, delimiter: string): string {
 	return value;
 }
 
-function triggerDownload(blob: Blob, fileName: string): void {
+export function triggerDownload(blob: Blob, fileName: string): void {
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;

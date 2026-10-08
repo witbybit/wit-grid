@@ -36,10 +36,12 @@ import type { RenderStats } from './renderer/renderTelemetry.js';
 import type { GridRowNode } from './publicRowNode.js';
 import type { AggregationDef } from './rows/stages/aggregateStage.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from './export/csvExport.js';
+import { exportToXlsx, toXlsxBlob, type ExcelExportOptions } from './export/xlsxExport.js';
 import { createHierarchyTextResolver } from './rows/hierarchyText.js';
 import { isHierarchyActive } from './rows/hierarchyConfig.js';
 import type { PersistenceStatus, PersistedGridState } from './persistence/statePersistence.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './workspace/workspaceTypes.js';
+import { EMPTY_WORKSPACE_STATE } from './workspace/GridWorkspaceController.js';
 import { extractPersistedState, preparePersistedGridStateRestore, areRowHeightsEqual } from './persistence/statePersistence.js';
 import { BUILT_IN_THEME_ORDER, getBuiltInTheme, isBuiltInThemeName, type BuiltInThemeName, type ThemeTokens } from './renderer/themes.js';
 
@@ -89,7 +91,6 @@ export {
 export type { DataVisualRow, GroupVisualRow, DetailVisualRow, TotalVisualRow, LoadingVisualRow, VisualRow, RowHierarchy } from './visualRow.js';
 
 export type { PersistenceStatus };
-export type { PersistedGridState as SerializableGridState } from './persistence/statePersistence.js';
 
 // ── Extracted modules — re-export for backward compat ────────────────────────
 export * from './api/GridApi.js';
@@ -158,16 +159,6 @@ const _FALLBACK_CAPS: Record<RowModelType, RowModelCapabilities> = {
 	client:   { fullDataset: true, loadedDataset: false, pagedDataset: false, clientMutation: true, loadedRowMutation: false, pageRowMutation: false, transactions: true, rowOrder: true, blockLoading: false, serverPagination: false, clientSort: true, clientFilter: true, serverSort: false, serverFilter: false, clientGrouping: true, clientTree: true, aggregation: true, masterDetail: true, allRowSelection: true, loadedRowSelection: false, pageRowSelection: false },
 };
 
-const _EMPTY_WS_STATE: GridWorkspaceState = {
-	views: [],
-	activeViewId: null,
-	defaultViewId: null,
-	autoSaveEnabled: true,
-	dirty: false,
-	lastSavedAt: null,
-	lastError: null,
-	loading: false,
-};
 
 /**
  * Internal runtime composition root.
@@ -521,14 +512,6 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		this.engine.setQuickFilterModel(trimmed ? { text: trimmed, columnIds } : null);
 	};
 
-	public getQueryModel = (): GridQueryModel | null => {
-		return this.state.queryModel ?? null;
-	};
-
-	public clearQueryModel = (): void => {
-		this.engine.setQueryModel(null);
-	};
-
 	public evaluateQueryForRow = (rowId: string): boolean => {
 		const queryModel = this.state.queryModel;
 		if (!queryModel) return true;
@@ -550,6 +533,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
+	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, this.state.columnWidths, options);
+	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, this.state.columnWidths, options);
 
 	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
 	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {
@@ -576,7 +561,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 
 	// All workspace methods are overridden by the composition root when a workspace adapter is configured.
 	public hasWorkspace = (): boolean => false;
-	public getWorkspaceState = (): GridWorkspaceState => _EMPTY_WS_STATE;
+	public getWorkspaceState = (): GridWorkspaceState => EMPTY_WORKSPACE_STATE;
 	public subscribeToWorkspaceState =
 		(_listener: (state: GridWorkspaceState) => void): (() => void) =>
 		() => {};
@@ -585,6 +570,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		Promise.reject(new Error('[wit-grid] No workspace adapter configured'));
 	public updateView = (_id: string, _state?: PersistedGridState): Promise<void> => Promise.resolve();
 	public applyView = (_id: string): Promise<void> => Promise.resolve();
+	public revertView = (): Promise<void> => Promise.resolve();
 	public deleteView = (_id: string): Promise<void> => Promise.resolve();
 	public duplicateView = (_id: string, _name: string): Promise<GridViewDefinition> =>
 		Promise.reject(new Error('[wit-grid] No workspace adapter configured'));

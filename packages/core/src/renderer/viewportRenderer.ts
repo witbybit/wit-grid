@@ -3,6 +3,8 @@ import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
 import { CORE_STYLES } from './styles.js';
 import { CELL_STYLES } from '../cells/cellStyles.js';
+import { SIDEBAR_STYLES } from '../sidebar/sidebarStyles.js';
+import { CHART_STYLES } from '../charts/chartStyles.js';
 import type { GridLayoutPlan } from './layoutPlan.js';
 import { LAYER_REGISTRY } from './layerRegistry.js';
 import type { BuiltInThemeName, ThemeTokens } from './themes.js';
@@ -421,7 +423,7 @@ export class ViewportRenderer<TRowData = unknown> {
 	private injectStyles(): void {
 		if (typeof document === 'undefined') return;
 		this.styleTag = document.createElement('style');
-		this.styleTag.textContent = CORE_STYLES + CELL_STYLES;
+		this.styleTag.textContent = CORE_STYLES + CELL_STYLES + SIDEBAR_STYLES + CHART_STYLES;
 		document.head.appendChild(this.styleTag);
 	}
 }

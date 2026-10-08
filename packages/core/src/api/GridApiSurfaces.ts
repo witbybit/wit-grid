@@ -24,6 +24,7 @@ import type { RenderStats } from '../renderer/renderTelemetry.js';
 import type { PersistenceStatus, PersistedGridState } from '../persistence/statePersistence.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
 import type { CsvExportOptions } from '../export/csvExport.js';
+import type { ExcelExportOptions } from '../export/xlsxExport.js';
 import type { GridDistinctValueSummary } from '../distinctValues.js';
 import type { GridEventPayloadMap, GridEventListener } from './GridEvents.js';
 import type { RuntimeFault, RuntimeFaultInput } from '../diagnostics/RuntimeFaultReporter.js';
@@ -154,9 +155,8 @@ export interface GridStructureApi<TRowData = unknown> {
 	getQuickFilter(): QuickFilterModel | null;
 	/** Search a single string across multiple columns (or every column). See `QuickFilterModel`. */
 	setQuickFilter(text: string, columnIds?: string[]): void;
-	getQueryModel(): GridQueryModel | null;
+	/** Sets the cross-column query; `null` clears it. The current one is `getStateSnapshot().queryModel`. */
 	setQueryModel(model: GridQueryModel | null): void;
-	clearQueryModel(): void;
 	evaluateQueryForRow(rowId: string): boolean;
 	getColumnDistinctValues(colField: string): (string | number | null)[];
 	getColumnDistinctValueSummary(colField: string): GridDistinctValueSummary;
@@ -280,6 +280,8 @@ export interface GridPersistenceWorkspaceApi {
 	saveView(name: string, options?: SaveViewOptions): Promise<GridViewDefinition>;
 	updateView(id: string, state?: PersistedGridState): Promise<void>;
 	applyView(id: string): Promise<void>;
+	/** Puts the grid back as it was when the active view was applied, saved or updated. */
+	revertView(): Promise<void>;
 	deleteView(id: string): Promise<void>;
 	duplicateView(id: string, name: string): Promise<GridViewDefinition>;
 	renameView(id: string, name: string): Promise<void>;
@@ -303,6 +305,10 @@ export interface GridDiagnosticsCapabilityApi<TRowData = unknown> {
 	exportCsv(options?: CsvExportOptions): void;
 	/** The CSV text `exportCsv` would download. */
 	getCsv(options?: CsvExportOptions): string;
+	/** Downloads an Excel workbook that keeps the grid's number, currency, percent and date formats. */
+	exportExcel(options?: ExcelExportOptions): Promise<void>;
+	/** The workbook `exportExcel` would download. */
+	getExcel(options?: ExcelExportOptions): Promise<Blob>;
 	can(action: GridCapabilityAction, params?: Partial<GridCapabilityParams<TRowData>>): GridCapabilityResult;
 	canEdit(rowId: string, colField: string): boolean;
 	canCopy(rowId?: string, colField?: string): boolean;

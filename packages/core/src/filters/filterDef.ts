@@ -51,6 +51,8 @@ export interface ColumnFilterDef<TRowData = unknown> {
 	operators?: readonly string[];
 	/** Number display in chips and inputs. */
 	format?: NumberCellOptions;
+	/** Date filters: the first day of a week for "this week" (0 Sunday … 6 Saturday). Default 1. */
+	weekStartsOn?: number;
 	/** Number inputs: bounds and step. */
 	min?: number;
 	max?: number;

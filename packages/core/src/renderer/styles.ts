@@ -2176,7 +2176,7 @@ export const CORE_STYLES = `
   }
   .og-btn-primary {
     background-color: var(--og-popover-item-active-bg, var(--og-focus-ring, #3b82f6));
-    color: #ffffff;
+    color: var(--og-accent-contrast, #ffffff);
   }
   .og-btn-primary:hover {
     filter: brightness(1.1);

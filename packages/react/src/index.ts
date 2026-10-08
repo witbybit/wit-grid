@@ -10,15 +10,18 @@ export type {
 } from './types.js';
 export { GroupToggle, GroupCount } from './GroupParts.js';
 export { useGridApi, useGridSelector, useGridKeySelector } from './hooks.js';
-export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelDef } from './sidebar/GridSidebar.js';
+export type { BuiltinSidebarPanelId, GridSidebarConfig, SidebarPanelContext, SidebarPanelDef } from './sidebar/sidebarConfig.js';
 export {
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,
 	BUILT_IN_THEME_METADATA,
+	BUILT_IN_THEME_FONTS_URL,
+	createTheme,
 	getBuiltInTheme,
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from '@eregister/wit-grid-core';
+export type { ThemePalette } from '@eregister/wit-grid-core';
 
 // ─── Built-in cell types (core, DOM-based) ───────────────────────────────────
 export {
@@ -115,6 +118,8 @@ export type {
 export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGroupRenderer } from '@eregister/wit-grid-core';
 export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
 export { resolveColumnFilterDef, summarizeFilter } from '@eregister/wit-grid-core';
+export { createGridChart, GRID_STATE_SCHEMA_VERSION } from '@eregister/wit-grid-core';
+export type { ChartAggregate, ChartData, ChartSeries, ChartSource, ChartSpec, ChartType, ExcelExportOptions, GridChartHandle } from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
 export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js';

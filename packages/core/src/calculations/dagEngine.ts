@@ -61,6 +61,11 @@ export class DagEngine {
 		this.invalidateCell(rowId, colField, invalidated);
 	}
 
+	/** Some cell of the column holds a formula. */
+	public hasFormulasInField(colField: string): boolean {
+		return this.formulaCountByField.has(colField);
+	}
+
 	/**
 	 * Remove a formula from a cell.
 	 */

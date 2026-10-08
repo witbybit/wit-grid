@@ -40,6 +40,8 @@ export interface ThemeTokens {
 	selectionBorder: string;
 	selectionBg: string;
 	focusRing: string; // Primary accent color used for focus and highlights
+	/** Text on the accent colour (active items, ticks, badges). Default white. */
+	accentContrast?: string;
 
 	/* ─────────────────────────────────────────────────────────────────────
      Pin Column Styling (vertical dividers between pinned/center/pinned)
@@ -137,350 +139,401 @@ export interface ThemeTokens {
 	totalHeaderHeight?: string;
 }
 
+/** The handful of colours (and a font) a whole theme is made from. */
+export interface ThemePalette {
+	appearance: 'light' | 'dark';
+	/** A CSS font stack; the first family is used when the page has loaded it. */
+	font: string;
+	/** The grid body. */
+	background: string;
+	/** Header, floating-filter row and other chrome. */
+	surface: string;
+	/** Popovers and menus. */
+	raised: string;
+	text: string;
+	/** Header text and secondary text. */
+	muted: string;
+	border: string;
+	/** A stronger border (emphasis, skeleton shimmer). */
+	borderStrong: string;
+	/** Focus, selection, active items, badges. */
+	accent: string;
+	/** The accent as text on the background (badges, links). Default: the accent. */
+	accentText?: string;
+	/** Row hover. */
+	hover: string;
+	error: string;
+	/** The outer corner radius. Default '8px'. */
+	radius?: string;
+	/** Inputs inside popovers and the floating-filter row. */
+	inputBackground?: string;
+}
+
+function hexToRgb(hex: string): [number, number, number] | null {
+	const match = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+	if (!match) return null;
+	const h = match[1].length === 3 ? match[1].replace(/./g, (c) => c + c) : match[1];
+	return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** A hex colour at an opacity (plain rgba, so canvases and every browser read it). */
+function alpha(hex: string, a: number): string {
+	const rgb = hexToRgb(hex);
+	return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})` : hex;
+}
+
+/** Text that reads on the colour: near-black on light accents, white on dark ones. */
+function contrastOn(hex: string): string {
+	const rgb = hexToRgb(hex);
+	if (!rgb) return '#ffffff';
+	const [r, g, b] = rgb.map((c) => {
+		const s = c / 255;
+		return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+	});
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.36 ? '#0b0d12' : '#ffffff';
+}
+
 /**
- * Light theme - clean, professional appearance
- * Used by default or when explicitly requested
+ * A complete theme from a palette: selection, popovers, group and detail rows, skeletons and
+ * pinned-column shadows all follow from a few colours.
+ *
+ * @example
+ * api.setTheme(createTheme({ ...myPalette, accent: '#0ea5e9' }));
  */
-export const LIGHT_THEME: ThemeTokens = {
-	fontFamily: "'Outfit', 'Inter', -apple-system, sans-serif",
+export function createTheme(p: ThemePalette): ThemeTokens {
+	const dark = p.appearance === 'dark';
+	const accentText = p.accentText ?? p.accent;
+	const input = p.inputBackground ?? (dark ? alpha(p.borderStrong, 0.35) : p.background);
+	return {
+		fontFamily: p.font,
 
-	bgColor: '#ffffff',
-	textColor: '#1a202c',
-	borderColor: '#e2e8f0',
-	borderColorAccent: '#cbd5e1',
+		bgColor: p.background,
+		textColor: p.text,
+		borderColor: p.border,
+		borderColorAccent: p.borderStrong,
 
-	headerBg: '#f8fafc',
-	headerText: '#475569',
+		headerBg: p.surface,
+		headerText: p.muted,
 
-	rowHoverBg: '#f1f5f9',
-	cellBorder: 'rgba(226, 232, 241, 0.5)',
+		rowHoverBg: p.hover,
+		cellBorder: alpha(p.border, dark ? 0.75 : 0.8),
 
-	selectionBorder: 'rgba(59, 130, 246, 0.6)',
-	selectionBg: 'rgba(59, 130, 246, 0.1)',
-	focusRing: '#3b82f6',
+		selectionBorder: alpha(p.accent, 0.7),
+		selectionBg: alpha(p.accent, dark ? 0.14 : 0.1),
+		focusRing: p.accent,
+		accentContrast: contrastOn(p.accent),
 
-	pinLeftBorderColor: 'rgba(0, 0, 0, 0.08)',
-	pinRightBorderColor: 'rgba(0, 0, 0, 0.08)',
-	pinLeftShadow: '-2px 0 8px rgba(0, 0, 0, 0.06)',
-	pinRightShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
+		pinLeftBorderColor: dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.08)',
+		pinRightBorderColor: dark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(0, 0, 0, 0.08)',
+		pinLeftShadow: dark ? '4px 0 14px rgba(0, 0, 0, 0.45)' : '4px 0 10px rgba(0, 0, 0, 0.06)',
+		pinRightShadow: dark ? '-4px 0 14px rgba(0, 0, 0, 0.45)' : '-4px 0 10px rgba(0, 0, 0, 0.06)',
 
-	skeletonStart: '#e2e8f0',
-	skeletonMid: '#cbd5e1',
-	skeletonEnd: '#e2e8f0',
-	skeletonWidth: '75%',
-	skeletonHeight: '14px',
-	skeletonBorderRadius: '4px',
-	skeletonAnimationDuration: '1.5s',
+		skeletonStart: p.border,
+		skeletonMid: p.borderStrong,
+		skeletonEnd: p.border,
+		skeletonWidth: '75%',
+		skeletonHeight: '14px',
+		skeletonBorderRadius: '4px',
+		skeletonAnimationDuration: '1.5s',
 
-	groupRowBg: 'rgba(59, 130, 246, 0.04)',
-	groupRowHoverBg: 'rgba(59, 130, 246, 0.08)',
-	groupRowText: '#1a202c',
-	groupRowFontSize: '13px',
-	groupRowFontWeight: '600',
-	groupBadgeBg: 'rgba(59, 130, 246, 0.15)',
-	groupBadgeBorder: 'rgba(59, 130, 246, 0.3)',
-	groupBadgeText: '#2563eb',
+		groupRowBg: alpha(p.accent, dark ? 0.06 : 0.05),
+		groupRowHoverBg: alpha(p.accent, dark ? 0.11 : 0.09),
+		groupRowText: p.text,
+		groupRowFontSize: '13px',
+		groupRowFontWeight: '600',
+		groupBadgeBg: alpha(p.accent, 0.16),
+		groupBadgeBorder: alpha(p.accent, 0.36),
+		groupBadgeText: accentText,
 
-	detailRowBg: 'rgba(59, 130, 246, 0.02)',
-	detailRowBorder: 'rgba(59, 130, 246, 0.1)',
-	detailRowText: '#64748b',
-	detailRowFontSize: '12px',
+		detailRowBg: alpha(p.accent, 0.03),
+		detailRowBorder: alpha(p.accent, 0.12),
+		detailRowText: p.muted,
+		detailRowFontSize: '12px',
 
-	popoverBg: 'rgba(248, 250, 252, 0.98)',
-	popoverBorder: 'rgba(0, 0, 0, 0.08)',
-	popoverText: '#1a202c',
-	popoverItemHoverBg: 'rgba(59, 130, 246, 0.08)',
-	popoverItemActiveBg: '#3b82f6',
-	popoverDivider: 'rgba(0, 0, 0, 0.08)',
-	popoverInputBg: '#ffffff',
-	popoverInputBorder: 'rgba(226, 232, 241, 0.8)',
+		popoverBg: p.raised,
+		popoverBorder: alpha(p.text, dark ? 0.1 : 0.12),
+		popoverText: p.text,
+		popoverItemHoverBg: alpha(p.text, dark ? 0.07 : 0.05),
+		popoverItemActiveBg: p.accent,
+		popoverDivider: alpha(p.text, 0.08),
+		popoverInputBg: input,
+		popoverInputBorder: alpha(p.text, dark ? 0.12 : 0.16),
 
+		error: p.error,
+
+		readonlyCellBg: dark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+		readonlyCellOpacity: dark ? '0.65' : '0.55',
+
+		floatingFilterBg: p.surface,
+		floatingFilterInputBg: input,
+		floatingFilterInputBorder: p.border,
+
+		outerBorderRadius: p.radius ?? '8px',
+
+		leafHeaderHeight: '40px',
+		groupPanelHeight: '42px',
+		bottomChromeHeight: '0px',
+		totalHeaderHeight: '40px',
+	};
+}
+
+/* Font stacks: each falls back to fonts every system has. */
+const FONTS = {
+	inter: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+	jakarta: "'Plus Jakarta Sans', 'Segoe UI', system-ui, -apple-system, sans-serif",
+	plex: "'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif",
+	dmSans: "'DM Sans', 'Segoe UI', system-ui, -apple-system, sans-serif",
+	grotesk: "'Space Grotesk', 'Avenir Next', 'Segoe UI', system-ui, sans-serif",
+	sourceSans: "'Source Sans 3', 'Segoe UI', 'Helvetica Neue', system-ui, sans-serif",
+	mono: "'JetBrains Mono', 'Cascadia Code', 'SF Mono', ui-monospace, Menlo, Consolas, monospace",
+	serif: "'Source Serif 4', 'Iowan Old Style', Charter, Georgia, ui-serif, serif",
+	lexend: "'Lexend', 'Segoe UI', system-ui, -apple-system, sans-serif",
+	rounded: "'Nunito', 'SF Pro Rounded', ui-rounded, 'Segoe UI', system-ui, sans-serif",
+	sheets: "'Roboto', 'Segoe UI', Arial, system-ui, sans-serif",
+	system: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+} as const;
+
+/** Dark: neutral graphite with an indigo accent. The default. */
+export const DARK_THEME: ThemeTokens = createTheme({
+	appearance: 'dark',
+	font: FONTS.inter,
+	background: '#0b0d12',
+	surface: '#08090d',
+	raised: '#12151c',
+	text: '#e6e9ef',
+	muted: '#98a1b2',
+	border: '#1d2330',
+	borderStrong: '#2c3444',
+	accent: '#6d7cff',
+	accentText: '#a5b0ff',
+	hover: '#141821',
+	error: '#f05252',
+});
+
+/** Light: crisp white with a blue accent. */
+export const LIGHT_THEME: ThemeTokens = createTheme({
+	appearance: 'light',
+	font: FONTS.inter,
+	background: '#ffffff',
+	surface: '#f7f8fa',
+	raised: '#ffffff',
+	text: '#111827',
+	muted: '#4b5563',
+	border: '#e5e7eb',
+	borderStrong: '#d1d5db',
+	accent: '#2563eb',
+	accentText: '#1d4ed8',
+	hover: '#f3f5f9',
 	error: '#dc2626',
-
-	readonlyCellBg: 'rgba(0, 0, 0, 0.02)',
-	readonlyCellOpacity: '0.55',
-
-	floatingFilterBg: '#f1f5f9',
-	floatingFilterInputBg: '#ffffff',
-	floatingFilterInputBorder: '#e2e8f0',
-
-	outerBorderRadius: '8px',
-
-	leafHeaderHeight: '40px',
-	groupPanelHeight: '42px',
-	bottomChromeHeight: '0px',
-	totalHeaderHeight: '40px',
-};
-
-/**
- * Dark theme (default) - optimized for extended viewing
- * High contrast, reduced eye strain, professional appearance
- */
-export const DARK_THEME: ThemeTokens = {
-	fontFamily: "'Outfit', 'Inter', -apple-system, sans-serif",
-
-	bgColor: '#0d0f12',
-	textColor: '#e2e8f0',
-	borderColor: '#1e293b',
-	borderColorAccent: '#334155',
-
-	headerBg: '#090a0f',
-	headerText: '#94a3b8',
-
-	rowHoverBg: '#161b22',
-	cellBorder: 'rgba(30, 41, 59, 0.5)',
-
-	selectionBorder: 'rgba(59, 130, 246, 0.6)',
-	selectionBg: 'rgba(59, 130, 246, 0.09)',
-	focusRing: '#3b82f6',
-
-	pinLeftBorderColor: 'rgba(255, 255, 255, 0.07)',
-	pinRightBorderColor: 'rgba(255, 255, 255, 0.07)',
-	pinLeftShadow: '4px 0 14px rgba(0, 0, 0, 0.45)',
-	pinRightShadow: '-4px 0 14px rgba(0, 0, 0, 0.45)',
-
-	skeletonStart: '#1e293b',
-	skeletonMid: '#334155',
-	skeletonEnd: '#1e293b',
-	skeletonWidth: '75%',
-	skeletonHeight: '14px',
-	skeletonBorderRadius: '4px',
-	skeletonAnimationDuration: '1.5s',
-
-	groupRowBg: 'rgba(15, 23, 42, 0.4)',
-	groupRowHoverBg: 'rgba(30, 41, 59, 0.6)',
-	groupRowText: '#e2e8f0',
-	groupRowFontSize: '13px',
-	groupRowFontWeight: '600',
-	groupBadgeBg: 'rgba(59, 130, 246, 0.2)',
-	groupBadgeBorder: 'rgba(59, 130, 246, 0.4)',
-	groupBadgeText: '#60a5fa',
-
-	detailRowBg: 'rgba(255, 255, 255, 0.02)',
-	detailRowBorder: 'rgba(255, 255, 255, 0.05)',
-	detailRowText: '#a0aec0',
-	detailRowFontSize: '12px',
-
-	popoverBg: 'rgba(17, 20, 28, 0.97)',
-	popoverBorder: 'rgba(255, 255, 255, 0.08)',
-	popoverText: '#e7e9ee',
-	popoverItemHoverBg: 'rgba(255, 255, 255, 0.07)',
-	popoverItemActiveBg: '#3b82f6',
-	popoverDivider: 'rgba(255, 255, 255, 0.07)',
-	popoverInputBg: 'rgba(30, 41, 59, 0.7)',
-	popoverInputBorder: 'rgba(255, 255, 255, 0.08)',
-
-	error: '#ef4444',
-
-	readonlyCellBg: 'rgba(255, 255, 255, 0.02)',
-	readonlyCellOpacity: '0.65',
-
-	floatingFilterBg: '#0c0e13',
-	floatingFilterInputBg: 'rgba(30, 41, 59, 0.6)',
-	floatingFilterInputBorder: 'rgba(255, 255, 255, 0.08)',
-
-	outerBorderRadius: '8px',
-
-	leafHeaderHeight: '40px',
-	groupPanelHeight: '42px',
-	bottomChromeHeight: '0px',
-	totalHeaderHeight: '40px',
-};
-
-/**
- * High-contrast light theme - enhanced accessibility
- * Stronger contrasts for better readability and visibility
- */
-export const HIGH_CONTRAST_LIGHT_THEME: ThemeTokens = {
-	...LIGHT_THEME,
-	textColor: '#000000',
-	borderColor: '#cccccc',
-	headerText: '#000000',
-	groupBadgeText: '#003d99',
-	detailRowText: '#333333',
-	popoverText: '#000000',
-	error: '#b91c1c',
-};
-
-/**
- * High-contrast dark theme - enhanced accessibility
- * Stronger contrasts optimized for dark mode
- */
-export const HIGH_CONTRAST_DARK_THEME: ThemeTokens = {
-	...DARK_THEME,
-	textColor: '#ffffff',
-	borderColor: '#666666',
-	headerText: '#ffffff',
-	rowHoverBg: '#1a1f2e',
-	groupBadgeText: '#90caf9',
-	detailRowText: '#b0bec5',
-	popoverText: '#ffffff',
-	popoverBg: 'rgba(0, 0, 0, 0.98)',
-	error: '#ff4444',
-};
-
-/**
- * Cool blue theme - modern tech aesthetic
- */
-export const COOL_BLUE_THEME: ThemeTokens = {
-	...DARK_THEME,
-	bgColor: '#0a1929',
-	textColor: '#e3f2fd',
-	borderColor: '#1a3a52',
-	headerBg: '#051827',
-	headerText: '#90caf9',
-	rowHoverBg: '#132f4c',
-	focusRing: '#2196f3',
-	groupBadgeBg: 'rgba(33, 150, 243, 0.2)',
-	groupBadgeBorder: 'rgba(33, 150, 243, 0.4)',
-	groupBadgeText: '#64b5f6',
-	error: '#f87171',
-	popoverBg: 'rgba(11, 31, 51, 0.98)',
-	popoverBorder: 'rgba(144, 202, 249, 0.16)',
-	popoverText: '#e3f2fd',
-	popoverItemHoverBg: 'rgba(33, 150, 243, 0.16)',
-	popoverItemActiveBg: '#2196f3',
-	popoverDivider: 'rgba(144, 202, 249, 0.12)',
-	popoverInputBg: 'rgba(5, 24, 39, 0.9)',
-	popoverInputBorder: 'rgba(144, 202, 249, 0.18)',
-};
-
-/**
- * Warm orange theme - energetic aesthetic
- */
-export const WARM_ORANGE_THEME: ThemeTokens = {
-	...DARK_THEME,
-	bgColor: '#1a0f00',
-	textColor: '#ffe4d6',
-	borderColor: '#332200',
-	headerBg: '#0d0600',
-	headerText: '#ffb399',
-	rowHoverBg: '#2a1500',
-	focusRing: '#ff9800',
-	groupBadgeBg: 'rgba(255, 152, 0, 0.2)',
-	groupBadgeBorder: 'rgba(255, 152, 0, 0.4)',
-	groupBadgeText: '#ffb74d',
-	error: '#fb923c',
-	popoverBg: 'rgba(36, 21, 4, 0.98)',
-	popoverBorder: 'rgba(255, 179, 153, 0.16)',
-	popoverText: '#ffe4d6',
-	popoverItemHoverBg: 'rgba(255, 152, 0, 0.14)',
-	popoverItemActiveBg: '#ff9800',
-	popoverDivider: 'rgba(255, 179, 153, 0.12)',
-	popoverInputBg: 'rgba(13, 6, 0, 0.9)',
-	popoverInputBorder: 'rgba(255, 179, 153, 0.18)',
-};
-
-/**
- * Spreadsheet theme - Microsoft Excel / Google Sheets aesthetic
- * Clean white body, light-gray headers, blue accent, hairline borders
- */
-export const SPREADSHEET_THEME: ThemeTokens = {
-	fontFamily: "'Roboto', 'Segoe UI', -apple-system, sans-serif",
-
-	bgColor: '#ffffff',
-	textColor: '#202124',
-	borderColor: '#d0d0d0',
-	borderColorAccent: '#bdbdbd',
-
-	headerBg: '#f2f2f2',
-	headerText: '#444444',
-
-	rowHoverBg: '#f5f5f5',
-	cellBorder: 'rgba(0, 0, 0, 0.08)',
-
-	selectionBorder: 'rgba(15, 157, 88, 0.7)',
-	selectionBg: 'rgba(15, 157, 88, 0.12)',
-	focusRing: '#0f9d58',
-
-	pinLeftBorderColor: '#d0d0d0',
-	pinRightBorderColor: '#d0d0d0',
-	pinLeftShadow: '2px 0 6px rgba(0, 0, 0, 0.1)',
-	pinRightShadow: '-2px 0 6px rgba(0, 0, 0, 0.1)',
-
-	skeletonStart: '#f5f5f5',
-	skeletonMid: '#e8e8e8',
-	skeletonEnd: '#f5f5f5',
-	skeletonWidth: '75%',
-	skeletonHeight: '14px',
-	skeletonBorderRadius: '2px',
-	skeletonAnimationDuration: '1.5s',
-
-	groupRowBg: 'rgba(15, 157, 88, 0.04)',
-	groupRowHoverBg: 'rgba(15, 157, 88, 0.08)',
-	groupRowText: '#202124',
-	groupRowFontSize: '12px',
-	groupRowFontWeight: '600',
-	groupBadgeBg: 'rgba(15, 157, 88, 0.12)',
-	groupBadgeBorder: 'rgba(15, 157, 88, 0.3)',
-	groupBadgeText: '#0f9d58',
-
-	detailRowBg: '#fafafa',
-	detailRowBorder: '#e0e0e0',
-	detailRowText: '#5f6368',
-	detailRowFontSize: '12px',
-
-	popoverBg: '#ffffff',
-	popoverBorder: 'rgba(0, 0, 0, 0.12)',
-	popoverText: '#202124',
-	popoverItemHoverBg: 'rgba(15, 157, 88, 0.08)',
-	popoverItemActiveBg: '#0f9d58',
-	popoverDivider: '#e0e0e0',
-	popoverInputBg: '#ffffff',
-	popoverInputBorder: '#d0d0d0',
-
-	error: '#c0392b',
-
-	floatingFilterBg: '#f8f9fa',
-	floatingFilterInputBg: '#ffffff',
-	floatingFilterInputBorder: '#d0d0d0',
-
-	outerBorderRadius: '0px',
-
-	leafHeaderHeight: '40px',
-	groupPanelHeight: '42px',
-	bottomChromeHeight: '0px',
-	totalHeaderHeight: '40px',
-};
-
-/**
- * Minimal monochrome theme - ultra-clean aesthetic
- */
-export const MINIMAL_MONOCHROME_THEME: ThemeTokens = {
-	...DARK_THEME,
-	bgColor: '#1a1a1a',
-	textColor: '#e8e8e8',
-	borderColor: '#2d2d2d',
-	headerBg: '#0f0f0f',
-	headerText: '#a0a0a0',
-	rowHoverBg: '#262626',
-	focusRing: '#808080',
-	groupBadgeBg: 'rgba(128, 128, 128, 0.15)',
-	groupBadgeBorder: 'rgba(128, 128, 128, 0.3)',
-	groupBadgeText: '#b0b0b0',
-	error: '#c0504d',
-	popoverBg: 'rgba(30, 30, 30, 0.98)',
-	popoverBorder: 'rgba(255, 255, 255, 0.1)',
-	popoverText: '#e8e8e8',
-	popoverItemHoverBg: 'rgba(255, 255, 255, 0.08)',
-	popoverItemActiveBg: '#808080',
-	popoverDivider: 'rgba(255, 255, 255, 0.08)',
-	popoverInputBg: 'rgba(15, 15, 15, 0.9)',
-	popoverInputBorder: 'rgba(255, 255, 255, 0.12)',
-};
+});
 
 /**
  * Theme registry - built-in themes users can reference by name
  */
 export const BUILT_IN_THEMES = {
-	light: LIGHT_THEME,
 	dark: DARK_THEME,
-	'light-hc': HIGH_CONTRAST_LIGHT_THEME,
-	'dark-hc': HIGH_CONTRAST_DARK_THEME,
-	'cool-blue': COOL_BLUE_THEME,
-	'warm-orange': WARM_ORANGE_THEME,
-	'minimal-monochrome': MINIMAL_MONOCHROME_THEME,
-	spreadsheet: SPREADSHEET_THEME,
+	light: LIGHT_THEME,
+	/** Deep sea navy with a cyan glow. */
+	ocean: createTheme({
+		appearance: 'dark',
+		font: FONTS.jakarta,
+		background: '#071a24',
+		surface: '#05141d',
+		raised: '#0b2230',
+		text: '#d9f1f7',
+		muted: '#7fb3c4',
+		border: '#123241',
+		borderStrong: '#1d4758',
+		accent: '#22d3ee',
+		accentText: '#67e8f9',
+		hover: '#0c2735',
+		error: '#fb7185',
+		radius: '10px',
+	}),
+	/** Arctic slate with frost-blue accents (Nord). */
+	fjord: createTheme({
+		appearance: 'dark',
+		font: FONTS.plex,
+		background: '#2e3440',
+		surface: '#292e39',
+		raised: '#3b4252',
+		text: '#eceff4',
+		muted: '#aab3c5',
+		border: '#3b4252',
+		borderStrong: '#4c566a',
+		accent: '#88c0d0',
+		accentText: '#8fbcbb',
+		hover: '#353b49',
+		error: '#e07a83',
+		radius: '10px',
+		inputBackground: '#353b49',
+	}),
+	/** Midnight plum with a neon-pink accent. */
+	velvet: createTheme({
+		appearance: 'dark',
+		font: FONTS.dmSans,
+		background: '#191626',
+		surface: '#14111f',
+		raised: '#221d33',
+		text: '#ece6ff',
+		muted: '#a99bd1',
+		border: '#2b2440',
+		borderStrong: '#3d3459',
+		accent: '#ff6ec7',
+		accentText: '#ff9ad8',
+		hover: '#221c33',
+		error: '#ff6b81',
+		radius: '12px',
+	}),
+	/** Warm charcoal lit with amber. */
+	ember: createTheme({
+		appearance: 'dark',
+		font: FONTS.grotesk,
+		background: '#17120e',
+		surface: '#110d0a',
+		raised: '#201913',
+		text: '#f4e9df',
+		muted: '#bfa58d',
+		border: '#2c221a',
+		borderStrong: '#3e3024',
+		accent: '#f59e0b',
+		accentText: '#fbbf24',
+		hover: '#211912',
+		error: '#f87171',
+	}),
+	/** Deep pine with emerald highlights. */
+	forest: createTheme({
+		appearance: 'dark',
+		font: FONTS.sourceSans,
+		background: '#0d1712',
+		surface: '#09120e',
+		raised: '#13201a',
+		text: '#e3f1e8',
+		muted: '#8fb5a0',
+		border: '#1b2d24',
+		borderStrong: '#274034',
+		accent: '#34d399',
+		accentText: '#6ee7b7',
+		hover: '#13221b',
+		error: '#f87171',
+	}),
+	/** A terminal: monospace, black and grey, a green cursor. */
+	mono: createTheme({
+		appearance: 'dark',
+		font: FONTS.mono,
+		background: '#0c0c0c',
+		surface: '#070707',
+		raised: '#151515',
+		text: '#e4e4e4',
+		muted: '#8a8a8a',
+		border: '#222222',
+		borderStrong: '#363636',
+		accent: '#4ade80',
+		accentText: '#86efac',
+		hover: '#181818',
+		error: '#f87171',
+		radius: '0px',
+	}),
+	/** Cream paper, ink and a terracotta pen: a serif for reading. */
+	paper: createTheme({
+		appearance: 'light',
+		font: FONTS.serif,
+		background: '#fbf7ef',
+		surface: '#f3ecdf',
+		raised: '#fffdf8',
+		text: '#2b2620',
+		muted: '#6b5f50',
+		border: '#e6dccb',
+		borderStrong: '#d6c8b2',
+		accent: '#c2410c',
+		accentText: '#9a3412',
+		hover: '#f5eee2',
+		error: '#b91c1c',
+		radius: '6px',
+	}),
+	/** Soft lavender-grey with a violet accent (Catppuccin Latte). */
+	latte: createTheme({
+		appearance: 'light',
+		font: FONTS.lexend,
+		background: '#eff1f5',
+		surface: '#e6e9ef',
+		raised: '#ffffff',
+		text: '#4c4f69',
+		muted: '#6c6f85',
+		border: '#ccd0da',
+		borderStrong: '#bcc0cc',
+		accent: '#8839ef',
+		accentText: '#7c3aed',
+		hover: '#e6e9f2',
+		error: '#d20f39',
+		radius: '10px',
+		inputBackground: '#ffffff',
+	}),
+	/** Rosewater and raspberry, with rounded type. */
+	blossom: createTheme({
+		appearance: 'light',
+		font: FONTS.rounded,
+		background: '#fffafb',
+		surface: '#fdf0f3',
+		raised: '#ffffff',
+		text: '#3b2a30',
+		muted: '#8a6470',
+		border: '#f3dde3',
+		borderStrong: '#e9c4cf',
+		accent: '#e11d74',
+		accentText: '#be185d',
+		hover: '#fdf2f5',
+		error: '#dc2626',
+		radius: '14px',
+	}),
+	/** Excel / Google Sheets: hairlines, grey headers, a green cursor. */
+	spreadsheet: createTheme({
+		appearance: 'light',
+		font: FONTS.sheets,
+		background: '#ffffff',
+		surface: '#f3f3f3',
+		raised: '#ffffff',
+		text: '#202124',
+		muted: '#444444',
+		border: '#d0d0d0',
+		borderStrong: '#bdbdbd',
+		accent: '#0f9d58',
+		accentText: '#0b8043',
+		hover: '#f5f5f5',
+		error: '#c0392b',
+		radius: '0px',
+	}),
+	/** Black and white with a bright blue focus: the strongest contrast. */
+	'dark-hc': createTheme({
+		appearance: 'dark',
+		font: FONTS.system,
+		background: '#000000',
+		surface: '#0a0a0a',
+		raised: '#0a0a0a',
+		text: '#ffffff',
+		muted: '#e5e5e5',
+		border: '#6b6b6b',
+		borderStrong: '#a3a3a3',
+		accent: '#58a6ff',
+		hover: '#1c1c1c',
+		error: '#ff6b6b',
+		inputBackground: '#000000',
+	}),
+	/** White and black with a deep blue focus: the strongest contrast. */
+	'light-hc': createTheme({
+		appearance: 'light',
+		font: FONTS.system,
+		background: '#ffffff',
+		surface: '#f0f0f0',
+		raised: '#ffffff',
+		text: '#000000',
+		muted: '#1a1a1a',
+		border: '#767676',
+		borderStrong: '#4d4d4d',
+		accent: '#0040c1',
+		hover: '#e8eefc',
+		error: '#b00020',
+	}),
 } as const;
 
 export type BuiltInThemeName = keyof typeof BUILT_IN_THEMES;
@@ -488,56 +541,43 @@ export type BuiltInThemeName = keyof typeof BUILT_IN_THEMES;
 export const BUILT_IN_THEME_ORDER: BuiltInThemeName[] = [
 	'dark',
 	'light',
+	'ocean',
+	'fjord',
+	'velvet',
+	'ember',
+	'forest',
+	'mono',
+	'paper',
+	'latte',
+	'blossom',
+	'spreadsheet',
 	'dark-hc',
 	'light-hc',
-	'cool-blue',
-	'warm-orange',
-	'minimal-monochrome',
-	'spreadsheet',
 ];
 
-export const BUILT_IN_THEME_METADATA: Record<BuiltInThemeName, { label: string; description: string; appearance: 'light' | 'dark' }> = {
-	dark: {
-		label: 'Dark',
-		description: 'High-contrast default tuned for long sessions.',
-		appearance: 'dark',
-	},
-	light: {
-		label: 'Light',
-		description: 'Clean neutral daylight theme.',
-		appearance: 'light',
-	},
-	'dark-hc': {
-		label: 'Dark HC',
-		description: 'Dark theme with stronger accessibility contrast.',
-		appearance: 'dark',
-	},
-	'light-hc': {
-		label: 'Light HC',
-		description: 'Light theme with stronger accessibility contrast.',
-		appearance: 'light',
-	},
-	'cool-blue': {
-		label: 'Cool Blue',
-		description: 'Blue-forward tech aesthetic.',
-		appearance: 'dark',
-	},
-	'warm-orange': {
-		label: 'Warm Orange',
-		description: 'Warm amber accents with a dark base.',
-		appearance: 'dark',
-	},
-	'minimal-monochrome': {
-		label: 'Mono',
-		description: 'Minimal grayscale presentation.',
-		appearance: 'dark',
-	},
-	spreadsheet: {
-		label: 'Spreadsheet',
-		description: 'Excel / Google Sheets-style daylight theme.',
-		appearance: 'light',
-	},
+export const BUILT_IN_THEME_METADATA: Record<BuiltInThemeName, { label: string; description: string; appearance: 'light' | 'dark'; font: string }> = {
+	dark: { label: 'Dark', description: 'Neutral graphite with an indigo accent.', appearance: 'dark', font: 'Inter' },
+	light: { label: 'Light', description: 'Crisp white with a blue accent.', appearance: 'light', font: 'Inter' },
+	ocean: { label: 'Ocean', description: 'Deep sea navy with a cyan glow.', appearance: 'dark', font: 'Plus Jakarta Sans' },
+	fjord: { label: 'Fjord', description: 'Arctic slate with frost-blue accents.', appearance: 'dark', font: 'IBM Plex Sans' },
+	velvet: { label: 'Velvet', description: 'Midnight plum with a neon-pink accent.', appearance: 'dark', font: 'DM Sans' },
+	ember: { label: 'Ember', description: 'Warm charcoal lit with amber.', appearance: 'dark', font: 'Space Grotesk' },
+	forest: { label: 'Forest', description: 'Deep pine with emerald highlights.', appearance: 'dark', font: 'Source Sans 3' },
+	mono: { label: 'Mono', description: 'A terminal: monospace, greys and a green cursor.', appearance: 'dark', font: 'JetBrains Mono' },
+	paper: { label: 'Paper', description: 'Cream paper, ink and terracotta, in a serif.', appearance: 'light', font: 'Source Serif 4' },
+	latte: { label: 'Latte', description: 'Soft lavender-grey with a violet accent.', appearance: 'light', font: 'Lexend' },
+	blossom: { label: 'Blossom', description: 'Rosewater and raspberry, rounded type.', appearance: 'light', font: 'Nunito' },
+	spreadsheet: { label: 'Spreadsheet', description: 'Excel / Google Sheets: hairlines and a green cursor.', appearance: 'light', font: 'Roboto' },
+	'dark-hc': { label: 'High contrast dark', description: 'Black, white and a bright blue focus.', appearance: 'dark', font: 'System' },
+	'light-hc': { label: 'High contrast light', description: 'White, black and a deep blue focus.', appearance: 'light', font: 'System' },
 };
+
+/**
+ * Google Fonts families the built-in themes use (a stylesheet URL to add to your page). Without
+ * them each theme falls back to its system font stack.
+ */
+export const BUILT_IN_THEME_FONTS_URL =
+	'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Lexend:wght@400;500;600;700&family=Nunito:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Roboto:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap';
 
 export function isBuiltInThemeName(value: string): value is BuiltInThemeName {
 	return value in BUILT_IN_THEMES;

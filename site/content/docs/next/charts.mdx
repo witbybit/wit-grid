@@ -1,0 +1,66 @@
+---
+title: Charts
+description: Chart the selection or a column per category, in a floating window or any container; live, themed and cross-filtering.
+icon: ChartColumn
+---
+
+Charts are drawn by the grid core on a canvas (sharp at any pixel ratio), with themed text, legend and tooltips.
+They follow the grid: its data as it changes, its filters, the selection (for range charts) and its theme.
+
+## The chart window
+
+```tsx
+<Grid rows={rows} columns={columns} enableChart />
+```
+
+Right-click a selection and choose **Chart Range**, or anywhere and choose **Chart Data**; `api.openChart()`,
+`api.closeChart()` and `api.toggleChart()` do the same from code. The window can be dragged by its header and
+resized from its corner. From its toolbar:
+
+- **Type**: columns, bars, line, area, pie, donut, scatter.
+- **Data**: the selection, or **By column**: a category column, a measure and sum / average / min / max (or a row
+  count).
+- **Options**: stacked, smooth, values on the marks, legend, filter on click.
+- **Download PNG**.
+
+## Charts in your own layout
+
+`createGridChart(api, element, spec)` draws a chart in any element (a dashboard tile, a docked panel) and keeps it in
+step with the grid.
+
+```typescript
+import { createGridChart } from '@eregister/wit-grid-react';
+
+const chart = createGridChart(api, document.getElementById('revenue')!, {
+	type: 'column',
+	title: 'Revenue by region',
+	source: { kind: 'aggregate', category: 'region', measures: [{ field: 'revenue', aggregate: 'sum' }] },
+});
+
+chart.update({ type: 'donut' }); // change any part of the spec
+await chart.downloadPNG('revenue.png'); // or chart.toPNG() for the Blob
+chart.destroy();
+```
+
+| Spec           | What it does                                                                                       |
+| -------------- | -------------------------------------------------------------------------------------------------- |
+| `type`         | `'column'`, `'bar'`, `'line'`, `'area'`, `'pie'`, `'donut'`, `'scatter'`                           |
+| `source`       | `{ kind: 'range', transposed? }` or `{ kind: 'aggregate', category, measures, sort?, limit? }`     |
+| `stacked`      | Columns, bars and areas pile up                                                                    |
+| `smooth`       | Lines and areas curve through their points (without overshooting)                                  |
+| `labels`       | Values on the marks                                                                                |
+| `legend`       | Default `true`; click a series to hide it                                                          |
+| `zeroBased`    | Default `true`: the value axis starts at zero                                                      |
+| `crossFilter`  | Default `true`: clicking a category filters the grid to it, clicking it again clears               |
+| `palette`      | Series colours; by default the theme's accent first                                                |
+
+Aggregates take `limit` categories (24 by default, largest first); the rest fold into **Other**. A chart that
+cross-filters by its own category leaves that one filter out of its data, so the other categories stay in view while
+the grid shows the chosen one.
+
+## Performance
+
+Lines and areas with more points than the plot has pixels are downsampled with LTTB, which keeps their shape: a
+100,000-point area draws about as fast as one of a few hundred. Aggregates read row data directly for plain columns
+(and through the grid for `valueGetter` and formula columns), and charts redraw at most once a frame, however fast the
+data changes.

@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { BUILT_IN_THEMES, type BuiltInThemeName, type ThemeTokens } from '@eregister/wit-grid-react';
+import { BUILT_IN_THEMES, BUILT_IN_THEME_METADATA, BUILT_IN_THEME_ORDER, type BuiltInThemeName, type ThemeTokens } from '@eregister/wit-grid-react';
 
 interface CSSThemeStudioProps {
 	onThemeSelect?: (themeName: BuiltInThemeName, theme: ThemeTokens) => void;
@@ -18,15 +18,7 @@ export const CSSThemeStudio: React.FC<CSSThemeStudioProps> = ({ onThemeSelect })
 	const [selectedTheme, setSelectedTheme] = useState<BuiltInThemeName>('dark');
 	const [showTokens, setShowTokens] = useState(false);
 
-	const themes: { name: BuiltInThemeName; label: string; description: string }[] = [
-		{ name: 'light', label: 'Light', description: 'Clean, professional light theme' },
-		{ name: 'dark', label: 'Dark', description: 'High contrast dark theme (default)' },
-		{ name: 'light-hc', label: 'Light HC', description: 'Enhanced light contrast (a11y)' },
-		{ name: 'dark-hc', label: 'Dark HC', description: 'Enhanced dark contrast (a11y)' },
-		{ name: 'cool-blue', label: 'Cool Blue', description: 'Modern tech aesthetic' },
-		{ name: 'warm-orange', label: 'Warm Orange', description: 'Energetic aesthetic' },
-		{ name: 'minimal-monochrome', label: 'Monochrome', description: 'Ultra-clean minimalist' },
-	];
+	const themes = BUILT_IN_THEME_ORDER.map((name) => ({ name, ...BUILT_IN_THEME_METADATA[name] }));
 
 	const currentTheme = BUILT_IN_THEMES[selectedTheme];
 

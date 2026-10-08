@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	GRID_STATE_SCHEMA_VERSION,
-	applyPersistedState,
 	areRowHeightsEqual,
 	createLocalStorageAdapter,
 	createPersistenceSubscription,
@@ -25,7 +24,7 @@ const QUERY_MODEL: GridQueryModel = {
 		kind: 'group',
 		id: 'root',
 		operator: 'and',
-		children: [{ kind: 'condition', id: 'q1', columnId: 'name', operator: 'contains', value: 'Alice' }],
+		children: [{ kind: 'condition', id: 'q1', columnId: 'name', filter: { type: 'text', operator: 'contains', value: 'Alice' } }],
 	},
 };
 
@@ -98,70 +97,6 @@ describe('statePersistence', () => {
 					columnOrder: ['id'],
 				},
 			});
-		});
-	});
-
-	describe('applyPersistedState', () => {
-		const defaultColumns = [
-			{ field: 'id', header: 'ID', width: 50 },
-			{ field: 'name', header: 'Name', width: 100 },
-			{ field: 'age', header: 'Age', width: 80, hide: true },
-		] as ColumnDef<any>[];
-
-		it('rejects malformed or unsupported blobs before applying anything', () => {
-			expect(applyPersistedState({} as PersistedGridState, {}, defaultColumns)).toBeNull();
-			expect(
-				applyPersistedState(
-					{ v: GRID_STATE_SCHEMA_VERSION, state: { runtimeOnly: true } as unknown as SerializedGridState },
-					{},
-					defaultColumns
-				)
-			).toBeNull();
-		});
-
-		it('applies valid persisted fields from the nested state payload', () => {
-			const saved = wrapState({
-				columnWidths: { id: 60, name: 120, unknownCol: 200 },
-				columnOrder: ['age', 'id', 'name'],
-				columnVisibility: { name: false, age: true },
-				sortModel: [{ colId: 'id', sort: 'desc' }],
-				filterModel: { name: { type: 'text', operator: 'contains', value: 'Alice' } },
-				queryModel: QUERY_MODEL,
-				themeName: 'light',
-				grouping: { by: ['age', 'invalidCol'], totals: { groups: 'bottom' }, stickyHeaders: true },
-				pinnedColumns: { left: 2, right: 1 },
-			});
-			const initial: Partial<GridInitialState> = {
-				columnWidths: { age: 90 },
-			};
-
-			const result = applyPersistedState(saved, initial, defaultColumns)!;
-
-			expect(result.columnWidths).toEqual({ age: 90, id: 60, name: 120 });
-			expect(result.columns?.map((column) => column.field)).toEqual(['age', 'id', 'name']);
-			expect(result.columns?.[2].hide).toBe(true);
-			expect(result.columns?.[0].hide).toBe(false);
-			expect(result.sortModel).toEqual([{ colId: 'id', sort: 'desc' }]);
-			expect(result.filterModel).toEqual({ name: { type: 'text', operator: 'contains', value: 'Alice' } });
-			expect(result.queryModel).toEqual(QUERY_MODEL);
-			expect(result.themeName).toBe('light');
-			expect(result.grouping).toEqual({ by: ['age'], totals: { groups: 'bottom' }, stickyHeaders: true });
-			expect(result.pinnedColumns).toEqual({ left: 2, right: 1 });
-		});
-
-		it('round-trips extracted state back into an initial-state merge', () => {
-			const gridState = {
-				columns: [{ field: 'id', width: 100 }],
-				columnWidths: { id: 100 },
-				sortModel: [{ colId: 'id', sort: 'asc' }],
-				pinnedColumns: { left: 0, right: 0 },
-			} as any;
-
-			const persisted = extractPersistedState(gridState);
-			const result = applyPersistedState(persisted, {}, gridState.columns);
-
-			expect(result).not.toBeNull();
-			expect((result as any).columnWidths?.id).toBe(100);
 		});
 	});
 
@@ -393,6 +328,48 @@ describe('statePersistence', () => {
 			expect(stateMutation.pinnedColumns).toEqual({ left: 1, right: 0 });
 		});
 
+		it('keeps a saved column order when columns were added since: new ones keep their place', () => {
+			const current = makeCurrent({
+				columns: [
+					{ field: '__rowSelect__', header: '', width: 40 },
+					{ field: 'id', header: 'ID', width: 100 },
+					{ field: 'added', header: 'Added', width: 100 },
+					{ field: 'name', header: 'Name', width: 150 },
+				],
+			});
+			const result = preparePersistedGridStateRestore(wrapState({ columnOrder: ['name', 'id', 'gone'] }), current);
+			expect(result.ok && result.restore.stateMutation.columns?.map((c) => c.field)).toEqual(['__rowSelect__', 'name', 'id', 'added']);
+		});
+
+		it('drops query conditions on removed columns and malformed filters', () => {
+			const saved = wrapState({
+				queryModel: {
+					version: 1,
+					root: {
+						kind: 'group',
+						id: 'root',
+						operator: 'or',
+						children: [
+							{ kind: 'condition', id: 'a', columnId: 'gone', filter: { type: 'text', operator: 'contains', value: 'x' } },
+							{ kind: 'condition', id: 'b', columnId: 'name', filter: { type: 'number', operator: 'gte', value: 'nope' } as never },
+							{ kind: 'group', id: 'g', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'id', filter: null }] },
+						],
+					},
+				},
+				filterModel: {
+					id: { type: 'select', values: [{}] } as never,
+					name: { type: 'text', operator: 'startsWith', value: 'A' },
+				},
+			});
+			const result = preparePersistedGridStateRestore(saved, makeCurrent());
+			if (!result.ok) throw new Error(result.reason);
+			expect(result.restore.stateMutation.queryModel).toEqual({
+				version: 1,
+				root: { kind: 'group', id: 'root', operator: 'or', children: [{ kind: 'group', id: 'g', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'id', filter: null }] }] },
+			});
+			expect(result.restore.stateMutation.filterModel).toEqual({ name: { type: 'text', operator: 'startsWith', value: 'A' } });
+		});
+
 		it('round-trips grouping { by, totals, stickyHeaders }, keeping configured GroupDefs and dropping removed columns', () => {
 			const keyCreator = ({ value }: { value: unknown }) => String(value).toUpperCase();
 			const comparator = (a: unknown, b: unknown) => String(b).localeCompare(String(a));
@@ -432,15 +409,6 @@ describe('statePersistence', () => {
 			// Configured, unpersisted settings survive.
 			expect(grouping.defaultExpanded).toBe(1);
 			expect(grouping.rowHeight).toBe(44);
-
-			// applyPersistedState merges over the initial grouping the same way.
-			const applied = applyPersistedState(
-				persisted,
-				{ grouping: { by: [{ colId: 'name', keyCreator }] } },
-				after.columns as ColumnDef<unknown>[]
-			)!;
-			expect(applied.grouping?.by).toEqual([{ colId: 'name', keyCreator }]);
-			expect(applied.grouping?.stickyHeaders).toBe(true);
 		});
 
 		it('round-trips stickyHeaders options and rejects malformed ones', () => {

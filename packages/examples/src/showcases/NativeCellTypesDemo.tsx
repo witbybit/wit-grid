@@ -27,6 +27,7 @@ import {
 	sparklineColumnType,
 	openCellPopover,
 	CELL_HUES,
+	createLocalStorageWorkspaceAdapter,
 } from '@eregister/wit-grid-react';
 import type {
 	BuiltInThemeName,
@@ -37,6 +38,7 @@ import type {
 	ColumnTypeDefinition,
 	GridApi,
 	GridReadyEvent,
+	GridSidebarConfig,
 	PersonOption,
 } from '@eregister/wit-grid-react';
 import { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';
@@ -462,6 +464,9 @@ interface NativeCellTypesDemoProps {
 	theme?: BuiltInThemeName;
 }
 
+// The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
+const SIDEBAR: GridSidebarConfig<TaskRow> = { panels: ['columns', 'filters', 'sort', 'query', 'views'] };
+
 export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
@@ -498,8 +503,11 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			initialState={initialState}
 			navigationOptions={{ editTrigger: 'doubleClick' }}
 			pinLeftColumns={2}
+			enableChart
 			showFloatingFilters={filterRow}
 			showFilterChipBar
+			sidebar={SIDEBAR}
+			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}
 			onGridReady={handleReady}
 			rendererOptions={{ rowAnimation: { duration: 700, style: 'slide', easing: 'spring' } }}
 		/>

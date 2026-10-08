@@ -3,8 +3,9 @@ import { registerGridRuntimeComposition } from './apiInternalBridge.js';
 import { PUBLIC_ENGINE_FORWARD_NAMES } from './engineForwards.js';
 import { pickMembers } from './memberNames.js';
 import { exportToCsv, toCsv, type CsvExportOptions } from '../export/csvExport.js';
+import { exportToXlsx, toXlsxBlob, type ExcelExportOptions } from '../export/xlsxExport.js';
 import type { GridStore as GridRuntime } from '../store.js';
-import type { GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
+import { EMPTY_WORKSPACE_STATE, type GridWorkspaceController } from '../workspace/GridWorkspaceController.js';
 import type { GridViewDefinition, GridWorkspaceState, SaveViewOptions } from '../workspace/workspaceTypes.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { InfiniteDatasource } from '../infiniteRowModel.js';
@@ -29,7 +30,13 @@ import type {
 import type { ColumnDef } from '../columnDef.js';
 import type { RowModelCapability } from '../rowModel.js';
 import type { ColumnState } from '../state/GridState.js';
-import type { GridPersistenceAdapter, PersistenceController, PersistenceStatus, PersistedGridState } from '../persistence/statePersistence.js';
+import {
+	validatePersistedGridState,
+	type GridPersistenceAdapter,
+	type PersistenceController,
+	type PersistenceStatus,
+	type PersistedGridState,
+} from '../persistence/statePersistence.js';
 
 interface GridRuntimeCompositionOptions<TRowData> {
 	runtime: GridRuntime<TRowData>;
@@ -39,16 +46,6 @@ interface GridRuntimeCompositionOptions<TRowData> {
 	workspaceController?: GridWorkspaceController;
 }
 
-const _EMPTY_WORKSPACE_STATE: GridWorkspaceState = {
-	views: [],
-	activeViewId: null,
-	defaultViewId: null,
-	autoSaveEnabled: true,
-	dirty: false,
-	lastSavedAt: null,
-	lastError: null,
-	loading: false,
-};
 
 export function createGridRuntimeComposition<TRowData>({
 	runtime,
@@ -96,6 +93,8 @@ export function createGridRuntimeComposition<TRowData>({
 		setDescendantsSelected: (id: string, selected: boolean) => runtime.setDescendantsSelected(id, selected),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
 		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
+		exportExcel: (options?: ExcelExportOptions) => exportToXlsx(runtime, runtime.engine.getState().columnWidths, options),
+		getExcel: (options?: ExcelExportOptions) => toXlsxBlob(runtime, runtime.engine.getState().columnWidths, options),
 		startEditing: (rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api') =>
 			runtime.startEditing(rowId, colFieldOrInstanceId, source),
 		updateEditDraft: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.updateEditDraft(rowId, colFieldOrInstanceId, value),
@@ -108,6 +107,21 @@ export function createGridRuntimeComposition<TRowData>({
 		applyGridState: (state: PersistedGridState) =>
 			persistenceController ? persistenceController.suspendAutoSave(() => runtime.applyGridState(state)) : runtime.applyGridState(state),
 		getRawRowById: (rowId: string) => runtime.getRawRowById(rowId),
+		// Bound members of the runtime, shared as they are.
+		getRowNode: runtime.getRowNode,
+		getDisplayedRowAtIndex: runtime.getDisplayedRowAtIndex,
+		getRowIndexById: runtime.getRowIndexById,
+		getRowLoadState: runtime.getRowLoadState,
+		forEachDisplayedNode: runtime.forEachDisplayedNode,
+		getSelectedRowCount: runtime.getSelectedRowCount,
+		isRowNodeSelected: runtime.isRowNodeSelected,
+		evaluateQueryForRow: runtime.evaluateQueryForRow,
+		can: runtime.can,
+		canEdit: runtime.canEdit,
+		canCopy: runtime.canCopy,
+		canPaste: runtime.canPaste,
+		canExport: runtime.canExport,
+		forEachNode: (callback: Parameters<typeof runtime.forEachNode>[0]) => runtime.forEachNode(callback),
 		applyRowSelectionGesture: (gesture: RowSelectionGesture) => runtime.applyRowSelectionGesture(gesture),
 		selectRows: (rowIds: string[], options?: SelectRowsOptions) => runtime.selectRows(rowIds, options),
 		deselectRows: (rowIds: string[]) => runtime.deselectRows(rowIds),
@@ -145,7 +159,7 @@ export function createGridRuntimeComposition<TRowData>({
 
 		// ── Workspace / named views ───────────────────────────────────────────────
 		hasWorkspace: (): boolean => workspaceController !== undefined,
-		getWorkspaceState: (): GridWorkspaceState => workspaceController?.getState() ?? _EMPTY_WORKSPACE_STATE,
+		getWorkspaceState: (): GridWorkspaceState => workspaceController?.getState() ?? EMPTY_WORKSPACE_STATE,
 		subscribeToWorkspaceState: (listener: (state: GridWorkspaceState) => void): (() => void) =>
 			workspaceController?.onStateChange(listener) ?? (() => {}),
 		listViews: (): Promise<readonly GridViewDefinition[]> => Promise.resolve(workspaceController?.getState().views ?? []),
@@ -165,13 +179,29 @@ export function createGridRuntimeComposition<TRowData>({
 			if (!workspaceController) return;
 			const view = await workspaceController.getView(id);
 			if (!view) throw new Error(`[wit-grid] workspace: view "${id}" not found`);
+			// A view this grid cannot restore (another schema version, malformed): not applied, not active.
+			const invalid = validatePersistedGridState(view.state);
+			if (invalid) {
+				const error = new Error(`View "${view.name}" could not be applied: ${invalid}`);
+				workspaceController.fail('apply view', error);
+				throw error;
+			}
 			if (persistenceController) {
 				persistenceController.suspendAutoSave(() => runtime.applyGridState(view.state));
 			} else {
 				runtime.applyGridState(view.state);
 			}
-			workspaceController.setActiveViewId(id);
+			workspaceController.setActiveView(id, runtime.getGridState());
 			runtime.dispatchEvent(GridEventName.viewApplied, { view });
+			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
+		},
+		revertView: async (): Promise<void> => {
+			const baseline = workspaceController?.getBaseline();
+			const id = workspaceController?.getState().activeViewId;
+			if (!workspaceController || !baseline || !id) return;
+			if (persistenceController) persistenceController.suspendAutoSave(() => runtime.applyGridState(baseline));
+			else runtime.applyGridState(baseline);
+			workspaceController.setActiveView(id, runtime.getGridState());
 			runtime.dispatchEvent(GridEventName.workspaceStateChanged, { state: workspaceController.getState() });
 		},
 		deleteView: async (id: string): Promise<void> => {

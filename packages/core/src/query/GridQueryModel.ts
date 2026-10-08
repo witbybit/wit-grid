@@ -3,6 +3,7 @@
 // across columns in arbitrary nested groups.
 
 import type { ColumnFilter } from '../filterModel.js';
+import { restoreColumnFilter } from '../filterOperations.js';
 
 export type GridQueryNode = GridQueryGroup | GridQueryCondition;
 
@@ -74,4 +75,32 @@ export function createEmptyQueryModel(): GridQueryModel {
 		version: 1,
 		root: { kind: 'group', id: 'root', operator: 'and', children: [] },
 	};
+}
+
+function restoreNode(raw: unknown, knownFields: ReadonlySet<string>): GridQueryNode | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const node = raw as Record<string, unknown>;
+	if (typeof node.id !== 'string') return null;
+	if (node.kind === 'condition') {
+		if (typeof node.columnId !== 'string' || !knownFields.has(node.columnId)) return null;
+		const filter = node.filter == null ? null : restoreColumnFilter(node.filter);
+		if (node.filter != null && !filter) return null;
+		return { kind: 'condition', id: node.id, columnId: node.columnId, filter };
+	}
+	if (node.kind !== 'group' || (node.operator !== 'and' && node.operator !== 'or') || !Array.isArray(node.children)) return null;
+	const children = node.children.map((child) => restoreNode(child, knownFields)).filter((child): child is GridQueryNode => !!child);
+	return { kind: 'group', id: node.id, operator: node.operator, children };
+}
+
+/**
+ * A saved query checked against the grid: conditions on columns that no longer exist, and
+ * malformed nodes, are dropped. Null when no condition is left.
+ */
+export function restoreQueryModel(raw: unknown, knownFields: ReadonlySet<string>): GridQueryModel | null {
+	if (!raw || typeof raw !== 'object') return null;
+	const model = raw as { version?: unknown; root?: unknown };
+	const root = restoreNode(model.root, knownFields);
+	if (!root || root.kind !== 'group') return null;
+	const restored: GridQueryModel = { version: typeof model.version === 'number' ? model.version : 1, root };
+	return isQueryModelActive(restored) ? restored : null;
 }

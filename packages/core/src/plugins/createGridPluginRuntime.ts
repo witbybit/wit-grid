@@ -14,7 +14,7 @@ const PLUGIN_RUNTIME_MEMBERS = `
 	getColumnDistinctValues getColumnDistinctValueSummary copySelectedRange pasteFromClipboard copyRange
 	setColumnVisible setColumnsVisible getColumns getDisplayedColumns setPinnedColumns getPinnedColumns
 	moveColumn setColumnOrder setColumnReorderEnabled setRowHeight setSortModel setFilterModel getQuickFilter
-	setQuickFilter getQueryModel setQueryModel clearQueryModel evaluateQueryForRow setStyleRules setGroupBy
+	setQuickFilter setQueryModel evaluateQueryForRow setStyleRules setGroupBy
 	getGroupBy addGroupBy removeGroupBy moveGroupBy getGrouping setGrouping updateGrouping getTreeData
 	setTreeData getAggregation setAggregation getHierarchyColumn setHierarchyColumn getDetail setDetail
 	setExpanded toggleExpanded isExpanded expandAll collapseAll setDetailOpen toggleDetailOpen isDetailOpen
@@ -23,9 +23,9 @@ const PLUGIN_RUNTIME_MEMBERS = `
 	stopEditing commitEdit getColumnState applyColumnState getGridState applyGridState subscribe subscribeToKey
 	subscribeToSnapshotSelector subscribeToIntegrity subscribeToCell subscribeToDomainVersions subscribeDomain
 	getColumnIndex getColumnField getColumnDef undo redo canUndo canRedo openPanel closePanel togglePanel
-	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv hasPersistence clearPersistedState
+	getOpenPanel openChart closeChart toggleChart isChartOpen exportCsv getCsv exportExcel getExcel hasPersistence clearPersistedState
 	setAutoSave isAutoSaveEnabled getPersistenceStatus subscribeToPersistenceStatus saveNow hasWorkspace
-	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView deleteView duplicateView
+	getWorkspaceState subscribeToWorkspaceState listViews saveView updateView applyView revertView deleteView duplicateView
 	renameView setDefaultView getRuntimeFaults clearRuntimeFaults flushCellUpdatesSync getInstrumentation
 	setInstrumentation reportRuntimeFault getTheme getThemeName getAvailableThemes switchTheme mergeTheme
 	setTheme onThemeChange getContainer destroy getCellState getCheapDisplayValue getVisualRow getVisualRowCount

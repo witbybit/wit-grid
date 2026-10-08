@@ -76,6 +76,7 @@ export function createGridStateSnapshot<TRowData>(state: InternalGridState<TRowD
 		loading: state.loading,
 		pagination: state.pagination ? freezeCopy(state.pagination) : undefined,
 		enableColumnReorder: state.enableColumnReorder,
+		pinnedColumns: state.pinnedColumns ? freezeCopy(state.pinnedColumns) : undefined,
 		themeName: state.themeName,
 		sidebarOpenPanel: state.sidebarOpenPanel,
 		chartOpen: state.chartOpen,

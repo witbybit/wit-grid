@@ -39,6 +39,10 @@ const adapter: GridPersistenceAdapter = {
 `clear()` and `debounceMs` are optional. `save` is called on a debounce timer after relevant state changes, not
 on every keystroke.
 
+A restore is checked against today's grid: columns that no longer exist drop out of the order, sort, filters,
+query and grouping; columns added since keep their place; malformed filter conditions are dropped. A failed load
+or save is reported as a `runtimeFault` event and the grid keeps its current state.
+
 ## Controlling autosave
 
 ```typescript
@@ -63,12 +67,23 @@ const workspace = createLocalStorageWorkspaceAdapter({ storageKey: 'orders-grid-
 ```
 
 ```typescript
-const views = await api.listViews();
-const saved = await api.saveView('Q1 close', { setAsDefault: true });
+const saved = await api.saveView('Q1 close', { makeDefault: true }); // becomes the active view
 await api.applyView(saved.id);
+await api.updateView(saved.id); // save the grid's current state into it
+await api.revertView(); // back to the grid as it was when the view was applied
 await api.renameView(saved.id, 'Q1 close (final)');
+await api.duplicateView(saved.id, 'Q1 close (copy)'); // a personal copy
 await api.deleteView(saved.id);
+
+const { views, activeViewId, defaultViewId, dirty, lastError } = api.getWorkspaceState();
+api.subscribeToWorkspaceState((state) => console.log(state.dirty));
 ```
+
+- `dirty` is true once the grid changes after the active view was applied, saved or updated.
+- The default view opens the grid when there is no saved session to restore (a saved session wins).
+- A failed adapter call rejects, sets `lastError`, and is reported as a `runtimeFault` event.
+
+The sidebar's [Views panel](/docs/next/sidebar#views) is built on this API.
 
 <Callout title='Two different mechanisms' type='info'>
 	`persistence` auto-saves the grid's *current* state on every relevant change. `workspace` lets users save and switch between *multiple named*

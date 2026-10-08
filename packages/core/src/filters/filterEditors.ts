@@ -11,10 +11,11 @@ import { cellIconSvg, createCellIcon } from '../cells/icons.js';
 import { createCellListbox, optionLabel, type CellOption } from '../cells/listbox.js';
 import { createCellOptionsStore, isCellOptionsStore, type CellOptionsStore } from '../cells/optionsStore.js';
 import { openCellPopover, type CellPopover } from '../cells/popover.js';
-import type { ColumnFilter, FilterCondition, SelectFilterCondition } from '../filterModel.js';
+import type { ColumnFilter, DateFilterCondition, FilterCondition, SelectFilterCondition } from '../filterModel.js';
 import { defaultOpForType, getOpMeta, getOpsForType, summarizeFilter, type OpOption } from '../filterOperations.js';
 import { defaultGridScheduler, type GridScheduler } from '../renderer/gridScheduler.js';
 import type { ColumnFilterDef, DomFilterEditor, DomFilterEditorHandle, DomFilterEditorParams } from './filterDef.js';
+import { DATE_PERIODS, RELATIVE_DATE_UNITS, type DatePeriod, type RelativeDateUnit } from './relativeDates.js';
 
 /** Typing applies after this pause (Enter applies at once). */
 const TYPING_DEBOUNCE_MS = 300;
@@ -187,9 +188,63 @@ function numberScale(def: ColumnFilterDef): number {
 const toShown = (n: number, scale: number) => String(scale === 1 ? n : Math.round(n * scale * 1e6) / 1e6);
 
 /** The value inputs for an operator: none, one, or two (between). */
-function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCondition | null, onInput: (immediate: boolean) => void) {
+/** A relative date: an amount and a unit (in the last / next N days, weeks…). */
+function relativeAmountInputs(first: DateFilterCondition | null, onInput: (immediate: boolean) => void) {
+	const amount = el('input', 'og-flt-input');
+	amount.type = 'text';
+	amount.inputMode = 'numeric';
+	amount.setAttribute('data-numeric', '');
+	amount.setAttribute('aria-label', 'How many');
+	amount.value = String(first?.amount ?? 7);
+	amount.addEventListener('input', () => onInput(false));
+	const unit = el('select', 'og-flt-input og-flt-select');
+	unit.setAttribute('aria-label', 'Unit');
+	for (const u of RELATIVE_DATE_UNITS) unit.appendChild(new Option(u.plural, u.value));
+	unit.value = first?.unit ?? 'day';
+	unit.addEventListener('change', () => onInput(true));
+	const amountField = el('div', 'og-flt-field og-flt-amount');
+	amountField.appendChild(amount);
+	const unitField = el('div', 'og-flt-field');
+	unitField.appendChild(unit);
+	return { fields: [amountField, unitField], inputs: [amount, unit] };
+}
+
+/** A named period: chips in the full editor, a select in the compact one. */
+function periodInput(first: DateFilterCondition | null, compact: boolean, onInput: (immediate: boolean) => void) {
+	if (compact) {
+		const select = el('select', 'og-flt-input og-flt-select');
+		select.setAttribute('aria-label', 'Period');
+		select.appendChild(new Option('Pick…', ''));
+		for (const p of DATE_PERIODS) select.appendChild(new Option(p.label, p.value));
+		select.value = first?.period ?? '';
+		select.addEventListener('change', () => onInput(true));
+		const field = el('div', 'og-flt-field');
+		field.appendChild(select);
+		return { element: field, input: select as HTMLInputElement | HTMLSelectElement };
+	}
+	const chosen = el('input');
+	chosen.type = 'hidden';
+	chosen.value = first?.period ?? '';
+	const grid = el('div', 'og-flt-periods');
+	grid.setAttribute('role', 'radiogroup');
+	grid.setAttribute('aria-label', 'Period');
+	for (const p of DATE_PERIODS) {
+		const chip = button('og-flt-period', p.label, () => {
+			chosen.value = chosen.value === p.value ? '' : p.value;
+			for (const other of grid.querySelectorAll('.og-flt-period')) other.setAttribute('aria-checked', String(other === chip && chosen.value !== ''));
+			onInput(true);
+		});
+		chip.setAttribute('role', 'radio');
+		chip.setAttribute('aria-checked', String(chosen.value === p.value));
+		grid.appendChild(chip);
+	}
+	grid.appendChild(chosen);
+	return { element: grid, input: chosen as HTMLInputElement | HTMLSelectElement };
+}
+
+function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCondition | null, onInput: (immediate: boolean) => void, compact = false) {
 	const box = el('div', 'og-flt-values');
-	let inputs: HTMLInputElement[] = [];
+	let inputs: (HTMLInputElement | HTMLSelectElement)[] = [];
 	const closers: (() => void)[] = [];
 	const first = condition && condition.type === kind ? condition : null;
 	const initial = (i: number): string => {
@@ -208,6 +263,20 @@ function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCon
 		closers.length = 0;
 		const meta = getOpMeta(kind, op);
 		if (meta.noValue) return;
+		const relativeFirst = first?.type === 'date' && first.operator === op ? first : null;
+		if (meta.relative === 'amount') {
+			const relative = relativeAmountInputs(relativeFirst, onInput);
+			box.append(...relative.fields);
+			inputs = relative.inputs;
+			return;
+		}
+		if (meta.relative === 'period') {
+			const period = periodInput(relativeFirst, compact, onInput);
+			box.appendChild(period.element);
+			box.toggleAttribute('data-wrap', !compact);
+			inputs = [period.input];
+			return;
+		}
 		const count = meta.range ? 2 : 1;
 		for (let i = 0; i < count; i++) {
 			if (i === 1) box.appendChild(el('span', 'og-flt-dash', '–'));
@@ -259,6 +328,12 @@ function buildCondition(kind: ValueKind, op: string, values: string[], def: Colu
 		return { type: 'number', operator: op as 'equals', value: a };
 	}
 	if (meta.noValue) return { type: 'date', operator: op as 'blank', dateFrom: '' };
+	if (meta.relative === 'amount') {
+		const amount = Number(values[0]);
+		if (!Number.isFinite(amount) || amount < 1) return null;
+		return { type: 'date', operator: op as 'inLast', dateFrom: '', amount: Math.floor(amount), unit: values[1] as RelativeDateUnit };
+	}
+	if (meta.relative === 'period') return values[0] ? { type: 'date', operator: 'period', dateFrom: '', period: values[0] as DatePeriod } : null;
 	const from = parseCellDate(values[0]);
 	if (!from) return null;
 	const to = meta.range && values[1] ? parseCellDate(values[1]) : null;
@@ -278,7 +353,7 @@ function conditionRow(
 	const ops = getOpsForType(kind, def);
 	const startOp = condition && condition.type === kind && 'operator' in condition ? condition.operator : defaultOpForType(kind, def);
 	const row = el('div', 'og-flt-row');
-	const inputs = valueInputs(kind, def, condition, onInput);
+	const inputs = valueInputs(kind, def, condition, onInput, compact);
 	const picker = operatorPicker(ops, startOp, compact, (op) => {
 		inputs.build(op);
 		onInput(true);

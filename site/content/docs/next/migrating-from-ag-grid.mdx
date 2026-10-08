@@ -212,11 +212,12 @@ api.setTheme({ ...api.getTheme(), focusRing: '#10b981' });
 Seven built-in themes ship out of the box, with runtime switching and system color-scheme detection. See
 [Theming](/docs/next/theming).
 
-## Clipboard, CSV export, and undo/redo
+## Clipboard, export, and undo/redo
 
 ```typescript
 await api.copySelectedRange(); // clipboard copy
 await api.pasteFromClipboard(); // clipboard paste
+await api.exportExcel(); // Excel export (keeps number, currency, percent and date formats)
 api.exportCsv(); // CSV export
 api.undo(); // history
 api.redo();
@@ -241,8 +242,6 @@ api.redo();
 - **No `editable` boolean.** Editability is one of several capability callbacks (`canEdit`, `canSort`,
   `canCopy`, `canPaste`, `canExport`, …) — see [Grid API](/docs/next/grid-api#columns) and
   [Columns](/docs/next/columns#capabilities).
-- **No Excel export.** CSV export (`api.exportCsv()`) is built in; there's no equivalent to AG Grid's
-  `exportDataAsExcel`.
 - **Not on strict semver yet.** See [Migration Notes](/docs/next/migration-notes) before you pin a version in a
   production migration.
 

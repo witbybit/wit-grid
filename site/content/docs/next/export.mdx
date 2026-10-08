@@ -1,0 +1,50 @@
+---
+title: Export
+description: Excel workbooks that keep the grid's formats, and CSV.
+icon: FileDown
+---
+
+## Excel
+
+`api.exportExcel()` downloads an `.xlsx` workbook that keeps what the grid shows:
+
+- Numbers stay numbers, with their column's format: currency (with its symbol), percent, fixed decimals.
+- Dates and date-times are Excel dates, so they sort and filter as dates.
+- Option columns (select, multi-select, tags, people, linked records) write their labels; other columns their
+  `valueFormatter` text.
+- Column widths follow the grid; the header row is bold, frozen and has filter buttons.
+- Grouped and tree grids export as Excel outlines: group rows sit above their rows and collapse.
+
+```typescript
+await api.exportExcel({ fileName: 'orders.xlsx', sheetName: 'Orders' });
+
+// Pick columns and rows
+await api.exportExcel({ columns: ['id', 'customer', 'total'], onlySelected: true });
+
+// The workbook as a Blob, to upload or save yourself
+const blob = await api.getExcel();
+```
+
+| Option                           | Default            | What it does                                              |
+| -------------------------------- | ------------------ | --------------------------------------------------------- |
+| `fileName`                       | `'export.xlsx'`    | The downloaded file's name                                |
+| `sheetName`                      | `'Sheet1'`         | The worksheet's name                                      |
+| `columns`                        | displayed columns  | Column fields to export, in order                         |
+| `onlySelected` / `rowIds`        | all shown rows     | Only the selected rows, or these rows in this order       |
+| `includeHeader`                  | `true`             | The header row                                            |
+| `freezeHeader` / `autoFilter`    | `true`             | Keep the header in view; give it filter buttons           |
+| `includeGroups` / `includeTotals` | `true`            | Group and total rows of grouped grids                     |
+| `locale`                         | the browser's      | Locale for currency symbols                               |
+
+The workbook is written by the grid itself (no extra dependency) and compressed with the browser's
+`CompressionStream`. The grid's context menu has **Export All as Excel**.
+
+## CSV
+
+```typescript
+api.exportCsv({ fileName: 'orders.csv' });
+const text = api.getCsv({ delimiter: ';' });
+```
+
+CSV writes each cell as text (through `valueFormatter`); grouped grids export the hierarchy with group and total rows
+(`includeGroups`, `includeTotals`) and the hierarchy column indented or as a path (`hierarchyText`).
