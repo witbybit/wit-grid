@@ -130,6 +130,7 @@ describe('Public/internal boundary', () => {
 				'createServerSideRouteKey',
 				'createSparklineRenderer',
 				'createTheme',
+				'createTimelineRenderer',
 				'createToggleEditor',
 				'createWorkspaceController',
 				'currencyColumnType',
@@ -194,6 +195,7 @@ describe('Public/internal boundary', () => {
 				'switchColumnType',
 				'tagsColumnType',
 				'themeToCSSVariables',
+				'timelineColumnType',
 				'urlColumnType',
 				'validateSchemaVersion',
 			]);

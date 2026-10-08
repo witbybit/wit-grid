@@ -66,6 +66,7 @@ export {
 	colorColumnType,
 	longTextColumnType,
 	dateRangeColumnType,
+	timelineColumnType,
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
@@ -73,6 +74,8 @@ export {
 export type { ColumnTypeDefinition, CellOptionInput, LinkedRecordOptions } from './cellTypes.js';
 export { createToggleEditor } from './editors.js';
 export { createSparklineRenderer } from './sparkline.js';
+export { createTimelineRenderer } from './timeline.js';
+export type { TimelineCellOptions } from './timeline.js';
 export type { SparklineCellOptions } from './sparkline.js';
 export { defaultDateRangePresets } from './dateRange.js';
 export type { DateRange, DateRangePreset, DateRangeCellOptions } from './dateRange.js';

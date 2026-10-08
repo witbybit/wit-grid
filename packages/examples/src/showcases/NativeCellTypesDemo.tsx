@@ -26,6 +26,7 @@ import {
 	linkedRecordColumnType,
 	sparklineColumnType,
 	numberColumnType,
+	timelineColumnType,
 	openCellPopover,
 	CELL_HUES,
 	createLocalStorageWorkspaceAdapter,
@@ -62,6 +63,7 @@ interface TaskRow {
 	projects: string[];
 	location: string[];
 	sprint: { start: string; end: string };
+	schedule: { start: string; end: string };
 	billable: boolean;
 	trend: number[];
 	commits: number[];
@@ -293,6 +295,7 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 	confidence: progressColumnType({ max: 1, traffic: true }),
 	rating: ratingColumnType(),
 	velocity: numberColumnType({ decimals: 0 }),
+	schedule: timelineColumnType({ color: (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color }),
 	effort: segmentedColumnType(EFFORT),
 	// Links to another table: record chips, a record picker paged from its API, chips open the record.
 	projects: linkedRecordColumnType([], {
@@ -315,6 +318,7 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'task', header: 'Task', width: 220 },
 	{ field: 'status', header: 'Status', width: 140, type: 'status' },
 	{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },
+	{ field: 'schedule', header: 'Timeline', width: 280, type: 'schedule' },
 	{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },
 	{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },
 	{ field: 'team', header: 'Team', width: 150, type: 'team' },
@@ -391,6 +395,7 @@ function generateTasks(count: number): TaskRow[] {
 			progress,
 			confidence: ((i * 29) % 100) / 100,
 			rating: (i * 3) % 6,
+			schedule: scheduleFor(i),
 			velocity: Math.round(8 + 34 * Math.abs(Math.sin(i * 1.7)) + (i % 5)),
 			spec: `docs.example.com/specs/${1001 + i}`,
 			contact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,
@@ -417,7 +422,25 @@ const TEAMMATE_EDITS: Record<string, TeammateEdit> = {
 	velocity: (v) => clamp(Math.round(Number(v) + (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 10)), 4, 60),
 	budget: (v) => Math.round((Number(v) + (Math.random() * 14000 - 5000)) / 100) * 100,
 	confidence: (v) => Math.round(clamp(Number(v) + (Math.random() * 0.4 - 0.2), 0, 1) * 100) / 100,
+	schedule: (v) => {
+		const { start, end } = v as { start: string; end: string };
+		const shift = (iso: string, days: number) => {
+			const d = new Date(`${iso}T00:00:00`);
+			d.setDate(d.getDate() + days);
+			return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		};
+		const days = Math.round(Math.random() * 8 - 3);
+		return Math.random() < 0.5 ? { start: shift(start, days), end: shift(end, days) } : { start, end: shift(end, Math.abs(days) + 1) };
+	},
 };
+
+// A plausible project plan: staggered starts over a quarter, one to five weeks each.
+function scheduleFor(i: number): { start: string; end: string } {
+	const start = new Date(2026, 8, 1 + ((i * 5) % 70));
+	const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6 + ((i * 11) % 29));
+	const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	return { start: iso(start), end: iso(end) };
+}
 
 // ─── Reference ────────────────────────────────────────────────────────────────
 

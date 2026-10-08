@@ -9,6 +9,7 @@
  * }
  * ```
  */
+import { createTimelineRenderer, type TimelineCellOptions } from './timeline.js';
 import type { ColumnDef } from '../columnDef.js';
 import {
 	createDateEditor,
@@ -132,6 +133,22 @@ export function dateRangeColumnType(options: DateRangeCellOptions = {}): ColumnT
 	return {
 		renderer: { kind: 'dom', renderer: createDateRangeRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createDateRangeEditor(options) },
+		valueFormatter: ({ value }) => {
+			const range = parseDateRange(value);
+			return range ? formatDateRange(range, options.locale) : '';
+		},
+		filterDef: { type: 'dateRange' },
+	};
+}
+
+/**
+ * A date range as a bar on a time scale shared by the column (a Gantt column): drag the bar to move
+ * it, its ends to resize it; double-click opens the range calendar. Same value as `dateRangeColumnType`.
+ */
+export function timelineColumnType(options: TimelineCellOptions = {}): ColumnTypeDefinition<any> {
+	return {
+		renderer: { kind: 'dom', renderer: createTimelineRenderer(options) },
+		cellEditor: { kind: 'dom', editor: createDateRangeEditor({ locale: options.locale }) },
 		valueFormatter: ({ value }) => {
 			const range = parseDateRange(value);
 			return range ? formatDateRange(range, options.locale) : '';
@@ -355,6 +372,7 @@ export const BUILTIN_COLUMN_TYPES: Readonly<Record<string, ColumnTypeDefinition<
 	color: colorColumnType(),
 	longText: longTextColumnType(),
 	dateRange: dateRangeColumnType(),
+	timeline: timelineColumnType(),
 	sparkline: sparklineColumnType(),
 };
 

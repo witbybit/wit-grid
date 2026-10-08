@@ -62,6 +62,8 @@ export {
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
+	timelineColumnType,
+	createTimelineRenderer,
 	createSparklineRenderer,
 	defaultDateRangePresets,
 } from '@eregister/wit-grid-core';
@@ -90,6 +92,7 @@ export type {
 	CellPopoverOptions,
 	LinkedRecordOptions,
 	SparklineCellOptions,
+	TimelineCellOptions,
 	DateRange,
 	DateRangePreset,
 	DateRangeCellOptions,

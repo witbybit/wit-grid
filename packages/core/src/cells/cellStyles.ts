@@ -22,10 +22,27 @@ export const CELL_STYLES = `
   --og-ct-track: color-mix(in srgb, var(--og-text-color) 11%, transparent);
   --og-ct-danger: var(--og-error, #ef4444);
   --og-ct-rating: #f5a524;
+  --og-ct-timeline-tick: color-mix(in srgb, var(--og-text-color) 10%, transparent);
+  --og-ct-timeline-today: color-mix(in srgb, var(--og-ct-danger) 70%, transparent);
   --og-ct-radius: 6px;
 }
 
 /* ── Cells ─────────────────────────────────────────────────────────────── */
+/* Timeline: month lines and today on the track; the bar moves and resizes. */
+.og-ct-timeline { position: relative; flex: 1; align-self: stretch; margin: 0 -6px; }
+.og-ct-timeline-bar {
+  position: absolute; top: 50%; height: 18px; transform: translateY(-50%); min-width: 4px; box-sizing: border-box;
+  display: flex; align-items: center; padding: 0 6px; overflow: hidden; border-radius: 5px;
+  background: color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 75%, transparent);
+  transition: left .18s ease, width .18s ease;
+}
+.og-ct-timeline-bar[data-dragging] { transition: none; box-shadow: 0 2px 10px color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 40%, transparent); }
+.og-ct-timeline-label { font-size: 11px; font-weight: 600; color: var(--og-ct-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar { cursor: grab; touch-action: none; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-dragging] { cursor: grabbing; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-edge="start"],
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-edge="end"] { cursor: ew-resize; }
 .og-ct-cell { display: flex; align-items: center; gap: 6px; width: 100%; height: 100%; min-width: 0; overflow: hidden; }
 .og-ct-cell-end { justify-content: flex-end; }
 .og-ct-cell-center { justify-content: center; }
