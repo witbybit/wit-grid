@@ -1,3 +1,4 @@
+import { MarkIcon } from '@/components/brand/mark-icon';
 import { ImageResponse } from 'next/og';
 
 export const size = { width: 32, height: 32 };
@@ -16,11 +17,7 @@ export default function Icon() {
 				borderRadius: 6,
 			}}
 		>
-			<svg width='20' height='20' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>
-				<rect x='2' y='2' width='20' height='20' rx='2' stroke='#e2e8f0' strokeWidth='2' />
-				<line x1='2' y1='9' x2='22' y2='9' stroke='#e2e8f0' strokeWidth='2' />
-				<line x1='9' y1='9' x2='9' y2='22' stroke='#e2e8f0' strokeWidth='2' />
-			</svg>
+			<MarkIcon size={22} />
 		</div>,
 		{ ...size }
 	);

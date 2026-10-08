@@ -14,6 +14,7 @@ import {
 	ArrowRightLeft,
 	Gauge,
 } from 'lucide-react';
+import { BrandHero } from '@/components/home/brand-hero';
 import { HeroGrid } from '@/components/home/hero-grid';
 import { InstallSnippet } from '@/components/home/install-snippet';
 
@@ -49,8 +50,8 @@ const features = [
 		gradient: 'linear-gradient(135deg, #f59e0b, #ea580c)',
 	},
 	{
-		title: 'Eight built-in themes',
-		description: 'Runtime theme switching, system color-scheme detection, and full custom theme composition — all through the same GridApi.',
+		title: 'Fourteen built-in themes',
+		description: 'Each with its own palette and typeface; runtime switching, system color-scheme detection, and custom themes from a palette with createTheme().',
 		icon: Palette,
 		tag: 'switchTheme()',
 		gradient: 'linear-gradient(135deg, #ec4899, #db2777)',
@@ -102,19 +103,20 @@ export default function HomePage() {
 	return (
 		<main className='min-h-screen'>
 			<div className='wg-landing-bg'>
-				<section className='mx-auto flex max-w-6xl flex-col gap-6 px-6 pt-16 sm:pt-24'>
+				<section className='mx-auto flex max-w-6xl flex-col gap-6 px-6 pt-6 sm:pt-10'>
+					<BrandHero />
 					<div className='max-w-3xl'>
 						<span className='wg-eyebrow-badge'>
 							<Gauge aria-hidden size={12} />
 							100,000+ rows · 1,000+ columns · 60fps
 						</span>
-						<h1 className='mt-5 text-4xl font-semibold tracking-tight text-fd-foreground sm:text-6xl'>
+						<h2 className='mt-5 text-3xl font-semibold tracking-tight text-fd-foreground sm:text-5xl'>
 							A grid engine built for{' '}
 							<span className='bg-gradient-to-r from-sky-500 via-sky-400 to-violet-500 bg-clip-text text-transparent'>
 								massive, editable
 							</span>{' '}
 							datasets.
-						</h1>
+						</h2>
 						<p className='mt-6 text-lg leading-8 text-fd-muted-foreground'>
 							A centralized, out-of-render state engine drives cell-level micro-subscriptions, so React paints individual cells with
 							surgical precision instead of re-rendering the tree. This is a live grid — try sorting, filtering, and editing it below.
