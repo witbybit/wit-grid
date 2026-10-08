@@ -11,7 +11,10 @@ function ScaleVisual() {
 					<div key={i} className='wg-v-scale-row'>
 						<i style={{ width: `${30 + ((i * 37) % 40)}%` }} />
 						<i style={{ width: `${14 + ((i * 23) % 18)}%` }} />
-						<b data-up={i % 3 !== 0 || undefined}>{i % 3 === 0 ? '−' : '+'}{((i * 1.37) % 9).toFixed(2)}%</b>
+						<b data-up={i % 3 !== 0 || undefined}>
+							{i % 3 === 0 ? '−' : '+'}
+							{((i * 1.37) % 9).toFixed(2)}%
+						</b>
 					</div>
 				))}
 			</div>
@@ -284,7 +287,7 @@ export function FeatureBento() {
 				<h2 className='wg-bento-title'>
 					Everything a serious grid needs, <span>built into the core.</span>
 				</h2>
-				<p className='wg-bento-lede'>A framework-agnostic engine draws the grid; the React adapter is a thin bridge. Nothing here is a paid add-on.</p>
+				<p className='wg-bento-lede'>A framework-agnostic engine draws the grid; the React adapter is a thin bridge.</p>
 			</div>
 			<div className='wg-bento'>
 				{FEATURES.map((feature) => {
