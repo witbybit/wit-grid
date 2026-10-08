@@ -180,6 +180,7 @@ function DeskGridImpl({
 			pinBottomRows={groupBy === 'none' ? 0 : 1}
 			showStatusBar={!compact}
 			enableNavigation
+			enableChart
 			navigationOptions={{ editTrigger, arrowKeyNavigationEdit }}
 			onCellValueChanged={onCellValueChanged}
 			initialState={initialState}
