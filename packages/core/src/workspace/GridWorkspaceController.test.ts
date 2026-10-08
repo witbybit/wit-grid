@@ -82,6 +82,45 @@ describe('workspace', () => {
 		api.destroy();
 	});
 
+	it('a restored filter, query and sort change the rows, not only the state', async () => {
+		const api = grid(memoryAdapter());
+		await settle();
+		api.applyGridState({
+			v: 3,
+			state: {
+				filterModel: { name: { type: 'text', operator: 'contains', value: 'a' } },
+				sortModel: [{ colId: 'name', sort: 'desc' }],
+			},
+		});
+		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Liam', 'Ava']);
+		api.applyGridState({
+			v: 3,
+			state: {
+				filterModel: null,
+				queryModel: {
+					version: 1,
+					root: { kind: 'group', id: 'root', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }] },
+				},
+			},
+		});
+		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava']);
+		api.destroy();
+	});
+
+	it('a default view with a query filters the rows when the grid opens', async () => {
+		const query = view('ava', {
+			queryModel: {
+				version: 1,
+				root: { kind: 'group', id: 'root', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }] },
+			},
+		});
+		const api = grid(memoryAdapter([query], 'ava'));
+		await settle();
+		expect(api.getWorkspaceState().activeViewId).toBe('ava');
+		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava']);
+		api.destroy();
+	});
+
 	it('opens the default view when there is no saved session', async () => {
 		const sorted = view('sorted', { sortModel: [{ colId: 'name', sort: 'desc' }] });
 		const api = grid(memoryAdapter([sorted], 'sorted'));
