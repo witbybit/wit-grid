@@ -1,3 +1,4 @@
+import { PresenceLayer } from './presenceLayer.js';
 import { ConditionalFormatPainter, registerConditionalFormatPainter, unregisterConditionalFormatPainter } from '../styling/conditionalFormat.js';
 import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
@@ -105,6 +106,32 @@ export class ViewportRenderer<TRowData = unknown> {
 
 		this.buildLayers();
 		this.mountConditionalFormatting(container);
+		this.mountPresence();
+	}
+
+	private presenceLayer: PresenceLayer | null = null;
+
+	private mountPresence(): void {
+		const layer = this.layers.get('presence');
+		if (!layer) return;
+		const engine = this.engine;
+		this.presenceLayer = new PresenceLayer(
+			engine.presence,
+			() => {
+				const model = engine.getRowModel();
+				const geometry = engine.geometry;
+				return {
+					getVisualIndexByRowId: (rowId) => model?.getVisualIndexByRowId(rowId) ?? -1,
+					getVisualRowCount: () => model?.getVisualRowCount() ?? 0,
+					getColumnIndex: (field) => engine.getColumnIndex(field),
+					rowTops: geometry.rowTops,
+					rowHeights: geometry.rowHeights,
+					colLefts: geometry.colLefts,
+					colWidths: geometry.colWidths,
+				};
+			},
+			layer
+		);
 	}
 
 	private mountConditionalFormatting(container: HTMLElement): void {
@@ -186,6 +213,8 @@ export class ViewportRenderer<TRowData = unknown> {
 	}
 
 	public unmount(): void {
+		this.presenceLayer?.dispose();
+		this.presenceLayer = null;
 		if (this.container) unregisterConditionalFormatPainter(this.container);
 		this.themeManager?.unmount();
 		this.themeManager = null;
@@ -341,6 +370,7 @@ export class ViewportRenderer<TRowData = unknown> {
 
 	public syncLayoutPlan(plan: GridLayoutPlan): void {
 		this.layoutPlan = plan;
+		this.presenceLayer?.sync(plan);
 
 		this.syncAriaCounts();
 

@@ -41,10 +41,11 @@ describe('layer registry (Plan 039)', () => {
 	it('plan-positioned layers expose an apply(); CSS-only layers may omit it', () => {
 		// Most layers (group-panel/header/rows/chrome) derive geometry from the plan and
 		// MUST carry an apply. Two categories legitimately have none:
-		//   - "exiting": pure CSS overlay positioned by content coordinates (ghost layer)
+		//   - "exiting" / "presence": pure CSS overlays in content coordinates (fade-out ghosts,
+		//     peers' cursors), positioned per child
 		//   - "header" / "floating-filter": center flex lanes sized by CSS flex:1; no JS
 		//     width needed since the pin-lane apply functions set left/right widths.
-		const CSS_ONLY = new Set(['exiting', 'header', 'floating-filter']);
+		const CSS_ONLY = new Set(['exiting', 'presence', 'header', 'floating-filter']);
 		for (const d of LAYER_REGISTRY) {
 			if (CSS_ONLY.has(d.id)) {
 				expect(d.apply, `CSS-only layer "${d.id}" should not have apply`).toBeUndefined();

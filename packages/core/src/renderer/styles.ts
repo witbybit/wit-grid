@@ -108,6 +108,81 @@ export const CORE_STYLES = `
     pointer-events: none;
   }
 
+  /* ── Presence: peers' cell cursors and cell flashes ─────────────────────── */
+  /* Content coordinates like the rows; pointer-inert, above the cells. */
+  .og-layer-presence {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .og-presence,
+  .og-cell-flash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+  }
+
+  .og-presence {
+    border: 2px solid var(--og-presence-color);
+    border-radius: 3px;
+    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), width 240ms cubic-bezier(0.2, 0.8, 0.2, 1), height 240ms ease;
+  }
+  .og-presence-still {
+    transition: none;
+  }
+  .og-presence[data-editing] {
+    background: color-mix(in srgb, var(--og-presence-color) 14%, transparent);
+    animation: og-presence-pulse 1.4s ease-in-out infinite;
+  }
+
+  .og-presence-tag {
+    position: absolute;
+    left: -2px;
+    bottom: 100%;
+    padding: 1px 6px;
+    border-radius: 4px 4px 4px 0;
+    background: var(--og-presence-color);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .og-presence-tag-below {
+    bottom: auto;
+    top: 100%;
+    border-radius: 0 4px 4px 4px;
+  }
+  .og-presence[data-editing] .og-presence-tag::after {
+    content: ' ✎';
+  }
+
+  .og-cell-flash {
+    background: var(--og-flash-color, var(--og-focus-ring));
+    opacity: 0;
+    animation: og-cell-flash 900ms ease-out;
+  }
+
+  @keyframes og-presence-pulse {
+    50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-presence-color) 30%, transparent); }
+  }
+  @keyframes og-cell-flash {
+    from { opacity: 0.38; }
+    to { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .og-presence { transition: none; }
+    .og-presence[data-editing] { animation: none; }
+  }
+
   /* ── Floating filter row ────────────────────────────────────────────────── */
 
   /* Wrapper: sticky horizontal stripe, same z-index as the header. */

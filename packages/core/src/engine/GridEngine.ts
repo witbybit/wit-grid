@@ -1,3 +1,4 @@
+import { PresenceStore, type GridCellFlash, type GridPresencePeer } from '../presence.js';
 import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import { canEditCell, isCellSelectable } from '../visualRow.js';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
@@ -141,6 +142,8 @@ export class GridEngine<TRowData = unknown> {
 	public readonly columns: ColumnModel<TRowData>;
 	public readonly viewport: ViewportModel<TRowData>;
 	public readonly geometry: GeometryModel;
+	/** Peers' cursors and cell flashes, fed by the app; drawn by the renderer's presence layer. */
+	public readonly presence = new PresenceStore();
 	public readonly selection: SelectionModel;
 	public readonly cellAccess: CellAccessModel<TRowData>;
 	public readonly stateManager: StateManager<TRowData>;
@@ -1149,6 +1152,15 @@ export class GridEngine<TRowData = unknown> {
 	}
 	public setColumnReorderEnabled(enabled: boolean): void {
 		this.columnFeature.setColumnReorderEnabled(enabled);
+	}
+	public setPresence(peers: readonly GridPresencePeer[]): void {
+		this.presence.set(peers);
+	}
+	public getPresence(): readonly GridPresencePeer[] {
+		return this.presence.peers;
+	}
+	public flashCells(cells: readonly GridCellFlash[]): void {
+		this.presence.flash(cells);
 	}
 	public setStyleRules(styleRules: InternalGridState<TRowData>['styleRules']): void {
 		this.stateFeature.setStyleRules(styleRules);

@@ -212,6 +212,13 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		parent: 'rows',
 		order: 0,
 	},
+	// Peers' cell cursors and cell flashes (PresenceLayer): content coordinates like the rows.
+	{
+		id: 'presence',
+		className: 'og-layer-presence',
+		parent: 'rows',
+		order: 1,
+	},
 	{
 		id: 'overlay',
 		className: 'og-layer-overlay',

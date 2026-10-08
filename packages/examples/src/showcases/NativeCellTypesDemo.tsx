@@ -43,7 +43,8 @@ import type {
 	PersonOption,
 	StyleRule,
 } from '@eregister/wit-grid-react';
-import { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';
+import { Box, Code2, ChevronRight, Filter, Palette, Users } from 'lucide-react';
+import { startTeammates, type TeammateEdit } from './simulatedTeammates';
 import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -405,6 +406,19 @@ const STYLE_RULES: StyleRule<TaskRow>[] = [
 	{ kind: 'iconSet', field: 'velocity', icons: 'arrows' },
 ];
 
+// What simulated teammates change, and how: each edit goes through the normal API.
+const STATUS_ORDER = STATUS.map((s) => s.value as string);
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+const TEAMMATE_EDITS: Record<string, TeammateEdit> = {
+	status: (v) => STATUS_ORDER[(STATUS_ORDER.indexOf(String(v)) + 1) % STATUS_ORDER.length],
+	priority: () => PRIORITY[Math.floor(Math.random() * PRIORITY.length)].value,
+	rating: (v) => (Number(v) + 1) % 6,
+	progress: (v) => (Number(v) >= 100 ? 0 : clamp(Number(v) + 20, 0, 100)),
+	velocity: (v) => clamp(Math.round(Number(v) + (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 10)), 4, 60),
+	budget: (v) => Math.round((Number(v) + (Math.random() * 14000 - 5000)) / 100) * 100,
+	confidence: (v) => Math.round(clamp(Number(v) + (Math.random() * 0.4 - 0.2), 0, 1) * 100) / 100,
+};
+
 // ─── Reference ────────────────────────────────────────────────────────────────
 
 const TYPE_REFERENCE: { name: string; text: string }[] = [
@@ -489,18 +503,26 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 	const [showSnippet, setShowSnippet] = useState(false);
 	// The floating filter row: compact filter editors under the headers (on by default on the page).
 	const [filterRow, setFilterRow] = useState(!compact);
+	// Simulated teammates: cursors, live edits and flashes (they step back while you use the grid).
+	const [teammates, setTeammates] = useState(true);
+	const [readyApi, setReadyApi] = useState<GridApi<TaskRow> | null>(null);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
 	const initialState = useMemo(() => ({ themeName: themeRef.current }), []);
 
 	const handleReady = useCallback(
 		(event: GridReadyEvent<TaskRow>) => {
 			apiRef.current = event.api;
+			setReadyApi(event.api);
 			// A remounted grid starts on the theme it was created with: bring it to the current one.
 			if (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);
 			onGridReady?.(event);
 		},
 		[onGridReady]
 	);
+	useEffect(() => {
+		if (!readyApi || !teammates) return;
+		return startTeammates(readyApi, { edits: TEAMMATE_EDITS });
+	}, [readyApi, teammates]);
 	useEffect(() => {
 		themeRef.current = theme;
 		const api = apiRef.current;
@@ -546,6 +568,16 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 					>
 						<Filter className='w-3.5 h-3.5' />
 						Filter row
+					</button>
+					<button
+						onClick={() => setTeammates((v) => !v)}
+						aria-pressed={teammates}
+						className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${
+							teammates ? 'border-slate-500 bg-slate-800 text-slate-100' : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'
+						}`}
+					>
+						<Users className='w-3.5 h-3.5' />
+						Teammates
 					</button>
 					{!controlledTheme && (
 						<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>

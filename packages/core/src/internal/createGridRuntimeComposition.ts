@@ -102,6 +102,7 @@ export function createGridRuntimeComposition<TRowData>({
 		commitEdit: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.commitEdit(rowId, colFieldOrInstanceId, value),
 		integrity: runtime.integrity,
 		getVisibleColumnRange: () => runtime.getVisibleColumnRange(),
+		getVisibleRowRange: () => runtime.getVisibleRowRange(),
 		applyColumnState: (states: ColumnState[], opts?: { applyOrder?: boolean }) => runtime.applyColumnState(states, opts),
 		getGridState: () => runtime.getGridState(),
 		applyGridState: (state: PersistedGridState) =>
