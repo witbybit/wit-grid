@@ -1,3 +1,4 @@
+import type { GridCommitEvent } from './engine/GridChangeApplier.js';
 import type {
 	QuickFilterModel,
 	ClientStructuralRowModel,
@@ -713,11 +714,27 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			return;
 		}
 
+		// The row model re-runs its pipeline on these events (as when sort, filters, the query or
+		// grouping are set any other way): announce what the restore changes.
+		const mutation = prepared.restore.stateMutation;
+		const current = this.engine.getState();
+		const changed = <K extends keyof typeof mutation>(key: K) => key in mutation && JSON.stringify(mutation[key] ?? null) !== JSON.stringify(current[key] ?? null);
+		const events: GridCommitEvent<TRowData>[] = [];
+		if (changed('columns')) {
+			const columns = mutation.columns as ColumnDef<TRowData>[];
+			events.push({ type: GridEventName.columnsChanged, payload: { columns, columnFields: columns.map((c) => c.field) } });
+		}
+		if (changed('sortModel')) events.push({ type: GridEventName.sortChanged, payload: { sortModel: mutation.sortModel ?? null } });
+		if (changed('filterModel')) events.push({ type: GridEventName.filterChanged, payload: { filterModel: mutation.filterModel ?? null } });
+		if (changed('queryModel')) events.push({ type: GridEventName.queryModelChanged, payload: { queryModel: mutation.queryModel ?? null } });
+		if (changed('grouping')) events.push({ type: GridEventName.groupingChanged, payload: { grouping: mutation.grouping } });
+
 		const result = this.engine.changeApplier.commit({
 			reason: 'persistence:restore',
-			state: prepared.restore.stateMutation,
-			domains: ['columns', 'rows'],
+			state: mutation,
+			domains: ['columns', 'rows', 'filtering'],
 			invalidations: [{ kind: 'full', reason: 'set data' }],
+			events,
 			historyPolicy: 'suppress',
 			requestRender: true,
 		});
