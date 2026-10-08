@@ -219,6 +219,13 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		parent: 'rows',
 		order: 1,
 	},
+	// A gallery or calendar view over the table's area; GridViewHost positions and fills it.
+	{
+		id: 'view',
+		className: 'og-layer-view',
+		parent: 'container',
+		order: 1,
+	},
 	// The minimap strip beside the vertical scrollbar; MinimapLayer positions and draws it.
 	{
 		id: 'minimap',

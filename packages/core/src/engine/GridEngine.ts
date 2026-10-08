@@ -1,3 +1,4 @@
+import type { GridViewConfig } from '../views.js';
 import { MinimapMarksStore, type GridMinimapMark } from '../minimap.js';
 import { PresenceStore, type GridCellFlash, type GridPresencePeer } from '../presence.js';
 import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
@@ -502,6 +503,7 @@ export class GridEngine<TRowData = unknown> {
 			showGroupPanel: config.showGroupPanel,
 			showFilterChipBar: config.showFilterChipBar,
 			showMinimap: config.showMinimap,
+			view: config.view ?? null,
 			showFloatingFilters: config.showFloatingFilters,
 			showStatusBar: config.showStatusBar,
 			pagination: config.pagination,
@@ -1175,6 +1177,12 @@ export class GridEngine<TRowData = unknown> {
 
 	public setShowFloatingFilters(enabled: boolean): void {
 		this.stateFeature.setShowFloatingFilters(enabled);
+	}
+	public setView(view: GridViewConfig<TRowData> | null): void {
+		this.stateFeature.setView(view);
+	}
+	public getView(): GridViewConfig<TRowData> | null {
+		return (this.getState().view ?? null) as GridViewConfig<TRowData> | null;
 	}
 	public setShowMinimap(enabled: boolean): void {
 		this.stateFeature.setShowMinimap(enabled);

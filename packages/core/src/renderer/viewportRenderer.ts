@@ -1,3 +1,4 @@
+import { GridViewHost } from './views/gridViewHost.js';
 import { GridEventName } from '../api/GridEvents.js';
 import { MinimapLayer } from './minimapLayer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
@@ -111,7 +112,11 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.mountConditionalFormatting(container);
 		this.mountPresence();
 		this.mountMinimap();
+		const viewLayer = this.layers.get('view');
+		if (viewLayer) this.viewHost = new GridViewHost(viewLayer, container, this.engine);
 	}
+
+	private viewHost: GridViewHost<TRowData> | null = null;
 
 	private minimapLayer: MinimapLayer | null = null;
 	private unsubscribeMinimap: (() => void) | null = null;
@@ -284,6 +289,8 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.unsubscribeMinimap = null;
 		this.minimapLayer?.dispose();
 		this.minimapLayer = null;
+		this.viewHost?.dispose();
+		this.viewHost = null;
 		if (this.container) unregisterConditionalFormatPainter(this.container);
 		this.themeManager?.unmount();
 		this.themeManager = null;
@@ -441,6 +448,7 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.layoutPlan = plan;
 		this.presenceLayer?.sync(plan);
 		this.minimapLayer?.sync(plan);
+		this.viewHost?.sync(plan);
 
 		this.syncAriaCounts();
 

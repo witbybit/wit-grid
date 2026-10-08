@@ -163,6 +163,8 @@ const PUBLIC_API_MEMBERS = {
 	setServerSideDatasource: true,
 	setShowFilterChipBar: true,
 	setShowMinimap: true,
+	setView: true,
+	getView: true,
 	setMinimapMarks: true,
 	setShowFloatingFilters: true,
 	setShowGroupPanel: true,

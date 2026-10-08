@@ -131,6 +131,7 @@ export type {
 export type { GridInitialState } from './state/GridState.js';
 export type { GridPresencePeer, GridPresenceCell, GridCellFlash } from './presence.js';
 export type { GridMinimapMark } from './minimap.js';
+export type { GridViewConfig, GalleryViewConfig, CalendarViewConfig } from './views.js';
 export type {
 	VisualRowModel,
 	RowModelViewportAccess,

@@ -129,6 +129,218 @@ export const CORE_STYLES = `
     display: block;
   }
 
+  /* ── Views: gallery and calendar over the table's area ────────────────────── */
+  .og-layer-view {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 35;
+    display: flex;
+    background: var(--og-bg-color);
+    color: var(--og-text-color);
+  }
+  .og-layer-view[hidden] {
+    display: none;
+  }
+  .og-view-active > .og-scroll-viewport,
+  .og-view-active > .og-layer-minimap {
+    visibility: hidden;
+  }
+
+  .og-view-gallery {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+  }
+  .og-view-gallery-sizer {
+    position: relative;
+  }
+  .og-view-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    padding: 0 12px;
+    overflow: hidden;
+    border: 1px solid var(--og-cell-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--og-text-color) 3%, var(--og-bg-color));
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .og-view-card:hover {
+    border-color: color-mix(in srgb, var(--og-focus-ring) 55%, transparent);
+    box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--og-focus-ring) 45%, transparent);
+  }
+  .og-view-card-band {
+    height: 4px;
+    margin: 0 -12px;
+  }
+  .og-view-card-title {
+    height: 36px;
+    line-height: 36px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 30px;
+  }
+  .og-view-field-label {
+    flex: none;
+    width: 84px;
+    font-size: 11px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-field-value {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .og-view-calendar {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px 12px;
+    box-sizing: border-box;
+  }
+  .og-view-cal-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .og-view-cal-button {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--og-cell-border);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .og-view-cal-button:hover {
+    background: color-mix(in srgb, var(--og-text-color) 7%, transparent);
+  }
+  .og-view-cal-label {
+    margin-left: 8px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .og-view-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    font-size: 11px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+  }
+  .og-view-cal-weekdays > span {
+    padding: 4px 6px;
+  }
+  .og-view-cal-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    border-top: 1px solid var(--og-cell-border);
+    border-left: 1px solid var(--og-cell-border);
+  }
+  .og-view-cal-day {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 4px;
+    overflow: hidden;
+    border-right: 1px solid var(--og-cell-border);
+    border-bottom: 1px solid var(--og-cell-border);
+  }
+  .og-view-cal-day[data-outside] {
+    background: color-mix(in srgb, var(--og-text-color) 3%, transparent);
+  }
+  .og-view-cal-day[data-outside] .og-view-cal-date {
+    opacity: 0.45;
+  }
+  .og-view-cal-day[data-drop] {
+    background: color-mix(in srgb, var(--og-focus-ring) 14%, transparent);
+  }
+  .og-view-cal-date {
+    align-self: flex-start;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 4px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 20px;
+    text-align: center;
+  }
+  .og-view-cal-day[data-today] .og-view-cal-date {
+    background: var(--og-focus-ring);
+    color: var(--og-accent-contrast, #fff);
+    font-weight: 600;
+  }
+  .og-view-cal-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+  }
+  .og-view-cal-entry {
+    height: 18px;
+    line-height: 18px;
+    padding: 0 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: color-mix(in srgb, var(--og-view-entry, var(--og-focus-ring)) 26%, transparent);
+  }
+  .og-view-cal-entry[data-start] {
+    margin-left: 4px;
+    border-left: 3px solid var(--og-view-entry, var(--og-focus-ring));
+    border-radius: 4px 0 0 4px;
+  }
+  .og-view-cal-entry[data-end] {
+    margin-right: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
+  .og-view-cal-entry:not([data-start]):not([data-week-start]) {
+    color: transparent;
+  }
+  .og-view-cal-entry[data-editable] {
+    cursor: grab;
+    touch-action: none;
+  }
+  .og-view-calendar[data-dragging] .og-view-cal-entry {
+    cursor: grabbing;
+  }
+  .og-view-cal-more {
+    padding: 0 6px;
+    font-size: 10px;
+    line-height: 12px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+  }
+
   /* ── Presence: peers' cell cursors and cell flashes ─────────────────────── */
   /* Content coordinates like the rows; pointer-inert, above the cells. */
   .og-layer-presence {

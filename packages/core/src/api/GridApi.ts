@@ -1,3 +1,4 @@
+import type { GridViewConfig } from '../views.js';
 import type { FilterModel, SortModel } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import type { ColumnDef, CellRendererPhase, ColumnInstanceId } from '../columnDef.js';
@@ -223,6 +224,8 @@ export interface GridStateSnapshot<TRowData = unknown> {
 	readonly selectedRowIds: readonly string[];
 	readonly activeEdit: ActiveEditState | null;
 	readonly loading?: boolean;
+	/** The view showing the rows (gallery, calendar), or null for the table. */
+	readonly view: GridViewConfig<TRowData> | null;
 	readonly pagination?: { pageSize: number; page?: number };
 	readonly enableColumnReorder: boolean;
 	/** How many displayed columns are pinned to each side. */

@@ -1,3 +1,4 @@
+import type { GridViewConfig } from '../views.js';
 import { GridEventName } from '../api/GridEvents.js';
 import type { StateManager } from '../state/StateManager.js';
 import type { SortModel, FilterModel, QuickFilterModel } from '../rowModel.js';
@@ -68,6 +69,17 @@ export class GridStateFeatureController<TRowData = unknown> {
 				{ kind: 'viewport', reason: 'showFloatingFilters' },
 				{ kind: 'headers', reason: 'showFloatingFilters' },
 			],
+			requestRender: true,
+		});
+	}
+
+	public setView(view: GridViewConfig<any> | null): void {
+		if ((this.deps.stateManager.getState().view ?? null) === view) return;
+		this.deps.applyChange({
+			reason: 'ui:set-view',
+			state: { view },
+			invalidations: [{ kind: 'viewport', reason: 'view' }],
+			domains: ['geometry'],
 			requestRender: true,
 		});
 	}

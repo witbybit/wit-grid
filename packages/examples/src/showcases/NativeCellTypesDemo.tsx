@@ -43,8 +43,9 @@ import type {
 	GridSidebarConfig,
 	PersonOption,
 	StyleRule,
+	GridViewConfig,
 } from '@eregister/wit-grid-react';
-import { Box, Code2, ChevronRight, Filter, Palette, Users } from 'lucide-react';
+import { Box, CalendarDays, Code2, ChevronRight, Filter, LayoutGrid, Palette, Table2, Users } from 'lucide-react';
 import { startTeammates, type TeammateEdit } from './simulatedTeammates';
 import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
 
@@ -411,6 +412,19 @@ const STYLE_RULES: StyleRule<TaskRow>[] = [
 	{ kind: 'iconSet', field: 'velocity', icons: 'arrows' },
 ];
 
+// The same rows, other ways: cards and a calendar over the plan (filters and sort apply).
+const statusColour = (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color;
+const VIEWS: Record<'table' | 'gallery' | 'calendar', GridViewConfig<TaskRow> | null> = {
+	table: null,
+	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'priority', 'owner', 'progress', 'budget'], color: statusColour },
+	calendar: { kind: 'calendar', dateField: 'schedule', titleField: 'task', color: statusColour },
+};
+const VIEW_CHOICES = [
+	{ id: 'table', label: 'Table', icon: Table2 },
+	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
+	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
+] as const;
+
 // What simulated teammates change, and how: each edit goes through the normal API.
 const STATUS_ORDER = STATUS.map((s) => s.value as string);
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -528,6 +542,7 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 	const [filterRow, setFilterRow] = useState(!compact);
 	// Simulated teammates: cursors, live edits and flashes (they step back while you use the grid).
 	const [teammates, setTeammates] = useState(true);
+	const [viewId, setViewId] = useState<keyof typeof VIEWS>('table');
 	const [readyApi, setReadyApi] = useState<GridApi<TaskRow> | null>(null);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
 	// Sorted by velocity: as teammates change it, rows slide to their new places under the heat scale.
@@ -566,6 +581,8 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			showFloatingFilters={filterRow}
 			showFilterChipBar
 			showMinimap
+			view={VIEWS[viewId]}
+			onViewChange={(next) => setViewId((Object.keys(VIEWS) as (keyof typeof VIEWS)[]).find((id) => VIEWS[id] === next) ?? 'table')}
 			styleRules={STYLE_RULES}
 			sidebar={SIDEBAR}
 			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}
@@ -604,6 +621,22 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 						<Users className='w-3.5 h-3.5' />
 						Teammates
 					</button>
+					<div className='flex items-center rounded-md border border-slate-800 p-0.5' role='radiogroup' aria-label='View'>
+						{VIEW_CHOICES.map(({ id, label, icon: Icon }) => (
+							<button
+								key={id}
+								role='radio'
+								aria-checked={viewId === id}
+								onClick={() => setViewId(id)}
+								className={`flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors ${
+									viewId === id ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+								}`}
+							>
+								<Icon className='w-3.5 h-3.5' />
+								{label}
+							</button>
+						))}
+					</div>
 					{!controlledTheme && (
 						<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>
 							<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />

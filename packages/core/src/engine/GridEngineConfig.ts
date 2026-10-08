@@ -1,3 +1,4 @@
+import type { GridViewConfig } from '../views.js';
 import type {
 	AggregationConfig,
 	DetailConfig,
@@ -56,6 +57,7 @@ export interface GridEngineConfig<TRowData = unknown> {
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
 	showMinimap?: boolean;
+	view?: GridViewConfig<TRowData> | null;
 	showFloatingFilters?: boolean;
 	showStatusBar?: boolean;
 	pagination?: { pageSize: number; page?: number };
