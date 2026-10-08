@@ -1,12 +1,11 @@
-import { WitGridMark } from '@/components/brand/wit-grid-mark';
+import { WitGridWordmark } from '@/components/brand/wit-grid-mark';
 import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 
 export const baseOptions: BaseLayoutProps = {
 	nav: {
 		title: (
 			<span className='wg-nav-brand'>
-				<WitGridMark id='wgm-nav' size={22} />
-				Wit Grid
+				<WitGridWordmark />
 			</span>
 		),
 	},

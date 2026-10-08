@@ -948,37 +948,39 @@ body {
 	gap: clamp(0.9rem, 2.5vw, 1.6rem);
 }
 
-.wg-brand-mark {
-	width: clamp(64px, 11vw, 112px);
-	height: auto;
-	filter: drop-shadow(0 10px 30px color-mix(in srgb, #6d7cff 45%, transparent));
-}
 
 .wg-wordmark {
 	margin: 0;
-	display: flex;
-	gap: 0.22em;
-	font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
-	font-size: clamp(3.4rem, 11vw, 8.5rem);
-	font-weight: 700;
-	line-height: 0.95;
-	letter-spacing: -0.055em;
+	font-size: clamp(3.6rem, 12vw, 9rem);
 	color: var(--color-fd-foreground);
-}
-
-.wg-wordmark-wit {
 	animation: wg-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+.wg-word.wg-mark-animated .wg-word-i::after {
+	animation: wg-handle-in 1.3s 0.95s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
 
-.wg-wordmark-grid {
-	background: linear-gradient(100deg, #38bdf8 0%, #6d7cff 35%, #a855f7 60%, #38bdf8 100%);
-	background-size: 220% 100%;
-	-webkit-background-clip: text;
-	background-clip: text;
-	color: transparent;
-	animation:
-		wg-rise 0.9s 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-		wg-sheen 7s 1s ease-in-out infinite alternate;
+/* The dot lands as a selected cell, then hollows into the fill handle. */
+@keyframes wg-handle-in {
+	0% {
+		opacity: 0;
+		transform: scale(0.4);
+		background: #6d7cff;
+		box-shadow: inset 0 0 0 0.07em #6d7cff, 0 0 0 transparent;
+	}
+	30% {
+		opacity: 1;
+		transform: scale(1.15);
+		background: #6d7cff;
+		box-shadow: inset 0 0 0 0.07em #6d7cff, 0 0 0.3em #6d7cff;
+	}
+	55% {
+		transform: none;
+		background: #6d7cff;
+	}
+	100% {
+		background: #fff;
+		box-shadow: inset 0 0 0 0.032em #6d7cff, 0 0 0 transparent;
+	}
 }
 
 @keyframes wg-rise {
@@ -991,12 +993,6 @@ body {
 		opacity: 1;
 		transform: none;
 		filter: none;
-	}
-}
-
-@keyframes wg-sheen {
-	to {
-		background-position: 100% 0;
 	}
 }
 
@@ -1024,35 +1020,17 @@ body {
 	font-weight: 600;
 }
 
-/* The mark: lines draw in, the selected cell glows. */
-.wg-mark-animated .wg-mark-line {
-	stroke-dasharray: 100;
-	stroke-dashoffset: 100;
-	animation: wg-draw 1.2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+/* The mark: the grid fades in, then the W lights up cell by cell (delays are inline). */
+.wg-mark-animated .wg-mark-dim {
+	animation: wg-fade-in 0.5s both;
 }
-.wg-mark-animated .wg-mark-line-2 {
-	animation-delay: 0.25s;
-}
-.wg-mark-animated .wg-mark-line-3 {
-	animation-delay: 0.4s;
-}
-.wg-mark-animated .wg-mark-line-4 {
-	animation-delay: 0.55s;
-}
-.wg-mark-animated .wg-mark-cell {
-	transform-origin: 33px 33px;
-	animation:
-		wg-cell-in 0.5s 0.9s cubic-bezier(0.2, 0.8, 0.2, 1.4) both,
-		wg-cell-glow 2.8s 1.6s ease-in-out infinite;
-}
-.wg-mark-animated .wg-mark-handle {
-	animation: wg-cell-in 0.4s 1.2s cubic-bezier(0.2, 0.8, 0.2, 1.4) both;
-	transform-origin: 41px 41px;
+.wg-mark-animated .wg-mark-lit {
+	animation: wg-cell-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1.4) both;
 }
 
-@keyframes wg-draw {
-	to {
-		stroke-dashoffset: 0;
+@keyframes wg-fade-in {
+	from {
+		opacity: 0;
 	}
 }
 @keyframes wg-cell-in {
@@ -1065,40 +1043,62 @@ body {
 		transform: none;
 	}
 }
-@keyframes wg-cell-glow {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.7;
-	}
+/* The wordmark: lowercase, with the i dotted by a selected cell. */
+.wg-word {
+	display: inline-block;
+	font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
+	font-weight: 700;
+	line-height: 1;
+	letter-spacing: -0.045em;
+	white-space: nowrap;
+}
+/* The mark as the w: as tall as the x-height, sitting on the baseline. */
+.wg-word-w {
+	display: inline-block;
+	height: 0.5em;
+	width: auto;
+	margin-right: 0.04em;
+	vertical-align: baseline;
+}
+.wg-word-i {
+	position: relative;
+	display: inline-block;
+}
+.wg-word-i::after {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: 0.15em;
+	width: 0.14em;
+	height: 0.14em;
+	margin-left: -0.07em;
+	border-radius: 0.03em;
+	/* The spreadsheet fill handle: a white cell with an accent border. */
+	background: #fff;
+	box-shadow: inset 0 0 0 0.032em #6d7cff;
 }
 
 .wg-nav-brand {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.5rem;
-	font-family: 'Space Grotesk', 'Avenir Next', 'Segoe UI', system-ui, sans-serif;
-	font-weight: 700;
-	letter-spacing: -0.02em;
+	gap: 0.45rem;
+	font-size: 1.3rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.wg-brand-floor,
 	.wg-brand-glow,
-	.wg-wordmark-wit,
-	.wg-wordmark-grid,
+	.wg-wordmark,
+	.wg-word.wg-mark-animated .wg-word-i::after,
 	.wg-brand-tagline,
-	.wg-mark-animated .wg-mark-cell,
-	.wg-mark-animated .wg-mark-handle {
+	.wg-mark-animated .wg-mark-dim,
+	.wg-mark-animated .wg-mark-lit {
 		animation: none;
 	}
 	.wg-beam {
 		display: none;
 	}
-	.wg-brand-underline path,
-	.wg-mark-animated .wg-mark-line {
+	.wg-brand-underline path {
 		animation: none;
 		stroke-dashoffset: 0;
 	}

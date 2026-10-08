@@ -1,4 +1,4 @@
-import { WitGridMark } from '@/components/brand/wit-grid-mark';
+import { WitGridWordmark } from '@/components/brand/wit-grid-mark';
 
 /** Light beams travelling along the background grid lines: [axis, position on the 48px grid, delay s, duration s]. */
 const BEAMS: ['h' | 'v', number, number, number][] = [
@@ -28,10 +28,8 @@ export function BrandHero() {
 				))}
 			</div>
 			<div className='wg-brand-lockup'>
-				<WitGridMark id='wgm-hero' size={112} animated className='wg-brand-mark' />
 				<h1 className='wg-wordmark'>
-					<span className='wg-wordmark-wit'>Wit</span>
-					<span className='wg-wordmark-grid'>Grid</span>
+					<WitGridWordmark animated />
 				</h1>
 			</div>
 			<svg className='wg-brand-underline' viewBox='0 0 600 24' preserveAspectRatio='none' aria-hidden>
