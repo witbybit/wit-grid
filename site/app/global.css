@@ -1072,8 +1072,8 @@ body {
 	top: 0.13em;
 	width: 0.155em;
 	height: 0.155em;
-	border-radius: 0.03em;
-	/* The spreadsheet fill handle: a white cell with an accent border. */
+	border-radius: 50%;
+	/* A fill handle: white with an accent border. */
 	background: #fff;
 	box-shadow: inset 0 0 0 0.016em #6d7cff;
 }
