@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
-import { Activity, MousePointerClick } from 'lucide-react';
+import { Activity, Users } from 'lucide-react';
 import { BUILT_IN_THEME_METADATA, BUILT_IN_THEME_ORDER, getBuiltInTheme, type BuiltInThemeName } from '@eregister/wit-grid-react';
 
 const loading = (label: string) =>
@@ -24,8 +24,8 @@ const NativeCellTypes = dynamic(() => import('@eregister/wit-grid-examples/nativ
 type HeroDemo = 'desk' | 'cells';
 
 const DEMOS: { id: HeroDemo; label: string; hint: string; icon: typeof Activity }[] = [
+	{ id: 'cells', label: 'Team workspace', hint: 'Teammates editing live: double-click any cell to join in', icon: Users },
 	{ id: 'desk', label: 'Live market desk', hint: 'Thousands of updates a second', icon: Activity },
-	{ id: 'cells', label: 'Native cell editors', hint: 'Double-click any cell to edit', icon: MousePointerClick },
 ];
 
 /** Every built-in grid theme, with its background and accent for the swatch. */
@@ -37,7 +37,7 @@ const THEMES = BUILT_IN_THEME_ORDER.map((name) => {
 export function HeroGrid() {
 	const { resolvedTheme } = useTheme();
 	const siteTheme: BuiltInThemeName = resolvedTheme === 'light' ? 'light' : 'dark';
-	const [demo, setDemo] = useState<HeroDemo>('desk');
+	const [demo, setDemo] = useState<HeroDemo>('cells');
 	// The cell demo follows the site's light / dark mode until a theme is picked here.
 	const [pickedTheme, setPickedTheme] = useState<BuiltInThemeName | null>(null);
 	const gridTheme = pickedTheme ?? siteTheme;

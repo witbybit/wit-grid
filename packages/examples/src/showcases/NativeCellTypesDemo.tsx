@@ -319,6 +319,8 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'status', header: 'Status', width: 140, type: 'status' },
 	{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },
 	{ field: 'schedule', header: 'Timeline', width: 280, type: 'schedule' },
+	{ field: 'velocity', header: 'Velocity', width: 132, type: 'velocity' },
+	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
 	{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },
 	{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },
 	{ field: 'team', header: 'Team', width: 150, type: 'team' },
@@ -330,14 +332,12 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'location', header: 'Office', width: 240, type: 'location' },
 	{ field: 'due', header: 'Due', width: 140, type: 'date' },
 	{ field: 'sprint', header: 'Sprint', width: 250, type: 'sprint' },
-	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
 	{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },
 	{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },
 	{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },
 	{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },
 	{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },
 	{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },
-	{ field: 'velocity', header: 'Velocity', width: 120, type: 'velocity' },
 	{ field: 'color', header: 'Colour', width: 130, type: 'color' },
 	{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },
 	{ field: 'spec', header: 'Spec', width: 190, type: 'url' },
@@ -530,7 +530,8 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 	const [teammates, setTeammates] = useState(true);
 	const [readyApi, setReadyApi] = useState<GridApi<TaskRow> | null>(null);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
-	const initialState = useMemo(() => ({ themeName: themeRef.current }), []);
+	// Sorted by velocity: as teammates change it, rows slide to their new places under the heat scale.
+	const initialState = useMemo(() => ({ themeName: themeRef.current, sortModel: [{ colId: 'velocity', sort: 'desc' as const }] }), []);
 
 	const handleReady = useCallback(
 		(event: GridReadyEvent<TaskRow>) => {
