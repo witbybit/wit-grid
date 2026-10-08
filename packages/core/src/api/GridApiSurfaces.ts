@@ -1,3 +1,4 @@
+import type { GridMinimapMark } from '../minimap.js';
 import type { GridCellFlash, GridPresencePeer } from '../presence.js';
 import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import type {
@@ -212,6 +213,10 @@ export interface GridStructureApi<TRowData = unknown> {
 	setRowAnimation(options: RowAnimationOptions | undefined): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;
+	/** Shows the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	setShowMinimap(enabled: boolean): void;
+	/** Rows the app marks on the minimap (search hits, bookmarks); replaces the previous set. */
+	setMinimapMarks(marks: readonly GridMinimapMark[]): void;
 	getVisibleColumnRange(): { colStart: number; colEnd: number; total: number };
 	/** The displayed rows in view, from `startIdx` to `endIdx` (display indexes). */
 	getVisibleRowRange(): { startIdx: number; endIdx: number };

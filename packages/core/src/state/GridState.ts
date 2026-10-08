@@ -63,6 +63,8 @@ export interface GridModelState<TRowData = unknown> {
 	hierarchyColumn?: HierarchyColumnConfig<TRowData> | false;
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
+	/** A strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	showMinimap?: boolean;
 	pinnedColumns?: { left: number; right: number };
 
 	/** Show an always-visible inline filter row below the column headers. */

@@ -1,3 +1,6 @@
+import { GridEventName } from '../api/GridEvents.js';
+import { MinimapLayer } from './minimapLayer.js';
+import { readInteractionState } from '../interaction/interactionState.js';
 import { PresenceLayer } from './presenceLayer.js';
 import { ConditionalFormatPainter, registerConditionalFormatPainter, unregisterConditionalFormatPainter } from '../styling/conditionalFormat.js';
 import { isHierarchyActive } from '../rows/hierarchyConfig.js';
@@ -107,6 +110,68 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.buildLayers();
 		this.mountConditionalFormatting(container);
 		this.mountPresence();
+		this.mountMinimap();
+	}
+
+	private minimapLayer: MinimapLayer | null = null;
+	private unsubscribeMinimap: (() => void) | null = null;
+
+	private mountMinimap(): void {
+		const layer = this.layers.get('minimap');
+		const viewport = this.scrollViewport;
+		if (!layer || !viewport) return;
+		const engine = this.engine;
+		// Identity → small id, so the version string notices replaced arrays without hashing them.
+		const ids = new WeakMap<object, number>();
+		let nextId = 0;
+		const idOf = (value: object) => {
+			let id = ids.get(value);
+			if (id === undefined) ids.set(value, (id = ++nextId));
+			return id;
+		};
+		const minimap = new MinimapLayer(layer, {
+			enabled: () => !!engine.getState().showMinimap,
+			rowCount: () => engine.getRowModel()?.getVisualRowCount() ?? 0,
+			indexOf: (rowId) => engine.getRowModel()?.getVisualIndexByRowId(rowId) ?? -1,
+			rowTop: (index) => {
+				const tops = engine.geometry.rowTops;
+				return index < tops.length ? tops[index] : engine.geometry.getTotalHeight(engine.getState().defaultRowHeight ?? 40);
+			},
+			selection: () => {
+				const interaction = readInteractionState(engine.getState());
+				const ranges: { start: number; end: number }[] = [];
+				const bounds = interaction.cellSelection.selection.bounds;
+				if (bounds) ranges.push({ start: bounds.minRow, end: bounds.maxRow });
+				const model = engine.getRowModel();
+				for (const rowId of interaction.rowSelection.selectedRowIds) {
+					const index = model?.getVisualIndexByRowId(rowId) ?? -1;
+					if (index >= 0) ranges.push({ start: index, end: index });
+				}
+				return ranges;
+			},
+			issues: () => {
+				const issues = engine.getState().integrity.validation.issues;
+				return issues.filter((issue): issue is typeof issue & { rowId: string } => issue.rowId !== undefined);
+			},
+			marks: () => engine.minimapMarks.marks,
+			version: () => {
+				const state = engine.getState();
+				const interaction = readInteractionState(state);
+				const bounds = interaction.cellSelection.selection.bounds;
+				return `${bounds ? `${bounds.minRow}-${bounds.maxRow}` : ''}|${idOf(interaction.rowSelection.selectedRowIds)}|${idOf(state.integrity.validation.issues)}|${engine.minimapMarks.version}`;
+			},
+			scrollToFraction: (fraction) => {
+				const total = engine.geometry.getTotalHeight(engine.getState().defaultRowHeight ?? 40);
+				viewport.scrollTop = Math.max(0, fraction * total - viewport.clientHeight / 2);
+			},
+		});
+		const offChange = engine.addEventListener(GridEventName.cellValueChanged, (event) => minimap.noteChange(event.payload.rowId));
+		const offMarks = engine.minimapMarks.subscribe(() => minimap.redraw());
+		this.minimapLayer = minimap;
+		this.unsubscribeMinimap = () => {
+			offChange();
+			offMarks();
+		};
 	}
 
 	private presenceLayer: PresenceLayer | null = null;
@@ -215,6 +280,10 @@ export class ViewportRenderer<TRowData = unknown> {
 	public unmount(): void {
 		this.presenceLayer?.dispose();
 		this.presenceLayer = null;
+		this.unsubscribeMinimap?.();
+		this.unsubscribeMinimap = null;
+		this.minimapLayer?.dispose();
+		this.minimapLayer = null;
 		if (this.container) unregisterConditionalFormatPainter(this.container);
 		this.themeManager?.unmount();
 		this.themeManager = null;
@@ -371,6 +440,7 @@ export class ViewportRenderer<TRowData = unknown> {
 	public syncLayoutPlan(plan: GridLayoutPlan): void {
 		this.layoutPlan = plan;
 		this.presenceLayer?.sync(plan);
+		this.minimapLayer?.sync(plan);
 
 		this.syncAriaCounts();
 

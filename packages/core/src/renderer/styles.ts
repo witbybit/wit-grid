@@ -108,6 +108,27 @@ export const CORE_STYLES = `
     pointer-events: none;
   }
 
+  /* ── Minimap: every displayed row on a strip beside the vertical scrollbar ─ */
+  .og-layer-minimap {
+    position: absolute;
+    width: 10px;
+    z-index: 30;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--og-text-color) 5%, transparent);
+    border-left: 1px solid color-mix(in srgb, var(--og-text-color) 10%, transparent);
+    --og-minimap-window: color-mix(in srgb, var(--og-text-color) 22%, transparent);
+    --og-minimap-selection: var(--og-focus-ring);
+    --og-minimap-change: #f59e0b;
+    --og-minimap-error: #ef4444;
+    --og-minimap-warning: #f59e0b;
+  }
+  .og-layer-minimap[hidden] {
+    display: none;
+  }
+  .og-minimap-canvas {
+    display: block;
+  }
+
   /* ── Presence: peers' cell cursors and cell flashes ─────────────────────── */
   /* Content coordinates like the rows; pointer-inert, above the cells. */
   .og-layer-presence {

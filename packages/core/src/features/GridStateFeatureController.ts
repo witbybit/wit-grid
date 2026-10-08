@@ -72,6 +72,17 @@ export class GridStateFeatureController<TRowData = unknown> {
 		});
 	}
 
+	public setShowMinimap(enabled: boolean): void {
+		if ((this.deps.stateManager.getState().showMinimap ?? false) === enabled) return;
+		this.deps.applyChange({
+			reason: 'ui:set-minimap',
+			state: { showMinimap: enabled },
+			invalidations: [{ kind: 'viewport', reason: 'showMinimap' }],
+			domains: ['geometry'],
+			requestRender: true,
+		});
+	}
+
 	public setShowFilterChipBar(enabled: boolean): void {
 		if ((this.deps.stateManager.getState().showFilterChipBar ?? false) === enabled) return;
 		this.deps.applyChange({

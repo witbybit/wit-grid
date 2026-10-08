@@ -21,7 +21,7 @@ export {
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from '@eregister/wit-grid-core';
-export type { ThemePalette, GridPresencePeer, GridPresenceCell, GridCellFlash } from '@eregister/wit-grid-core';
+export type { ThemePalette, GridPresencePeer, GridPresenceCell, GridCellFlash, GridMinimapMark } from '@eregister/wit-grid-core';
 
 // ─── Built-in cell types (core, DOM-based) ───────────────────────────────────
 export {

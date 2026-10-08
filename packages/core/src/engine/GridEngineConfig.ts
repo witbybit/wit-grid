@@ -55,6 +55,7 @@ export interface GridEngineConfig<TRowData = unknown> {
 	pinnedColumns?: { left: number; right: number };
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
+	showMinimap?: boolean;
 	showFloatingFilters?: boolean;
 	showStatusBar?: boolean;
 	pagination?: { pageSize: number; page?: number };

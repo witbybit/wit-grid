@@ -130,6 +130,7 @@ export type {
 } from './columnDef.js';
 export type { GridInitialState } from './state/GridState.js';
 export type { GridPresencePeer, GridPresenceCell, GridCellFlash } from './presence.js';
+export type { GridMinimapMark } from './minimap.js';
 export type {
 	VisualRowModel,
 	RowModelViewportAccess,

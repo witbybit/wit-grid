@@ -565,6 +565,7 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			enableChart
 			showFloatingFilters={filterRow}
 			showFilterChipBar
+			showMinimap
 			styleRules={STYLE_RULES}
 			sidebar={SIDEBAR}
 			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}

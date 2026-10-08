@@ -219,6 +219,13 @@ export const LAYER_REGISTRY: LayerDescriptor[] = [
 		parent: 'rows',
 		order: 1,
 	},
+	// The minimap strip beside the vertical scrollbar; MinimapLayer positions and draws it.
+	{
+		id: 'minimap',
+		className: 'og-layer-minimap',
+		parent: 'container',
+		order: 1,
+	},
 	{
 		id: 'overlay',
 		className: 'og-layer-overlay',

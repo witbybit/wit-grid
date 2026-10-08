@@ -241,6 +241,7 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			pinnedColumns: initialState.pinnedColumns,
 			showGroupPanel: initialState.showGroupPanel,
 			showFilterChipBar: initialState.showFilterChipBar,
+			showMinimap: initialState.showMinimap,
 			showFloatingFilters: initialState.showFloatingFilters,
 			showStatusBar: initialState.showStatusBar,
 			pagination: initialState.pagination,

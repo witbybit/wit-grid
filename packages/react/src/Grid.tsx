@@ -59,6 +59,8 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	showStatusBar?: boolean;
 	/** Show the filter chip bar above the header when filters are active. */
 	showFilterChipBar?: boolean;
+	/** Show the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	showMinimap?: boolean;
 	/** Show the floating filter row — always-visible inline filter inputs below column headers. */
 	showFloatingFilters?: boolean;
 	/**
@@ -108,6 +110,7 @@ function createInitialState<TRowData>(
 		pagination: { pageSize: number; initialPage: number } | null;
 		showStatusBar?: boolean;
 		showFilterChipBar?: boolean;
+		showMinimap?: boolean;
 		showFloatingFilters?: boolean;
 		rowDragMode?: 'managed' | 'unmanaged';
 	}
@@ -125,6 +128,7 @@ function createInitialState<TRowData>(
 	if (extras.pagination) merged.pagination = { pageSize: extras.pagination.pageSize, page: extras.pagination.initialPage };
 	if (extras.showStatusBar) merged.showStatusBar = true;
 	if (extras.showFilterChipBar) merged.showFilterChipBar = true;
+	if (extras.showMinimap) merged.showMinimap = true;
 	if (extras.showFloatingFilters) merged.showFloatingFilters = true;
 	if (extras.rowDragMode) merged.rowDragMode = extras.rowDragMode;
 	return merged;
@@ -161,6 +165,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		pagination,
 		showStatusBar,
 		showFilterChipBar,
+		showMinimap,
 		showFloatingFilters,
 		rowAnimation,
 		rows,
@@ -232,7 +237,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				columnTypes,
 				styleRules,
 			},
-			{ pagination: paginationConfig, showStatusBar, showFilterChipBar, showFloatingFilters, rowDragMode }
+			{ pagination: paginationConfig, showStatusBar, showFilterChipBar, showMinimap, showFloatingFilters, rowDragMode }
 		);
 
 		if (rowModelType === 'infinite') {
@@ -298,6 +303,10 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	useEffect(() => {
 		api.setShowFilterChipBar(!!showFilterChipBar);
 	}, [api, showFilterChipBar]);
+
+	useEffect(() => {
+		api.setShowMinimap(!!showMinimap);
+	}, [api, showMinimap]);
 
 	// New rows reach the grid during the commit, not in a passive effect that React may run after the
 	// browser paints: a live data change is drawn on the next frame instead of one frame later.
