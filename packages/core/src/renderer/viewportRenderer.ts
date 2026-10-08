@@ -1,3 +1,4 @@
+import { ConditionalFormatPainter, registerConditionalFormatPainter, unregisterConditionalFormatPainter } from '../styling/conditionalFormat.js';
 import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
@@ -103,6 +104,30 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.container.appendChild(this.scrollViewport);
 
 		this.buildLayers();
+		this.mountConditionalFormatting(container);
+	}
+
+	private mountConditionalFormatting(container: HTMLElement): void {
+		const engine = this.engine;
+		const painter = new ConditionalFormatPainter(
+			{
+				getRules: () => engine.getState().styleRules,
+				getValue: (rowId, field) => engine.getComputedCellValue(rowId, field),
+				getVersion: () => engine.getDomainVersions().rows + engine.getState().globalVersion,
+				forEachDisplayedRowId: (visit) => {
+					const model = engine.getRowModel();
+					if (!model || model.kind !== 'client') return false;
+					const count = model.getVisualRowCount();
+					for (let i = 0; i < count; i++) {
+						const row = model.getVisualRow(i);
+						if (row?.kind === 'data') visit(row.rowId);
+					}
+					return true;
+				},
+			},
+			container
+		);
+		registerConditionalFormatPainter(container, painter);
 	}
 
 	/**
@@ -161,6 +186,7 @@ export class ViewportRenderer<TRowData = unknown> {
 	}
 
 	public unmount(): void {
+		if (this.container) unregisterConditionalFormatPainter(this.container);
 		this.themeManager?.unmount();
 		this.themeManager = null;
 

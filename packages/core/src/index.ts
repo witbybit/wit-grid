@@ -121,6 +121,10 @@ export type {
 	DetailRowStyleRule,
 	CellStyleRule,
 	HeaderCellStyleRule,
+	ColorScaleRule,
+	DataBarRule,
+	IconSetRule,
+	ValueScaleRule,
 	GridStyleRule,
 	ValueGetterParams,
 } from './columnDef.js';

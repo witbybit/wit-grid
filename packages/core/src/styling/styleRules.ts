@@ -98,6 +98,11 @@ export function compileStyleRules<TRowData>(rules: readonly GridStyleRule<TRowDa
 				}
 				compiled.hasHeaderRules = true;
 				break;
+			case 'colorScale':
+			case 'dataBar':
+			case 'iconSet':
+				// Value-scaled: painted per cell by ConditionalFormatPainter, not as classes.
+				break;
 		}
 	}
 

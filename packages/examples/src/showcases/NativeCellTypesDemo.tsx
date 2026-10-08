@@ -25,6 +25,7 @@ import {
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
+	numberColumnType,
 	openCellPopover,
 	CELL_HUES,
 	createLocalStorageWorkspaceAdapter,
@@ -40,6 +41,7 @@ import type {
 	GridReadyEvent,
 	GridSidebarConfig,
 	PersonOption,
+	StyleRule,
 } from '@eregister/wit-grid-react';
 import { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';
 import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
@@ -72,6 +74,7 @@ interface TaskRow {
 	progress: number;
 	confidence: number;
 	rating: number;
+	velocity: number;
 	spec: string;
 	contact: string;
 	updated: string;
@@ -288,6 +291,7 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 	progress: progressColumnType(),
 	confidence: progressColumnType({ max: 1, traffic: true }),
 	rating: ratingColumnType(),
+	velocity: numberColumnType({ decimals: 0 }),
 	effort: segmentedColumnType(EFFORT),
 	// Links to another table: record chips, a record picker paged from its API, chips open the record.
 	projects: linkedRecordColumnType([], {
@@ -328,6 +332,7 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'commits', header: 'Commits', width: 150, type: 'commits' },
 	{ field: 'confidence', header: 'Confidence', width: 150, type: 'confidence' },
 	{ field: 'rating', header: 'Impact', width: 120, type: 'rating' },
+	{ field: 'velocity', header: 'Velocity', width: 120, type: 'velocity' },
 	{ field: 'color', header: 'Colour', width: 130, type: 'color' },
 	{ field: 'notes', header: 'Notes', width: 260, type: 'notes' },
 	{ field: 'spec', header: 'Spec', width: 190, type: 'url' },
@@ -385,12 +390,20 @@ function generateTasks(count: number): TaskRow[] {
 			progress,
 			confidence: ((i * 29) % 100) / 100,
 			rating: (i * 3) % 6,
+			velocity: Math.round(8 + 34 * Math.abs(Math.sin(i * 1.7)) + (i % 5)),
 			spec: `docs.example.com/specs/${1001 + i}`,
 			contact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,
 			updated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,
 		};
 	});
 }
+
+// Conditional formatting: bars, heat and icons scaled to each column's range.
+const STYLE_RULES: StyleRule<TaskRow>[] = [
+	{ kind: 'dataBar', field: 'budget' },
+	{ kind: 'colorScale', field: 'velocity' },
+	{ kind: 'iconSet', field: 'velocity', icons: 'arrows' },
+];
 
 // ─── Reference ────────────────────────────────────────────────────────────────
 
@@ -506,6 +519,7 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			enableChart
 			showFloatingFilters={filterRow}
 			showFilterChipBar
+			styleRules={STYLE_RULES}
 			sidebar={SIDEBAR}
 			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}
 			onGridReady={handleReady}

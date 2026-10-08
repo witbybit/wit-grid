@@ -126,7 +126,7 @@ export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, P
 export type { GridWriteBlockedEventPayload } from './types.js';
 export type { GridWorkspaceAdapter, GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './types.js';
 export { createLocalStorageWorkspaceAdapter } from './types.js';
-export type { StyleRule, RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from './types.js';
+export type { StyleRule, RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule, ColorScaleRule, DataBarRule, IconSetRule, ValueScaleRule } from './types.js';
 export type {
 	ColumnDef,
 	CellEditorProps,
