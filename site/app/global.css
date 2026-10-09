@@ -117,6 +117,37 @@ body {
 	color: var(--color-fd-primary-foreground);
 }
 
+/* Table / Gallery / Calendar for the team workspace: a quieter segmented control than the tabs. */
+.wg-hero-views {
+	display: inline-flex;
+	gap: 2px;
+	padding: 2px;
+	border-radius: 8px;
+	border: 1px solid var(--color-fd-border);
+	background: var(--color-fd-background);
+}
+
+.wg-hero-view {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 24px;
+	padding: 0 9px;
+	border-radius: 6px;
+	font-size: 12px;
+	color: color-mix(in srgb, var(--color-fd-foreground) 65%, transparent);
+	cursor: pointer;
+}
+
+.wg-hero-view:hover {
+	color: var(--color-fd-foreground);
+}
+
+.wg-hero-view[aria-checked='true'] {
+	background: var(--color-fd-accent);
+	color: var(--color-fd-foreground);
+}
+
 .wg-hero-hint {
 	font-size: 12px;
 	color: var(--color-fd-muted-foreground);

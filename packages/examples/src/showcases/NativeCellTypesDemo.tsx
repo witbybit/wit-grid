@@ -414,7 +414,7 @@ const STYLE_RULES: StyleRule<TaskRow>[] = [
 
 // The same rows, other ways: cards and a calendar over the plan (filters and sort apply).
 const statusColour = (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color;
-const VIEWS: Record<'table' | 'gallery' | 'calendar', GridViewConfig<TaskRow> | null> = {
+const VIEWS: Record<NativeCellTypesView, GridViewConfig<TaskRow> | null> = {
 	table: null,
 	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'priority', 'owner', 'progress', 'budget'], color: statusColour },
 	calendar: { kind: 'calendar', dateField: 'schedule', titleField: 'task', color: statusColour },
@@ -526,12 +526,17 @@ interface NativeCellTypesDemoProps {
 	 * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.
 	 */
 	theme?: BuiltInThemeName;
+	/** The view, when the host picks it (the docs hero): table, gallery or calendar. */
+	view?: NativeCellTypesView;
+	onViewChange?: (view: NativeCellTypesView) => void;
 }
+
+export type NativeCellTypesView = 'table' | 'gallery' | 'calendar';
 
 // The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
 const SIDEBAR: GridSidebarConfig<TaskRow> = { panels: ['columns', 'filters', 'sort', 'query', 'views'] };
 
-export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {
+export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme, view: controlledView, onViewChange }: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
 	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');
@@ -542,7 +547,12 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 	const [filterRow, setFilterRow] = useState(!compact);
 	// Simulated teammates: cursors, live edits and flashes (they step back while you use the grid).
 	const [teammates, setTeammates] = useState(true);
-	const [viewId, setViewId] = useState<keyof typeof VIEWS>('table');
+	const [ownViewId, setOwnViewId] = useState<NativeCellTypesView>('table');
+	const viewId = controlledView ?? ownViewId;
+	const setViewId = (next: NativeCellTypesView) => {
+		setOwnViewId(next);
+		onViewChange?.(next);
+	};
 	const [readyApi, setReadyApi] = useState<GridApi<TaskRow> | null>(null);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
 	// Sorted by velocity: as teammates change it, rows slide to their new places under the heat scale.
@@ -582,7 +592,7 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			showFilterChipBar
 			showMinimap
 			view={VIEWS[viewId]}
-			onViewChange={(next) => setViewId((Object.keys(VIEWS) as (keyof typeof VIEWS)[]).find((id) => VIEWS[id] === next) ?? 'table')}
+			onViewChange={(next) => setViewId((Object.keys(VIEWS) as NativeCellTypesView[]).find((id) => VIEWS[id] === next) ?? 'table')}
 			styleRules={STYLE_RULES}
 			sidebar={SIDEBAR}
 			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}

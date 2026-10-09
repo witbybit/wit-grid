@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
-import { Activity, Users } from 'lucide-react';
+import { Activity, CalendarDays, LayoutGrid, Table2, Users } from 'lucide-react';
 import { BUILT_IN_THEME_METADATA, BUILT_IN_THEME_ORDER, getBuiltInTheme, type BuiltInThemeName } from '@eregister/wit-grid-react';
 
 const loading = (label: string) =>
@@ -28,6 +28,13 @@ const DEMOS: { id: HeroDemo; label: string; hint: string; icon: typeof Activity 
 	{ id: 'desk', label: 'Live market desk', hint: 'Thousands of updates a second', icon: Activity },
 ];
 
+type CellsView = 'table' | 'gallery' | 'calendar';
+const CELL_VIEWS: { id: CellsView; label: string; icon: typeof Activity }[] = [
+	{ id: 'table', label: 'Table', icon: Table2 },
+	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
+	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
+];
+
 /** Every built-in grid theme, with its background and accent for the swatch. */
 const THEMES = BUILT_IN_THEME_ORDER.map((name) => {
 	const tokens = getBuiltInTheme(name);
@@ -40,6 +47,8 @@ export function HeroGrid() {
 	const [demo, setDemo] = useState<HeroDemo>('cells');
 	// The cell demo follows the site's light / dark mode until a theme is picked here.
 	const [pickedTheme, setPickedTheme] = useState<BuiltInThemeName | null>(null);
+	// The team workspace as a table, a gallery of cards or a calendar of the plan.
+	const [cellsView, setCellsView] = useState<CellsView>('table');
 	const gridTheme = pickedTheme ?? siteTheme;
 	const active = DEMOS.find((d) => d.id === demo)!;
 
@@ -67,6 +76,16 @@ export function HeroGrid() {
 				</div>
 				<span className='wg-hero-hint'>{active.hint}</span>
 				{demo === 'cells' && (
+					<div className='wg-hero-views' role='radiogroup' aria-label='View'>
+						{CELL_VIEWS.map(({ id, label, icon: Icon }) => (
+							<button key={id} type='button' role='radio' aria-checked={cellsView === id} className='wg-hero-view' onClick={() => setCellsView(id)}>
+								<Icon aria-hidden size={13} />
+								{label}
+							</button>
+						))}
+					</div>
+				)}
+				{demo === 'cells' && (
 					<div className='wg-hero-themes' role='radiogroup' aria-label='Grid theme'>
 						{THEMES.map((t) => (
 							<button
@@ -86,7 +105,7 @@ export function HeroGrid() {
 				)}
 			</div>
 			<div id='wg-hero-demo' role='tabpanel' className='wg-hero-grid'>
-				{demo === 'desk' ? <RealtimeDashboard compact theme={siteTheme} /> : <NativeCellTypes compact theme={gridTheme} />}
+				{demo === 'desk' ? <RealtimeDashboard compact theme={siteTheme} /> : <NativeCellTypes compact theme={gridTheme} view={cellsView} onViewChange={setCellsView} />}
 			</div>
 		</div>
 	);
