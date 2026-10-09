@@ -225,6 +225,9 @@ body {
 .wg-landing-bg {
 	position: relative;
 	isolation: isolate;
+	/* The brand stage intentionally reaches past the content column; keep that
+	   decorative bleed from widening the document and creating a page scrollbar. */
+	overflow-x: clip;
 }
 
 .wg-landing-bg::before {
