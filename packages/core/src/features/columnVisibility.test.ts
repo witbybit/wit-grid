@@ -28,9 +28,19 @@ describe('hiding columns', () => {
 		api.setFilterModel({ a: { type: 'text', operator: 'equals', value: 'Ava' } });
 		api.setColumnVisible('a', false);
 		expect(api.getStateSnapshot().filterModel).toEqual({ a: { type: 'text', operator: 'equals', value: 'Ava' } });
-		expect(api.rows().getAll().map((r) => r.id)).toEqual(['1']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.id)
+		).toEqual(['1']);
 		api.setColumnVisible('a', true);
-		expect(api.rows().getAll().map((r) => r.id)).toEqual(['1']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.id)
+		).toEqual(['1']);
 		api.destroy();
 	});
 

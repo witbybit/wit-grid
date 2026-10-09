@@ -38,7 +38,13 @@ export function Tasks({ rows, columns }: Props) {
 	return (
 		<>
 			<ViewSwitcher value={view} onChange={setView} />
-			<Grid rows={rows} columns={columns} getRowId={(row) => row.id} view={VIEWS[view]} onViewChange={(next) => setView(next ? next.kind : 'table')} />
+			<Grid
+				rows={rows}
+				columns={columns}
+				getRowId={(row) => row.id}
+				view={VIEWS[view]}
+				onViewChange={(next) => setView(next ? next.kind : 'table')}
+			/>
 		</>
 	);
 }
@@ -53,12 +59,12 @@ Cards with a title, an optional colour band and a few fields. Each field is draw
 so status pills, avatars, progress bars and currency look exactly as they do in the table. Only the cards in view
 exist and they are recycled as the gallery scrolls, so 100k rows scroll as smoothly as a dozen.
 
-| Option       | Default                          | What it does                                     |
-| ------------ | -------------------------------- | ------------------------------------------------ |
-| `titleField` | the first displayed column       | The card's title                                 |
-| `fields`     | the next four displayed columns  | Fields on each card, in order                    |
-| `color`      | none                             | `(row) => colour`: a band along the card's top   |
-| `cardWidth`  | `260`                            | The narrowest a card gets; columns fill the width |
+| Option       | Default                         | What it does                                      |
+| ------------ | ------------------------------- | ------------------------------------------------- |
+| `titleField` | the first displayed column      | The card's title                                  |
+| `fields`     | the next four displayed columns | Fields on each card, in order                     |
+| `color`      | none                            | `(row) => colour`: a band along the card's top    |
+| `cardWidth`  | `260`                           | The narrowest a card gets; columns fill the width |
 
 ## Calendar
 
@@ -68,14 +74,14 @@ repeat their label when they wrap into a new week; a crowded day shows **+N more
 move it: the value shifts by the days moved and is written back in the shape the cell held (date string, date-time,
 `Date`, timestamp, or range).
 
-| Option         | Default                    | What it does                                  |
-| -------------- | -------------------------- | --------------------------------------------- |
-| `dateField`    | (required)                 | A date or date-range field                    |
-| `titleField`   | the first displayed column | The entry's label                             |
-| `color`        | the theme accent           | `(row) => colour` per entry                   |
-| `initialDate`  | today                      | The month shown first                         |
-| `weekStartsOn` | `1` (Monday)               | First day of the week, `0` = Sunday           |
-| `editable`     | `true`                     | Drag entries to another day                   |
+| Option         | Default                    | What it does                        |
+| -------------- | -------------------------- | ----------------------------------- |
+| `dateField`    | (required)                 | A date or date-range field          |
+| `titleField`   | the first displayed column | The entry's label                   |
+| `color`        | the theme accent           | `(row) => colour` per entry         |
+| `initialDate`  | today                      | The month shown first               |
+| `weekStartsOn` | `1` (Monday)               | First day of the week, `0` = Sunday |
+| `editable`     | `true`                     | Drag entries to another day         |
 
 ## Back to the table
 

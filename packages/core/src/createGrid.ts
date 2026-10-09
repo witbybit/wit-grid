@@ -112,7 +112,10 @@ function withRowSelectionColumn<TRowData>(
 	return { columns: nextColumns, initialState: nextInitial };
 }
 
-function wireGridWorkspace<TRowData>(options: { workspace?: GridWorkspaceAdapter }, runtime: GridRuntime<TRowData>): GridWorkspaceController | undefined {
+function wireGridWorkspace<TRowData>(
+	options: { workspace?: GridWorkspaceAdapter },
+	runtime: GridRuntime<TRowData>
+): GridWorkspaceController | undefined {
 	if (!options.workspace) return undefined;
 	const controller = createWorkspaceController(options.workspace, (operation, error) =>
 		runtime.reportRuntimeFault({ source: 'persistence', operation: `workspace: ${operation}`, error })
@@ -240,7 +243,9 @@ function createGridBootstrap<TRowData>(
 		void Promise.all([views, session]).then(([loaded, saved]) => {
 			const id = workspaceController.getState().defaultViewId;
 			if (destroyed || !loaded || saved || !id || !workspaceController.getState().views.some((v) => v.id === id)) return;
-			api.applyView(id).catch((error: unknown) => runtime.reportRuntimeFault({ source: 'persistence', operation: 'workspace: apply default view', error }));
+			api.applyView(id).catch((error: unknown) =>
+				runtime.reportRuntimeFault({ source: 'persistence', operation: 'workspace: apply default view', error })
+			);
 		});
 	}
 	return api;

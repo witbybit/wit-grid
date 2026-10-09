@@ -1,13 +1,5 @@
 import Link from 'next/link';
-import {
-	ArrowRight,
-	ArrowUpRight,
-	Rocket,
-	FlaskConical,
-	Terminal,
-	ArrowRightLeft,
-	Gauge,
-} from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Rocket, FlaskConical, Terminal, ArrowRightLeft, Gauge } from 'lucide-react';
 import { BrandHero } from '@/components/home/brand-hero';
 import { FeatureBento } from '@/components/home/feature-bento';
 import { HeroGrid } from '@/components/home/hero-grid';

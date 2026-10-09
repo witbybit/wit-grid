@@ -32,7 +32,10 @@ function grid(grouped = false) {
 			currency: currencyColumnType({ currency: 'USD' }),
 			percent: percentColumnType(),
 			date: dateColumnType(),
-			status: selectColumnType([{ value: 'done', label: 'Done' }, { value: 'todo', label: 'To do' }]),
+			status: selectColumnType([
+				{ value: 'done', label: 'Done' },
+				{ value: 'todo', label: 'To do' },
+			]),
 		}
 	);
 	return createClientGrid<Row>({
@@ -56,7 +59,9 @@ async function unzip(bytes: Uint8Array): Promise<Record<string, string>> {
 		const start = at + 30 + nameLength + extra;
 		const body = bytes.subarray(start, start + size);
 		const data =
-			method === 8 ? new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer()) : body;
+			method === 8
+				? new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())
+				: body;
 		out[name] = new TextDecoder().decode(data);
 		at = start + size;
 	}
@@ -72,7 +77,14 @@ async function exported(api: ReturnType<typeof grid>, options = {}) {
 describe('Excel export', () => {
 	it('is a workbook: content types, workbook, sheet and styles', async () => {
 		const parts = await exported(grid());
-		expect(Object.keys(parts).sort()).toEqual(['[Content_Types].xml', '_rels/.rels', 'xl/_rels/workbook.xml.rels', 'xl/styles.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml']);
+		expect(Object.keys(parts).sort()).toEqual([
+			'[Content_Types].xml',
+			'_rels/.rels',
+			'xl/_rels/workbook.xml.rels',
+			'xl/styles.xml',
+			'xl/workbook.xml',
+			'xl/worksheets/sheet1.xml',
+		]);
 		expect(parts['xl/workbook.xml']).toContain('<sheet name="Sheet1"');
 	});
 
@@ -132,12 +144,18 @@ describe('Excel export', () => {
 		const sheet = (await exported(api))['xl/worksheets/sheet1.xml'];
 		// After the auto filter, as the schema orders them; one block per column, B = Budget, C = Share.
 		expect(sheet.indexOf('<conditionalFormatting')).toBeGreaterThan(sheet.indexOf('<autoFilter'));
-		expect(sheet).toContain('<conditionalFormatting sqref="B2:B4"><cfRule type="dataBar" priority="1"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF22C55E"/>');
+		expect(sheet).toContain(
+			'<conditionalFormatting sqref="B2:B4"><cfRule type="dataBar" priority="1"><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="FF22C55E"/>'
+		);
 		// A colour the export cannot read (a CSS variable) falls back to Excel's scale; fixed bounds are numbers.
-		expect(sheet).toContain('<cfRule type="colorScale" priority="2"><colorScale><cfvo type="num" val="0"/><cfvo type="num" val="5000"/><color rgb="FFF8696B"/><color rgb="FF63BE7B"/>');
+		expect(sheet).toContain(
+			'<cfRule type="colorScale" priority="2"><colorScale><cfvo type="num" val="0"/><cfvo type="num" val="5000"/><color rgb="FFF8696B"/><color rgb="FF63BE7B"/>'
+		);
 		expect(sheet).toContain('<conditionalFormatting sqref="C2:C4">');
 		expect(sheet).toContain('<cfvo type="percentile" val="50"/>');
-		expect(sheet).toContain('<iconSet iconSet="3TrafficLights1" reverse="1"><cfvo type="percent" val="0"/><cfvo type="percent" val="33.333333"/><cfvo type="percent" val="66.666667"/></iconSet>');
+		expect(sheet).toContain(
+			'<iconSet iconSet="3TrafficLights1" reverse="1"><cfvo type="percent" val="0"/><cfvo type="percent" val="33.333333"/><cfvo type="percent" val="66.666667"/></iconSet>'
+		);
 		expect(sheet.match(/<conditionalFormatting /g)).toHaveLength(2);
 	});
 });

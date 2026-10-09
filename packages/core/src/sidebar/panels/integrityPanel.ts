@@ -83,7 +83,13 @@ export const integrityPanel: SidebarPanel<any> = {
 			const errors = all.filter((i) => i.severity === 'error').length;
 			const warnings = all.filter((i) => i.severity === 'warning').length;
 			if (all.length === 0) {
-				body.appendChild(emptyState('integrity', 'No issues', 'Validation and data-quality findings show here. Run the checks to look for duplicates, outliers and format problems.'));
+				body.appendChild(
+					emptyState(
+						'integrity',
+						'No issues',
+						'Validation and data-quality findings show here. Run the checks to look for duplicates, outliers and format problems.'
+					)
+				);
 				return;
 			}
 			const seg = el('div', 'og-sb-seg og-sb-seg-sm');
@@ -115,7 +121,13 @@ export const integrityPanel: SidebarPanel<any> = {
 		const renderDiff = (body: HTMLElement) => {
 			const diff = integrity.getDiffResult();
 			if (!diff) {
-				body.appendChild(emptyState('columns', 'No comparison', 'Compare the grid with another dataset (integrity.setDiffModel) to see what changed, cell by cell.'));
+				body.appendChild(
+					emptyState(
+						'columns',
+						'No comparison',
+						'Compare the grid with another dataset (integrity.setDiffModel) to see what changed, cell by cell.'
+					)
+				);
 				return;
 			}
 			const stats = el('div', 'og-sb-stats');
@@ -156,7 +168,13 @@ export const integrityPanel: SidebarPanel<any> = {
 		const renderConflicts = (body: HTMLElement) => {
 			const conflicts = integrity.getConflicts();
 			if (conflicts.length === 0) {
-				body.appendChild(emptyState('check', 'No conflicts', 'When a live update or a refresh meets a cell you are editing, both values show here for you to choose.'));
+				body.appendChild(
+					emptyState(
+						'check',
+						'No conflicts',
+						'When a live update or a refresh meets a cell you are editing, both values show here for you to choose.'
+					)
+				);
 				return;
 			}
 			for (const conflict of conflicts.slice(0, LIST_LIMIT)) body.appendChild(conflictCard(conflict));
@@ -173,14 +191,21 @@ export const integrityPanel: SidebarPanel<any> = {
 			const card = el('div', 'og-sb-conflict');
 			const head = el('button', 'og-sb-conflict-head');
 			head.type = 'button';
-			head.append(el('span', 'og-sb-conflict-where', `${labelOf(conflict.colField)} · row ${conflict.rowId}`), el('span', 'og-sb-tag', conflict.source));
+			head.append(
+				el('span', 'og-sb-conflict-where', `${labelOf(conflict.colField)} · row ${conflict.rowId}`),
+				el('span', 'og-sb-tag', conflict.source)
+			);
 			head.addEventListener('click', () => goTo(conflict.rowId, conflict.colField));
 			const sides = el('div', 'og-sb-conflict-sides');
 			const side = (label: string, value: unknown, strategy: 'local' | 'remote', action: string) => {
 				const box = el('div', 'og-sb-conflict-side');
 				box.append(el('span', 'og-sb-conflict-label', label), el('span', 'og-sb-conflict-value', show(value)));
 				box.appendChild(
-					textButton(action, () => void integrity.resolveConflict(conflict.id, { strategy }).then(render, () => render()), strategy === 'local' ? 'ghost' : 'primary')
+					textButton(
+						action,
+						() => void integrity.resolveConflict(conflict.id, { strategy }).then(render, () => render()),
+						strategy === 'local' ? 'ghost' : 'primary'
+					)
 				);
 				return box;
 			};
@@ -202,18 +227,23 @@ export const integrityPanel: SidebarPanel<any> = {
 			badge.appendChild(icon(status.icon, 16));
 			const text = el('div', 'og-sb-health-text');
 			text.append(el('span', 'og-sb-health-label', status.label), el('span', 'og-sb-health-hint', runError ?? status.hint));
-			const run = textButton(running ? 'Running…' : 'Run checks', () => {
-				running = true;
-				runError = null;
-				render();
-				integrity
-					.run({ modules: ['quality'] })
-					.catch((error: unknown) => (runError = error instanceof Error ? error.message : String(error)))
-					.finally(() => {
-						running = false;
-						render();
-					});
-			}, 'subtle', 'refresh');
+			const run = textButton(
+				running ? 'Running…' : 'Run checks',
+				() => {
+					running = true;
+					runError = null;
+					render();
+					integrity
+						.run({ modules: ['quality'] })
+						.catch((error: unknown) => (runError = error instanceof Error ? error.message : String(error)))
+						.finally(() => {
+							running = false;
+							render();
+						});
+				},
+				'subtle',
+				'refresh'
+			);
 			run.disabled = running;
 			const top = el('div', 'og-sb-health-top');
 			top.append(badge, text);

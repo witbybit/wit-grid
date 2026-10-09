@@ -35,7 +35,12 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
 	return node;
 }
 
-export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTMLElement, initial: ChartSpec, scheduler: GridScheduler = defaultGridScheduler): GridChartHandle {
+export function createGridChart<TRowData>(
+	api: GridApi<TRowData>,
+	container: HTMLElement,
+	initial: ChartSpec,
+	scheduler: GridScheduler = defaultGridScheduler
+): GridChartHandle {
 	let spec: ChartSpec = { ...initial };
 	const anyApi = api as GridApi<any>;
 	const root = el('div', 'og-chart');
@@ -75,7 +80,8 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 			accent: v('--og-focus-ring', '#6366f1'),
 		};
 	};
-	const palette = (theme: { accent: string }) => spec.palette ?? [theme.accent, ...BASE_PALETTE.filter((c) => c.toLowerCase() !== theme.accent.toLowerCase())];
+	const palette = (theme: { accent: string }) =>
+		spec.palette ?? [theme.accent, ...BASE_PALETTE.filter((c) => c.toLowerCase() !== theme.accent.toLowerCase())];
 
 	/** The category a cross-filter selected (its filter is one value of the category column). */
 	const selectedCategory = (): number | null => {
@@ -154,7 +160,10 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 		const nothing = data.categories.length === 0 || data.series.length === 0;
 		empty.hidden = !nothing;
 		empty.textContent = nothing ? (spec.source.kind === 'range' ? 'Select cells with numbers to chart them.' : 'No data to chart.') : '';
-		canvas.setAttribute('aria-label', `${spec.title ?? 'Chart'}: ${data.series.map((s) => s.name).join(', ')} by ${data.categories.length} categories`);
+		canvas.setAttribute(
+			'aria-label',
+			`${spec.title ?? 'Chart'}: ${data.series.map((s) => s.name).join(', ')} by ${data.categories.length} categories`
+		);
 		if (!ctx || width <= 0 || height <= 0) return;
 		if (progress < 1) {
 			const now = performance.now();
@@ -185,11 +194,17 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 			const swatch = el('i');
 			swatch.style.background = pie ? colors[category % colors.length] : series.color;
 			const value = series.values[category] ?? 0;
-			row.append(swatch, el('span', undefined, series.name), el('b', undefined, pie && total > 0 ? `${formatCompact(value)} · ${Math.round((value / total) * 100)}%` : formatCompact(value)));
+			row.append(
+				swatch,
+				el('span', undefined, series.name),
+				el('b', undefined, pie && total > 0 ? `${formatCompact(value)} · ${Math.round((value / total) * 100)}%` : formatCompact(value))
+			);
 			tooltip.appendChild(row);
 		}
 		if (spec.crossFilter !== false && data.categoryField && data.categoryValues[category] != null)
-			tooltip.appendChild(el('div', 'og-chart-tooltip-hint', selectedCategory() === category ? 'Click to clear the filter' : 'Click to filter the grid'));
+			tooltip.appendChild(
+				el('div', 'og-chart-tooltip-hint', selectedCategory() === category ? 'Click to clear the filter' : 'Click to filter the grid')
+			);
 		tooltip.hidden = false;
 		const box = plot.getBoundingClientRect();
 		const w = tooltip.offsetWidth;
@@ -204,7 +219,8 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 		const y = event.clientY - box.top;
 		const hit = hitTest(result, x, y);
 		const next = hit?.category ?? null;
-		canvas.style.cursor = next !== null && spec.crossFilter !== false && data.categoryField && data.categoryValues[next] != null ? 'pointer' : 'default';
+		canvas.style.cursor =
+			next !== null && spec.crossFilter !== false && data.categoryField && data.categoryValues[next] != null ? 'pointer' : 'default';
 		if (next !== hover) {
 			hover = next;
 			invalidate();
@@ -226,7 +242,9 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 		if (value == null) return;
 		const model = (api.getStateSnapshot().filterModel as FilterModel | null) ?? null;
 		const same = selectedCategory() === hit.category;
-		api.setFilterModel(applyFilterToModel(data.categoryField, same ? null : { type: 'select', values: [value], labels: [data.categories[hit.category]] }, model));
+		api.setFilterModel(
+			applyFilterToModel(data.categoryField, same ? null : { type: 'select', values: [value], labels: [data.categories[hit.category]] }, model)
+		);
 	};
 	canvas.addEventListener('pointermove', onMove);
 	canvas.addEventListener('pointerleave', onLeave);
@@ -268,7 +286,9 @@ export function createGridChart<TRowData>(api: GridApi<TRowData>, container: HTM
 			ctx.fillText(spec.title, 14 * dpr, (header / 2) * dpr);
 		}
 		ctx.drawImage(canvas, 0, Math.round(header * dpr));
-		return new Promise((resolve, reject) => out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('[wit-grid] chart: could not draw the image'))), 'image/png'));
+		return new Promise((resolve, reject) =>
+			out.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('[wit-grid] chart: could not draw the image'))), 'image/png')
+		);
 	};
 
 	return {

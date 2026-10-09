@@ -264,7 +264,9 @@ function restoreCondition(raw: unknown): FilterCondition | null {
 		case 'boolean':
 			return typeof c.value === 'boolean' ? (raw as FilterCondition) : null;
 		case 'dateRange':
-			return DATE_RANGE_OP_SET.has(c.operator as string) && isString(c.dateFrom) && isOptionalString(c.dateTo) ? (raw as FilterCondition) : null;
+			return DATE_RANGE_OP_SET.has(c.operator as string) && isString(c.dateFrom) && isOptionalString(c.dateTo)
+				? (raw as FilterCondition)
+				: null;
 		case 'path':
 			return Array.isArray(c.paths) && c.paths.every((p) => Array.isArray(p) && p.every(isString)) ? (raw as FilterCondition) : null;
 		case 'custom':

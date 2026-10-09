@@ -225,7 +225,13 @@ describe('the public GridApi at runtime', () => {
 	});
 
 	it('forwarded members work through the api', () => {
-		const api = createClientGrid<Row>({ rows: [{ id: '1', name: 'Ava' }, { id: '2', name: 'Liam' }], columns });
+		const api = createClientGrid<Row>({
+			rows: [
+				{ id: '1', name: 'Ava' },
+				{ id: '2', name: 'Liam' },
+			],
+			columns,
+		});
 		expect(api.getRowNode('2')?.data).toEqual({ id: '2', name: 'Liam' });
 		expect(api.getDisplayedRowAtIndex(0)?.id).toBe('1');
 		expect(api.getRowIndexById('2')).toBe(1);
@@ -239,7 +245,12 @@ describe('the public GridApi at runtime', () => {
 		expect(api.can('sort', { colField: 'name' }).allowed).toBe(true);
 		api.setQueryModel({
 			version: 1,
-			root: { kind: 'group', id: 'root', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Liam' } }] },
+			root: {
+				kind: 'group',
+				id: 'root',
+				operator: 'and',
+				children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Liam' } }],
+			},
 		});
 		expect(api.evaluateQueryForRow('2')).toBe(true);
 		expect(api.evaluateQueryForRow('1')).toBe(false);

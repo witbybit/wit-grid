@@ -26,15 +26,15 @@ between rail buttons and Escape closes the panel.
 
 ## Built-in panels
 
-| Panel           | What it does                                                                                                                                         |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Panel           | What it does                                                                                                                                          |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `columns`       | Row grouping (drop a column on it, drag the pills to reorder, subtotals, sticky headers); every column in its lane: show / hide, drag to reorder, pin |
-| `filters`       | Every filterable column with its filter editor, the same one as the header funnel; a collapsed section summarizes its filter                         |
-| `sort`          | The sort rules in priority order: drag (or ↑ / ↓) to reorder, flip direction, add a column from a searchable list                                    |
-| `query`         | Conditions across columns in nested All / Any groups, edited as a draft and applied with Apply                                                       |
-| `views`         | The view on the grid (save changes, revert, save as new) and the saved views; with persistence, Remember layout                                      |
+| `filters`       | Every filterable column with its filter editor, the same one as the header funnel; a collapsed section summarizes its filter                          |
+| `sort`          | The sort rules in priority order: drag (or ↑ / ↓) to reorder, flip direction, add a column from a searchable list                                     |
+| `query`         | Conditions across columns in nested All / Any groups, edited as a draft and applied with Apply                                                        |
+| `views`         | The view on the grid (save changes, revert, save as new) and the saved views; with persistence, Remember layout                                       |
 | `dataIntegrity` | The grid's status with Run checks; issues by severity, the diff (accept a change), conflicts (keep mine / take theirs)                                |
-| `themes`        | A card per built-in theme                                                                                                                            |
+| `themes`        | A card per built-in theme                                                                                                                             |
 
 ### Views
 
@@ -57,28 +57,29 @@ grid api, a slot for actions in its header, `close()`, and `mountFilterEditor` t
 			renderPanel: ({ api }) => <NotesPanel api={api} />,
 		};
 
-		<Grid rows={rows} columns={columns} sidebar={{ panels: ['columns', notes] }} />;
-		```
+    	<Grid rows={rows} columns={columns} sidebar={{ panels: ['columns', notes] }} />;
+    	```
 
-		The component renders inside the grid's React tree, so hooks such as `useGridKeySelector` work. When the config changes (say the
-		panel reads new props), the open panel updates in place.
-	</Tab>
-	<Tab value='DOM'>
-		```typescript
-		const notes: SidebarPanelDef<Order> = {
-			id: 'notes',
-			label: 'Notes',
-			panel: {
-				mount(container, { api, actions }) {
-					const count = document.createElement('p');
-					const sync = () => (count.textContent = `${api.rows().getAll().length} rows shown`);
-					sync();
-					container.appendChild(count);
-					const off = api.subscribeToKey('filterModel', sync);
-					return { destroy: off };
-				},
-			},
-		};
-		```
-	</Tab>
+    	The component renders inside the grid's React tree, so hooks such as `useGridKeySelector` work. When the config changes (say the
+    	panel reads new props), the open panel updates in place.
+    </Tab>
+    <Tab value='DOM'>
+    	```typescript
+    	const notes: SidebarPanelDef<Order> = {
+    		id: 'notes',
+    		label: 'Notes',
+    		panel: {
+    			mount(container, { api, actions }) {
+    				const count = document.createElement('p');
+    				const sync = () => (count.textContent = `${api.rows().getAll().length} rows shown`);
+    				sync();
+    				container.appendChild(count);
+    				const off = api.subscribeToKey('filterModel', sync);
+    				return { destroy: off };
+    			},
+    		},
+    	};
+    	```
+    </Tab>
+
 </Tabs>

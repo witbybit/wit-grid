@@ -57,7 +57,10 @@ describe('relative date filters', () => {
 		expect(match('2026-02-25')).toBe(false);
 		expect(match('2026-03-05')).toBe(false);
 		expect(match(null)).toBe(false);
-		const thisWeek = prepareColumnFilter({ type: 'date', operator: 'period', dateFrom: '', period: 'thisWeek' }, { type: 'date', weekStartsOn: 0 })!;
+		const thisWeek = prepareColumnFilter(
+			{ type: 'date', operator: 'period', dateFrom: '', period: 'thisWeek' },
+			{ type: 'date', weekStartsOn: 0 }
+		)!;
 		expect(thisWeek('2026-03-01')).toBe(true);
 		expect(thisWeek('2026-03-08')).toBe(false);
 	});

@@ -63,7 +63,11 @@ export const viewsPanel: SidebarPanel<any> = {
 
 		if (!api.hasWorkspace()) {
 			root.appendChild(
-				emptyState('views', 'Views are not set up', 'Give the grid a workspace (for example createLocalStorageWorkspaceAdapter) to save and switch views.')
+				emptyState(
+					'views',
+					'Views are not set up',
+					'Give the grid a workspace (for example createLocalStorageWorkspaceAdapter) to save and switch views.'
+				)
 			);
 			return { destroy: () => d.dispose() };
 		}
@@ -140,7 +144,8 @@ export const viewsPanel: SidebarPanel<any> = {
 				)
 			);
 			current.appendChild(buttons);
-			if (active && s.dirty && !writable(active)) current.appendChild(el('div', 'og-sb-hint', 'This is a shared view: save your changes as a new one.'));
+			if (active && s.dirty && !writable(active))
+				current.appendChild(el('div', 'og-sb-hint', 'This is a shared view: save your changes as a new one.'));
 		};
 
 		const openMenu = (anchor: HTMLElement, view: GridViewDefinition) => {
@@ -175,16 +180,21 @@ export const viewsPanel: SidebarPanel<any> = {
 			});
 			if (writable(view)) {
 				box.appendChild(el('div', 'og-sb-menu-sep'));
-				const del = item('Delete', 'trash', () => {
-					if (confirmDelete !== view.id) {
-						confirmDelete = view.id;
-						del.querySelector('span:not(.og-sb-icon)')!.textContent = 'Click again to delete';
-						return;
-					}
-					confirmDelete = null;
-					menu?.close();
-					void guard(api.deleteView(view.id));
-				}, true);
+				const del = item(
+					'Delete',
+					'trash',
+					() => {
+						if (confirmDelete !== view.id) {
+							confirmDelete = view.id;
+							del.querySelector('span:not(.og-sb-icon)')!.textContent = 'Click again to delete';
+							return;
+						}
+						confirmDelete = null;
+						menu?.close();
+						void guard(api.deleteView(view.id));
+					},
+					true
+				);
 			}
 			menu = openCellPopover({
 				anchor,
@@ -210,7 +220,13 @@ export const viewsPanel: SidebarPanel<any> = {
 				return;
 			}
 			if (s.views.length === 0) {
-				list.appendChild(emptyState('views', 'No saved views yet', 'Save the columns, sort, filters and grouping you set up, and switch back to them in one click.'));
+				list.appendChild(
+					emptyState(
+						'views',
+						'No saved views yet',
+						'Save the columns, sort, filters and grouping you set up, and switch back to them in one click.'
+					)
+				);
 				return;
 			}
 			const shown = query ? s.views.filter((v) => v.name.toLowerCase().includes(query)) : s.views;
@@ -219,7 +235,9 @@ export const viewsPanel: SidebarPanel<any> = {
 				return;
 			}
 			// The default first, then the most recently changed.
-			const sorted = [...shown].sort((a, b) => Number(b.id === s.defaultViewId) - Number(a.id === s.defaultViewId) || b.updatedAt - a.updatedAt);
+			const sorted = [...shown].sort(
+				(a, b) => Number(b.id === s.defaultViewId) - Number(a.id === s.defaultViewId) || b.updatedAt - a.updatedAt
+			);
 			for (const view of sorted) {
 				if (mode.kind === 'rename' && mode.id === view.id) {
 					const field = nameField(

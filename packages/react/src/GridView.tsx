@@ -326,11 +326,7 @@ export function GridView<TRowData = unknown>({
 	}, [api, sidebar?.defaultOpen]);
 
 	const gridPane = (
-		<div
-			ref={containerRef}
-			tabIndex={-1}
-			style={{ width: '100%', height: '100%', position: 'relative' }}
-		>
+		<div ref={containerRef} tabIndex={-1} style={{ width: '100%', height: '100%', position: 'relative' }}>
 			<PortalManager
 				store={portalStore}
 				api={api}
@@ -343,9 +339,7 @@ export function GridView<TRowData = unknown>({
 
 	return (
 		<GridAdapterContext.Provider value={adapterHandle}>
-			<GridFilterMountContext.Provider value={filterMount}>
-				{gridPane}
-			</GridFilterMountContext.Provider>
+			<GridFilterMountContext.Provider value={filterMount}>{gridPane}</GridFilterMountContext.Provider>
 		</GridAdapterContext.Provider>
 	);
 }

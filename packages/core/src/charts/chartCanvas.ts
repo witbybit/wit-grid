@@ -51,7 +51,7 @@ function valueDomain(data: ChartData, spec: ChartSpec): [number, number] {
 		}
 	} else {
 		const series = spec.type === 'scatter' && data.series.length > 1 ? data.series.slice(1) : data.series;
-		for (const s of series) for (const v of s.values) if (Number.isFinite(v)) (min = Math.min(min, v)), (max = Math.max(max, v));
+		for (const s of series) for (const v of s.values) if (Number.isFinite(v)) ((min = Math.min(min, v)), (max = Math.max(max, v)));
 	}
 	if (min === Infinity) return [0, 1];
 	if (spec.zeroBased !== false) {
@@ -81,14 +81,30 @@ function alphaFor(state: DrawState, category: number): number {
 	return state.focus === null || state.focus === category ? 1 : DIM;
 }
 
-export function drawChart(ctx: CanvasRenderingContext2D, width: number, height: number, data: ChartData, spec: ChartSpec, theme: ChartTheme, state: DrawState): DrawResult {
+export function drawChart(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	data: ChartData,
+	spec: ChartSpec,
+	theme: ChartTheme,
+	state: DrawState
+): DrawResult {
 	ctx.clearRect(0, 0, width, height);
 	if (data.categories.length === 0 || data.series.length === 0) return { regions: [] };
 	if (spec.type === 'pie' || spec.type === 'donut') return drawPie(ctx, width, height, data, spec, theme, state);
 	return drawCartesian(ctx, width, height, data, spec, theme, state);
 }
 
-function drawPie(ctx: CanvasRenderingContext2D, width: number, height: number, data: ChartData, spec: ChartSpec, theme: ChartTheme, state: DrawState): DrawResult {
+function drawPie(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	data: ChartData,
+	spec: ChartSpec,
+	theme: ChartTheme,
+	state: DrawState
+): DrawResult {
 	const regions: HitRegion[] = [];
 	const values = data.series[0].values.map((v) => Math.max(0, v || 0));
 	const total = values.reduce((s, v) => s + v, 0);
@@ -149,7 +165,15 @@ function drawPie(ctx: CanvasRenderingContext2D, width: number, height: number, d
 const SLICE_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899', '#84cc16', '#14b8a6', '#f97316'];
 const sliceColor = (i: number) => SLICE_COLORS[i % SLICE_COLORS.length];
 
-function drawCartesian(ctx: CanvasRenderingContext2D, width: number, height: number, data: ChartData, spec: ChartSpec, theme: ChartTheme, state: DrawState): DrawResult {
+function drawCartesian(
+	ctx: CanvasRenderingContext2D,
+	width: number,
+	height: number,
+	data: ChartData,
+	spec: ChartSpec,
+	theme: ChartTheme,
+	state: DrawState
+): DrawResult {
 	const regions: HitRegion[] = [];
 	const horizontal = spec.type === 'bar';
 	const n = data.categories.length;
@@ -206,7 +230,8 @@ function drawCartesian(ctx: CanvasRenderingContext2D, width: number, height: num
 	// Category labels: as many as fit, evenly spaced.
 	const categoryLength = horizontal ? plotH : plotW;
 	const band = categoryLength / n;
-	const pointX = (i: number) => (spec.type === 'line' || spec.type === 'area' || spec.type === 'scatter') && n > 1 ? left + (i / (n - 1)) * plotW : left + band * (i + 0.5);
+	const pointX = (i: number) =>
+		(spec.type === 'line' || spec.type === 'area' || spec.type === 'scatter') && n > 1 ? left + (i / (n - 1)) * plotW : left + band * (i + 0.5);
 	const categoryPos = (i: number) => (horizontal ? top + band * (i + 0.5) : pointX(i));
 	ctx.fillStyle = theme.text;
 	ctx.globalAlpha = 0.7;
@@ -288,7 +313,14 @@ function drawCartesian(ctx: CanvasRenderingContext2D, width: number, height: num
 	}
 	const plotted = xyScatter ? data.series.slice(1) : data.series;
 	const stack = new Array(n).fill(0);
-	const indexes = (values: number[]) => (n > plotW * 1.5 && !xyScatter ? lttb(values.map((_, i) => i), values, Math.round(plotW)) : values.map((_, i) => i));
+	const indexes = (values: number[]) =>
+		n > plotW * 1.5 && !xyScatter
+			? lttb(
+					values.map((_, i) => i),
+					values,
+					Math.round(plotW)
+				)
+			: values.map((_, i) => i);
 	plotted.forEach((series, sIndex) => {
 		const s = xyScatter ? sIndex + 1 : sIndex;
 		const keep = indexes(series.values);
@@ -310,7 +342,12 @@ function drawCartesian(ctx: CanvasRenderingContext2D, width: number, height: num
 			return;
 		}
 		if (spec.type === 'area') {
-			const floor: [number, number][] = spec.stacked ? keep.map((i, k) => [xScale(i), grow(below[k])] as [number, number]).reverse() : [[points[points.length - 1][0], base], [points[0][0], base]];
+			const floor: [number, number][] = spec.stacked
+				? keep.map((i, k) => [xScale(i), grow(below[k])] as [number, number]).reverse()
+				: [
+						[points[points.length - 1][0], base],
+						[points[0][0], base],
+					];
 			const gradient = ctx.createLinearGradient(0, top, 0, bottom);
 			gradient.addColorStop(0, withAlpha(series.color, 0.42));
 			gradient.addColorStop(1, withAlpha(series.color, 0.04));
@@ -378,7 +415,16 @@ function withAlpha(color: string, alpha: number): string {
 }
 
 /** A bar with its outer end rounded. */
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, end: 'top' | 'bottom' | 'start' | 'end', square: boolean) {
+function roundRect(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+	r: number,
+	end: 'top' | 'bottom' | 'start' | 'end',
+	square: boolean
+) {
 	ctx.beginPath();
 	const radius = square ? Math.min(r, 2) : Math.min(r, w / 2, h / 2);
 	if (radius <= 0.5 || w < 2 || h < 2) {

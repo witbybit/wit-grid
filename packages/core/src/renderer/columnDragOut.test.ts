@@ -13,7 +13,17 @@ function setup(options: { hidden?: string[]; dragOutHides?: boolean } = {}) {
 	};
 	const container = document.createElement('div');
 	container.className = 'og-grid-container';
-	container.getBoundingClientRect = () => ({ left: 100, top: 100, right: 500, bottom: 400, width: 400, height: 300, x: 100, y: 100, toJSON: () => ({}) });
+	container.getBoundingClientRect = () => ({
+		left: 100,
+		top: 100,
+		right: 500,
+		bottom: 400,
+		width: 400,
+		height: 300,
+		x: 100,
+		y: 100,
+		toJSON: () => ({}),
+	});
 	const viewport = container.appendChild(document.createElement('div'));
 	viewport.getBoundingClientRect = container.getBoundingClientRect;
 	document.body.appendChild(container);

@@ -29,16 +29,16 @@ await api.exportExcel({ columns: ['id', 'customer', 'total'], onlySelected: true
 const blob = await api.getExcel();
 ```
 
-| Option                           | Default            | What it does                                              |
-| -------------------------------- | ------------------ | --------------------------------------------------------- |
-| `fileName`                       | `'export.xlsx'`    | The downloaded file's name                                |
-| `sheetName`                      | `'Sheet1'`         | The worksheet's name                                      |
-| `columns`                        | displayed columns  | Column fields to export, in order                         |
-| `onlySelected` / `rowIds`        | all shown rows     | Only the selected rows, or these rows in this order       |
-| `includeHeader`                  | `true`             | The header row                                            |
-| `freezeHeader` / `autoFilter`    | `true`             | Keep the header in view; give it filter buttons           |
-| `includeGroups` / `includeTotals` | `true`            | Group and total rows of grouped grids                     |
-| `locale`                         | the browser's      | Locale for currency symbols                               |
+| Option                            | Default           | What it does                                        |
+| --------------------------------- | ----------------- | --------------------------------------------------- |
+| `fileName`                        | `'export.xlsx'`   | The downloaded file's name                          |
+| `sheetName`                       | `'Sheet1'`        | The worksheet's name                                |
+| `columns`                         | displayed columns | Column fields to export, in order                   |
+| `onlySelected` / `rowIds`         | all shown rows    | Only the selected rows, or these rows in this order |
+| `includeHeader`                   | `true`            | The header row                                      |
+| `freezeHeader` / `autoFilter`     | `true`            | Keep the header in view; give it filter buttons     |
+| `includeGroups` / `includeTotals` | `true`            | Group and total rows of grouped grids               |
+| `locale`                          | the browser's     | Locale for currency symbols                         |
 
 The workbook is written by the grid itself (no extra dependency) and compressed with the browser's
 `CompressionStream`. The grid's context menu has **Export All as Excel**.

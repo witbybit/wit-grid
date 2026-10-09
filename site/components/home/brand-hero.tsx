@@ -41,10 +41,18 @@ export function BrandHero() {
 						<stop offset='1' stopColor='#a855f7' stopOpacity='0' />
 					</linearGradient>
 				</defs>
-				<path d='M4 16 C 140 4, 300 22, 596 8' stroke='url(#wg-underline)' strokeWidth='3' fill='none' strokeLinecap='round' pathLength='100' />
+				<path
+					d='M4 16 C 140 4, 300 22, 596 8'
+					stroke='url(#wg-underline)'
+					strokeWidth='3'
+					fill='none'
+					strokeLinecap='round'
+					pathLength='100'
+				/>
 			</svg>
 			<p className='wg-brand-tagline'>
-				The data grid that keeps up: <strong>live</strong>, <strong>editable</strong> and <strong>themeable</strong>, on a framework-agnostic core.
+				The data grid that keeps up: <strong>live</strong>, <strong>editable</strong> and <strong>themeable</strong>, on a framework-agnostic
+				core.
 			</p>
 		</section>
 	);

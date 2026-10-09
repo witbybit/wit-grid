@@ -90,7 +90,9 @@ describe('calendar view', () => {
 	});
 
 	it('moves an entry by the days it is dragged, and opens it in the table on double-click', () => {
-		const { day, setCellValue, openInTable } = mount([{ id: 'b', data: { task: 'Sprint', status: 'todo', plan: { start: '2026-03-12', end: '2026-03-13' } } }]);
+		const { day, setCellValue, openInTable } = mount([
+			{ id: 'b', data: { task: 'Sprint', status: 'todo', plan: { start: '2026-03-12', end: '2026-03-13' } } },
+		]);
 		const entry = day('2026-03-12').querySelector<HTMLElement>('.og-view-cal-entry')!;
 		document.elementFromPoint = vi.fn(() => day('2026-03-19'));
 		entry.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true }));
@@ -134,7 +136,11 @@ describe('gallery view', () => {
 		const host = document.createElement('div');
 		document.body.appendChild(host);
 		const { ctx, openInTable } = context(rows, columns);
-		const view = createGalleryView(host, ctx, { kind: 'gallery', titleField: 'task', color: (row) => (row.status === 'done' ? 'green' : undefined) });
+		const view = createGalleryView(host, ctx, {
+			kind: 'gallery',
+			titleField: 'task',
+			color: (row) => (row.status === 'done' ? 'green' : undefined),
+		});
 		const scroller = host.querySelector<HTMLElement>('.og-view-gallery')!;
 		// 1000px wide: three 260px+ cards a row; 400px tall.
 		sized(scroller, 1000, 400);

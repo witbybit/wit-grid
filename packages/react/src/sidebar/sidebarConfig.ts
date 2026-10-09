@@ -1,5 +1,10 @@
 import type { ReactNode } from 'react';
-import type { BuiltinSidebarPanelId, GridSidebarConfig as CoreSidebarConfig, SidebarPanelContext, SidebarPanelDef as CorePanelDef } from '@eregister/wit-grid-core';
+import type {
+	BuiltinSidebarPanelId,
+	GridSidebarConfig as CoreSidebarConfig,
+	SidebarPanelContext,
+	SidebarPanelDef as CorePanelDef,
+} from '@eregister/wit-grid-core';
 
 /** A sidebar panel of your own: a DOM `panel`, or a React component from `renderPanel`. */
 export interface SidebarPanelDef<TRowData = unknown> extends Omit<CorePanelDef<TRowData>, 'renderPanel'> {

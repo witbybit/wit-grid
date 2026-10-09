@@ -77,7 +77,9 @@ class TimelineScale {
 		const layers: string[] = [];
 		const line = (fraction: number, colour: string, width: number) => {
 			const at = `${(fraction * 100).toFixed(3)}%`;
-			layers.push(`linear-gradient(to right, transparent calc(${at} - ${width / 2}px), ${colour} calc(${at} - ${width / 2}px), ${colour} calc(${at} + ${width / 2}px), transparent calc(${at} + ${width / 2}px))`);
+			layers.push(
+				`linear-gradient(to right, transparent calc(${at} - ${width / 2}px), ${colour} calc(${at} - ${width / 2}px), ${colour} calc(${at} + ${width / 2}px), transparent calc(${at} + ${width / 2}px))`
+			);
 		};
 		const month = new Date(this.start.getFullYear(), this.start.getMonth() + 1, 1);
 		for (; month < this.end; month.setMonth(month.getMonth() + 1)) line(this.at(month), 'var(--og-ct-timeline-tick)', 1);

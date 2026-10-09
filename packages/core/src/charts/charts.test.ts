@@ -66,7 +66,11 @@ describe('chart scales', () => {
 
 	it('LTTB keeps the ends and the extremes within the threshold', () => {
 		const ys = Array.from({ length: 1000 }, (_, i) => (i === 500 ? 100 : Math.sin(i / 50)));
-		const kept = lttb(ys.map((_, i) => i), ys, 50);
+		const kept = lttb(
+			ys.map((_, i) => i),
+			ys,
+			50
+		);
 		expect(kept.length).toBe(50);
 		expect(kept[0]).toBe(0);
 		expect(kept.at(-1)).toBe(999);
@@ -77,7 +81,11 @@ describe('chart scales', () => {
 describe('chart data', () => {
 	it('aggregates a column per category, largest first; count needs no field', () => {
 		const api = grid();
-		const data = readChartData(api as never, { kind: 'aggregate', category: 'team', measures: [{ field: 'sales', aggregate: 'sum' }, { aggregate: 'count' }] }, colors);
+		const data = readChartData(
+			api as never,
+			{ kind: 'aggregate', category: 'team', measures: [{ field: 'sales', aggregate: 'sum' }, { aggregate: 'count' }] },
+			colors
+		);
 		expect(data.categories).toEqual(['Beta', 'Alpha', 'Gamma']);
 		expect(data.series.map((s) => s.name)).toEqual(['Sales', 'Count']);
 		expect(data.series[0].values).toEqual([300, 150, 25]);
@@ -87,10 +95,18 @@ describe('chart data', () => {
 
 	it('averages, label order, and folding the rest into Other', () => {
 		const api = grid();
-		const avg = readChartData(api as never, { kind: 'aggregate', category: 'region', measures: [{ field: 'cost', aggregate: 'avg' }], sort: 'label' }, colors);
+		const avg = readChartData(
+			api as never,
+			{ kind: 'aggregate', category: 'region', measures: [{ field: 'cost', aggregate: 'avg' }], sort: 'label' },
+			colors
+		);
 		expect(avg.categories).toEqual(['EU', 'US']);
 		expect(avg.series[0].values).toEqual([65, 7.5]);
-		const limited = readChartData(api as never, { kind: 'aggregate', category: 'team', measures: [{ field: 'sales', aggregate: 'sum' }], limit: 2 }, colors);
+		const limited = readChartData(
+			api as never,
+			{ kind: 'aggregate', category: 'team', measures: [{ field: 'sales', aggregate: 'sum' }], limit: 2 },
+			colors
+		);
 		expect(limited.categories).toEqual(['Beta', 'Other']);
 		expect(limited.series[0].values).toEqual([300, 175]);
 		expect(limited.categoryValues[1]).toBeNull();
@@ -167,6 +183,8 @@ describe('canvas charts', () => {
 	});
 
 	it('nothing to plot draws nothing', () => {
-		expect(drawChart(mockContext(), 300, 200, { ...data, categories: [], series: [] }, spec({}), THEME, { focus: null, progress: 1 }).regions).toEqual([]);
+		expect(
+			drawChart(mockContext(), 300, 200, { ...data, categories: [], series: [] }, spec({}), THEME, { focus: null, progress: 1 }).regions
+		).toEqual([]);
 	});
 });

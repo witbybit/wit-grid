@@ -46,7 +46,6 @@ interface GridRuntimeCompositionOptions<TRowData> {
 	workspaceController?: GridWorkspaceController;
 }
 
-
 export function createGridRuntimeComposition<TRowData>({
 	runtime,
 	destroy,

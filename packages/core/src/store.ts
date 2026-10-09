@@ -160,7 +160,6 @@ const _FALLBACK_CAPS: Record<RowModelType, RowModelCapabilities> = {
 	client:   { fullDataset: true, loadedDataset: false, pagedDataset: false, clientMutation: true, loadedRowMutation: false, pageRowMutation: false, transactions: true, rowOrder: true, blockLoading: false, serverPagination: false, clientSort: true, clientFilter: true, serverSort: false, serverFilter: false, clientGrouping: true, clientTree: true, aggregation: true, masterDetail: true, allRowSelection: true, loadedRowSelection: false, pageRowSelection: false },
 };
 
-
 /**
  * Internal runtime composition root.
  *
@@ -539,8 +538,10 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
-	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
-	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
+	public exportExcel = (options?: ExcelExportOptions): Promise<void> =>
+		exportToXlsx(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
+	public getExcel = (options?: ExcelExportOptions): Promise<Blob> =>
+		toXlsxBlob(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
 
 	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
 	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {
@@ -723,7 +724,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		// grouping are set any other way): announce what the restore changes.
 		const mutation = prepared.restore.stateMutation;
 		const current = this.engine.getState();
-		const changed = <K extends keyof typeof mutation>(key: K) => key in mutation && JSON.stringify(mutation[key] ?? null) !== JSON.stringify(current[key] ?? null);
+		const changed = <K extends keyof typeof mutation>(key: K) =>
+			key in mutation && JSON.stringify(mutation[key] ?? null) !== JSON.stringify(current[key] ?? null);
 		const events: GridCommitEvent<TRowData>[] = [];
 		if (changed('columns')) {
 			const columns = mutation.columns as ColumnDef<TRowData>[];

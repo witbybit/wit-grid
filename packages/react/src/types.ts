@@ -62,7 +62,17 @@ import type {
 import type { ColumnTypeDefinition } from '@eregister/wit-grid-core';
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from '@eregister/wit-grid-core';
 export type { ColumnTypeDefinition } from '@eregister/wit-grid-core';
-export type { RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule, ColorScaleRule, DataBarRule, IconSetRule, ValueScaleRule } from '@eregister/wit-grid-core';
+export type {
+	RowStyleRule,
+	GroupRowStyleRule,
+	DetailRowStyleRule,
+	CellStyleRule,
+	HeaderCellStyleRule,
+	ColorScaleRule,
+	DataBarRule,
+	IconSetRule,
+	ValueScaleRule,
+} from '@eregister/wit-grid-core';
 export type {
 	GroupDef,
 	AggregationDef,

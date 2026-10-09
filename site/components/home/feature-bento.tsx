@@ -1,4 +1,19 @@
-import { BarChart3, Boxes, CalendarRange, Database, FileSpreadsheet, Filter, Gauge, Layers3, Map as MapIcon, Palette, PanelRight, Rows3, ShieldCheck, Users } from 'lucide-react';
+import {
+	BarChart3,
+	Boxes,
+	CalendarRange,
+	Database,
+	FileSpreadsheet,
+	Filter,
+	Gauge,
+	Layers3,
+	Map as MapIcon,
+	Palette,
+	PanelRight,
+	Rows3,
+	ShieldCheck,
+	Users,
+} from 'lucide-react';
 
 /* ─── Small live visuals, one per card ─────────────────────────────────────── */
 

@@ -22,7 +22,11 @@ interface Card<TRowData> {
  * renderers. Virtualized: only the cards in view exist, recycled as the gallery scrolls.
  * Double-click a card to open its row in the table.
  */
-export function createGalleryView<TRowData>(host: HTMLElement, context: GridViewContext<TRowData>, config: GalleryViewConfig<TRowData>): GridViewInstance {
+export function createGalleryView<TRowData>(
+	host: HTMLElement,
+	context: GridViewContext<TRowData>,
+	config: GalleryViewConfig<TRowData>
+): GridViewInstance {
 	const scroller = document.createElement('div');
 	scroller.className = 'og-view-gallery';
 	const sizer = document.createElement('div');
@@ -32,7 +36,13 @@ export function createGalleryView<TRowData>(host: HTMLElement, context: GridView
 
 	const columns = context.columns();
 	const titleCol: ColumnDef<TRowData> | undefined = columns.find((c) => c.field === config.titleField) ?? columns[0];
-	const fieldCols = (config.fields ?? columns.filter((c) => c !== titleCol).slice(0, 4).map((c) => c.field))
+	const fieldCols = (
+		config.fields ??
+		columns
+			.filter((c) => c !== titleCol)
+			.slice(0, 4)
+			.map((c) => c.field)
+	)
 		.map((field) => columns.find((c) => c.field === field))
 		.filter((c): c is ColumnDef<TRowData> => !!c && c !== titleCol);
 	const cardHeight = TITLE_H + fieldCols.length * FIELD_H + PADDING;

@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { GridStyleRule } from '../columnDef.js';
-import { buildLook, ConditionalFormatPainter, findConditionalFormatPainter, registerConditionalFormatPainter, unregisterConditionalFormatPainter } from './conditionalFormat.js';
+import {
+	buildLook,
+	ConditionalFormatPainter,
+	findConditionalFormatPainter,
+	registerConditionalFormatPainter,
+	unregisterConditionalFormatPainter,
+} from './conditionalFormat.js';
 
 function setup(rules: GridStyleRule<any>[], values: Record<string, number | string | null>, enumerable = true) {
 	const data = { ...values };

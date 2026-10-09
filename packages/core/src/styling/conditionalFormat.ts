@@ -319,10 +319,20 @@ const ICON_SETS: Record<NonNullable<Extract<ValueScaleRule, { kind: 'iconSet' }>
 		svg(`<path d='M13 8 6 2.5v11z' fill='#f59e0b'/>`),
 		svg(`<path d='M8 3l5.5 7h-11z' fill='#22c55e'/>`),
 	],
-	dots: [svg(`<circle cx='8' cy='8' r='5' fill='#ef4444'/>`), svg(`<circle cx='8' cy='8' r='5' fill='#f59e0b'/>`), svg(`<circle cx='8' cy='8' r='5' fill='#22c55e'/>`)],
+	dots: [
+		svg(`<circle cx='8' cy='8' r='5' fill='#ef4444'/>`),
+		svg(`<circle cx='8' cy='8' r='5' fill='#f59e0b'/>`),
+		svg(`<circle cx='8' cy='8' r='5' fill='#22c55e'/>`),
+	],
 	signal: [
-		svg(`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8' opacity='.35'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8' opacity='.35'/>`),
-		svg(`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8' opacity='.35'/>`),
-		svg(`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8'/>`),
+		svg(
+			`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8' opacity='.35'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8' opacity='.35'/>`
+		),
+		svg(
+			`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8' opacity='.35'/>`
+		),
+		svg(
+			`<rect x='2' y='10' width='3' height='4' rx='1' fill='#94a3b8'/><rect x='6.5' y='6' width='3' height='8' rx='1' fill='#94a3b8'/><rect x='11' y='2' width='3' height='12' rx='1' fill='#94a3b8'/>`
+		),
 	],
 };

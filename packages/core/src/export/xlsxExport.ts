@@ -50,7 +50,9 @@ export interface ColumnPlan {
 }
 
 const escapeXml = (text: string) =>
-	text.replace(/[&<>"]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;')).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+	text
+		.replace(/[&<>"]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;'))
+		.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
 
 function decimalsPattern(decimals: number | undefined, fallback: number): string {
 	const d = decimals ?? fallback;
@@ -65,8 +67,9 @@ function numberFormat(format: NumberCellOptions | undefined, locale?: string): s
 		let symbol = format.currency ?? '';
 		try {
 			symbol =
-				new Intl.NumberFormat(locale, { style: 'currency', currency: format.currency ?? 'USD' }).formatToParts(1).find((p) => p.type === 'currency')?.value ??
-				symbol;
+				new Intl.NumberFormat(locale, { style: 'currency', currency: format.currency ?? 'USD' })
+					.formatToParts(1)
+					.find((p) => p.type === 'currency')?.value ?? symbol;
 		} catch {
 			// An unknown currency code: keep the code.
 		}
@@ -153,8 +156,18 @@ export interface XlsxSheetContext {
 
 export async function toXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxSheetContext, options: ExcelExportOptions = {}): Promise<Uint8Array> {
 	const { widths } = context;
-	const { includeHeader = true, onlySelected = false, rowIds, includeGroups = true, includeTotals = true, freezeHeader = true, autoFilter = true } = options;
-	const cols = (api.getDisplayedColumns() as unknown as ColumnDef<TRowData>[]).filter((col) => !options.columns || options.columns.includes(col.field));
+	const {
+		includeHeader = true,
+		onlySelected = false,
+		rowIds,
+		includeGroups = true,
+		includeTotals = true,
+		freezeHeader = true,
+		autoFilter = true,
+	} = options;
+	const cols = (api.getDisplayedColumns() as unknown as ColumnDef<TRowData>[]).filter(
+		(col) => !options.columns || options.columns.includes(col.field)
+	);
 	const plans = planColumns(cols as ColumnDef<any>[], widths, options.locale);
 	const styles = new StyleSheet();
 	const rows: SheetRow[] = [];
@@ -167,7 +180,8 @@ export async function toXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxS
 	/** A data cell, typed by its column. */
 	const dataCell = (plan: ColumnPlan, ref: string, value: unknown, row: TRowData, rowId: string): string => {
 		if (value == null || value === '') return '';
-		if (plan.kind === 'number' && typeof value === 'number' && Number.isFinite(value)) return numberCell(ref, value, plan.numFmt ? styles.style(plan.numFmt, false) : 0);
+		if (plan.kind === 'number' && typeof value === 'number' && Number.isFinite(value))
+			return numberCell(ref, value, plan.numFmt ? styles.style(plan.numFmt, false) : 0);
 		if (plan.kind === 'number' && typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)))
 			return numberCell(ref, Number(value), plan.numFmt ? styles.style(plan.numFmt, false) : 0);
 		if (plan.kind === 'date') {
@@ -178,7 +192,11 @@ export async function toXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxS
 			}
 		}
 		const col = plan.col;
-		const text = col.valueFormatter ? col.valueFormatter({ value, rowData: row, colDef: col, rowId } as never) : typeof value === 'object' ? JSON.stringify(value) : String(value);
+		const text = col.valueFormatter
+			? col.valueFormatter({ value, rowData: row, colDef: col, rowId } as never)
+			: typeof value === 'object'
+				? JSON.stringify(value)
+				: String(value);
 		return textCell(ref, text);
 	};
 
@@ -231,9 +249,13 @@ export async function toXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxS
 		(includeHeader && freezeHeader ? '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' : '') +
 		'</sheetView></sheetViews>' +
 		'<sheetFormatPr defaultRowHeight="15"/>' +
-		(plans.length ? `<cols>${plans.map((plan, i) => `<col min="${i + 1}" max="${i + 1}" width="${plan.width}" customWidth="1"/>`).join('')}</cols>` : '') +
+		(plans.length
+			? `<cols>${plans.map((plan, i) => `<col min="${i + 1}" max="${i + 1}" width="${plan.width}" customWidth="1"/>`).join('')}</cols>`
+			: '') +
 		'<sheetData>' +
-		rows.map((row, i) => `<row r="${i + 1}"${row.outlineLevel ? ` outlineLevel="${row.outlineLevel}"` : ''}>${row.cells.join('')}</row>`).join('') +
+		rows
+			.map((row, i) => `<row r="${i + 1}"${row.outlineLevel ? ` outlineLevel="${row.outlineLevel}"` : ''}>${row.cells.join('')}</row>`)
+			.join('') +
 		'</sheetData>' +
 		(includeHeader && autoFilter && rows.length > 1 && plans.length ? `<autoFilter ref="A1:${lastCol}${rows.length}"/>` : '') +
 		conditionalFormattingXml(context.styleRules, plans, includeHeader ? 2 : 1, rows.length) +

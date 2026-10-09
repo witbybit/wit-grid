@@ -42,17 +42,17 @@ await chart.downloadPNG('revenue.png'); // or chart.toPNG() for the Blob
 chart.destroy();
 ```
 
-| Spec           | What it does                                                                                       |
-| -------------- | -------------------------------------------------------------------------------------------------- |
-| `type`         | `'column'`, `'bar'`, `'line'`, `'area'`, `'pie'`, `'donut'`, `'scatter'`                           |
-| `source`       | `{ kind: 'range', transposed? }` or `{ kind: 'aggregate', category, measures, sort?, limit? }`     |
-| `stacked`      | Columns, bars and areas pile up                                                                    |
-| `smooth`       | Lines and areas curve through their points (without overshooting)                                  |
-| `labels`       | Values on the marks                                                                                |
-| `legend`       | Default `true`; click a series to hide it                                                          |
-| `zeroBased`    | Default `true`: the value axis starts at zero                                                      |
-| `crossFilter`  | Default `true`: clicking a category filters the grid to it, clicking it again clears               |
-| `palette`      | Series colours; by default the theme's accent first                                                |
+| Spec          | What it does                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `type`        | `'column'`, `'bar'`, `'line'`, `'area'`, `'pie'`, `'donut'`, `'scatter'`                       |
+| `source`      | `{ kind: 'range', transposed? }` or `{ kind: 'aggregate', category, measures, sort?, limit? }` |
+| `stacked`     | Columns, bars and areas pile up                                                                |
+| `smooth`      | Lines and areas curve through their points (without overshooting)                              |
+| `labels`      | Values on the marks                                                                            |
+| `legend`      | Default `true`; click a series to hide it                                                      |
+| `zeroBased`   | Default `true`: the value axis starts at zero                                                  |
+| `crossFilter` | Default `true`: clicking a category filters the grid to it, clicking it again clears           |
+| `palette`     | Series colours; by default the theme's accent first                                            |
 
 Aggregates take `limit` categories (24 by default, largest first); the rest fold into **Other**. A chart that
 cross-filters by its own category leaves that one filter out of its data, so the other categories stay in view while

@@ -52,7 +52,9 @@ import {
 } from './renderers.js';
 
 /** The column settings a type supplies; the column's own settings win over them. */
-export type ColumnTypeDefinition<TRowData = unknown> = Partial<Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef' | 'sortValue'>>;
+export type ColumnTypeDefinition<TRowData = unknown> = Partial<
+	Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef' | 'sortValue'>
+>;
 
 /** Options as objects or bare values. */
 export type CellOptionInput = CellOption | string;
@@ -124,7 +126,10 @@ export function switchColumnType(options: SwitchCellOptions = {}): ColumnTypeDef
 }
 
 /** Two to four options inline as a segmented control: one press picks. Enter opens them as a list. */
-export function segmentedColumnType(input: readonly CellOptionInput[], config: SegmentedCellOptions & OptionSortConfig = {}): ColumnTypeDefinition<any> {
+export function segmentedColumnType(
+	input: readonly CellOptionInput[],
+	config: SegmentedCellOptions & OptionSortConfig = {}
+): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, {});
 	return {
 		renderer: { kind: 'dom', renderer: createSegmentedRenderer(store.options, config) },

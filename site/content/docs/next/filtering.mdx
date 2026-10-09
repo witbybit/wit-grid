@@ -27,7 +27,7 @@ cascading select by tree. Set `filterDef` on a column to choose one yourself; wi
 | ---------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | `text`           | Operator (contains, is, starts with…, is empty) + value; optional second condition (And / Or)           | `{ type: 'text', operator, value }`                 |
 | `number`         | Operator (=, ≥, between…) + value(s); `stars: 5` shows a star picker                                    | `{ type: 'number', operator, value, valueTo }`      |
-| `date`           | On, before, after, between (with a calendar); in the last / next N days, weeks…; a period (this week…)   | `{ type: 'date', operator, dateFrom, dateTo }`      |
+| `date`           | On, before, after, between (with a calendar); in the last / next N days, weeks…; a period (this week…)  | `{ type: 'date', operator, dateFrom, dateTo }`      |
 | `select`         | Searchable checklist with counts, Select all / Clear, “(Blanks)”; `listValues` adds Any / All / None of | `{ type: 'select', values, matchMode }`             |
 | `boolean`        | All · Yes · No                                                                                          | `{ type: 'boolean', value }`                        |
 | `dateRange`      | Overlaps / within / includes a date                                                                     | `{ type: 'dateRange', operator, dateFrom, dateTo }` |

@@ -66,7 +66,11 @@ export class ViewField<TRowData = unknown> {
 			return;
 		}
 		const formatted =
-			value == null ? '' : this.col.valueFormatter ? this.col.valueFormatter({ value, rowData: row.data, colDef: this.col, rowId: row.id }) : String(value);
+			value == null
+				? ''
+				: this.col.valueFormatter
+					? this.col.valueFormatter({ value, rowData: row.data, colDef: this.col, rowId: row.id })
+					: String(value);
 		if (!this.text) {
 			this.text = document.createTextNode('');
 			this.element.appendChild(this.text);

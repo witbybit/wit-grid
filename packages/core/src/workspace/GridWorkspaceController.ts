@@ -44,7 +44,10 @@ export interface GridWorkspaceController {
 	destroy(): void;
 }
 
-export function createWorkspaceController(adapter: GridWorkspaceAdapter, onError?: (operation: string, error: unknown) => void): GridWorkspaceController {
+export function createWorkspaceController(
+	adapter: GridWorkspaceAdapter,
+	onError?: (operation: string, error: unknown) => void
+): GridWorkspaceController {
 	let state: GridWorkspaceState = EMPTY_WORKSPACE_STATE;
 	/** The grid's state when the active view was applied, saved or updated (a view may hold only part of it). */
 	let baseline: PersistedGridState | null = null;

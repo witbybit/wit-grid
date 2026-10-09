@@ -75,7 +75,10 @@ export function compareSortKeys(a: SortKey, b: SortKey): number {
 }
 
 /** A column's sort reader: its value reader, mapped through `sortValue` when the column has one. */
-export function sortReaderOf<TNode>(column: { sortValue?: (value: unknown) => unknown } | undefined, read: (node: TNode) => unknown): (node: TNode) => unknown {
+export function sortReaderOf<TNode>(
+	column: { sortValue?: (value: unknown) => unknown } | undefined,
+	read: (node: TNode) => unknown
+): (node: TNode) => unknown {
 	const sortValue = column?.sortValue;
 	return sortValue ? (node) => sortValue(read(node)) : read;
 }

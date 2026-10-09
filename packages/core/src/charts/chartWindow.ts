@@ -17,9 +17,18 @@ const TYPE_ICONS: Record<ChartType, string> = {
 	area: '<path d="M3 3v18h18"/><path d="M7 17V12l4-4 3 3 5-5v11Z"/>',
 	pie: '<path d="M21 12A9 9 0 1 1 12 3v9Z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15Z"/>',
 	donut: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 3v5"/>',
-	scatter: '<path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.2"/><circle cx="12" cy="9" r="1.2"/><circle cx="16" cy="13" r="1.2"/><circle cx="18" cy="6" r="1.2"/>',
+	scatter:
+		'<path d="M3 3v18h18"/><circle cx="8" cy="15" r="1.2"/><circle cx="12" cy="9" r="1.2"/><circle cx="16" cy="13" r="1.2"/><circle cx="18" cy="6" r="1.2"/>',
 };
-const TYPE_LABELS: Record<ChartType, string> = { column: 'Columns', bar: 'Bars', line: 'Line', area: 'Area', pie: 'Pie', donut: 'Donut', scatter: 'Scatter' };
+const TYPE_LABELS: Record<ChartType, string> = {
+	column: 'Columns',
+	bar: 'Bars',
+	line: 'Line',
+	area: 'Area',
+	pie: 'Pie',
+	donut: 'Donut',
+	scatter: 'Scatter',
+};
 const AGGREGATES: { value: ChartAggregate; label: string }[] = [
 	{ value: 'sum', label: 'Sum' },
 	{ value: 'avg', label: 'Average' },
@@ -91,7 +100,9 @@ export class GridChartWindow<TRowData = unknown> {
 		const measure = this.measureColumns()[0]?.value;
 		return {
 			type: 'column',
-			source: category ? { kind: 'aggregate', category, measures: [measure ? { field: measure, aggregate: 'sum' } : { aggregate: 'count' }] } : { kind: 'range' },
+			source: category
+				? { kind: 'aggregate', category, measures: [measure ? { field: measure, aggregate: 'sum' } : { aggregate: 'count' }] }
+				: { kind: 'range' },
 			title: category ? undefined : 'Selection',
 		};
 	}
@@ -106,7 +117,9 @@ export class GridChartWindow<TRowData = unknown> {
 		const out = new Map<string, { numeric: boolean; distinct: number }>();
 		for (const col of this.columns()) {
 			const values = sample.map((row) => this.api.getCellValue(this.api.getRowId(row), col.field)).filter((v) => v != null && v !== '');
-			const numeric = values.length > 0 && values.every((v) => typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))));
+			const numeric =
+				values.length > 0 &&
+				values.every((v) => typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))));
 			out.set(col.field, { numeric, distinct: new Set(values.map(String)).size });
 		}
 		return out;
@@ -118,7 +131,12 @@ export class GridChartWindow<TRowData = unknown> {
 		return this.columns()
 			.filter((c) => {
 				const type = resolveColumnFilterDef(c)?.type;
-				return type !== 'number' && type !== 'date' && type !== 'dateRange' && !(type === undefined || type === 'text' ? profile.get(c.field)?.numeric : false);
+				return (
+					type !== 'number' &&
+					type !== 'date' &&
+					type !== 'dateRange' &&
+					!(type === undefined || type === 'text' ? profile.get(c.field)?.numeric : false)
+				);
 			})
 			.map((c) => ({ value: c.field, label: String(c.header || c.field), distinct: profile.get(c.field)?.distinct ?? 0 }))
 			.sort((a, b) => (a.distinct > 1 ? a.distinct : Infinity) - (b.distinct > 1 ? b.distinct : Infinity));
@@ -142,7 +160,12 @@ export class GridChartWindow<TRowData = unknown> {
 		const vh = document.documentElement.clientHeight || window.innerHeight;
 		const w = Math.min(this.position.w, vw - 24);
 		const h = Math.min(this.position.h, vh - 24);
-		this.position = { w, h, x: box ? Math.max(12, Math.min(vw - w - 12, box.right - w - 24)) : 24, y: box ? Math.max(12, Math.min(vh - h - 12, box.top + 56)) : 24 };
+		this.position = {
+			w,
+			h,
+			x: box ? Math.max(12, Math.min(vw - w - 12, box.right - w - 24)) : 24,
+			y: box ? Math.max(12, Math.min(vh - h - 12, box.top + 56)) : 24,
+		};
 
 		const root = el('div', 'og-cw');
 		root.setAttribute('role', 'dialog');
@@ -217,7 +240,13 @@ export class GridChartWindow<TRowData = unknown> {
 					const category = this.categoryColumns()[0]?.value;
 					const measure = this.measureColumns()[0]?.value;
 					const next: ChartSource =
-						kind === 'range' ? { kind: 'range' } : { kind: 'aggregate', category: category ?? '', measures: [measure ? { field: measure, aggregate: 'sum' } : { aggregate: 'count' }] };
+						kind === 'range'
+							? { kind: 'range' }
+							: {
+									kind: 'aggregate',
+									category: category ?? '',
+									measures: [measure ? { field: measure, aggregate: 'sum' } : { aggregate: 'count' }],
+								};
 					this.update({ source: next, title: kind === 'range' ? 'Selection' : undefined });
 					title.value = this.spec?.title ?? '';
 					renderBar();
@@ -232,14 +261,25 @@ export class GridChartWindow<TRowData = unknown> {
 				const measures = [{ value: '', label: 'Rows' }, ...this.measureColumns()];
 				bar.appendChild(
 					select('Of', measures, measure.aggregate === 'count' ? '' : (measure.field ?? ''), (field) => {
-						this.update({ source: { ...agg, measures: [field ? { field, aggregate: measure.aggregate === 'count' ? 'sum' : measure.aggregate } : { aggregate: 'count' }] } });
+						this.update({
+							source: {
+								...agg,
+								measures: [
+									field ? { field, aggregate: measure.aggregate === 'count' ? 'sum' : measure.aggregate } : { aggregate: 'count' },
+								],
+							},
+						});
 						renderBar();
 					})
 				);
 				if (measure.aggregate !== 'count')
 					bar.appendChild(
-						select('As', AGGREGATES.filter((a) => a.value !== 'count'), measure.aggregate, (aggregate) =>
-							this.update({ source: { ...agg, measures: [{ field: measure.field, aggregate: aggregate as ChartAggregate }] } })
+						select(
+							'As',
+							AGGREGATES.filter((a) => a.value !== 'count'),
+							measure.aggregate,
+							(aggregate) =>
+								this.update({ source: { ...agg, measures: [{ field: measure.field, aggregate: aggregate as ChartAggregate }] } })
 						)
 					);
 			} else {
@@ -255,7 +295,8 @@ export class GridChartWindow<TRowData = unknown> {
 			}
 			const options = el('div', 'og-cw-options');
 			const cartesian = spec.type !== 'pie' && spec.type !== 'donut';
-			if (spec.type === 'column' || spec.type === 'bar' || spec.type === 'area') options.appendChild(toggle('Stacked', 'stacked', !!spec.stacked));
+			if (spec.type === 'column' || spec.type === 'bar' || spec.type === 'area')
+				options.appendChild(toggle('Stacked', 'stacked', !!spec.stacked));
 			if (spec.type === 'line' || spec.type === 'area') options.appendChild(toggle('Smooth', 'smooth', !!spec.smooth));
 			options.appendChild(toggle('Values', 'labels', !!spec.labels));
 			if (cartesian) options.appendChild(toggle('Legend', 'legend', spec.legend !== false));
@@ -264,7 +305,11 @@ export class GridChartWindow<TRowData = unknown> {
 		};
 
 		tools.append(
-			iconButton(svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>'), 'Download PNG', () => void this.chart?.downloadPNG().catch(() => {})),
+			iconButton(
+				svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>'),
+				'Download PNG',
+				() => void this.chart?.downloadPNG().catch(() => {})
+			),
 			iconButton(sidebarIconSvg('x', 16), 'Close chart', () => this.api.closeChart())
 		);
 		renderTypes();

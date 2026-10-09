@@ -152,7 +152,9 @@ export const sortPanel: SidebarPanel<any> = {
 				});
 				root.appendChild(rules);
 			}
-			const sortable = api.getColumns().some((c) => c.sortable !== false && !c.field.startsWith('__') && !list.some((i) => i.colId === c.field));
+			const sortable = api
+				.getColumns()
+				.some((c) => c.sortable !== false && !c.field.startsWith('__') && !list.some((i) => i.colId === c.field));
 			if (sortable) {
 				const add = textButton(list.length === 0 ? 'Add a sort' : 'Add another sort', () => openPicker(add), 'subtle', 'plus');
 				add.classList.add('og-sb-add');

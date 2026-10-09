@@ -193,7 +193,8 @@ export class GridSidebar<TRowData = unknown> {
 	private applyConfig(): void {
 		const next = resolvePanels(this.config);
 		const sameRail =
-			next.length === this.panels.length && next.every((p, i) => p.id === this.panels[i].id && p.label === this.panels[i].label && p.icon === this.panels[i].icon);
+			next.length === this.panels.length &&
+			next.every((p, i) => p.id === this.panels[i].id && p.label === this.panels[i].label && p.icon === this.panels[i].icon);
 		this.panels = next;
 		this.element.dataset.position = this.config.position ?? 'right';
 		this.element.style.setProperty('--og-sb-width', `${this.config.width ?? DEFAULT_WIDTH}px`);

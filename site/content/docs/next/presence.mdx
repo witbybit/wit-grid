@@ -56,13 +56,13 @@ function LiveCursors({ channel }: { channel: MyRealtimeChannel }) {
 
 ## Peers
 
-| Field     | Type                          | Notes                                                       |
-| --------- | ----------------------------- | ----------------------------------------------------------- |
-| `id`      | `string`                      | Stable per person: the same id keeps the same cursor (and its glide) |
-| `name`    | `string`                      | The tag's text                                              |
-| `color`   | any CSS colour                | Cursor and tag colour                                       |
-| `cell`    | `{ rowId, field } \| null`    | The peer's focused cell; `null` hides their cursor          |
-| `editing` | `boolean`                     | Pulse while the peer edits                                  |
+| Field     | Type                       | Notes                                                                |
+| --------- | -------------------------- | -------------------------------------------------------------------- |
+| `id`      | `string`                   | Stable per person: the same id keeps the same cursor (and its glide) |
+| `name`    | `string`                   | The tag's text                                                       |
+| `color`   | any CSS colour             | Cursor and tag colour                                                |
+| `cell`    | `{ rowId, field } \| null` | The peer's focused cell; `null` hides their cursor                   |
+| `editing` | `boolean`                  | Pulse while the peer edits                                           |
 
 `api.setPresence(peers)` replaces the whole set; `api.getPresence()` returns it.
 
@@ -80,6 +80,6 @@ channel.onEdit(({ rowId, field, value, color }) => {
 Each flash fades out on its own; `color` defaults to the theme accent.
 
 <Callout title='See it live' type='info'>
-	The landing page's **Team workspace** runs simulated teammates against these two calls: they move to cells in view,
-	type, land edits through the normal API and flash them, and step back while you use the grid.
+	The landing page's **Team workspace** runs simulated teammates against these two calls: they move to cells in view, type, land edits through the
+	normal API and flash them, and step back while you use the grid.
 </Callout>

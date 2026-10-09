@@ -59,7 +59,11 @@ describe('option columns sort by what the user sees', () => {
 	});
 
 	it("sorts by the label shown with sortBy: 'label', never by the stored value", () => {
-		const { store, controller, order } = createGrid(ROWS, { field: 'status', header: 'Status', ...selectColumnType(STATUS, { sortBy: 'label' }) });
+		const { store, controller, order } = createGrid(ROWS, {
+			field: 'status',
+			header: 'Status',
+			...selectColumnType(STATUS, { sortBy: 'label' }),
+		});
 		store.setSortModel([{ colId: 'status', sort: 'asc' }]);
 		// Backlog, Done, In progress, mystery, To do — by label ('progress' shows as "In progress").
 		expect(order()).toEqual(['b', 'a', 'c', 'e', 'd']);

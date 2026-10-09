@@ -216,7 +216,12 @@ export class ColumnInteractionController<TRowData = unknown> {
 		// The last shown column stays.
 		if (state.columns.filter((c) => !c.hide).length <= 1) return false;
 		const r = container.getBoundingClientRect();
-		return e.clientX < r.left - DRAG_OUT_HIDE_PX || e.clientX > r.right + DRAG_OUT_HIDE_PX || e.clientY < r.top - DRAG_OUT_HIDE_PX || e.clientY > r.bottom + DRAG_OUT_HIDE_PX;
+		return (
+			e.clientX < r.left - DRAG_OUT_HIDE_PX ||
+			e.clientX > r.right + DRAG_OUT_HIDE_PX ||
+			e.clientY < r.top - DRAG_OUT_HIDE_PX ||
+			e.clientY > r.bottom + DRAG_OUT_HIDE_PX
+		);
 	}
 
 	/** Called by RenderEngine to wire up the group panel for drag-to-group support. */

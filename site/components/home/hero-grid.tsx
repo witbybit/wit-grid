@@ -78,7 +78,14 @@ export function HeroGrid() {
 				{demo === 'cells' && (
 					<div className='wg-hero-views' role='radiogroup' aria-label='View'>
 						{CELL_VIEWS.map(({ id, label, icon: Icon }) => (
-							<button key={id} type='button' role='radio' aria-checked={cellsView === id} className='wg-hero-view' onClick={() => setCellsView(id)}>
+							<button
+								key={id}
+								type='button'
+								role='radio'
+								aria-checked={cellsView === id}
+								className='wg-hero-view'
+								onClick={() => setCellsView(id)}
+							>
 								<Icon aria-hidden size={13} />
 								{label}
 							</button>
@@ -105,7 +112,11 @@ export function HeroGrid() {
 				)}
 			</div>
 			<div id='wg-hero-demo' role='tabpanel' className='wg-hero-grid'>
-				{demo === 'desk' ? <RealtimeDashboard compact theme={siteTheme} /> : <NativeCellTypes compact theme={gridTheme} view={cellsView} onViewChange={setCellsView} />}
+				{demo === 'desk' ? (
+					<RealtimeDashboard compact theme={siteTheme} />
+				) : (
+					<NativeCellTypes compact theme={gridTheme} view={cellsView} onViewChange={setCellsView} />
+				)}
 			</div>
 		</div>
 	);

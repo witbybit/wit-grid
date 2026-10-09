@@ -81,7 +81,10 @@ export function conditionalFormattingXml(
 	let priority = 0;
 	let xml = '';
 	plans.forEach((plan, index) => {
-		const own = rules.filter((rule): rule is ValueScaleRule => (rule.kind === 'colorScale' || rule.kind === 'dataBar' || rule.kind === 'iconSet') && rule.field === plan.col.field);
+		const own = rules.filter(
+			(rule): rule is ValueScaleRule =>
+				(rule.kind === 'colorScale' || rule.kind === 'dataBar' || rule.kind === 'iconSet') && rule.field === plan.col.field
+		);
 		if (own.length === 0) return;
 		const column = columnName(index);
 		xml += `<conditionalFormatting sqref="${column}${firstRow}:${column}${lastRow}">${own.map((rule) => ruleXml(rule, ++priority)).join('')}</conditionalFormatting>`;

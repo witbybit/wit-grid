@@ -44,7 +44,11 @@ interface Entry<TRowData> {
  * days, crowded days show "+N more". Drag an entry to another day to move it; double-click to open
  * its row in the table.
  */
-export function createCalendarView<TRowData>(host: HTMLElement, context: GridViewContext<TRowData>, config: CalendarViewConfig<TRowData>): GridViewInstance {
+export function createCalendarView<TRowData>(
+	host: HTMLElement,
+	context: GridViewContext<TRowData>,
+	config: CalendarViewConfig<TRowData>
+): GridViewInstance {
 	const weekStartsOn = config.weekStartsOn ?? 1;
 	const editable = config.editable ?? true;
 	const columns = context.columns();
@@ -163,7 +167,8 @@ export function createCalendarView<TRowData>(host: HTMLElement, context: GridVie
 
 	// Drag an entry onto another day: the value shifts by the days moved, written once on drop.
 	let drag: { rowId: string; from: string; over: HTMLElement | null } | null = null;
-	const dayAt = (event: PointerEvent) => (document.elementFromPoint(event.clientX, event.clientY) as Element | null)?.closest<HTMLElement>('.og-view-cal-day') ?? null;
+	const dayAt = (event: PointerEvent) =>
+		(document.elementFromPoint(event.clientX, event.clientY) as Element | null)?.closest<HTMLElement>('.og-view-cal-day') ?? null;
 	const onPointerDown = (event: PointerEvent) => {
 		const entry = (event.target as Element).closest<HTMLElement>('.og-view-cal-entry[data-editable]');
 		const day = entry?.closest<HTMLElement>('.og-view-cal-day');

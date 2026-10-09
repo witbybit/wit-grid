@@ -536,7 +536,13 @@ export type NativeCellTypesView = 'table' | 'gallery' | 'calendar';
 // The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
 const SIDEBAR: GridSidebarConfig<TaskRow> = { panels: ['columns', 'filters', 'sort', 'query', 'views'] };
 
-export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme, view: controlledView, onViewChange }: NativeCellTypesDemoProps) {
+export default function NativeCellTypesDemo({
+	onGridReady,
+	compact = false,
+	theme: controlledTheme,
+	view: controlledView,
+	onViewChange,
+}: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
 	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');

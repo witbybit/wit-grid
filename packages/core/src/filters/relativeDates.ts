@@ -80,7 +80,10 @@ function periodRange(period: DatePeriod, today: Date, weekStartsOn: number): { f
 	const m = today.getMonth();
 	const d = today.getDate();
 	const weekStart = at(y, m, d - ((today.getDay() - weekStartsOn + 7) % 7));
-	const week = (offset: number) => ({ from: shift(weekStart, 'week', offset), to: at(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offset * 7 + 6) });
+	const week = (offset: number) => ({
+		from: shift(weekStart, 'week', offset),
+		to: at(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + offset * 7 + 6),
+	});
 	const month = (offset: number) => ({ from: at(y, m + offset, 1), to: at(y, m + offset + 1, 0) });
 	const quarter = (offset: number) => {
 		const first = Math.floor(m / 3) * 3 + offset * 3;
