@@ -1014,10 +1014,13 @@ body {
 	0% {
 		stroke-dasharray: 0 100;
 		stroke-dashoffset: 0;
-		rx: 8px;
+		x: 2px;
+		y: 2px;
 		width: 16px;
 		height: 16px;
+		rx: 8px;
 		fill: transparent;
+		stroke-width: 3;
 	}
 	3% {
 		stroke-dasharray: 24 76;
@@ -1033,48 +1036,69 @@ body {
 		rx: 8px;
 	}
 	26% {
+		x: 2px;
+		y: 2px;
+		width: 16px;
+		height: 16px;
 		rx: 8px;
-		width: 16px;
-		height: 16px;
+		stroke-width: 3;
 	}
+	/* Squares off a little smaller than the ring: a cell. */
 	32% {
-		rx: 2px;
-		width: 16px;
-		height: 16px;
+		x: 3px;
+		y: 3px;
+		width: 14px;
+		height: 14px;
+		rx: 1.5px;
 		fill: transparent;
 		stroke-dasharray: 100 0;
 		stroke-dashoffset: -100;
+		stroke-width: 2.4;
 	}
+	/* Dragged out into a small range, kept around the dot, with fine marching ants. */
 	42% {
-		width: 38px;
-		height: 28px;
+		x: 1px;
+		y: 2px;
+		width: 22px;
+		height: 18px;
+		rx: 1.5px;
 		fill: color-mix(in srgb, #8b9bff 18%, transparent);
-		stroke-dasharray: 4 2.5;
+		stroke-dasharray: 2.2 1.6;
 		stroke-dashoffset: -100;
+		stroke-width: 2;
 	}
 	56% {
-		width: 38px;
-		height: 28px;
+		x: 1px;
+		y: 2px;
+		width: 22px;
+		height: 18px;
 		fill: color-mix(in srgb, #8b9bff 18%, transparent);
-		stroke-dasharray: 4 2.5;
-		stroke-dashoffset: -126;
+		stroke-dasharray: 2.2 1.6;
+		stroke-dashoffset: -119;
+		stroke-width: 2;
 	}
 	66% {
-		rx: 2px;
-		width: 16px;
-		height: 16px;
+		x: 3px;
+		y: 3px;
+		width: 14px;
+		height: 14px;
+		rx: 1.5px;
 		fill: transparent;
 		stroke-dasharray: 100 0;
-		stroke-dashoffset: -126;
+		stroke-dashoffset: -119;
+		stroke-width: 2.4;
 	}
 	74%,
 	100% {
-		rx: 8px;
+		x: 2px;
+		y: 2px;
 		width: 16px;
 		height: 16px;
+		rx: 8px;
 		fill: transparent;
 		stroke-dasharray: 100 0;
-		stroke-dashoffset: -126;
+		stroke-dashoffset: -119;
+		stroke-width: 3;
 	}
 }
 
