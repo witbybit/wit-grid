@@ -419,6 +419,23 @@
 					"signature": "(styleRules: GridStyleRule<TRowData>[] | undefined): void"
 				},
 				{
+					"name": "setPresence",
+					"optional": false,
+					"signature": "(peers: readonly GridPresencePeer[]): void",
+					"description": "Shows other people in the grid: each peer's cell cursor with a name tag (pulsing while editing). Replaces the previous set."
+				},
+				{
+					"name": "getPresence",
+					"optional": false,
+					"signature": "(): readonly GridPresencePeer[]"
+				},
+				{
+					"name": "flashCells",
+					"optional": false,
+					"signature": "(cells: readonly GridCellFlash[]): void",
+					"description": "Briefly highlights cells, e.g. when a peer's edit lands."
+				},
+				{
 					"name": "getGrouping",
 					"optional": false,
 					"signature": "(): GroupingConfig<TRowData> | undefined",
@@ -588,9 +605,38 @@
 					"signature": "(enabled: boolean): void"
 				},
 				{
+					"name": "setShowMinimap",
+					"optional": false,
+					"signature": "(enabled: boolean): void",
+					"description": "Shows the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows."
+				},
+				{
+					"name": "setView",
+					"optional": false,
+					"signature": "(view: GridViewConfig<TRowData> | null): void",
+					"description": "Shows the displayed rows another way (a gallery of cards, a calendar); null returns to the table."
+				},
+				{
+					"name": "getView",
+					"optional": false,
+					"signature": "(): GridViewConfig<TRowData> | null"
+				},
+				{
+					"name": "setMinimapMarks",
+					"optional": false,
+					"signature": "(marks: readonly GridMinimapMark[]): void",
+					"description": "Rows the app marks on the minimap (search hits, bookmarks); replaces the previous set."
+				},
+				{
 					"name": "getVisibleColumnRange",
 					"optional": false,
 					"signature": "(): { colStart: number; colEnd: number; total: number }"
+				},
+				{
+					"name": "getVisibleRowRange",
+					"optional": false,
+					"signature": "(): { startIdx: number; endIdx: number }",
+					"description": "The displayed rows in view, from `startIdx` to `endIdx` (display indexes)."
 				},
 				{
 					"name": "getColumnState",

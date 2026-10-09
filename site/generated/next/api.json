@@ -24,6 +24,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "BUILT_IN_THEME_FONTS_URL",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "BUILT_IN_THEME_METADATA",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -52,6 +57,11 @@
 			"name": "BuiltInThemeName",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "CalendarViewConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "CAPABILITY_ALLOWED",
@@ -204,6 +214,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "ColorScaleRule",
+			"kind": "type",
+			"source": "./types.js"
+		},
+		{
 			"name": "ColumnDef",
 			"kind": "type",
 			"source": "./types.js"
@@ -304,6 +319,16 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "createTheme",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "createTimelineRenderer",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "CsvExportOptions",
 			"kind": "type",
 			"source": "./types.js"
@@ -322,6 +347,11 @@
 			"name": "CustomFilterCondition",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DataBarRule",
+			"kind": "type",
+			"source": "./types.js"
 		},
 		{
 			"name": "DataVisualRow",
@@ -474,6 +504,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "GalleryViewConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "getBuiltInTheme",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -530,6 +565,11 @@
 		},
 		{
 			"name": "GridCellDiff",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridCellFlash",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -679,6 +719,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "GridMinimapMark",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "GridPaginationConfig",
 			"kind": "type",
 			"source": "./Grid.js"
@@ -687,6 +732,16 @@
 			"name": "GridPersistenceAdapter",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "GridPresenceCell",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridPresencePeer",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "GridProps",
@@ -740,6 +795,11 @@
 		},
 		{
 			"name": "GridValidationIntegrityOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GridViewConfig",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -812,6 +872,11 @@
 			"name": "HeaderMenuRendererProps",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "IconSetRule",
+			"kind": "type",
+			"source": "./types.js"
 		},
 		{
 			"name": "ImperativeCellHandle",
@@ -1164,6 +1229,11 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "ThemePalette",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "themeToCSSVariables",
 			"kind": "value",
 			"source": "@eregister/wit-grid-core"
@@ -1172,6 +1242,16 @@
 			"name": "ThemeTokens",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "TimelineCellOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "timelineColumnType",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "TooltipParams",
@@ -1202,6 +1282,11 @@
 			"name": "useGridSelector",
 			"kind": "value",
 			"source": "./hooks.js"
+		},
+		{
+			"name": "ValueScaleRule",
+			"kind": "type",
+			"source": "./types.js"
 		},
 		{
 			"name": "VisualRow",
@@ -1310,6 +1395,24 @@
 					"description": "Show the filter chip bar above the header when filters are active."
 				},
 				{
+					"name": "showMinimap",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows."
+				},
+				{
+					"name": "view",
+					"optional": true,
+					"type": "GridViewConfig<TRowData> | null",
+					"description": "Show the displayed rows another way: a gallery of cards or a calendar. Absent or null shows the table."
+				},
+				{
+					"name": "onViewChange",
+					"optional": true,
+					"type": "(view: GridViewConfig<TRowData> | null) => void",
+					"description": "The grid changed view itself (double-clicking a card or entry opens it in the table)."
+				},
+				{
 					"name": "showFloatingFilters",
 					"optional": true,
 					"type": "boolean",
@@ -1319,7 +1422,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1450,6 +1553,24 @@
 					"description": "Show the filter chip bar above the header when filters are active."
 				},
 				{
+					"name": "showMinimap",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows."
+				},
+				{
+					"name": "view",
+					"optional": true,
+					"type": "GridViewConfig<TRowData> | null",
+					"description": "Show the displayed rows another way: a gallery of cards or a calendar. Absent or null shows the table."
+				},
+				{
+					"name": "onViewChange",
+					"optional": true,
+					"type": "(view: GridViewConfig<TRowData> | null) => void",
+					"description": "The grid changed view itself (double-clicking a card or entry opens it in the table)."
+				},
+				{
 					"name": "showFloatingFilters",
 					"optional": true,
 					"type": "boolean",
@@ -1459,7 +1580,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1589,6 +1710,24 @@
 					"description": "Show the filter chip bar above the header when filters are active."
 				},
 				{
+					"name": "showMinimap",
+					"optional": true,
+					"type": "boolean",
+					"description": "Show the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows."
+				},
+				{
+					"name": "view",
+					"optional": true,
+					"type": "GridViewConfig<TRowData> | null",
+					"description": "Show the displayed rows another way: a gallery of cards or a calendar. Absent or null shows the table."
+				},
+				{
+					"name": "onViewChange",
+					"optional": true,
+					"type": "(view: GridViewConfig<TRowData> | null) => void",
+					"description": "The grid changed view itself (double-clicking a card or entry opens it in the table)."
+				},
+				{
 					"name": "showFloatingFilters",
 					"optional": true,
 					"type": "boolean",
@@ -1598,7 +1737,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1723,6 +1862,12 @@
 					"name": "enableChart",
 					"optional": true,
 					"type": "boolean"
+				},
+				{
+					"name": "dragOutHidesColumns",
+					"optional": true,
+					"type": "boolean",
+					"description": "Dragging a column header out of the grid hides the column. Default true."
 				},
 				{
 					"name": "autoRowHeight",
