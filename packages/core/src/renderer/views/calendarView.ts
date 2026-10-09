@@ -352,10 +352,23 @@ export function createCalendarView<TRowData>(
 	 * open while nudging, so the entry can be watched moving; Escape or a click elsewhere closes it.
 	 */
 	const POPOVER_WIDTH = 280;
-	const popFields = (config.fields ?? columns.filter((c) => c !== titleCol && c.field !== config.dateField).slice(0, 3).map((c) => c.field))
+	const popFields = (
+		config.fields ??
+		columns
+			.filter((c) => c !== titleCol && c.field !== config.dateField)
+			.slice(0, 3)
+			.map((c) => c.field)
+	)
 		.map((field) => columns.find((c) => c.field === field))
 		.filter((c): c is ColumnDef<TRowData> => !!c);
-	let popover: { rowId: string; element: HTMLElement; title: HTMLElement; dates: HTMLElement; band: HTMLElement; fields: ViewField<TRowData>[] } | null = null;
+	let popover: {
+		rowId: string;
+		element: HTMLElement;
+		title: HTMLElement;
+		dates: HTMLElement;
+		band: HTMLElement;
+		fields: ViewField<TRowData>[];
+	} | null = null;
 	let justDragged = false;
 
 	const closePopover = () => {
@@ -433,7 +446,9 @@ export function createCalendarView<TRowData>(
 		action('Open in table', { pop: 'open' }, 'Show this row in the table');
 		const tip = document.createElement('div');
 		tip.className = 'og-view-pop-tip';
-		tip.textContent = editable ? 'Drag an entry to another day to move it · double-click to open it' : 'Double-click an entry to open it in the table';
+		tip.textContent = editable
+			? 'Drag an entry to another day to move it · double-click to open it'
+			: 'Double-click an entry to open it in the table';
 		element.append(band, head, dates, list, actions, tip);
 		root.appendChild(element);
 		popover = { rowId, element, title, dates, band, fields };

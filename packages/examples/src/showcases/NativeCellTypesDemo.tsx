@@ -433,9 +433,15 @@ const VIEW_GUIDES: Record<'gallery' | 'calendar', { title: string; steps: { name
 		steps: [
 			{ name: 'Same rows, by date', text: 'Every task sits on its due day. Filters, sort and search apply here exactly as in the table.' },
 			{ name: 'Click an entry', text: 'A card opens with its dates, status, priority and owner, and buttons to nudge it a day or a week.' },
-			{ name: 'Drag to reschedule', text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.' },
+			{
+				name: 'Drag to reschedule',
+				text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.',
+			},
 			{ name: 'Double-click', text: 'Opens the task in the table, scrolled to the middle and flashed, so you can edit every field.' },
-			{ name: 'Ranges span days', text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.' },
+			{
+				name: 'Ranges span days',
+				text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.',
+			},
 		],
 		note: 'Moves write through the normal API: sort order, conditional formats, the minimap and teammates all react, and undo works.',
 	},
@@ -712,7 +718,11 @@ export default function NativeCellTypesDemo({
 				{viewId !== 'table' && (
 					<div className='p-4 rounded-xl border border-violet-900/60 bg-violet-950/20 flex flex-col gap-3'>
 						<h3 className='text-[11px] font-semibold text-slate-200 flex items-center gap-1.5'>
-							{viewId === 'calendar' ? <CalendarDays className='w-3.5 h-3.5 text-violet-300' /> : <LayoutGrid className='w-3.5 h-3.5 text-violet-300' />}
+							{viewId === 'calendar' ? (
+								<CalendarDays className='w-3.5 h-3.5 text-violet-300' />
+							) : (
+								<LayoutGrid className='w-3.5 h-3.5 text-violet-300' />
+							)}
 							{VIEW_GUIDES[viewId].title}
 						</h3>
 						<ol className='flex flex-col gap-2.5'>
