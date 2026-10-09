@@ -137,6 +137,29 @@ describe('calendar view', () => {
 		expect(setCellValue).not.toHaveBeenCalled();
 	});
 
+	it('opens a card on click with dates, fields and actions that nudge the entry', () => {
+		const rows = [{ id: 'b', data: { task: 'Sprint', status: 'todo', plan: { start: '2026-03-12', end: '2026-03-13' } as unknown } }];
+		const { host, day, setCellValue, openInTable } = mount(rows);
+		const entry = day('2026-03-12').querySelector<HTMLElement>('.og-view-cal-entry')!;
+		entry.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		const popover = host.querySelector<HTMLElement>('.og-view-cal-popover')!;
+		expect(popover.querySelector('strong')!.textContent).toBe('Sprint');
+		expect(popover.querySelector('.og-view-pop-dates')!.textContent).toMatch(/2 days/);
+		// The default fields: the displayed columns other than the title and the date field.
+		expect([...popover.querySelectorAll('.og-view-field-label')].map((l) => l.textContent)).toEqual(['status']);
+		popover.querySelector<HTMLElement>('[data-move="7"]')!.click();
+		expect(setCellValue).toHaveBeenCalledWith('b', 'plan', { start: '2026-03-19', end: '2026-03-20' });
+		// A nudge keeps the card open; a click elsewhere closes it.
+		expect(host.querySelector('.og-view-cal-popover')).not.toBeNull();
+		day('2026-03-02').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		expect(host.querySelector('.og-view-cal-popover')).toBeNull();
+
+		entry.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		host.querySelector<HTMLElement>('[data-pop="open"]')!.click();
+		expect(openInTable).toHaveBeenCalledWith('b');
+		expect(host.querySelector('.og-view-cal-popover')).toBeNull();
+	});
+
 	it('steps between months', () => {
 		const { host } = mount([]);
 		host.querySelector<HTMLElement>('[data-action="next"]')!.click();

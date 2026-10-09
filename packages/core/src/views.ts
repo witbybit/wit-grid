@@ -22,6 +22,8 @@ export interface CalendarViewConfig<TRowData = unknown> {
 	dateField: string;
 	/** The entry's label. Default: the first displayed column. */
 	titleField?: string;
+	/** Fields shown when an entry is clicked, drawn by their columns' renderers. Default: the next three displayed columns. */
+	fields?: string[];
 	/** The entry's colour (any CSS colour or palette name). Default: the theme accent. */
 	color?: (row: TRowData) => string | undefined;
 	/** The month shown first. Default: today's. */

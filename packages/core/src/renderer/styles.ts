@@ -320,6 +320,93 @@ export const CORE_STYLES = `
   .og-view-cal-ghost[hidden] {
     display: none;
   }
+  /* An entry's card: dates, fields drawn by their columns, and what can be done with it. */
+  .og-view-cal-popover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    width: 280px;
+    box-sizing: border-box;
+    padding: 0 12px 10px;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid var(--og-cell-border);
+    background: var(--og-bg-color);
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.55);
+    animation: og-view-pop-in 0.16s ease-out;
+  }
+  @keyframes og-view-pop-in {
+    from {
+      opacity: 0;
+      margin-top: -4px;
+    }
+  }
+  .og-view-pop-band {
+    height: 4px;
+    margin: 0 -12px;
+  }
+  .og-view-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .og-view-pop-head strong {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-pop-close {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .og-view-pop-close:hover {
+    background: color-mix(in srgb, var(--og-text-color) 9%, transparent);
+  }
+  .og-view-pop-dates {
+    margin: 2px 0 6px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in srgb, var(--og-text-color) 70%, transparent);
+  }
+  .og-view-pop-fields {
+    padding: 2px 0 6px;
+    border-top: 1px solid var(--og-cell-border);
+  }
+  .og-view-pop-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--og-cell-border);
+  }
+  .og-view-pop-actions .og-view-cal-button {
+    height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .og-view-pop-actions [data-pop='open'] {
+    margin-left: auto;
+    border-color: color-mix(in srgb, var(--og-focus-ring) 60%, transparent);
+    color: var(--og-focus-ring);
+  }
+  .og-view-pop-tip {
+    margin-top: 8px;
+    font-size: 10px;
+    color: color-mix(in srgb, var(--og-text-color) 50%, transparent);
+  }
+
   /* Dropped: the entry pops into its new days with a glow. */
   .og-view-cal-entry[data-landed] {
     animation: og-view-landed 0.9s cubic-bezier(0.2, 0.8, 0.2, 1.2);
@@ -489,6 +576,7 @@ export const CORE_STYLES = `
     .og-presence { transition: none; }
     .og-presence[data-editing] { animation: none; }
     .og-view-cal-entry[data-landed] { animation: none; }
+    .og-view-cal-popover { animation: none; }
   }
 
   /* ── Floating filter row ────────────────────────────────────────────────── */

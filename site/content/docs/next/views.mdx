@@ -72,12 +72,18 @@ A month grid that places rows by a date field or a `{ start, end }` range field 
 [`dateRangeColumnType` and `timelineColumnType`](/docs/next/columns#more-cell-types) hold). Ranges span their days and
 repeat their label when they wrap into a new week; a crowded day shows **+N more**. Drag an entry to another day to
 move it: the value shifts by the days moved and is written back in the shape the cell held (date string, date-time,
-`Date`, timestamp, or range).
+`Date`, timestamp, or range). While you drag, the days it will cover light up, the original dims and a tag shows the
+new dates and the shift; the entry pops into place on drop, and Escape cancels.
+
+**Click an entry** for its card: the dates and length, a few fields drawn by their columns' own renderers, buttons
+to nudge it a day earlier, a day later or a week later (the card stays open so you can watch it move), and **Open in
+table**.
 
 | Option         | Default                    | What it does                        |
 | -------------- | -------------------------- | ----------------------------------- |
 | `dateField`    | (required)                 | A date or date-range field          |
 | `titleField`   | the first displayed column | The entry's label                   |
+| `fields`       | the next three columns     | Fields on the entry's card          |
 | `color`        | the theme accent           | `(row) => colour` per entry         |
 | `initialDate`  | today                      | The month shown first               |
 | `weekStartsOn` | `1` (Monday)               | First day of the week, `0` = Sunday |

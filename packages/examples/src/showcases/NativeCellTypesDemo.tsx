@@ -391,7 +391,7 @@ function generateTasks(count: number): TaskRow[] {
 			watchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],
 			owner: owner.value,
 			reviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),
-			due: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,
+			due: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((Math.floor(i / 12) * 9) % 28) + 1).padStart(2, '0')}`,
 			budget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),
 			progress,
 			confidence: ((i * 29) % 100) / 100,
@@ -417,13 +417,39 @@ const statusColour = (row: TaskRow) => STATUS.find((s) => s.value === row?.statu
 const VIEWS: Record<NativeCellTypesView, GridViewConfig<TaskRow> | null> = {
 	table: null,
 	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'priority', 'owner', 'progress', 'budget'], color: statusColour },
-	calendar: { kind: 'calendar', dateField: 'schedule', titleField: 'task', color: statusColour },
+	// Placed by the due date: one day per task keeps the month readable (range fields span their days).
+	calendar: { kind: 'calendar', dateField: 'due', titleField: 'task', fields: ['status', 'priority', 'owner'], color: statusColour },
 };
 const VIEW_CHOICES = [
 	{ id: 'table', label: 'Table', icon: Table2 },
 	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
 	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
 ] as const;
+
+/** The side panel's guide while a view is showing, instead of the cell type reference. */
+const VIEW_GUIDES: Record<'gallery' | 'calendar', { title: string; steps: { name: string; text: string }[]; note: string }> = {
+	calendar: {
+		title: 'How the calendar works',
+		steps: [
+			{ name: 'Same rows, by date', text: 'Every task sits on its due day. Filters, sort and search apply here exactly as in the table.' },
+			{ name: 'Click an entry', text: 'A card opens with its dates, status, priority and owner, and buttons to nudge it a day or a week.' },
+			{ name: 'Drag to reschedule', text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.' },
+			{ name: 'Double-click', text: 'Opens the task in the table, scrolled to the middle and flashed, so you can edit every field.' },
+			{ name: 'Ranges span days', text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.' },
+		],
+		note: 'Moves write through the normal API: sort order, conditional formats, the minimap and teammates all react, and undo works.',
+	},
+	gallery: {
+		title: 'How the gallery works',
+		steps: [
+			{ name: 'Cards, not rows', text: 'Each task is a card: its title, a status-coloured band and the fields you choose.' },
+			{ name: 'Native fields', text: 'Status pills, avatars, progress and currency are drawn by the same cell renderers as the table.' },
+			{ name: 'Virtualized', text: 'Only the cards in view exist; they are recycled as you scroll, so 100k rows stay smooth.' },
+			{ name: 'Double-click a card', text: 'Opens the task in the table, scrolled into view and flashed.' },
+		],
+		note: 'Filters, sort and search from the sidebar and the chips apply to the gallery too.',
+	},
+};
 
 // What simulated teammates change, and how: each edit goes through the normal API.
 const STATUS_ORDER = STATUS.map((s) => s.value as string);
@@ -683,6 +709,28 @@ export default function NativeCellTypesDemo({
 			</div>
 
 			<div className='w-full lg:w-[300px] flex flex-col gap-4 shrink lg:shrink-0 min-h-0 overflow-y-auto max-h-[40%] lg:max-h-none pr-1'>
+				{viewId !== 'table' && (
+					<div className='p-4 rounded-xl border border-violet-900/60 bg-violet-950/20 flex flex-col gap-3'>
+						<h3 className='text-[11px] font-semibold text-slate-200 flex items-center gap-1.5'>
+							{viewId === 'calendar' ? <CalendarDays className='w-3.5 h-3.5 text-violet-300' /> : <LayoutGrid className='w-3.5 h-3.5 text-violet-300' />}
+							{VIEW_GUIDES[viewId].title}
+						</h3>
+						<ol className='flex flex-col gap-2.5'>
+							{VIEW_GUIDES[viewId].steps.map((step, i) => (
+								<li key={step.name} className='flex gap-2.5'>
+									<span className='shrink-0 w-4 h-4 rounded-full bg-violet-500/20 text-violet-200 text-[10px] font-semibold flex items-center justify-center'>
+										{i + 1}
+									</span>
+									<span className='flex flex-col gap-0.5'>
+										<span className='text-[11px] font-medium text-slate-200'>{step.name}</span>
+										<span className='text-[11px] text-slate-400 leading-snug'>{step.text}</span>
+									</span>
+								</li>
+							))}
+						</ol>
+						<p className='text-[11px] text-slate-500 leading-snug border-t border-slate-800 pt-3'>{VIEW_GUIDES[viewId].note}</p>
+					</div>
+				)}
 				<div className='p-4 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col gap-3'>
 					<h3 className='text-[11px] font-semibold text-slate-300'>Cell types</h3>
 					{TYPE_REFERENCE.map((t) => (

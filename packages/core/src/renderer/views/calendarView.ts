@@ -3,7 +3,7 @@ import type { CalendarViewConfig } from '../../views.js';
 import { parseDateRange, writeDateRange, type DateRange } from '../../cells/dateRange.js';
 import { parseCellDate, toIsoDay } from '../../cells/format.js';
 import { defaultGridScheduler } from '../gridScheduler.js';
-import { fieldText, viewColour, type GridViewContext, type GridViewInstance, type ViewRow } from './viewContext.js';
+import { fieldText, viewColour, ViewField, type GridViewContext, type GridViewInstance, type ViewRow } from './viewContext.js';
 
 const DAY_MS = 86_400_000;
 const WEEKS = 6;
@@ -179,6 +179,7 @@ export function createCalendarView<TRowData>(
 			}
 			day.entries.replaceChildren(...nodes);
 		});
+		refreshPopover();
 	};
 
 	/*
@@ -312,6 +313,9 @@ export function createCalendarView<TRowData>(
 		if (!drag) return;
 		const { rowId, moved, shift } = drag;
 		endDrag();
+		// The click that follows a drag is not a click on an entry.
+		justDragged = moved;
+		if (moved) closePopover();
 		const row = moved && shift ? context.rows().find((r) => r.id === rowId) : undefined;
 		if (row && shift) {
 			// The next draw (from the write) shows the entry landing in its new place.
@@ -341,12 +345,154 @@ export function createCalendarView<TRowData>(
 		const entry = (event.target as Element).closest<HTMLElement>('.og-view-cal-entry');
 		if (entry?.dataset.rowId) context.openInTable(entry.dataset.rowId);
 	};
+
+	/*
+	 * Click an entry: a card with its dates, length and a few fields (drawn by their columns' own
+	 * renderers), and what can be done with it — nudge it a day or a week, or open its row. It stays
+	 * open while nudging, so the entry can be watched moving; Escape or a click elsewhere closes it.
+	 */
+	const POPOVER_WIDTH = 280;
+	const popFields = (config.fields ?? columns.filter((c) => c !== titleCol && c.field !== config.dateField).slice(0, 3).map((c) => c.field))
+		.map((field) => columns.find((c) => c.field === field))
+		.filter((c): c is ColumnDef<TRowData> => !!c);
+	let popover: { rowId: string; element: HTMLElement; title: HTMLElement; dates: HTMLElement; band: HTMLElement; fields: ViewField<TRowData>[] } | null = null;
+	let justDragged = false;
+
+	const closePopover = () => {
+		if (!popover) return;
+		for (const field of popover.fields) field.destroy();
+		popover.element.remove();
+		popover = null;
+		document.removeEventListener('keydown', onPopoverKey, true);
+	};
+
+	const refreshPopover = () => {
+		if (!popover) return;
+		const row = context.rows().find((r) => r.id === popover!.rowId);
+		const range = row ? rangeOf(row) : null;
+		// Filtered out or cleared by a live update: nothing left to describe.
+		if (!row || !range) return closePopover();
+		popover.title.textContent = fieldText(titleCol, row);
+		const days = daysBetween(range.start, range.end) + 1;
+		popover.dates.textContent =
+			days === 1 ? shortDay.format(range.start) : `${shortDay.format(range.start)} – ${shortDay.format(range.end)} · ${days} days`;
+		const colour = viewColour(config.color?.(row.data));
+		popover.band.style.background = colour ?? 'var(--og-focus-ring)';
+		for (const field of popover.fields) field.show(row);
+	};
+
+	const openPopover = (entry: HTMLElement) => {
+		closePopover();
+		const rowId = entry.dataset.rowId!;
+		const element = document.createElement('div');
+		element.className = 'og-view-cal-popover';
+		element.setAttribute('role', 'dialog');
+		const band = document.createElement('div');
+		band.className = 'og-view-pop-band';
+		const head = document.createElement('div');
+		head.className = 'og-view-pop-head';
+		const title = document.createElement('strong');
+		const close = document.createElement('button');
+		close.type = 'button';
+		close.className = 'og-view-pop-close';
+		close.dataset.pop = 'close';
+		close.setAttribute('aria-label', 'Close');
+		close.textContent = '×';
+		head.append(title, close);
+		const dates = document.createElement('div');
+		dates.className = 'og-view-pop-dates';
+		const list = document.createElement('div');
+		list.className = 'og-view-pop-fields';
+		const fields = popFields.map((col) => {
+			const line = document.createElement('div');
+			line.className = 'og-view-field';
+			const label = document.createElement('span');
+			label.className = 'og-view-field-label';
+			label.textContent = col.header ?? col.field;
+			const field = new ViewField(col, context.api);
+			line.append(label, field.element);
+			list.appendChild(line);
+			return field;
+		});
+		const actions = document.createElement('div');
+		actions.className = 'og-view-pop-actions';
+		const action = (text: string, data: Record<string, string>, title?: string) => {
+			const b = document.createElement('button');
+			b.type = 'button';
+			b.className = 'og-view-cal-button';
+			b.textContent = text;
+			if (title) b.title = title;
+			Object.assign(b.dataset, data);
+			actions.appendChild(b);
+		};
+		if (editable) {
+			action('−1 day', { move: '-1' }, 'One day earlier');
+			action('+1 day', { move: '1' }, 'One day later');
+			action('+1 week', { move: '7' }, 'One week later');
+		}
+		action('Open in table', { pop: 'open' }, 'Show this row in the table');
+		const tip = document.createElement('div');
+		tip.className = 'og-view-pop-tip';
+		tip.textContent = editable ? 'Drag an entry to another day to move it · double-click to open it' : 'Double-click an entry to open it in the table';
+		element.append(band, head, dates, list, actions, tip);
+		root.appendChild(element);
+		popover = { rowId, element, title, dates, band, fields };
+		refreshPopover();
+		if (!popover) return;
+		// Below the entry, kept inside the calendar; above it when there is no room below.
+		const bounds = root.getBoundingClientRect();
+		const anchor = entry.getBoundingClientRect();
+		const left = Math.min(Math.max(8, anchor.left - bounds.left), Math.max(8, bounds.width - POPOVER_WIDTH - 8));
+		const below = anchor.bottom - bounds.top + 6;
+		const height = element.offsetHeight;
+		const top = below + height > bounds.height - 8 ? Math.max(8, anchor.top - bounds.top - height - 6) : below;
+		element.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
+		document.addEventListener('keydown', onPopoverKey, true);
+	};
+
+	const onPopoverKey = (event: KeyboardEvent) => {
+		if (event.key !== 'Escape' || drag) return;
+		event.stopPropagation();
+		closePopover();
+	};
+
+	const onRootClick = (event: MouseEvent) => {
+		const target = event.target as Element;
+		const inPopover = popover && popover.element.contains(target);
+		if (inPopover) {
+			const button = target.closest<HTMLElement>('button');
+			if (!button || !popover) return;
+			const rowId = popover.rowId;
+			if (button.dataset.pop === 'close') return closePopover();
+			if (button.dataset.pop === 'open') {
+				closePopover();
+				return context.openInTable(rowId);
+			}
+			const shift = Number(button.dataset.move);
+			const row = context.rows().find((r) => r.id === rowId);
+			if (!shift || !row) return;
+			landedRowId = rowId;
+			landedShown = false;
+			const value = (row.data as Record<string, unknown> | null)?.[config.dateField];
+			context.api.setCellValue(rowId, config.dateField, shiftCalendarValue(value, shift));
+			return;
+		}
+		if (justDragged) {
+			justDragged = false;
+			return;
+		}
+		const entry = target.closest<HTMLElement>('.og-view-cal-entry');
+		if (entry && popover?.rowId !== entry.dataset.rowId) openPopover(entry);
+		else closePopover();
+	};
+
 	grid.addEventListener('pointerdown', onPointerDown);
 	grid.addEventListener('pointermove', onPointerMove);
 	grid.addEventListener('pointerup', onPointerUp);
 	grid.addEventListener('pointercancel', onPointerUp);
 	grid.addEventListener('dblclick', onDoubleClick);
 	toolbar.addEventListener('click', onClick);
+	root.addEventListener('click', onRootClick);
 
 	return {
 		render: draw,
@@ -358,6 +504,8 @@ export function createCalendarView<TRowData>(
 			grid.removeEventListener('pointercancel', onPointerUp);
 			grid.removeEventListener('dblclick', onDoubleClick);
 			toolbar.removeEventListener('click', onClick);
+			root.removeEventListener('click', onRootClick);
+			closePopover();
 			root.remove();
 		},
 	};
