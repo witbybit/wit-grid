@@ -90,19 +90,51 @@ describe('calendar view', () => {
 	});
 
 	it('moves an entry by the days it is dragged, and opens it in the table on double-click', () => {
-		const { day, setCellValue, openInTable } = mount([
+		const { host, day, setCellValue, openInTable } = mount([
 			{ id: 'b', data: { task: 'Sprint', status: 'todo', plan: { start: '2026-03-12', end: '2026-03-13' } } },
 		]);
 		const entry = day('2026-03-12').querySelector<HTMLElement>('.og-view-cal-entry')!;
+		const grid = host.querySelector<HTMLElement>('.og-view-cal-grid')!;
 		document.elementFromPoint = vi.fn(() => day('2026-03-19'));
-		entry.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true }));
-		entry.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
-		expect(day('2026-03-19').hasAttribute('data-drop')).toBe(true);
-		entry.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+		entry.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, clientX: 10, clientY: 10 }));
+		// Under the drag threshold: still a click, nothing lights up.
+		grid.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 12, clientY: 11 }));
+		expect(host.querySelector('[data-drop-span]')).toBeNull();
+		grid.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 60, clientY: 80 }));
+		// The days it would cover light up, the original dims, and the ghost says where it goes.
+		expect(day('2026-03-19').hasAttribute('data-drop-first')).toBe(true);
+		expect(day('2026-03-20').hasAttribute('data-drop-last')).toBe(true);
+		expect(entry.hasAttribute('data-drag-source')).toBe(true);
+		const ghost = host.querySelector<HTMLElement>('.og-view-cal-ghost')!;
+		expect(ghost.hidden).toBe(false);
+		expect(ghost.textContent).toContain('+7 days');
+		grid.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: 60, clientY: 80 }));
 		expect(setCellValue).toHaveBeenCalledWith('b', 'plan', { start: '2026-03-19', end: '2026-03-20' });
+		expect(ghost.hidden).toBe(true);
+		expect(host.querySelector('[data-drop-span]')).toBeNull();
 
 		entry.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
 		expect(openInTable).toHaveBeenCalledWith('b');
+	});
+
+	it('cancels a drag with Escape, and holds live redraws until the drop', () => {
+		const rows = [{ id: 'b', data: { task: 'Sprint', status: 'todo', plan: { start: '2026-03-12', end: '2026-03-13' } as unknown } }];
+		const { host, view, day, setCellValue } = mount(rows);
+		const entry = day('2026-03-12').querySelector<HTMLElement>('.og-view-cal-entry')!;
+		const grid = host.querySelector<HTMLElement>('.og-view-cal-grid')!;
+		document.elementFromPoint = vi.fn(() => day('2026-03-19'));
+		entry.dispatchEvent(new PointerEvent('pointerdown', { button: 0, bubbles: true, clientX: 10, clientY: 10 }));
+		grid.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: 60, clientY: 80 }));
+		// A live update mid-drag does not rebuild the entries under the pointer.
+		rows[0].data.plan = { start: '2026-03-02', end: '2026-03-02' };
+		view.render();
+		expect(day('2026-03-12').querySelector('.og-view-cal-entry')).toBe(entry);
+		document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+		expect(host.querySelector('[data-drop-span]')).toBeNull();
+		// The held redraw runs on cancel.
+		expect(day('2026-03-02').textContent).toContain('Sprint');
+		grid.dispatchEvent(new PointerEvent('pointerup', { bubbles: true }));
+		expect(setCellValue).not.toHaveBeenCalled();
 	});
 
 	it('steps between months', () => {

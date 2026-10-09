@@ -2,6 +2,7 @@ import type { ColumnDef } from '../../columnDef.js';
 import type { CalendarViewConfig } from '../../views.js';
 import { parseDateRange, writeDateRange, type DateRange } from '../../cells/dateRange.js';
 import { parseCellDate, toIsoDay } from '../../cells/format.js';
+import { defaultGridScheduler } from '../gridScheduler.js';
 import { fieldText, viewColour, type GridViewContext, type GridViewInstance, type ViewRow } from './viewContext.js';
 
 const DAY_MS = 86_400_000;
@@ -112,6 +113,11 @@ export function createCalendarView<TRowData>(
 	const firstShown = () => addDays(month, -((month.getDay() - weekStartsOn + 7) % 7));
 
 	const draw = () => {
+		// Mid-drag the entries stay put (the dragged one is dimmed in place); redraw on drop.
+		if (drag) {
+			pendingDraw = true;
+			return;
+		}
 		const first = firstShown();
 		const last = addDays(first, WEEKS * 7 - 1);
 		const today = startOfDay(new Date());
@@ -153,6 +159,16 @@ export function createCalendarView<TRowData>(
 				entry.textContent = fieldText(titleCol, row);
 				entry.title = entry.textContent;
 				if (editable) entry.setAttribute('data-editable', '');
+				if (row.id === landedRowId) {
+					entry.setAttribute('data-landed', '');
+					if (!landedShown) {
+						landedShown = true;
+						const landed = landedRowId;
+						defaultGridScheduler.timeout(() => {
+							if (landedRowId === landed) landedRowId = null;
+						}, LANDED_MS);
+					}
+				}
 				nodes.push(entry);
 			}
 			if (list.length > shown) {
@@ -165,40 +181,144 @@ export function createCalendarView<TRowData>(
 		});
 	};
 
-	// Drag an entry onto another day: the value shifts by the days moved, written once on drop.
-	let drag: { rowId: string; from: string; over: HTMLElement | null } | null = null;
+	/*
+	 * Drag an entry onto another day. While dragging, a ghost follows the pointer with the new dates,
+	 * the days the entry will cover light up and the original dims; on drop the value shifts by the
+	 * days moved (written once) and the entry lands with a pop. Escape cancels. Redraws wait for the
+	 * drop, and the pointer is captured on the grid, so a live update mid-drag cannot lose it.
+	 */
+	const DRAG_THRESHOLD = 4;
+	const LANDED_MS = 1200;
+	interface DragState {
+		rowId: string;
+		from: string;
+		range: DateRange;
+		title: string;
+		x: number;
+		y: number;
+		moved: boolean;
+		shift: number | null;
+		pointerId: number;
+	}
+	let drag: DragState | null = null;
+	let pendingDraw = false;
+	let landedRowId: string | null = null;
+	/** The landing has been drawn; it clears LANDED_MS after that draw, not after the drop. */
+	let landedShown = false;
+	const ghost = document.createElement('div');
+	ghost.className = 'og-view-cal-ghost';
+	ghost.hidden = true;
+	root.appendChild(ghost);
+	const shortDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+
 	const dayAt = (event: PointerEvent) =>
 		(document.elementFromPoint(event.clientX, event.clientY) as Element | null)?.closest<HTMLElement>('.og-view-cal-day') ?? null;
+	const entriesOf = (rowId: string) => [...grid.querySelectorAll<HTMLElement>('.og-view-cal-entry')].filter((e) => e.dataset.rowId === rowId);
+
+	/** Lights the days the entry would cover after shifting by `shift` days (null clears). */
+	const paintDropSpan = (shift: number | null) => {
+		const start = drag && shift !== null ? toIsoDay(addDays(drag.range.start, shift)) : null;
+		const end = drag && shift !== null ? toIsoDay(addDays(drag.range.end, shift)) : null;
+		for (const { element } of days) {
+			const date = element.dataset.date!;
+			const inside = start !== null && end !== null && date >= start && date <= end;
+			element.toggleAttribute('data-drop-span', inside);
+			element.toggleAttribute('data-drop-first', inside && date === start);
+			element.toggleAttribute('data-drop-last', inside && date === end);
+		}
+	};
+
+	const describeGhost = (state: DragState) => {
+		const shift = state.shift ?? 0;
+		const start = addDays(state.range.start, shift);
+		const end = addDays(state.range.end, shift);
+		const dates = start.getTime() === end.getTime() ? shortDay.format(start) : `${shortDay.format(start)} – ${shortDay.format(end)}`;
+		const delta = shift === 0 ? 'not moved' : `${shift > 0 ? '+' : '−'}${Math.abs(shift)} day${Math.abs(shift) === 1 ? '' : 's'}`;
+		ghost.replaceChildren();
+		const title = document.createElement('strong');
+		title.textContent = state.title;
+		const detail = document.createElement('span');
+		detail.textContent = `${dates} · ${delta}`;
+		ghost.append(title, detail);
+	};
+
+	const endDrag = () => {
+		if (!drag) return;
+		if (grid.hasPointerCapture?.(drag.pointerId)) grid.releasePointerCapture(drag.pointerId);
+		drag = null;
+		ghost.hidden = true;
+		root.removeAttribute('data-dragging');
+		for (const entry of grid.querySelectorAll<HTMLElement>('[data-drag-source]')) entry.removeAttribute('data-drag-source');
+		paintDropSpan(null);
+		document.removeEventListener('keydown', onKeyDown, true);
+	};
+
+	const flushDraw = () => {
+		if (!pendingDraw) return;
+		pendingDraw = false;
+		draw();
+	};
+
 	const onPointerDown = (event: PointerEvent) => {
 		const entry = (event.target as Element).closest<HTMLElement>('.og-view-cal-entry[data-editable]');
-		const day = entry?.closest<HTMLElement>('.og-view-cal-day');
-		if (!entry || !day || event.button !== 0) return;
+		if (!entry || event.button !== 0) return;
+		const row = context.rows().find((r) => r.id === entry.dataset.rowId);
+		const range = row ? rangeOf(row) : null;
+		const day = entry.closest<HTMLElement>('.og-view-cal-day');
+		if (!row || !range || !day) return;
 		event.preventDefault();
-		drag = { rowId: entry.dataset.rowId!, from: day.dataset.date!, over: null };
-		entry.setPointerCapture?.(event.pointerId);
-		root.setAttribute('data-dragging', '');
+		drag = { rowId: row.id, from: day.dataset.date!, range, title: fieldText(titleCol, row), x: event.clientX, y: event.clientY, moved: false, shift: null, pointerId: event.pointerId };
+		root.style.setProperty('--og-view-drag', viewColour(config.color?.(row.data)) ?? 'var(--og-focus-ring)');
+		try {
+			grid.setPointerCapture(event.pointerId);
+		} catch {
+			// The pointer is already gone (or synthetic): the drag still follows grid events.
+		}
+		document.addEventListener('keydown', onKeyDown, true);
 	};
+
 	const onPointerMove = (event: PointerEvent) => {
 		if (!drag) return;
-		const day = dayAt(event);
-		if (day === drag.over) return;
-		drag.over?.removeAttribute('data-drop');
-		drag.over = day;
-		day?.setAttribute('data-drop', '');
-	};
-	const onPointerUp = (event: PointerEvent) => {
-		if (!drag) return;
-		const { rowId, from } = drag;
+		if (!drag.moved) {
+			// A press without movement stays a click (double-click opens the row).
+			if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < DRAG_THRESHOLD) return;
+			drag.moved = true;
+			root.setAttribute('data-dragging', '');
+			for (const entry of entriesOf(drag.rowId)) entry.setAttribute('data-drag-source', '');
+			ghost.hidden = false;
+		}
+		const bounds = root.getBoundingClientRect();
+		ghost.style.transform = `translate(${Math.round(event.clientX - bounds.left + 14)}px, ${Math.round(event.clientY - bounds.top + 12)}px)`;
 		const target = dayAt(event)?.dataset.date;
-		drag.over?.removeAttribute('data-drop');
-		drag = null;
-		root.removeAttribute('data-dragging');
-		if (!target || target === from) return;
-		const shift = daysBetween(new Date(`${from}T00:00:00`), new Date(`${target}T00:00:00`));
-		const row = context.rows().find((r) => r.id === rowId);
-		if (!row) return;
-		const value = (row.data as Record<string, unknown> | null)?.[config.dateField];
-		context.api.setCellValue(rowId, config.dateField, shiftCalendarValue(value, shift));
+		const shift = target ? daysBetween(new Date(`${drag.from}T00:00:00`), new Date(`${target}T00:00:00`)) : null;
+		if (shift !== drag.shift || ghost.childElementCount === 0) {
+			drag.shift = shift;
+			paintDropSpan(shift);
+			describeGhost(drag);
+		}
+	};
+
+	const onPointerUp = () => {
+		if (!drag) return;
+		const { rowId, moved, shift } = drag;
+		endDrag();
+		const row = moved && shift ? context.rows().find((r) => r.id === rowId) : undefined;
+		if (row && shift) {
+			// The next draw (from the write) shows the entry landing in its new place.
+			landedRowId = rowId;
+			landedShown = false;
+			const value = (row.data as Record<string, unknown> | null)?.[config.dateField];
+			context.api.setCellValue(rowId, config.dateField, shiftCalendarValue(value, shift));
+		}
+		flushDraw();
+	};
+
+	const onKeyDown = (event: KeyboardEvent) => {
+		if (event.key !== 'Escape' || !drag) return;
+		event.preventDefault();
+		event.stopPropagation();
+		endDrag();
+		flushDraw();
 	};
 	const onClick = (event: MouseEvent) => {
 		const action = (event.target as Element).closest<HTMLElement>('[data-action]')?.dataset.action;
@@ -221,6 +341,7 @@ export function createCalendarView<TRowData>(
 	return {
 		render: draw,
 		destroy() {
+			endDrag();
 			grid.removeEventListener('pointerdown', onPointerDown);
 			grid.removeEventListener('pointermove', onPointerMove);
 			grid.removeEventListener('pointerup', onPointerUp);

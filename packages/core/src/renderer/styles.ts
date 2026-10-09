@@ -207,6 +207,7 @@ export const CORE_STYLES = `
   }
 
   .og-view-calendar {
+    position: relative;
     flex: 1;
     min-width: 0;
     min-height: 0;
@@ -273,8 +274,71 @@ export const CORE_STYLES = `
   .og-view-cal-day[data-outside] .og-view-cal-date {
     opacity: 0.45;
   }
-  .og-view-cal-day[data-drop] {
-    background: color-mix(in srgb, var(--og-focus-ring) 14%, transparent);
+  /* Dragging: the days the entry will cover light up in the accent (a grey entry would barely show), its ends marked. */
+  .og-view-cal-day[data-drop-span] {
+    background: color-mix(in srgb, var(--og-focus-ring) 20%, transparent);
+    box-shadow: inset 0 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+    transition: background-color 0.12s ease;
+  }
+  .og-view-cal-day[data-drop-first] {
+    box-shadow: inset 2px 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+  }
+  .og-view-cal-day[data-drop-last] {
+    box-shadow: inset -2px 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+  }
+  .og-view-cal-day[data-drop-first][data-drop-last] {
+    box-shadow: inset 0 0 0 2px var(--og-focus-ring);
+  }
+  .og-view-cal-entry[data-drag-source] {
+    opacity: 0.3;
+  }
+  .og-view-cal-ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--og-view-drag, var(--og-focus-ring));
+    border-left-width: 4px;
+    background: var(--og-bg-color);
+    box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.5);
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .og-view-cal-ghost strong {
+    font-weight: 600;
+  }
+  .og-view-cal-ghost span {
+    color: color-mix(in srgb, var(--og-text-color) 70%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .og-view-cal-ghost[hidden] {
+    display: none;
+  }
+  /* Dropped: the entry pops into its new days with a glow. */
+  .og-view-cal-entry[data-landed] {
+    animation: og-view-landed 0.9s cubic-bezier(0.2, 0.8, 0.2, 1.2);
+  }
+  @keyframes og-view-landed {
+    0% {
+      transform: scale(0.7);
+      opacity: 0;
+      box-shadow: 0 0 0 0 transparent;
+    }
+    35% {
+      transform: scale(1.04);
+      opacity: 1;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-view-entry, var(--og-focus-ring)) 45%, transparent);
+    }
+    100% {
+      transform: none;
+      box-shadow: 0 0 0 0 transparent;
+    }
   }
   .og-view-cal-date {
     align-self: flex-start;
@@ -325,6 +389,9 @@ export const CORE_STYLES = `
   .og-view-cal-entry[data-editable] {
     cursor: grab;
     touch-action: none;
+  }
+  .og-view-cal-entry[data-editable]:hover {
+    filter: brightness(1.18);
   }
   .og-view-calendar[data-dragging] .og-view-cal-entry {
     cursor: grabbing;
@@ -421,6 +488,7 @@ export const CORE_STYLES = `
   @media (prefers-reduced-motion: reduce) {
     .og-presence { transition: none; }
     .og-presence[data-editing] { animation: none; }
+    .og-view-cal-entry[data-landed] { animation: none; }
   }
 
   /* ── Floating filter row ────────────────────────────────────────────────── */

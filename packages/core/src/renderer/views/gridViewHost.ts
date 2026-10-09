@@ -19,6 +19,7 @@ export class GridViewHost<TRowData> {
 	private view: GridViewInstance | null = null;
 	private frame = 0;
 	private size = '';
+	private plan: GridLayoutPlan | null = null;
 	private readonly unsubscribers: (() => void)[] = [];
 
 	constructor(
@@ -56,6 +57,7 @@ export class GridViewHost<TRowData> {
 
 	/** Each layout pass: the area below the top chrome is the view's. */
 	public sync(plan: GridLayoutPlan): void {
+		this.plan = plan;
 		const top = plan.chrome.groupPanelHeight + plan.chrome.filterChipBarHeight;
 		const height = Math.max(0, plan.origins.bottomChromeTop - top);
 		const size = `${top}|${height}|${plan.viewport.width}`;
@@ -93,6 +95,46 @@ export class GridViewHost<TRowData> {
 		});
 	}
 
+	/**
+	 * Back in the table, the opened row glides to the middle of the rows area (not just to an edge),
+	 * then its first cell takes focus and the row flashes, so it is clear which row the card was.
+	 */
+	private revealRow(rowId: string, focusField?: string): void {
+		const engine = this.engine;
+		const api = engine.getApiRef();
+		const viewport = this.container.querySelector<HTMLElement>(':scope > .og-scroll-viewport');
+		const index = engine.getRowModel()?.getVisualIndexByRowId(rowId) ?? -1;
+		const plan = this.plan;
+		if (!viewport || !plan || index < 0) {
+			api.scrollToRow(rowId);
+			return;
+		}
+		const rowTop = engine.geometry.rowTops[index] ?? 0;
+		const rowHeight = engine.geometry.rowHeights[index] ?? 0;
+		const band = Math.max(0, plan.rows.visibleBottom - plan.rows.visibleTop);
+		const target = Math.max(0, Math.round(rowTop + rowHeight / 2 - band / 2 - plan.rows.pinnedTopHeight));
+		const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+		let settled = false;
+		const arrive = () => {
+			if (settled) return;
+			settled = true;
+			viewport.removeEventListener('scrollend', arrive);
+			const columns = engine.getDisplayedColumns();
+			const { colStart, colEnd } = api.getVisibleColumnRange();
+			const focus = columns.find((col) => col.field === focusField) ?? columns[0];
+			if (focus) api.selectCell({ rowId, colField: focus.field }, 'api');
+			engine.flashCells(columns.slice(Math.max(0, colStart), colEnd + 1).map((col) => ({ rowId, field: col.field })));
+		};
+		if (Math.abs(viewport.scrollTop - target) < 2) {
+			arrive();
+			return;
+		}
+		viewport.addEventListener('scrollend', arrive);
+		// Browsers without scrollend (and an interrupted glide) still arrive.
+		defaultGridScheduler.timeout(arrive, reduced ? 50 : 700);
+		viewport.scrollTo({ top: target, behavior: reduced ? 'auto' : 'smooth' });
+	}
+
 	private context(): GridViewContext<TRowData> {
 		const engine = this.engine;
 		return {
@@ -110,8 +152,10 @@ export class GridViewHost<TRowData> {
 			},
 			columns: () => engine.getDisplayedColumns(),
 			openInTable: (rowId) => {
+				// Focus lands on the field the card or entry was titled by.
+				const titleField = this.config?.titleField;
 				engine.setView(null);
-				engine.getApiRef().scrollToRow(rowId, { select: true });
+				this.revealRow(rowId, titleField);
 			},
 		};
 	}
