@@ -56,6 +56,16 @@ See the full walkthrough in [Clipboard](/docs/next/clipboard).
 `setDetailOpen` / `toggleDetailOpen` / `isDetailOpen` control master-detail rows — see
 [Master-Detail](/docs/next/master-detail) for the full renderer contract.
 
+## Presence, minimap and views
+
+| Call                                     | What it does                                                  |
+| ---------------------------------------- | ------------------------------------------------------------- |
+| `setPresence(peers)` / `getPresence()`   | Teammates' cell cursors — see [Presence](/docs/next/presence) |
+| `flashCells(cells)`                      | Briefly highlight cells                                       |
+| `setShowMinimap(on)` / `setMinimapMarks` | The [minimap](/docs/next/minimap) and your marks on it        |
+| `setView(config)` / `getView()`          | [Gallery or calendar](/docs/next/views); `null` for the table |
+| `getVisibleRowRange()`                   | The displayed rows in view, next to `getVisibleColumnRange()` |
+
 ## Full reference
 
 <GridApiReference />

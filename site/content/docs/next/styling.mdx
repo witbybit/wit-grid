@@ -1,6 +1,6 @@
 ---
 title: Conditional Styling
-description: Style rows, cells, and header cells declaratively based on row or column data.
+description: Style rows, cells and headers from their data, and format numbers with colour scales, data bars and icon sets.
 icon: Paintbrush
 ---
 
@@ -64,6 +64,39 @@ Rules are additive: a row or cell can match several rules at once, and all match
 	Use `styleRules` for data-driven decoration (status colors, thresholds, validation highlights). Use the [theming API](/docs/next/theming) for
 	token-level, grid-wide visual changes (surface colors, borders, fonts).
 </Callout>
+
+## Conditional formatting
+
+Three more rule kinds format a cell by where its number sits in its column: a **colour scale** tints it, a
+**data bar** draws a bar behind it, an **icon set** puts an arrow, dot or signal before it.
+
+```tsx
+const styleRules: StyleRule<Deal>[] = [
+	{ kind: 'dataBar', field: 'amount' },
+	{ kind: 'colorScale', field: 'margin' }, // red → amber → green
+	{ kind: 'iconSet', field: 'growth', icons: 'arrows' },
+	{ kind: 'iconSet', field: 'latency', icons: 'dots', reverse: true }, // low is good
+];
+```
+
+| `kind`       | Options                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `colorScale` | `colors` (two or three CSS colours, low → high), `mid`, `opacity` (default `0.24`)          |
+| `dataBar`    | `color` (default the theme accent), `negativeColor` (default red)                           |
+| `iconSet`    | `icons`: `'arrows'` · `'dots'` · `'signal'`; `thresholds` (default `[1/3, 2/3]`); `reverse` |
+
+Every kind takes `field` and optional fixed `min` / `max`.
+
+- **The range is the column's**, over the rows currently displayed: filter the grid and the scale re-fits. Give
+  `min` / `max` to keep cells comparable across filters.
+- **Live data moves it.** When a visible cell shows a new value the range is recomputed (at most every 200 ms) and
+  the visible cells repaint. Infinite and server row models keep a running range of the values seen.
+- **Data bars grow from zero**, so gains and losses read both ways.
+- **Rules stack** on one field: the icon draws over the bar, the bar over the tint.
+- **Colours are mixed by the browser**, so palette names, any CSS colour and theme variables all work.
+- **Cheap**: painted as background layers on the cell itself (no extra elements), written only when a cell's look
+  changes.
+- **Excel keeps them**: [`exportExcel`](/docs/next/export#excel) writes them as native conditional formats.
 
 ## Row animations
 

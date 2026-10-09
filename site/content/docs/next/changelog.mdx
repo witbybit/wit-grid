@@ -11,6 +11,44 @@ icon: Clock
 
 ## `next` (unreleased)
 
+### Added — conditional formatting
+
+Style rules `colorScale`, `dataBar` and `iconSet` format numbers by where they sit in their column's range over the
+displayed rows (or a fixed `min` / `max`), repaint as live data moves the range, stack on one field, and export to
+Excel as native conditional formats. See [Conditional Styling](/docs/next/styling#conditional-formatting).
+
+### Added — presence
+
+`api.setPresence(peers)` draws teammates' cell cursors with name tags: they glide between cells, follow their row
+through sorts and filters, stay on pinned columns and rows, and pulse while editing. `api.flashCells(cells)` flashes
+cells. See [Presence](/docs/next/presence).
+
+### Added — timeline column
+
+`timelineColumnType` (built-in `type: 'timeline'`) draws a date range as a bar on a time scale shared by the column;
+drag to move, drag an end to resize. See [Columns](/docs/next/columns#more-cell-types).
+
+### Added — gallery and calendar views
+
+`view` (prop), `api.setView(config)` and `initialState.view` show the displayed rows as virtualized cards — fields
+drawn by their columns' own renderers — or on a month calendar by a date or range field, with drag to reschedule.
+`onViewChange` reports the grid returning to the table. See [Gallery & Calendar Views](/docs/next/views).
+
+### Added — minimap
+
+`showMinimap` docks a strip beside the vertical scrollbar marking the view window, selection, recent edits,
+validation issues and your own marks (`api.setMinimapMarks`); click or drag to scroll. See [Minimap](/docs/next/minimap).
+
+### Changed — option columns sort by option order
+
+Select, combobox and segmented columns sort in the order their options are listed (`sortBy: 'label'` for
+alphabetical by label) instead of by the stored value. New `ColumnDef.sortValue` chooses what any column sorts by,
+applied in every client sort path. See [Columns](/docs/next/columns#filtering-and-sorting).
+
+### Added — `getVisibleRowRange` on the public API
+
+Next to `getVisibleColumnRange`.
+
 ### Added — checkbox selection across groups
 
 With `rowSelection: 'multiple'`, group rows get a tri-state checkbox in the selection column: it selects or deselects

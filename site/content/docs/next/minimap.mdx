@@ -1,0 +1,40 @@
+---
+title: Minimap
+description: A strip beside the scrollbar that marks selection, recent edits, issues and your own marks across every row.
+icon: Map
+---
+
+The minimap is a thin strip beside the vertical scrollbar that stands for every displayed row. It shows where you
+are and what's happening out of view; click or drag it to scroll there.
+
+```tsx
+<Grid rows={rows} columns={columns} showMinimap />
+```
+
+Or at runtime: `api.setShowMinimap(true)`.
+
+## What it marks
+
+| Mark              | Where                | Colour                       |
+| ----------------- | -------------------- | ---------------------------- |
+| The view window   | the strip's height   | a soft band                  |
+| Selection         | left lane            | the theme accent             |
+| Recent edits      | right lane           | amber, fading over 5 seconds |
+| Validation issues | full width           | red (errors), amber (warnings) |
+| Your marks        | full width           | your colour                  |
+
+Marks map content height onto the strip, so they line up with the view window even when rows differ in height.
+The strip is drawn on one canvas and only redraws when something it shows changed.
+
+## Your own marks
+
+`api.setMinimapMarks(marks)` adds marks for anything row-shaped: search hits, bookmarks, rows a teammate touched.
+It replaces the previous set.
+
+```typescript
+const hits = rows.filter((row) => row.notes.includes(query)).map((row) => ({ rowId: row.id, color: '#f59e0b' }));
+api.setMinimapMarks(hits);
+```
+
+Restyle the built-in marks with `--og-minimap-window`, `--og-minimap-selection`, `--og-minimap-change`,
+`--og-minimap-error` and `--og-minimap-warning` on the grid.

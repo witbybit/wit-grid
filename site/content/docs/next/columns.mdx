@@ -176,11 +176,17 @@ A type supplies `renderer`, `cellEditor`, `valueFormatter` and `filterDef`; what
 | `cascadeColumnType({ options \| loadChildren })`           | path `['in', 'ka', 'blr']` or `'in/ka/blr'`       | “India › Karnataka › Bengaluru”                | One column per level, ← → ↑ ↓ Enter, search across paths, async levels |
 | `dateRangeColumnType({ presets })`                         | `{ start, end }`, `[start, end]` or `'start/end'` | “Mar 4 – 18, 2026” and its length              | Two-month range calendar with presets, Apply                           |
 | `sparklineColumnType(options)`                             | numbers (array, `'1,2,3'`, `{ values }`)          | Line, area, bar or win / loss chart            | (display only)                                                         |
+| `timelineColumnType(options)`                              | `{ start, end }`, `[start, end]` or `'start/end'` | A bar on a time scale shared by the column     | Drag to move, drag an end to resize; double-click for the calendar     |
 
 Sparklines take `type`, `color` or `colorBy: 'trend'`, `curve: 'smooth'`, `markers` (`last`, `minmax`, `all`),
 `reference` (a value, `'average'` or `'zero'`), `label` (`last`, `change`), `format`, fixed `min` / `max` for
 comparable rows, `height` and `strokeWidth`. They stretch to the column without measuring it and keep strokes
 and markers crisp.
+
+A timeline column is a Gantt column: every cell shares one time scale (`range`, or the column's span padded to whole
+weeks, widening when a value falls outside it), with month lines and a today line. Dragging snaps to whole days and
+writes once on release, in the shape the cell held. `color` takes a palette name, a CSS colour or `(row) => colour`;
+`editable: false` and `showToday: false` turn those off. It is also the built-in `type: 'timeline'`.
 
 `cascadeColumnType` loads levels with `loadChildren(path, signal)` (mark leaves `isLeaf: true`), labels stored
 paths with `resolvePath(path)`, and searches a server with `searchPaths(query, signal)`; `changeOnSelect` allows
@@ -251,6 +257,19 @@ const columns: ColumnDef<Person>[] = [
 ```
 
 Column types choose a fitting filter on their own; `filterDef` overrides it. See [Filtering](/docs/next/filtering).
+
+Option columns (`selectColumnType`, `comboboxColumnType`, `segmentedColumnType`) **sort by what the user sees**: in the
+order their options are listed, so a status column runs Backlog → To do → In progress → Done and a priority column
+Urgent → High → Medium → Low, with values not in the list last. `sortBy: 'label'` sorts alphabetically by the label
+instead. Neither sorts by the hidden stored value.
+
+Any column can choose what it sorts by with `sortValue: (value) => sortKey`. Every client sort uses it — sorting,
+grouped sorting (group rows of that column follow it too) and re-sorting after an edit, so an edited row lands
+exactly where a full sort would put it.
+
+```tsx
+{ field: 'size', header: 'Size', sortValue: (v) => ['XS', 'S', 'M', 'L', 'XL'].indexOf(String(v)) }
+```
 
 ## Clipboard
 

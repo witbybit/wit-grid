@@ -1,0 +1,85 @@
+---
+title: Presence
+description: Show who else is in the grid — teammates' cell cursors with name tags, an editing pulse, and cell flashes.
+icon: Users
+---
+
+Presence draws other people in the grid: each teammate's cell cursor with their name, gliding as they move,
+pulsing while they edit. Your app owns the realtime channel (WebSockets, Liveblocks, Supabase, anything); the grid
+only draws what you give it.
+
+```tsx
+import { useEffect } from 'react';
+import { useGridApi } from '@eregister/wit-grid-react';
+
+// Your realtime layer: whatever tells you who is where.
+interface Peer {
+	userId: string;
+	displayName: string;
+	color: string;
+	focus: { rowId: string; field: string } | null;
+	isTyping: boolean;
+}
+interface MyRealtimeChannel {
+	onPeers(listener: (peers: Peer[]) => void): () => void;
+}
+
+function LiveCursors({ channel }: { channel: MyRealtimeChannel }) {
+	const api = useGridApi();
+	useEffect(
+		() =>
+			channel.onPeers((peers) =>
+				api.setPresence(
+					peers.map((p) => ({
+						id: p.userId,
+						name: p.displayName,
+						color: p.color,
+						cell: p.focus, // { rowId, field } or null
+						editing: p.isTyping,
+					}))
+				)
+			),
+		[api, channel]
+	);
+	return null;
+}
+```
+
+## What a cursor does
+
+- It sits over the peer's cell and **glides** to the next one; it appears and disappears without a glide.
+- It **follows its row** through sorting, filtering and grouping, and hides while the row or column is not
+  displayed.
+- It stays on **pinned columns** while the grid scrolls sideways, and draws on **pinned top and bottom rows** too.
+- With `editing: true` it **pulses** and its tag shows a pencil.
+- Each update is a few lookups per peer; nothing is written to the page unless a cursor moved or changed.
+
+## Peers
+
+| Field     | Type                          | Notes                                                       |
+| --------- | ----------------------------- | ----------------------------------------------------------- |
+| `id`      | `string`                      | Stable per person: the same id keeps the same cursor (and its glide) |
+| `name`    | `string`                      | The tag's text                                              |
+| `color`   | any CSS colour                | Cursor and tag colour                                       |
+| `cell`    | `{ rowId, field } \| null`    | The peer's focused cell; `null` hides their cursor          |
+| `editing` | `boolean`                     | Pulse while the peer edits                                  |
+
+`api.setPresence(peers)` replaces the whole set; `api.getPresence()` returns it.
+
+## Cell flashes
+
+`api.flashCells(cells)` briefly highlights cells, for example when a teammate's edit lands:
+
+```typescript
+channel.onEdit(({ rowId, field, value, color }) => {
+	api.transaction({ rows: { update: [{ ...api.getRowNode(rowId)!.data, [field]: value }] } });
+	api.flashCells([{ rowId, field, color }]);
+});
+```
+
+Each flash fades out on its own; `color` defaults to the theme accent.
+
+<Callout title='See it live' type='info'>
+	The landing page's **Team workspace** runs simulated teammates against these two calls: they move to cells in view,
+	type, land edits through the normal API and flash them, and step back while you use the grid.
+</Callout>

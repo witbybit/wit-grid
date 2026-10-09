@@ -1,4 +1,4 @@
-import { BarChart3, Boxes, Database, FileSpreadsheet, Filter, Layers3, Palette, PanelRight, Rows3, ShieldCheck } from 'lucide-react';
+import { BarChart3, Boxes, CalendarRange, Database, FileSpreadsheet, Filter, Gauge, Layers3, Map as MapIcon, Palette, PanelRight, Rows3, ShieldCheck, Users } from 'lucide-react';
 
 /* ─── Small live visuals, one per card ─────────────────────────────────────── */
 
@@ -182,6 +182,109 @@ function IntegrityVisual() {
 	);
 }
 
+/** Teammates' cursors gliding between cells, one of them typing. */
+function PresenceVisual() {
+	return (
+		<div className='wg-v-presence' aria-hidden>
+			{Array.from({ length: 15 }, (_, i) => (
+				<i key={i} />
+			))}
+			<span className='wg-v-cursor wg-v-cursor-a'>
+				<b>Ava</b>
+			</span>
+			<span className='wg-v-cursor wg-v-cursor-b'>
+				<b>Leo ✎</b>
+			</span>
+		</div>
+	);
+}
+
+/** Numbers formatted by where they sit: a data bar, a heat tint and an arrow. */
+function FormattingVisual() {
+	const rows: [number, number, string][] = [
+		[92, 0.9, '▲'],
+		[64, 0.62, '▶'],
+		[38, 0.35, '▼'],
+		[78, 0.75, '▲'],
+	];
+	return (
+		<div className='wg-v-format' aria-hidden>
+			{rows.map(([bar, heat, icon], i) => (
+				<div key={i}>
+					<span className='wg-v-format-bar' style={{ ['--w' as string]: `${bar}%` }}>
+						${(bar * 412).toLocaleString('en-US')}
+					</span>
+					<span className='wg-v-format-heat' style={{ ['--t' as string]: `${Math.round(heat * 100)}%` }}>
+						{Math.round(heat * 100)}
+					</span>
+					<span className='wg-v-format-icon' data-band={icon}>
+						{icon}
+					</span>
+				</div>
+			))}
+		</div>
+	);
+}
+
+/** Every row on a strip: the view window, selection, edits and issues. */
+function MinimapVisual() {
+	const marks: [number, string][] = [
+		[8, 'sel'],
+		[22, 'edit'],
+		[37, 'err'],
+		[51, 'edit'],
+		[63, 'sel'],
+		[78, 'err'],
+		[88, 'edit'],
+	];
+	return (
+		<div className='wg-v-minimap' aria-hidden>
+			<div className='wg-v-minimap-rows'>
+				{Array.from({ length: 9 }, (_, i) => (
+					<i key={i} style={{ width: `${45 + ((i * 29) % 45)}%` }} />
+				))}
+			</div>
+			<div className='wg-v-minimap-strip'>
+				<span className='wg-v-minimap-window' />
+				{marks.map(([top, kind], i) => (
+					<b key={i} data-kind={kind} style={{ top: `${top}%` }} />
+				))}
+			</div>
+		</div>
+	);
+}
+
+/** The same rows as cards, on a calendar and on a timeline. */
+function ViewsVisual() {
+	return (
+		<div className='wg-v-views' aria-hidden>
+			<div className='wg-v-views-cards'>
+				{['Launch', 'Pricing', 'Onboarding', 'Billing'].map((title, i) => (
+					<div key={title} style={{ ['--h' as string]: ['#22c55e', '#f59e0b', '#6d7cff', '#ec4899'][i] }}>
+						<strong>{title}</strong>
+						<i />
+						<i />
+					</div>
+				))}
+			</div>
+			<div className='wg-v-views-cal'>
+				{Array.from({ length: 21 }, (_, i) => (
+					// Placed explicitly, so the entries can overlay the days they span.
+					<span key={i} data-today={i === 9 || undefined} style={{ gridColumn: (i % 7) + 1, gridRow: Math.floor(i / 7) + 1 }} />
+				))}
+				<b style={{ gridColumn: '2 / 6', gridRow: 1, ['--h' as string]: '#6d7cff' }} />
+				<b style={{ gridColumn: '4 / 8', gridRow: 2, ['--h' as string]: '#22c55e' }} />
+				<b style={{ gridColumn: '1 / 3', gridRow: 3, ['--h' as string]: '#f59e0b' }} />
+			</div>
+			<div className='wg-v-views-gantt'>
+				<i style={{ marginLeft: '6%', width: '38%', ['--h' as string]: '#6d7cff' }} />
+				<i style={{ marginLeft: '30%', width: '44%', ['--h' as string]: '#22c55e' }} />
+				<i style={{ marginLeft: '58%', width: '30%', ['--h' as string]: '#f59e0b' }} />
+			</div>
+		</div>
+	);
+}
+
 /* ─── The cards ─────────────────────────────────────────────────────────────── */
 
 interface Feature {
@@ -276,6 +379,40 @@ const FEATURES: Feature[] = [
 		tag: 'api.integrity',
 		visual: IntegrityVisual,
 		hue: '#f43f5e',
+	},
+	{
+		title: 'Teammates, live in the grid',
+		description: 'Feed in who is where: their cursors glide between cells with name tags, follow rows through sorts and pulse while they type.',
+		icon: Users,
+		tag: 'api.setPresence()',
+		visual: PresenceVisual,
+		size: 'wide',
+		hue: '#ec4899',
+	},
+	{
+		title: 'Conditional formatting',
+		description: 'Colour scales, data bars and icon sets scaled to each column, repainting as live data moves — and kept in Excel.',
+		icon: Gauge,
+		tag: "kind: 'dataBar'",
+		visual: FormattingVisual,
+		hue: '#f59e0b',
+	},
+	{
+		title: 'A minimap of every row',
+		description: 'A strip beside the scrollbar marks selection, recent edits and issues across 100k rows. Click to jump.',
+		icon: MapIcon,
+		tag: 'showMinimap',
+		visual: MinimapVisual,
+		hue: '#14b8a6',
+	},
+	{
+		title: 'Gallery, calendar and timeline',
+		description: 'The same filtered, sorted rows as cards or on a calendar, and a Gantt column you drag to reschedule.',
+		icon: CalendarRange,
+		tag: 'api.setView()',
+		visual: ViewsVisual,
+		size: 'wide',
+		hue: '#6d7cff',
 	},
 ];
 

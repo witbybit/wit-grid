@@ -1768,3 +1768,275 @@ body {
 		transition: none;
 	}
 }
+
+/* ─── Bento visuals: presence, formatting, minimap, views ──────────────────── */
+
+/* Presence: a 5×3 sheet with two teammates' cursors gliding over it. */
+.wg-v-presence {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	grid-template-rows: repeat(3, 30px);
+	width: 86%;
+	box-shadow: inset 0 0 0 1px var(--line);
+	border-radius: 8px;
+	overflow: visible;
+}
+.wg-v-presence > i {
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
+}
+.wg-v-cursor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 20%;
+	height: 30px;
+	box-sizing: border-box;
+	border: 2px solid var(--c);
+	border-radius: 3px;
+	animation: wg-v-cursor-a 7s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+.wg-v-cursor b {
+	position: absolute;
+	left: -2px;
+	bottom: 100%;
+	padding: 0 6px;
+	border-radius: 4px 4px 4px 0;
+	background: var(--c);
+	color: #fff;
+	font-size: 10px;
+	font-weight: 600;
+	line-height: 15px;
+	white-space: nowrap;
+}
+.wg-v-cursor-a {
+	--c: #ec4899;
+}
+.wg-v-cursor-b {
+	--c: #22c55e;
+	background: color-mix(in srgb, #22c55e 14%, transparent);
+	animation-name: wg-v-cursor-b;
+	animation-duration: 9s;
+}
+@keyframes wg-v-cursor-a {
+	0%, 18% { transform: translate(100%, 30px); }
+	25%, 45% { transform: translate(300%, 30px); }
+	52%, 72% { transform: translate(300%, 60px); }
+	80%, 100% { transform: translate(100%, 30px); }
+}
+@keyframes wg-v-cursor-b {
+	0%, 20% { transform: translate(200%, 60px); }
+	28%, 55% { transform: translate(0%, 60px); }
+	63%, 88% { transform: translate(400%, 30px); }
+	96%, 100% { transform: translate(200%, 60px); }
+}
+
+/* Formatting: data bars, a heat tint and arrows. */
+.wg-v-format {
+	display: grid;
+	gap: 6px;
+	width: 84%;
+}
+.wg-v-format > div {
+	display: grid;
+	grid-template-columns: 1fr 52px 22px;
+	gap: 8px;
+	align-items: center;
+}
+.wg-v-format-bar {
+	position: relative;
+	padding: 3px 8px;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	background: linear-gradient(90deg, color-mix(in srgb, #6d7cff 18%, transparent), color-mix(in srgb, #6d7cff 55%, transparent)) no-repeat;
+	background-size: var(--w) 100%;
+	border-radius: 4px;
+	animation: wg-v-grow 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.wg-v-format-heat {
+	padding: 3px 0;
+	text-align: center;
+	border-radius: 4px;
+	font-variant-numeric: tabular-nums;
+	background: color-mix(in srgb, color-mix(in oklab, #22c55e var(--t), #ef4444) 30%, transparent);
+}
+.wg-v-format-icon {
+	font-size: 11px;
+	color: #f59e0b;
+}
+.wg-v-format-icon[data-band='▲'] {
+	color: #22c55e;
+}
+.wg-v-format-icon[data-band='▼'] {
+	color: #ef4444;
+}
+@keyframes wg-v-grow {
+	from {
+		background-size: 0 100%;
+	}
+}
+
+/* Minimap: faint rows beside a strip of marks; the view window drifts down. */
+.wg-v-minimap {
+	display: flex;
+	gap: 10px;
+	width: 70%;
+	height: 112px;
+}
+.wg-v-minimap-rows {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	padding: 4px 0;
+}
+.wg-v-minimap-rows i {
+	height: 6px;
+	border-radius: 3px;
+	background: var(--ink);
+}
+.wg-v-minimap-strip {
+	position: relative;
+	width: 12px;
+	border-radius: 3px;
+	background: var(--line);
+}
+.wg-v-minimap-window {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	height: 26%;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--color-fd-foreground) 20%, transparent);
+	animation: wg-v-window 8s ease-in-out infinite alternate;
+}
+.wg-v-minimap-strip b {
+	position: absolute;
+	height: 3px;
+	border-radius: 1px;
+}
+.wg-v-minimap-strip b[data-kind='sel'] {
+	left: 0;
+	width: 5px;
+	background: #6d7cff;
+}
+.wg-v-minimap-strip b[data-kind='edit'] {
+	right: 0;
+	width: 5px;
+	background: #f59e0b;
+	animation: wg-v-fade 2.4s ease-in-out infinite alternate;
+}
+.wg-v-minimap-strip b[data-kind='err'] {
+	left: 0;
+	right: 0;
+	background: #ef4444;
+}
+@keyframes wg-v-window {
+	to {
+		top: 74%;
+	}
+}
+@keyframes wg-v-fade {
+	to {
+		opacity: 0.25;
+	}
+}
+
+/* Views: cards, a calendar with spanning entries and a Gantt strip. */
+.wg-v-views {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	grid-template-rows: auto auto;
+	gap: 10px 14px;
+	width: 90%;
+}
+.wg-v-views-cards {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+	grid-row: span 2;
+}
+.wg-v-views-cards > div {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 6px 7px 8px;
+	border-radius: 7px;
+	box-shadow: inset 0 0 0 1px var(--line);
+	border-top: 3px solid var(--h);
+}
+.wg-v-views-cards strong {
+	font-size: 10px;
+	font-weight: 600;
+}
+.wg-v-views-cards i {
+	height: 5px;
+	border-radius: 3px;
+	background: var(--ink);
+}
+.wg-v-views-cards i + i {
+	width: 60%;
+}
+.wg-v-views-cal {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	grid-template-rows: repeat(3, 18px);
+	box-shadow: inset 0 0 0 1px var(--line);
+	border-radius: 6px;
+	overflow: hidden;
+}
+.wg-v-views-cal span {
+	grid-row: auto;
+	border-right: 1px solid var(--line);
+	border-bottom: 1px solid var(--line);
+}
+.wg-v-views-cal span[data-today] {
+	background: color-mix(in srgb, #6d7cff 18%, transparent);
+}
+.wg-v-views-cal b {
+	align-self: center;
+	height: 8px;
+	margin: 0 3px;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--h) 55%, transparent);
+	border-left: 2px solid var(--h);
+}
+.wg-v-views-gantt {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 5px;
+	padding: 6px 0;
+	background: repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%);
+}
+.wg-v-views-gantt i {
+	height: 8px;
+	border-radius: 4px;
+	background: color-mix(in srgb, var(--h) 40%, transparent);
+	border: 1px solid var(--h);
+	animation: wg-v-grow-x 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+	transform-origin: left;
+}
+@keyframes wg-v-grow-x {
+	from {
+		transform: scaleX(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wg-v-cursor,
+	.wg-v-format-bar,
+	.wg-v-minimap-window,
+	.wg-v-minimap-strip b,
+	.wg-v-views-gantt i {
+		animation: none;
+	}
+	.wg-v-cursor-a {
+		transform: translate(100%, 30px);
+	}
+	.wg-v-cursor-b {
+		transform: translate(200%, 60px);
+	}
+}

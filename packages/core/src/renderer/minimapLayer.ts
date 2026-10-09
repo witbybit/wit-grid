@@ -127,11 +127,13 @@ export class MinimapLayer {
 		const span = (start: number, end: number) => Math.max(markH, (this.source.rowTop(end + 1) - this.source.rowTop(start)) * scale);
 
 		// The view window.
-		ctx.fillStyle = colour('--og-minimap-window', 'rgba(127,127,127,0.18)');
+		// --og-minimap-* inherit, so they can be set on the grid or any ancestor; unset, the theme decides.
+		ctx.fillStyle = colour('--og-minimap-window', 'rgba(127,127,127,0.22)');
 		ctx.fillRect(0, plan.rows.visibleTop * scale, width, Math.max(6, (plan.rows.visibleBottom - plan.rows.visibleTop) * scale));
 
 		// Selection: the left lane.
-		ctx.fillStyle = colour('--og-minimap-selection', '#6d7cff');
+		const accent = colour('--og-minimap-selection', colour('--og-focus-ring', '#6d7cff'));
+		ctx.fillStyle = accent;
 		for (const range of this.source.selection()) {
 			const start = Math.max(0, range.start);
 			const end = Math.min(rowCount - 1, range.end);
@@ -152,7 +154,6 @@ export class MinimapLayer {
 		ctx.globalAlpha = 1;
 
 		// App marks, then issues on top: full width.
-		const accent = colour('--og-minimap-selection', '#6d7cff');
 		for (const mark of this.source.marks()) {
 			const index = this.source.indexOf(mark.rowId);
 			if (index < 0) continue;
