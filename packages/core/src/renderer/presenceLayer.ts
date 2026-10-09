@@ -13,11 +13,21 @@ export interface PresenceGeometry {
 	colWidths: ArrayLike<number>;
 }
 
+type Band = 'rows' | 'top' | 'bottom';
+
 interface Rect {
 	left: number;
 	top: number;
 	width: number;
 	height: number;
+	/** Which layer draws it: the rows, or the sticky pinned-top / pinned-bottom band. */
+	band: Band;
+}
+
+/** Hosts for cursors on pinned rows, which draw above the rows container. */
+export interface PresencePinnedHosts {
+	top: HTMLElement | null;
+	bottom: HTMLElement | null;
 }
 
 interface Cursor {
@@ -34,6 +44,8 @@ const FLASH_MS = 900;
  */
 export class PresenceLayer {
 	private readonly cursors = new Map<string, Cursor>();
+	/** Lazily made overlay bands inside the pinned row layers. */
+	private readonly bands = new Map<Band, HTMLDivElement>();
 	private plan: GridLayoutPlan | null = null;
 	private readonly unsubscribe: () => void;
 
@@ -42,6 +54,7 @@ export class PresenceLayer {
 		private readonly geometry: () => PresenceGeometry,
 		/** The registry's `presence` layer inside the rows container. */
 		private readonly element: HTMLDivElement,
+		private readonly pinned: PresencePinnedHosts = { top: null, bottom: null },
 		private readonly scheduler: GridScheduler = defaultGridScheduler
 	) {
 		this.element.setAttribute('aria-hidden', 'true');
@@ -51,6 +64,8 @@ export class PresenceLayer {
 	public dispose(): void {
 		this.unsubscribe();
 		this.element.replaceChildren();
+		for (const band of this.bands.values()) band.remove();
+		this.bands.clear();
 		this.cursors.clear();
 	}
 
@@ -93,9 +108,9 @@ export class PresenceLayer {
 			cursor = { element, tag, key: '' };
 			this.cursors.set(peer.id, cursor);
 		}
-		const firstRow = rect !== null && rect.top < 1;
+		const firstRow = rect !== null && rect.band !== 'bottom' && rect.top < 1;
 		const key = rect
-			? `${rect.left},${rect.top},${rect.width},${rect.height}|${peer.name}|${peer.color}|${peer.editing ? 1 : 0}|${firstRow ? 1 : 0}`
+			? `${rect.band}:${rect.left},${rect.top},${rect.width},${rect.height}|${peer.name}|${peer.color}|${peer.editing ? 1 : 0}|${firstRow ? 1 : 0}`
 			: 'hidden';
 		if (cursor.key === key) return;
 		const wasHidden = cursor.key === '' || cursor.key === 'hidden';
@@ -105,8 +120,12 @@ export class PresenceLayer {
 			element.hidden = true;
 			return;
 		}
+		// Moving into or out of a pinned band changes layer (and coordinates): jump, don't glide.
+		const host = this.hostFor(rect.band);
+		const changedBand = element.parentElement !== host;
+		if (changedBand) host.appendChild(element);
 		// Appearing (or reappearing) jumps into place; moving between cells glides.
-		element.classList.toggle('og-presence-still', wasHidden);
+		element.classList.toggle('og-presence-still', wasHidden || changedBand);
 		element.hidden = false;
 		element.style.transform = `translate(${rect.left}px, ${rect.top}px)`;
 		element.style.width = `${rect.width}px`;
@@ -116,7 +135,7 @@ export class PresenceLayer {
 		// A cursor on the first row tags below the cell: above it would sit under the header.
 		tag.classList.toggle('og-presence-tag-below', firstRow);
 		if (tag.textContent !== peer.name) tag.textContent = peer.name;
-		if (wasHidden) {
+		if (wasHidden || changedBand) {
 			// Re-enable the glide after this position has been applied.
 			this.scheduler.raf(() => element.classList.remove('og-presence-still'));
 		}
@@ -131,8 +150,22 @@ export class PresenceLayer {
 		element.style.width = `${rect.width}px`;
 		element.style.height = `${rect.height}px`;
 		if (flash.color) element.style.setProperty('--og-flash-color', flash.color);
-		this.element.appendChild(element);
+		this.hostFor(rect.band).appendChild(element);
 		this.scheduler.timeout(() => element.remove(), FLASH_MS);
+	}
+
+	private hostFor(band: Band): HTMLElement {
+		if (band === 'rows') return this.element;
+		let host = this.bands.get(band);
+		if (!host) {
+			host = document.createElement('div');
+			host.className = 'og-presence-band';
+			host.setAttribute('aria-hidden', 'true');
+			this.bands.set(band, host);
+		}
+		const parent = band === 'top' ? this.pinned.top : this.pinned.bottom;
+		if (parent && host.parentElement !== parent) parent.appendChild(host);
+		return host;
 	}
 
 	private rectFor(cell: GridPresenceCell, geometry: PresenceGeometry): Rect | null {
@@ -141,9 +174,18 @@ export class PresenceLayer {
 		const rowIndex = geometry.getVisualIndexByRowId(cell.rowId);
 		const colIndex = geometry.getColumnIndex(cell.field);
 		if (rowIndex < 0 || colIndex < 0) return null;
-		// Pinned rows live in their own sticky layers: no cursor there yet.
-		if (rowIndex < plan.rows.pinnedTopCount || rowIndex >= geometry.getVisualRowCount() - plan.rows.pinnedBottomCount) return null;
-		const top = geometry.rowTops[rowIndex];
+		// Pinned rows live in sticky layers of their own, with their own coordinates: the top band
+		// lays rows out from 0, the bottom band upward from its bottom edge.
+		let band: Band = 'rows';
+		let top = geometry.rowTops[rowIndex];
+		if (rowIndex < plan.rows.pinnedTopCount) {
+			if (!this.pinned.top) return null;
+			band = 'top';
+		} else if (rowIndex >= geometry.getVisualRowCount() - plan.rows.pinnedBottomCount) {
+			if (!this.pinned.bottom) return null;
+			band = 'bottom';
+			top = top - plan.dimensions.totalRowsHeight;
+		}
 		const height = geometry.rowHeights[rowIndex];
 		let left = geometry.colLefts[colIndex];
 		const width = geometry.colWidths[colIndex];
@@ -156,6 +198,6 @@ export class PresenceLayer {
 		} else if (lanes.right.colStart >= 0 && colIndex >= lanes.right.colStart && colIndex <= lanes.right.colEnd) {
 			left = scrollLeft + clientWidth - lanes.right.width + (left - lanes.right.baseLeft);
 		}
-		return { left, top, width, height };
+		return { left, top, width, height, band };
 	}
 }

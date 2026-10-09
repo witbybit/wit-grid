@@ -354,6 +354,18 @@ export const CORE_STYLES = `
     z-index: 6;
   }
 
+  /* Cursors on pinned rows: a band inside the sticky pinned layer, above its rows. */
+  .og-presence-band {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 30;
+  }
+
   .og-presence,
   .og-cell-flash {
     position: absolute;

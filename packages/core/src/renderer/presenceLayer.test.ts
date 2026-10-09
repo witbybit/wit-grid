@@ -20,11 +20,12 @@ function geometry(order = ROWS): PresenceGeometry {
 	};
 }
 
-function plan(scrollLeft = 0, pinLeft = true): GridLayoutPlan {
+function plan(scrollLeft = 0, pinLeft = true, pinnedRows = { top: 0, bottom: 0 }): GridLayoutPlan {
 	const lane = (colStart: number, colEnd: number, baseLeft: number, width: number) => ({ colStart, colEnd, baseLeft, width });
 	return {
 		viewport: { width: 600, clientWidth: 600, height: 300, scrollTop: 0, scrollLeft },
-		rows: { pinnedTopCount: 0, pinnedBottomCount: 0 },
+		rows: { pinnedTopCount: pinnedRows.top, pinnedBottomCount: pinnedRows.bottom },
+		dimensions: { totalRowsHeight: 120 },
 		columns: {
 			lanes: {
 				left: pinLeft ? lane(0, 0, 0, 100) : lane(-1, -1, 0, 0),
@@ -53,12 +54,14 @@ function scheduler(): GridScheduler & { flush(): void } {
 function setup(order = ROWS) {
 	const store = new PresenceStore();
 	const rows = document.createElement('div');
+	const pinnedTop = document.createElement('div');
+	const pinnedBottom = document.createElement('div');
 	const sched = scheduler();
 	let geo = geometry(order);
-	const layer = new PresenceLayer(store, () => geo, rows, sched);
+	const layer = new PresenceLayer(store, () => geo, rows, { top: pinnedTop, bottom: pinnedBottom }, sched);
 	layer.sync(plan());
 	const cursor = (i = 0) => rows.querySelectorAll<HTMLElement>('.og-presence')[i];
-	return { store, rows, layer, sched, cursor, reorder: (next: string[]) => (geo = geometry(next)) };
+	return { store, rows, pinnedTop, pinnedBottom, layer, sched, cursor, reorder: (next: string[]) => (geo = geometry(next)) };
 }
 
 afterEach(() => {
@@ -124,5 +127,26 @@ describe('PresenceLayer', () => {
 		expect(flash.style.getPropertyValue('--og-flash-color')).toBe('gold');
 		sched.flush();
 		expect(rows.querySelector('.og-cell-flash')).toBeNull();
+	});
+
+	it('draws cursors on pinned rows inside the pinned bands, in their coordinates, and moves between bands', () => {
+		const { store, layer, rows, pinnedTop, pinnedBottom } = setup();
+		const pinned = plan(0, true, { top: 1, bottom: 1 });
+		layer.sync(pinned);
+		store.set([
+			{ id: 'ava', name: 'Ava', color: 'red', cell: { rowId: 'r0', field: 'a' } },
+			{ id: 'leo', name: 'Leo', color: 'blue', cell: { rowId: 'r3', field: 'b' } },
+		]);
+		const top = pinnedTop.querySelector<HTMLElement>('.og-presence-band .og-presence')!;
+		expect(top.style.transform).toBe('translate(100px, 0px)');
+		// The bottom band lays rows out upward from its edge: row 3 (top 90 of 120) sits at -30.
+		const bottom = pinnedBottom.querySelector<HTMLElement>('.og-presence-band .og-presence')!;
+		expect(bottom.style.transform).toBe('translate(250px, -30px)');
+		expect(bottom.querySelector('.og-presence-tag-below')).toBeNull();
+		expect(rows.querySelectorAll('.og-presence')).toHaveLength(0);
+
+		store.set([{ id: 'ava', name: 'Ava', color: 'red', cell: { rowId: 'r1', field: 'a' } }]);
+		expect(top.parentElement).toBe(rows);
+		expect(top.classList.contains('og-presence-still')).toBe(true);
 	});
 });

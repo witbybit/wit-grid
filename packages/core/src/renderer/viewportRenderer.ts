@@ -200,7 +200,8 @@ export class ViewportRenderer<TRowData = unknown> {
 					colWidths: geometry.colWidths,
 				};
 			},
-			layer
+			layer,
+			{ top: this.pinnedTopLayer, bottom: this.pinnedBottomLayer }
 		);
 	}
 
