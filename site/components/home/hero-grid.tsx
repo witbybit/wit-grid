@@ -55,26 +55,29 @@ export function HeroGrid() {
 	return (
 		<div>
 			<div className='wg-hero-switcher'>
-				<div className='wg-hero-tabs' role='tablist' aria-label='Live demo'>
-					{DEMOS.map((d) => {
-						const Icon = d.icon;
-						return (
-							<button
-								key={d.id}
-								role='tab'
-								type='button'
-								aria-selected={demo === d.id}
-								aria-controls='wg-hero-demo'
-								className='wg-hero-tab'
-								onClick={() => setDemo(d.id)}
-							>
-								<Icon aria-hidden size={14} />
-								{d.label}
-							</button>
-						);
-					})}
+				{/* The tabs with their hint underneath, so the controls fit on one row beside them. */}
+				<div className='wg-hero-lead'>
+					<div className='wg-hero-tabs' role='tablist' aria-label='Live demo'>
+						{DEMOS.map((d) => {
+							const Icon = d.icon;
+							return (
+								<button
+									key={d.id}
+									role='tab'
+									type='button'
+									aria-selected={demo === d.id}
+									aria-controls='wg-hero-demo'
+									className='wg-hero-tab'
+									onClick={() => setDemo(d.id)}
+								>
+									<Icon aria-hidden size={14} />
+									{d.label}
+								</button>
+							);
+						})}
+					</div>
+					<span className='wg-hero-hint'>{active.hint}</span>
 				</div>
-				<span className='wg-hero-hint'>{active.hint}</span>
 				{demo === 'cells' && (
 					<div className='wg-hero-views' role='radiogroup' aria-label='View'>
 						{CELL_VIEWS.map(({ id, label, icon: Icon }) => (

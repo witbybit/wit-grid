@@ -76,9 +76,10 @@ body {
 .wg-hero-switcher {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
 	gap: 8px 14px;
 	padding: 8px 10px;
+	/* Tabs, view switcher and swatches share a row, lined up on the tab strip (the hint hangs below it). */
+	align-items: flex-start;
 	border-bottom: 1px solid var(--color-fd-border);
 	background: var(--color-fd-muted);
 }
@@ -119,6 +120,8 @@ body {
 
 /* Table / Gallery / Calendar for the team workspace: a quieter segmented control than the tabs. */
 .wg-hero-views {
+	/* Centred on the 36px tab strip. */
+	margin-top: 3px;
 	display: inline-flex;
 	gap: 2px;
 	padding: 2px;
@@ -148,6 +151,18 @@ body {
 	color: var(--color-fd-foreground);
 }
 
+.wg-hero-lead {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-width: 0;
+}
+
+.wg-hero-lead .wg-hero-hint {
+	padding-left: 4px;
+	font-size: 11px;
+}
+
 .wg-hero-hint {
 	font-size: 12px;
 	color: var(--color-fd-muted-foreground);
@@ -158,6 +173,8 @@ body {
 	align-items: center;
 	gap: 6px;
 	margin-left: auto;
+	/* The tab strip's height, so the swatches centre on it. */
+	min-height: 36px;
 }
 
 .wg-hero-swatch {
