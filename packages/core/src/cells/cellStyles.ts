@@ -129,8 +129,9 @@ export const CELL_STYLES = `
 .og-ct-popover {
   position: fixed; z-index: 10000; box-sizing: border-box; min-width: 180px; max-width: min(440px, calc(100vw - 16px));
   padding: 4px; border-radius: 10px; border: 1px solid var(--og-popover-border);
-  /* Themes give popovers a slightly translucent colour: lay it over the opaque grid background. */
-  background: linear-gradient(var(--og-popover-bg), var(--og-popover-bg)), var(--og-bg-color);
+  background: var(--og-glass-popover-bg, linear-gradient(var(--og-popover-bg), var(--og-popover-bg)), var(--og-bg-color));
+  backdrop-filter: var(--og-glass-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   color: var(--og-popover-text, var(--og-text-color));
   box-shadow: 0 16px 36px -12px rgba(0, 0, 0, .45), 0 2px 8px -2px rgba(0, 0, 0, .2);
   font-family: var(--og-font-family); font-size: 13px; line-height: 1.35; outline: none; overflow-y: auto;

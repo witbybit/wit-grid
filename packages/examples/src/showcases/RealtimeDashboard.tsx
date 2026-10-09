@@ -17,7 +17,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { GridReadyEvent, RowAnimationOptions } from '@eregister/wit-grid-react';
+import type { BuiltInThemeName, GridReadyEvent, RowAnimationOptions } from '@eregister/wit-grid-react';
 import { Pause, Play, TrendingUp } from 'lucide-react';
 import { DeskGrid, type GroupBy, type GroupDisplay } from './marketsDesk/DeskGrid';
 import { generateMarketAsync, type MarketRow } from './marketsDesk/data';
@@ -41,7 +41,7 @@ interface RealtimeDashboardProps {
 	 * Light switches the grid to the built-in `'spreadsheet'` theme and re-tints this component's own
 	 * chrome and custom renderers to match. Defaults to `'dark'`.
 	 */
-	theme?: 'light' | 'dark';
+	theme?: BuiltInThemeName;
 	/** Initial instrument count. Default: 50,000 (5,000 in `compact`). The gauntlet passes a small number. */
 	rowCount?: number;
 	/** Initial updates per second (100 / 1,000 / 10,000 / 50,000). Default: 10,000 (1,000 in `compact`). */

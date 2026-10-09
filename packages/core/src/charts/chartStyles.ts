@@ -9,7 +9,8 @@ export const CHART_STYLES = `
 .og-chart-empty[hidden] { display: none; }
 .og-chart-tooltip {
   position: absolute; z-index: 2; min-width: 140px; max-width: 260px; padding: 8px 10px; border-radius: 8px; pointer-events: none;
-  background: var(--og-popover-bg, var(--og-bg-color)); border: 1px solid var(--og-popover-border, var(--og-border-color));
+  background: var(--og-glass-popover-bg, var(--og-popover-bg, var(--og-bg-color))); border: 1px solid var(--og-glass-border, var(--og-popover-border, var(--og-border-color)));
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   box-shadow: 0 10px 30px rgba(0, 0, 0, .28); font-size: 12px; line-height: 1.5;
 }
 .og-chart-tooltip[hidden] { display: none; }
@@ -31,10 +32,11 @@ button.og-chart-legend-item { cursor: pointer; }
   --og-cw-line: var(--og-border-color);
   --og-cw-hover: color-mix(in srgb, var(--og-text-color) 8%, transparent);
   position: fixed; z-index: 2147483000; display: flex; flex-direction: column; min-width: 380px; min-height: 280px;
-  background: var(--og-bg-color); color: var(--og-text-color); font-family: var(--og-font-family, inherit); font-size: 13px;
+  background: var(--og-glass-popover-bg, var(--og-bg-color)); color: var(--og-text-color); font-family: var(--og-font-family, inherit); font-size: 13px;
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   border: 1px solid var(--og-cw-line); border-radius: 12px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35), 0 2px 8px rgba(0, 0, 0, .2); overflow: hidden;
 }
-.og-cw-head { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--og-cw-line); background: var(--og-header-bg); cursor: grab; user-select: none; }
+.og-cw-head { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 8px 0 14px; border-bottom: 1px solid var(--og-cw-line); background: var(--og-glass-header-bg, var(--og-header-bg)); cursor: grab; user-select: none; }
 .og-cw-head:active { cursor: grabbing; }
 .og-cw-title { flex: 1; min-width: 60px; height: 30px; padding: 0 6px; border: 0; border-radius: 6px; outline: 0; background: transparent; color: inherit; font: inherit; font-size: 14px; font-weight: 600; }
 .og-cw-title:hover { background: var(--og-cw-hover); }

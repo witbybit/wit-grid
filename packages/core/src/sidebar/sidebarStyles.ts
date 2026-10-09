@@ -17,7 +17,8 @@ export const SIDEBAR_STYLES = `
 /* Rail */
 .og-sb-rail {
   width: 48px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0;
-  background: var(--og-header-bg); border-left: 1px solid var(--og-sb-line);
+  background: var(--og-glass-header-bg, var(--og-header-bg)); border-left: 1px solid var(--og-sb-line);
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
 }
 .og-sb[data-position='left'] .og-sb-rail { border-left: 0; border-right: 1px solid var(--og-sb-line); }
 .og-sb-tab {
@@ -44,7 +45,8 @@ export const SIDEBAR_STYLES = `
 
 /* Panel */
 .og-sb-panel {
-  width: 0; flex: none; overflow: hidden; background: var(--og-bg-color);
+  width: 0; flex: none; overflow: hidden; background: var(--og-glass-popover-bg, var(--og-bg-color));
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   transition: width .22s cubic-bezier(.4, 0, .2, 1);
 }
 .og-sb[data-open] .og-sb-panel { width: var(--og-sb-width, 300px); border-left: 1px solid var(--og-sb-line); }

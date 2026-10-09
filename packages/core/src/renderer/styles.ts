@@ -70,6 +70,17 @@ export const CORE_STYLES = `
     box-sizing: border-box;
   }
 
+  /* Glass variables are emitted only by themes that opt in. The fallback keeps the
+     default render path free of backdrop filtering. */
+  @media (prefers-reduced-transparency: reduce) {
+    .og-grid-container {
+      --og-glass-backdrop-filter: none;
+      --og-glass-popover-bg: var(--og-popover-bg);
+      --og-glass-header-bg: var(--og-header-bg);
+      --og-glass-pinned-bg: var(--og-header-bg);
+    }
+  }
+
   /*
    * Scroll viewport — single overflow container for both axes.
    * No CSS Grid: rows live in og-rows-container (block flow after the sticky header).
@@ -337,7 +348,9 @@ export const CORE_STYLES = `
     overflow: hidden;
     border-radius: 10px;
     border: 1px solid var(--og-cell-border);
-    background: var(--og-bg-color);
+    background: var(--og-glass-popover-bg, var(--og-bg-color));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.55);
     animation: og-view-pop-in 0.16s ease-out;
   }
@@ -787,7 +800,9 @@ export const CORE_STYLES = `
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     color: var(--og-text-color);
     font-size: 12px;
     user-select: none;
@@ -1164,7 +1179,9 @@ export const CORE_STYLES = `
     overflow: hidden;
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   /* Left / right pin lanes — compositor-sticky so they never lag behind body rows. */
@@ -1180,7 +1197,9 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-right: 1px solid var(--og-pin-left-border-color);
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   .og-scrolled-left .og-layer-header-left {
@@ -1388,7 +1407,9 @@ export const CORE_STYLES = `
   }
 
   .og-row-pinned-top {
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-pinned-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     z-index: 25;
     border-bottom: 2px solid var(--og-border-color) !important;
   }
@@ -1427,7 +1448,9 @@ export const CORE_STYLES = `
   }
 
   .og-row-pinned-bottom {
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-pinned-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     z-index: 25;
     border-top: 2px solid var(--og-border-color) !important;
   }
@@ -2072,6 +2095,8 @@ export const CORE_STYLES = `
     pointer-events: none;
     white-space: nowrap;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   .og-cell-pinned-left .og-cell-editor,
@@ -2369,10 +2394,10 @@ export const CORE_STYLES = `
   .og-context-menu,
   .og-header-popover {
     position: fixed;
-    background: var(--og-popover-bg, rgba(15, 18, 26, 0.98));
-    backdrop-filter: blur(12px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border: 1px solid var(--og-popover-border, rgba(255, 255, 255, 0.09));
+    background: var(--og-glass-popover-bg, var(--og-popover-bg, rgba(15, 18, 26, 0.98)));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
+    border: 1px solid var(--og-glass-border, var(--og-popover-border, rgba(255, 255, 255, 0.09)));
     border-radius: 10px;
     box-shadow:
       0 16px 40px -12px rgba(0, 0, 0, 0.55),

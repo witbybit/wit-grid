@@ -558,7 +558,7 @@ export default function NativeCellTypesDemo({
 }: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
-	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');
+	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('glass-dark');
 	const theme = controlledTheme ?? ownTheme;
 	const themeRef = useRef(theme);
 	const [showSnippet, setShowSnippet] = useState(false);

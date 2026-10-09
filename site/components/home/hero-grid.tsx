@@ -43,7 +43,7 @@ const THEMES = BUILT_IN_THEME_ORDER.map((name) => {
 
 export function HeroGrid() {
 	const { resolvedTheme } = useTheme();
-	const siteTheme: BuiltInThemeName = resolvedTheme === 'light' ? 'light' : 'dark';
+	const siteTheme: BuiltInThemeName = resolvedTheme === 'light' ? 'glass-light' : 'glass-dark';
 	const [demo, setDemo] = useState<HeroDemo>('cells');
 	// The cell demo follows the site's light / dark mode until a theme is picked here.
 	const [pickedTheme, setPickedTheme] = useState<BuiltInThemeName | null>(null);
