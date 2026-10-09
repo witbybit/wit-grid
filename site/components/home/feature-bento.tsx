@@ -363,7 +363,7 @@ const FEATURES: Feature[] = [
 		hue: '#f59e0b',
 	},
 	{
-		title: 'Fourteen themes, your own in one call',
+		title: 'Sixteen themes, your own in one call',
 		description: 'Each with its own palette and typeface, switched at runtime — or build one from a dozen colours with createTheme().',
 		icon: Palette,
 		tag: 'createTheme()',
