@@ -1422,7 +1422,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1580,7 +1580,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1737,7 +1737,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1839,7 +1839,7 @@
 					"name": "groupRowRenderer",
 					"optional": true,
 					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
-					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\r\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
 				},
 				{
 					"name": "detailRowRenderer",

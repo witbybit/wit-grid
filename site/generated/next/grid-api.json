@@ -35,7 +35,7 @@
 					"name": "transaction",
 					"optional": false,
 					"signature": "(transaction: GridTransaction<TRowData>): GridTransactionResult<TRowData>",
-					"description": "The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)\r\ncommit atomically — one change, one undo entry, one repaint of what changed — with any grid\r\nstate (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it\r\nwith other queued row-only transactions into one commit before the next frame (high-frequency\r\nfeeds), awaits async validation of its cells, and resolves once committed. Any synchronous\r\nwrite commits the queue first, so writes land in call order."
+					"description": "The one data write: row deltas (`rows: { add, update, remove }`) and cell writes (`cells`)\ncommit atomically — one change, one undo entry, one repaint of what changed — with any grid\nstate (columns, sort, filter, pins) in the same call. `{ async: true }` queues it, merges it\nwith other queued row-only transactions into one commit before the next frame (high-frequency\nfeeds), awaits async validation of its cells, and resolves once committed. Any synchronous\nwrite commits the queue first, so writes land in call order."
 				},
 				{
 					"name": "transaction",
