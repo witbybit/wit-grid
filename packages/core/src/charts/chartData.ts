@@ -19,7 +19,9 @@ function fieldReader(api: GridApi<any>, columns: readonly ColumnDef<any>[], fiel
 	} catch {
 		direct = false;
 	}
-	const read: FieldReader = direct ? (_rowId, data) => (data as Record<string, unknown> | undefined)?.[field] : (rowId) => api.getCellValue(rowId, field);
+	const read: FieldReader = direct
+		? (_rowId, data) => (data as Record<string, unknown> | undefined)?.[field]
+		: (rowId) => api.getCellValue(rowId, field);
 	read.direct = direct;
 	return read;
 }
@@ -53,10 +55,11 @@ function rangeData(api: GridApi<any>, transposed: boolean, colors: (i: number) =
 		const value = api.getCellValue(id, col.field);
 		return col.valueFormatter ? col.valueFormatter({ value, colDef: col, rowId: id, rowData: undefined } as never) : String(value ?? '');
 	};
-	const isText = (col: ColumnDef<any>) => rows.some((row) => {
-		const value = api.getCellValue(row.id, col.field);
-		return value != null && value !== '' && toNumber(value) === null;
-	});
+	const isText = (col: ColumnDef<any>) =>
+		rows.some((row) => {
+			const value = api.getCellValue(row.id, col.field);
+			return value != null && value !== '' && toNumber(value) === null;
+		});
 	const first = cols[0];
 	const categoryCol = cols.length > 1 && isText(first) ? first : null;
 	const dataCols = categoryCol ? cols.slice(1) : cols;
@@ -65,9 +68,15 @@ function rangeData(api: GridApi<any>, transposed: boolean, colors: (i: number) =
 	if (!transposed) {
 		return {
 			categories: labels,
-			series: dataCols.map((col, i) => ({ name: columnLabel(col, col.field), values: rows.map((row) => value(col, row.id)), color: colors(i) })),
+			series: dataCols.map((col, i) => ({
+				name: columnLabel(col, col.field),
+				values: rows.map((row) => value(col, row.id)),
+				color: colors(i),
+			})),
 			categoryField: categoryCol?.field ?? null,
-			categoryValues: categoryCol ? rows.map((row) => api.getCellValue(row.id, categoryCol.field) as string | number | null) : rows.map(() => null),
+			categoryValues: categoryCol
+				? rows.map((row) => api.getCellValue(row.id, categoryCol.field) as string | number | null)
+				: rows.map(() => null),
 		};
 	}
 	return {
@@ -107,7 +116,11 @@ function aggregateData(api: GridApi<any>, source: Extract<ChartSource, { kind: '
 			let bucket = buckets.get(key);
 			if (!bucket) {
 				const label =
-					value === null ? '(Blank)' : categoryCol?.valueFormatter ? categoryCol.valueFormatter({ value, colDef: categoryCol, rowId, rowData: data } as never) : String(value);
+					value === null
+						? '(Blank)'
+						: categoryCol?.valueFormatter
+							? categoryCol.valueFormatter({ value, colDef: categoryCol, rowId, rowData: data } as never)
+							: String(value);
 				bucket = { value, label: label || String(value), acc: measures.map(() => ({ sum: 0, count: 0, min: Infinity, max: -Infinity })) };
 				buckets.set(key, bucket);
 			}
@@ -134,7 +147,10 @@ function aggregateData(api: GridApi<any>, source: Extract<ChartSource, { kind: '
 			.filter(([field]) => field !== source.category)
 			.map(([field, filter]) => {
 				const col = columns.find((c) => c.field === field);
-				return { read: fieldReader(api, columns, field), match: col ? prepareColumnFilter(filter as ColumnFilter, resolveColumnFilterDef(col)) : null };
+				return {
+					read: fieldReader(api, columns, field),
+					match: col ? prepareColumnFilter(filter as ColumnFilter, resolveColumnFilterDef(col)) : null,
+				};
 			});
 		api.forEachNode((node) => {
 			if (node.data === undefined || node.kind !== 'data') return;

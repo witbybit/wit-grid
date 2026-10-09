@@ -68,6 +68,8 @@ export interface GridHostOptions<TRowData = unknown> {
 	mountPanel?: AdapterPanelMount;
 	/** The chart window, opened with `api.openChart()` (and the context menu's Chart range). */
 	chart?: boolean;
+	/** Dragging a column header out of the grid hides the column. Default true. */
+	dragOutHidesColumns?: boolean;
 	autoRowHeight?: boolean;
 }
 
@@ -194,6 +196,7 @@ export function mountGridHost<TRowData>(
 	renderEngine.onMountHeaderMenu = options.headerMenu?.mountHeaderMenu;
 	renderEngine.onUnmountHeaderMenu = options.headerMenu?.unmountHeaderMenu;
 	renderEngine.filterPopover.mountAdapterFilter = options.mountFilter;
+	if (options.dragOutHidesColumns === false) renderEngine.dragOutHidesColumns = false;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);
 
 	// With a sidebar the container becomes a shell: the grid and the sidebar side by side.

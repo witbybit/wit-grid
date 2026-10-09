@@ -137,6 +137,26 @@ export interface ThemeTokens {
 	groupPanelHeight?: string;
 	bottomChromeHeight?: string;
 	totalHeaderHeight?: string;
+
+	/**
+	 * Optional frosted-glass treatment for floating surfaces, headers, and pinned rows.
+	 * It is deliberately opt-in because backdrop blur can add paint work while scrolling.
+	 */
+	glass?: GlassThemeOptions;
+}
+
+/** Controls the opt-in frosted-glass treatment emitted by a theme. */
+export interface GlassThemeOptions {
+	/** Blur radius applied behind glass surfaces. Defaults to `24px`. */
+	blur?: string;
+	/** Backdrop saturation. Defaults to `160%`. */
+	saturation?: string;
+	/** Tint for menus, editors, tooltips, and chart windows. */
+	tint?: string;
+	/** Tint for column headers and sidebar rails. */
+	headerTint?: string;
+	/** Tint for pinned rows. */
+	pinnedTint?: string;
 }
 
 /** The handful of colours (and a font) a whole theme is made from. */
@@ -167,6 +187,11 @@ export interface ThemePalette {
 	radius?: string;
 	/** Inputs inside popovers and the floating-filter row. */
 	inputBackground?: string;
+	/**
+	 * Enables frosted surfaces for menus, editors, tooltips, charts, headers, and pinned rows.
+	 * Disabled by default to keep the regular scrolling path as cheap as possible.
+	 */
+	glass?: boolean | GlassThemeOptions;
 }
 
 function hexToRgb(hex: string): [number, number, number] | null {
@@ -204,6 +229,15 @@ export function createTheme(p: ThemePalette): ThemeTokens {
 	const dark = p.appearance === 'dark';
 	const accentText = p.accentText ?? p.accent;
 	const input = p.inputBackground ?? (dark ? alpha(p.borderStrong, 0.35) : p.background);
+	const glass = p.glass
+		? {
+				blur: p.glass === true ? '24px' : (p.glass.blur ?? '24px'),
+				saturation: p.glass === true ? '160%' : (p.glass.saturation ?? '160%'),
+			tint: p.glass === true ? alpha(p.raised, dark ? 0.46 : 0.58) : (p.glass.tint ?? alpha(p.raised, dark ? 0.46 : 0.58)),
+			headerTint: p.glass === true ? alpha(p.surface, dark ? 0.42 : 0.54) : (p.glass.headerTint ?? alpha(p.surface, dark ? 0.42 : 0.54)),
+			pinnedTint: p.glass === true ? alpha(p.surface, dark ? 0.52 : 0.62) : (p.glass.pinnedTint ?? alpha(p.surface, dark ? 0.52 : 0.62)),
+			}
+		: undefined;
 	return {
 		fontFamily: p.font,
 
@@ -274,6 +308,8 @@ export function createTheme(p: ThemePalette): ThemeTokens {
 		groupPanelHeight: '42px',
 		bottomChromeHeight: '0px',
 		totalHeaderHeight: '40px',
+
+		glass,
 	};
 }
 
@@ -327,12 +363,52 @@ export const LIGHT_THEME: ThemeTokens = createTheme({
 	error: '#dc2626',
 });
 
+/** Dark frosted surfaces with cool-blue highlights. */
+export const GLASS_DARK_THEME: ThemeTokens = createTheme({
+	appearance: 'dark',
+	font: FONTS.inter,
+	background: '#0b1020',
+	surface: '#111a30',
+	raised: '#17213a',
+	text: '#edf3ff',
+	muted: '#a9b8d3',
+	border: '#2a3855',
+	borderStrong: '#465b82',
+	accent: '#7c9cff',
+	accentText: '#b8c8ff',
+	hover: '#18233d',
+	error: '#fb7185',
+	radius: '12px',
+	glass: true,
+});
+
+/** Bright frosted surfaces with a cobalt-blue accent. */
+export const GLASS_LIGHT_THEME: ThemeTokens = createTheme({
+	appearance: 'light',
+	font: FONTS.inter,
+	background: '#eef4ff',
+	surface: '#dfeaff',
+	raised: '#ffffff',
+	text: '#17233b',
+	muted: '#52627d',
+	border: '#c4d2ec',
+	borderStrong: '#9db3d8',
+	accent: '#3267dc',
+	accentText: '#2554bd',
+	hover: '#e1ebfb',
+	error: '#dc2626',
+	radius: '12px',
+	glass: true,
+});
+
 /**
  * Theme registry - built-in themes users can reference by name
  */
 export const BUILT_IN_THEMES = {
 	dark: DARK_THEME,
 	light: LIGHT_THEME,
+	'glass-dark': GLASS_DARK_THEME,
+	'glass-light': GLASS_LIGHT_THEME,
 	/** Deep sea navy with a cyan glow. */
 	ocean: createTheme({
 		appearance: 'dark',
@@ -541,6 +617,8 @@ export type BuiltInThemeName = keyof typeof BUILT_IN_THEMES;
 export const BUILT_IN_THEME_ORDER: BuiltInThemeName[] = [
 	'dark',
 	'light',
+	'glass-dark',
+	'glass-light',
 	'ocean',
 	'fjord',
 	'velvet',
@@ -558,6 +636,8 @@ export const BUILT_IN_THEME_ORDER: BuiltInThemeName[] = [
 export const BUILT_IN_THEME_METADATA: Record<BuiltInThemeName, { label: string; description: string; appearance: 'light' | 'dark'; font: string }> = {
 	dark: { label: 'Dark', description: 'Neutral graphite with an indigo accent.', appearance: 'dark', font: 'Inter' },
 	light: { label: 'Light', description: 'Crisp white with a blue accent.', appearance: 'light', font: 'Inter' },
+	'glass-dark': { label: 'Glass dark', description: 'Frosted navy surfaces with a cool-blue accent.', appearance: 'dark', font: 'Inter' },
+	'glass-light': { label: 'Glass light', description: 'Bright frosted surfaces with a cobalt-blue accent.', appearance: 'light', font: 'Inter' },
 	ocean: { label: 'Ocean', description: 'Deep sea navy with a cyan glow.', appearance: 'dark', font: 'Plus Jakarta Sans' },
 	fjord: { label: 'Fjord', description: 'Arctic slate with frost-blue accents.', appearance: 'dark', font: 'IBM Plex Sans' },
 	velvet: { label: 'Velvet', description: 'Midnight plum with a neon-pink accent.', appearance: 'dark', font: 'DM Sans' },
@@ -611,9 +691,17 @@ export function themeToCSSVariables(theme: ThemeTokens, selector = '.og-grid-con
 
 	const lines = [`${selector} {`];
 	for (const [key, value] of Object.entries(theme)) {
-		if (value !== undefined) {
+		if (key !== 'glass' && value !== undefined) {
 			lines.push(`  ${varName(key)}: ${value};`);
 		}
+	}
+	if (theme.glass) {
+		const glass = theme.glass;
+		lines.push(`  --og-glass-backdrop-filter: blur(${glass.blur ?? '24px'}) saturate(${glass.saturation ?? '160%'});`);
+		lines.push(`  --og-glass-popover-bg: ${glass.tint ?? theme.popoverBg};`);
+		lines.push(`  --og-glass-header-bg: ${glass.headerTint ?? theme.headerBg};`);
+		lines.push(`  --og-glass-pinned-bg: ${glass.pinnedTint ?? theme.headerBg};`);
+		lines.push(`  --og-glass-border: ${theme.borderColorAccent};`);
 	}
 	lines.push('}');
 	return lines.join('\n');

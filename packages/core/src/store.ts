@@ -160,7 +160,6 @@ const _FALLBACK_CAPS: Record<RowModelType, RowModelCapabilities> = {
 	client:   { fullDataset: true, loadedDataset: false, pagedDataset: false, clientMutation: true, loadedRowMutation: false, pageRowMutation: false, transactions: true, rowOrder: true, blockLoading: false, serverPagination: false, clientSort: true, clientFilter: true, serverSort: false, serverFilter: false, clientGrouping: true, clientTree: true, aggregation: true, masterDetail: true, allRowSelection: true, loadedRowSelection: false, pageRowSelection: false },
 };
 
-
 /**
  * Internal runtime composition root.
  *
@@ -241,6 +240,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			pinnedColumns: initialState.pinnedColumns,
 			showGroupPanel: initialState.showGroupPanel,
 			showFilterChipBar: initialState.showFilterChipBar,
+			showMinimap: initialState.showMinimap,
+			view: initialState.view,
 			showFloatingFilters: initialState.showFloatingFilters,
 			showStatusBar: initialState.showStatusBar,
 			pagination: initialState.pagination,
@@ -462,32 +463,35 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	public pasteFromClipboard = (): Promise<void> => this.interactionController.pasteFromClipboard();
 	public setColumnVisible = (colField: string, visible: boolean): void => this.setColumnsVisible([colField], visible);
 
+	/**
+	 * Shows or hides columns. A hidden column's filter stays (and keeps filtering, like any active
+	 * filter); pinned columns stay pinned, and hiding one does not pin its neighbour.
+	 */
 	public setColumnsVisible = (colFields: string[], visible: boolean): void => {
 		const fieldSet = new Set(colFields);
 		if (fieldSet.size === 0) return;
+		// Pins are counts of displayed columns: keep the same columns pinned across the change. A
+		// pinned column remembers its lane while hidden (`pinned`), so showing it pins it again.
+		const before = this.getDisplayedColumns().map((c) => c.field);
+		const pins = this.getPinnedColumns();
+		const pinnedLeft = new Set(before.slice(0, pins.left));
+		const pinnedRight = new Set(pins.right > 0 ? before.slice(before.length - pins.right) : []);
 		let changed = false;
 		const columns = this.state.columns.map((column) => {
 			if (!fieldSet.has(column.field) || column.hide === !visible) return column;
 			changed = true;
-			return { ...column, hide: !visible };
+			if (visible) return { ...column, hide: false };
+			const pinned: ColumnDef<TRowData>['pinned'] = pinnedLeft.has(column.field) ? 'left' : pinnedRight.has(column.field) ? 'right' : undefined;
+			return { ...column, hide: true, pinned };
 		});
-		if (changed) {
-			this.engine.setColumns(columns, false);
-			// Clear filters for columns being hidden so stale filter state doesn't accumulate
-			if (!visible && this.state.filterModel) {
-				const newModel = { ...this.state.filterModel };
-				let filterChanged = false;
-				for (const field of fieldSet) {
-					if (field in newModel) {
-						delete newModel[field];
-						filterChanged = true;
-					}
-				}
-				if (filterChanged) {
-					this.engine.setFilterModel(Object.keys(newModel).length > 0 ? newModel : null, false);
-				}
-			}
-		}
+		if (!changed) return;
+		this.engine.setColumns(columns, false);
+		const lane = new Map(columns.map((c) => [c.field, c.pinned]));
+		const after = this.getDisplayedColumns().map((c) => c.field);
+		const shown = (field: string) => visible && fieldSet.has(field);
+		const left = after.filter((f) => pinnedLeft.has(f) || (shown(f) && lane.get(f) === 'left')).length;
+		const right = after.filter((f) => pinnedRight.has(f) || (shown(f) && lane.get(f) === 'right')).length;
+		if (left !== pins.left || right !== pins.right) this.setPinnedColumns({ left, right });
 	};
 
 	public getColumns = (): ColumnDef<TRowData>[] => {
@@ -534,8 +538,10 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
-	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, this.state.columnWidths, options);
-	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, this.state.columnWidths, options);
+	public exportExcel = (options?: ExcelExportOptions): Promise<void> =>
+		exportToXlsx(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
+	public getExcel = (options?: ExcelExportOptions): Promise<Blob> =>
+		toXlsxBlob(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
 
 	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
 	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {
@@ -718,7 +724,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 		// grouping are set any other way): announce what the restore changes.
 		const mutation = prepared.restore.stateMutation;
 		const current = this.engine.getState();
-		const changed = <K extends keyof typeof mutation>(key: K) => key in mutation && JSON.stringify(mutation[key] ?? null) !== JSON.stringify(current[key] ?? null);
+		const changed = <K extends keyof typeof mutation>(key: K) =>
+			key in mutation && JSON.stringify(mutation[key] ?? null) !== JSON.stringify(current[key] ?? null);
 		const events: GridCommitEvent<TRowData>[] = [];
 		if (changed('columns')) {
 			const columns = mutation.columns as ColumnDef<TRowData>[];

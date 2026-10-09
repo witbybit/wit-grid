@@ -1,5 +1,5 @@
 import { createClientGrid, createInfiniteGrid, createServerSideGrid, createLocalStorageAdapter } from '@eregister/wit-grid-core';
-import type { RowAnimationOptions } from '@eregister/wit-grid-core';
+import type { GridViewConfig, RowAnimationOptions } from '@eregister/wit-grid-core';
 import { useEffect, useLayoutEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
 
 /** useLayoutEffect in the browser, useEffect on the server (where layout effects warn and never run). */
@@ -59,6 +59,12 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	showStatusBar?: boolean;
 	/** Show the filter chip bar above the header when filters are active. */
 	showFilterChipBar?: boolean;
+	/** Show the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	showMinimap?: boolean;
+	/** Show the displayed rows another way: a gallery of cards or a calendar. Absent or null shows the table. */
+	view?: GridViewConfig<TRowData> | null;
+	/** The grid changed view itself (double-clicking a card or entry opens it in the table). */
+	onViewChange?: (view: GridViewConfig<TRowData> | null) => void;
 	/** Show the floating filter row — always-visible inline filter inputs below column headers. */
 	showFloatingFilters?: boolean;
 	/**
@@ -108,6 +114,8 @@ function createInitialState<TRowData>(
 		pagination: { pageSize: number; initialPage: number } | null;
 		showStatusBar?: boolean;
 		showFilterChipBar?: boolean;
+		showMinimap?: boolean;
+		view?: GridViewConfig<TRowData> | null;
 		showFloatingFilters?: boolean;
 		rowDragMode?: 'managed' | 'unmanaged';
 	}
@@ -125,6 +133,8 @@ function createInitialState<TRowData>(
 	if (extras.pagination) merged.pagination = { pageSize: extras.pagination.pageSize, page: extras.pagination.initialPage };
 	if (extras.showStatusBar) merged.showStatusBar = true;
 	if (extras.showFilterChipBar) merged.showFilterChipBar = true;
+	if (extras.showMinimap) merged.showMinimap = true;
+	if (extras.view) merged.view = extras.view;
 	if (extras.showFloatingFilters) merged.showFloatingFilters = true;
 	if (extras.rowDragMode) merged.rowDragMode = extras.rowDragMode;
 	return merged;
@@ -161,6 +171,9 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		pagination,
 		showStatusBar,
 		showFilterChipBar,
+		showMinimap,
+		view,
+		onViewChange,
 		showFloatingFilters,
 		rowAnimation,
 		rows,
@@ -232,7 +245,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				columnTypes,
 				styleRules,
 			},
-			{ pagination: paginationConfig, showStatusBar, showFilterChipBar, showFloatingFilters, rowDragMode }
+			{ pagination: paginationConfig, showStatusBar, showFilterChipBar, showMinimap, view, showFloatingFilters, rowDragMode }
 		);
 
 		if (rowModelType === 'infinite') {
@@ -298,6 +311,18 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 	useEffect(() => {
 		api.setShowFilterChipBar(!!showFilterChipBar);
 	}, [api, showFilterChipBar]);
+
+	useEffect(() => {
+		api.setShowMinimap(!!showMinimap);
+	}, [api, showMinimap]);
+
+	useEffect(() => {
+		api.setView(view ?? null);
+	}, [api, view]);
+
+	const onViewChangeRef = useRef(onViewChange);
+	onViewChangeRef.current = onViewChange;
+	useEffect(() => api.subscribeToKey('view', (next) => onViewChangeRef.current?.(next)), [api]);
 
 	// New rows reach the grid during the commit, not in a passive effect that React may run after the
 	// browser paints: a live data change is drawn on the next frame instead of one frame later.

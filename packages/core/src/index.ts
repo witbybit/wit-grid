@@ -121,10 +121,17 @@ export type {
 	DetailRowStyleRule,
 	CellStyleRule,
 	HeaderCellStyleRule,
+	ColorScaleRule,
+	DataBarRule,
+	IconSetRule,
+	ValueScaleRule,
 	GridStyleRule,
 	ValueGetterParams,
 } from './columnDef.js';
 export type { GridInitialState } from './state/GridState.js';
+export type { GridPresencePeer, GridPresenceCell, GridCellFlash } from './presence.js';
+export type { GridMinimapMark } from './minimap.js';
+export type { GridViewConfig, GalleryViewConfig, CalendarViewConfig } from './views.js';
 export type {
 	VisualRowModel,
 	RowModelViewportAccess,
@@ -276,6 +283,8 @@ export type { GridNavigationOptions } from './interaction/GridInteractionControl
 export {
 	LIGHT_THEME,
 	DARK_THEME,
+	GLASS_DARK_THEME,
+	GLASS_LIGHT_THEME,
 	BUILT_IN_THEMES,
 	BUILT_IN_THEME_ORDER,
 	BUILT_IN_THEME_METADATA,
@@ -286,7 +295,7 @@ export {
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from './renderer/themes.js';
-export type { ThemeTokens, ThemePalette, BuiltInThemeName } from './renderer/themes.js';
+export type { ThemeTokens, ThemePalette, GlassThemeOptions, BuiltInThemeName } from './renderer/themes.js';
 export type { RowAnimationOptions } from './renderer/rowAnimation.js';
 export type { GridDomainVersions } from './state/GridDomainVersions.js';
 export type { GridInstrumentation, GridInstrumentationSnapshot, FrameMetrics, FallbackMetric } from './diagnostics/GridInstrumentation.js';

@@ -21,7 +21,16 @@ export {
 	isBuiltInThemeName,
 	themeToCSSVariables,
 } from '@eregister/wit-grid-core';
-export type { ThemePalette } from '@eregister/wit-grid-core';
+export type {
+	ThemePalette,
+	GridPresencePeer,
+	GridPresenceCell,
+	GridCellFlash,
+	GridMinimapMark,
+	GridViewConfig,
+	GalleryViewConfig,
+	CalendarViewConfig,
+} from '@eregister/wit-grid-core';
 
 // ─── Built-in cell types (core, DOM-based) ───────────────────────────────────
 export {
@@ -62,6 +71,8 @@ export {
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
+	timelineColumnType,
+	createTimelineRenderer,
 	createSparklineRenderer,
 	defaultDateRangePresets,
 } from '@eregister/wit-grid-core';
@@ -90,6 +101,7 @@ export type {
 	CellPopoverOptions,
 	LinkedRecordOptions,
 	SparklineCellOptions,
+	TimelineCellOptions,
 	DateRange,
 	DateRangePreset,
 	DateRangeCellOptions,
@@ -119,14 +131,34 @@ export type { GroupRenderContext, GroupRendererSpec, GroupRendererHandle, DomGro
 export type { RowAnimationOptions, StickyHeadersOptions } from '@eregister/wit-grid-core';
 export { resolveColumnFilterDef, summarizeFilter } from '@eregister/wit-grid-core';
 export { createGridChart, GRID_STATE_SCHEMA_VERSION } from '@eregister/wit-grid-core';
-export type { ChartAggregate, ChartData, ChartSeries, ChartSource, ChartSpec, ChartType, ExcelExportOptions, GridChartHandle } from '@eregister/wit-grid-core';
+export type {
+	ChartAggregate,
+	ChartData,
+	ChartSeries,
+	ChartSource,
+	ChartSpec,
+	ChartType,
+	ExcelExportOptions,
+	GridChartHandle,
+} from '@eregister/wit-grid-core';
 
 export { isDomCellRenderer, createLocalStorageAdapter, GridEventName } from './types.js';
 export type { GridEventPayloadMap, GridPersistenceAdapter, PersistedGridState, PersistenceStatus, PersistenceSaveStatus } from './types.js';
 export type { GridWriteBlockedEventPayload } from './types.js';
 export type { GridWorkspaceAdapter, GridViewDefinition, GridWorkspaceState, SaveViewOptions } from './types.js';
 export { createLocalStorageWorkspaceAdapter } from './types.js';
-export type { StyleRule, RowStyleRule, GroupRowStyleRule, DetailRowStyleRule, CellStyleRule, HeaderCellStyleRule } from './types.js';
+export type {
+	StyleRule,
+	RowStyleRule,
+	GroupRowStyleRule,
+	DetailRowStyleRule,
+	CellStyleRule,
+	HeaderCellStyleRule,
+	ColorScaleRule,
+	DataBarRule,
+	IconSetRule,
+	ValueScaleRule,
+} from './types.js';
 export type {
 	ColumnDef,
 	CellEditorProps,

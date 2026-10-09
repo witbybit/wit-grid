@@ -11,12 +11,12 @@ import { InfiniteRowModelController } from '../infiniteRowModel.js';
 import { ServerSideRowModelController } from '../serverSideRowModel.js';
 
 /**
- * Count the row-slot DOM children of the rows container, excluding the `.og-layer-exiting`
- * overlay (Plan 043) which is a deliberate non-slot sibling for fade-out ghosts. The
- * stable-slot invariant is about slot elements, not this overlay.
+ * Count the row-slot DOM children of the rows container, excluding the overlay layers
+ * (`.og-layer-*`: fade-out ghosts, Plan 043, and presence cursors), which are deliberate non-slot
+ * siblings. The stable-slot invariant is about slot elements, not these overlays.
  */
 function slotDomCount(rowsContainer: HTMLElement): number {
-	return Array.from(rowsContainer.children).filter((c) => !c.classList.contains('og-layer-exiting')).length;
+	return Array.from(rowsContainer.children).filter((c) => !c.className.startsWith('og-layer-')).length;
 }
 
 describe('RenderEngine', () => {

@@ -80,6 +80,8 @@ export function createGridStateSnapshot<TRowData>(state: InternalGridState<TRowD
 		themeName: state.themeName,
 		sidebarOpenPanel: state.sidebarOpenPanel,
 		chartOpen: state.chartOpen,
+		// Replaced, never mutated: shared by reference.
+		view: (state.view ?? null) as GridStateSnapshot<TRowData>['view'],
 		// Hierarchy configs are replaced, never mutated, on change: sharing the reference keeps
 		// selectors over them stable across unrelated snapshot rebuilds.
 		grouping: state.grouping,

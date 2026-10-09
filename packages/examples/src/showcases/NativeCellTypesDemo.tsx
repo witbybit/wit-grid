@@ -9,6 +9,7 @@ import {
 	BUILT_IN_THEME_METADATA,
 	BUILT_IN_THEME_ORDER,
 	Grid,
+	GridEventName,
 	getBuiltInTheme,
 	comboboxColumnType,
 	currencyColumnType,
@@ -25,6 +26,8 @@ import {
 	cascadeColumnType,
 	linkedRecordColumnType,
 	sparklineColumnType,
+	numberColumnType,
+	timelineColumnType,
 	openCellPopover,
 	CELL_HUES,
 	createLocalStorageWorkspaceAdapter,
@@ -40,8 +43,12 @@ import type {
 	GridReadyEvent,
 	GridSidebarConfig,
 	PersonOption,
+	StyleRule,
+	GridViewConfig,
 } from '@eregister/wit-grid-react';
-import { Box, Code2, ChevronRight, Filter, Palette } from 'lucide-react';
+import { Box, CalendarDays, Code2, ChevronRight, Filter, LayoutGrid, Palette, Table2, Users } from 'lucide-react';
+import { startTeammates, type TeammateEdit } from './simulatedTeammates';
+import { GUIDE_ICON, ViewGuidePanel } from './viewGuidePanel';
 import { ACCOUNTS, DIRECTORY, PROJECTS, accountsServer, directoryServer, projectsServer } from './nativeCellTypesServer';
 
 // ─── Data model ───────────────────────────────────────────────────────────────
@@ -59,6 +66,7 @@ interface TaskRow {
 	projects: string[];
 	location: string[];
 	sprint: { start: string; end: string };
+	schedule: { start: string; end: string };
 	billable: boolean;
 	trend: number[];
 	commits: number[];
@@ -72,6 +80,7 @@ interface TaskRow {
 	progress: number;
 	confidence: number;
 	rating: number;
+	velocity: number;
 	spec: string;
 	contact: string;
 	updated: string;
@@ -288,6 +297,8 @@ const TASK_COLUMN_TYPES: Record<string, ColumnTypeDefinition<TaskRow>> = {
 	progress: progressColumnType(),
 	confidence: progressColumnType({ max: 1, traffic: true }),
 	rating: ratingColumnType(),
+	velocity: numberColumnType({ decimals: 0 }),
+	schedule: timelineColumnType({ color: (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color }),
 	effort: segmentedColumnType(EFFORT),
 	// Links to another table: record chips, a record picker paged from its API, chips open the record.
 	projects: linkedRecordColumnType([], {
@@ -310,6 +321,9 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'task', header: 'Task', width: 220 },
 	{ field: 'status', header: 'Status', width: 140, type: 'status' },
 	{ field: 'priority', header: 'Priority', width: 120, type: 'priority' },
+	{ field: 'schedule', header: 'Timeline', width: 280, type: 'schedule' },
+	{ field: 'velocity', header: 'Velocity', width: 132, type: 'velocity' },
+	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
 	{ field: 'effort', header: 'Effort', width: 120, type: 'effort' },
 	{ field: 'labels', header: 'Labels', width: 200, type: 'labels' },
 	{ field: 'team', header: 'Team', width: 150, type: 'team' },
@@ -321,7 +335,6 @@ const COLUMNS: ColumnDef<TaskRow>[] = [
 	{ field: 'location', header: 'Office', width: 240, type: 'location' },
 	{ field: 'due', header: 'Due', width: 140, type: 'date' },
 	{ field: 'sprint', header: 'Sprint', width: 250, type: 'sprint' },
-	{ field: 'budget', header: 'Budget', width: 120, type: 'budget' },
 	{ field: 'billable', header: 'Billing', width: 130, type: 'billable' },
 	{ field: 'progress', header: 'Progress', width: 160, type: 'progress' },
 	{ field: 'trend', header: 'Trend (12 wk)', width: 170, type: 'trend' },
@@ -380,16 +393,70 @@ function generateTasks(count: number): TaskRow[] {
 			watchers: [pick(DIRECTORY, i * 13).value, pick(DIRECTORY, i * 29 + 7).value],
 			owner: owner.value,
 			reviewers: [pick(PEOPLE, i + 1).value, pick(PEOPLE, i + 4).value, ...(i % 3 === 0 ? [pick(PEOPLE, i + 6).value] : [])].join(','),
-			due: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((i * 7) % 28) + 1).padStart(2, '0')}`,
+			due: `2026-${String((i % 12) + 1).padStart(2, '0')}-${String(((Math.floor(i / 12) * 9) % 28) + 1).padStart(2, '0')}`,
 			budget: i % 13 === 4 ? -1200 : 2500 + ((i * 1733) % 48000),
 			progress,
 			confidence: ((i * 29) % 100) / 100,
 			rating: (i * 3) % 6,
+			schedule: scheduleFor(i),
+			velocity: Math.round(8 + 34 * Math.abs(Math.sin(i * 1.7)) + (i % 5)),
 			spec: `docs.example.com/specs/${1001 + i}`,
 			contact: `${owner.label!.split(' ')[0].toLowerCase()}@example.com`,
 			updated: `2026-09-${String((i % 28) + 1).padStart(2, '0')}T${String(8 + (i % 10)).padStart(2, '0')}:${String((i * 13) % 60).padStart(2, '0')}`,
 		};
 	});
+}
+
+// Conditional formatting: bars, heat and icons scaled to each column's range.
+const STYLE_RULES: StyleRule<TaskRow>[] = [
+	{ kind: 'dataBar', field: 'budget' },
+	{ kind: 'colorScale', field: 'velocity' },
+	{ kind: 'iconSet', field: 'velocity', icons: 'arrows' },
+];
+
+// The same rows, other ways: cards and a calendar over the plan (filters and sort apply).
+const statusColour = (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color;
+const VIEWS: Record<NativeCellTypesView, GridViewConfig<TaskRow> | null> = {
+	table: null,
+	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'priority', 'owner', 'progress', 'budget'], color: statusColour },
+	// Placed by the due date: one day per task keeps the month readable (range fields span their days).
+	calendar: { kind: 'calendar', dateField: 'due', titleField: 'task', fields: ['status', 'priority', 'owner'], color: statusColour },
+};
+const VIEW_CHOICES = [
+	{ id: 'table', label: 'Table', icon: Table2 },
+	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
+	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
+] as const;
+
+// What simulated teammates change, and how: each edit goes through the normal API.
+const STATUS_ORDER = STATUS.map((s) => s.value as string);
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+const TEAMMATE_EDITS: Record<string, TeammateEdit> = {
+	status: (v) => STATUS_ORDER[(STATUS_ORDER.indexOf(String(v)) + 1) % STATUS_ORDER.length],
+	priority: () => PRIORITY[Math.floor(Math.random() * PRIORITY.length)].value,
+	rating: (v) => (Number(v) + 1) % 6,
+	progress: (v) => (Number(v) >= 100 ? 0 : clamp(Number(v) + 20, 0, 100)),
+	velocity: (v) => clamp(Math.round(Number(v) + (Math.random() < 0.5 ? -1 : 1) * (4 + Math.random() * 10)), 4, 60),
+	budget: (v) => Math.round((Number(v) + (Math.random() * 14000 - 5000)) / 100) * 100,
+	confidence: (v) => Math.round(clamp(Number(v) + (Math.random() * 0.4 - 0.2), 0, 1) * 100) / 100,
+	schedule: (v) => {
+		const { start, end } = v as { start: string; end: string };
+		const shift = (iso: string, days: number) => {
+			const d = new Date(`${iso}T00:00:00`);
+			d.setDate(d.getDate() + days);
+			return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		};
+		const days = Math.round(Math.random() * 8 - 3);
+		return Math.random() < 0.5 ? { start: shift(start, days), end: shift(end, days) } : { start, end: shift(end, Math.abs(days) + 1) };
+	},
+};
+
+// A plausible project plan: staggered starts over a quarter, one to five weeks each.
+function scheduleFor(i: number): { start: string; end: string } {
+	const start = new Date(2026, 8, 1 + ((i * 5) % 70));
+	const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6 + ((i * 11) % 29));
+	const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	return { start: iso(start), end: iso(end) };
 }
 
 // ─── Reference ────────────────────────────────────────────────────────────────
@@ -462,32 +529,85 @@ interface NativeCellTypesDemoProps {
 	 * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.
 	 */
 	theme?: BuiltInThemeName;
+	/** The view, when the host picks it (the docs hero): table, gallery or calendar. */
+	view?: NativeCellTypesView;
+	onViewChange?: (view: NativeCellTypesView) => void;
 }
 
-// The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
-const SIDEBAR: GridSidebarConfig<TaskRow> = { panels: ['columns', 'filters', 'sort', 'query', 'views'] };
+export type NativeCellTypesView = 'table' | 'gallery' | 'calendar';
 
-export default function NativeCellTypesDemo({ onGridReady, compact = false, theme: controlledTheme }: NativeCellTypesDemoProps) {
+// The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
+// A custom panel of our own beside the built-in ones: the guide for whichever view is showing.
+const SIDEBAR: GridSidebarConfig<TaskRow> = {
+	panels: [
+		{ id: 'guide', label: 'Guide', icon: GUIDE_ICON, renderPanel: ({ api }) => <ViewGuidePanel api={api} /> },
+		'columns',
+		'filters',
+		'sort',
+		'query',
+		'views',
+	],
+};
+
+export default function NativeCellTypesDemo({
+	onGridReady,
+	compact = false,
+	theme: controlledTheme,
+	view: controlledView,
+	onViewChange,
+}: NativeCellTypesDemoProps) {
 	const rows = useMemo(() => generateTasks(200), []);
 	const apiRef = useRef<GridApi<TaskRow> | null>(null);
-	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('dark');
+	const [ownTheme, setOwnTheme] = useState<BuiltInThemeName>('glass-dark');
 	const theme = controlledTheme ?? ownTheme;
 	const themeRef = useRef(theme);
 	const [showSnippet, setShowSnippet] = useState(false);
 	// The floating filter row: compact filter editors under the headers (on by default on the page).
 	const [filterRow, setFilterRow] = useState(!compact);
+	// Simulated teammates: cursors, live edits and flashes (they step back while you use the grid).
+	const [teammates, setTeammates] = useState(true);
+	const [ownViewId, setOwnViewId] = useState<NativeCellTypesView>('table');
+	const viewId = controlledView ?? ownViewId;
+	const setViewId = (next: NativeCellTypesView) => {
+		setOwnViewId(next);
+		onViewChange?.(next);
+		// Switching to the gallery or calendar opens its guide in the grid sidebar.
+		if (next !== 'table' && next !== viewId) readyApi?.openPanel('guide');
+	};
+	const [readyApi, setReadyApi] = useState<GridApi<TaskRow> | null>(null);
 	// The theme the grid is created with (no flash of the default theme); later changes switch it.
-	const initialState = useMemo(() => ({ themeName: themeRef.current }), []);
+	// Sorted by velocity: as teammates change it, rows slide to their new places under the heat scale.
+	const initialState = useMemo(() => ({ themeName: themeRef.current, sortModel: [{ colId: 'velocity', sort: 'desc' as const }] }), []);
 
 	const handleReady = useCallback(
 		(event: GridReadyEvent<TaskRow>) => {
 			apiRef.current = event.api;
+			setReadyApi(event.api);
 			// A remounted grid starts on the theme it was created with: bring it to the current one.
 			if (event.api.getThemeName() !== themeRef.current) event.api.switchTheme(themeRef.current);
 			onGridReady?.(event);
 		},
 		[onGridReady]
 	);
+	useEffect(() => {
+		if (!readyApi || !teammates) return;
+		return startTeammates(readyApi, { edits: TEAMMATE_EDITS });
+	}, [readyApi, teammates]);
+	// Blocked tasks marked on the minimap, kept current as statuses change.
+	useEffect(() => {
+		if (!readyApi) return;
+		const markBlocked = () => {
+			const marks: { rowId: string; color: string }[] = [];
+			readyApi.forEachNode((node) => {
+				if (node.data?.status === 'blocked') marks.push({ rowId: node.id, color: CELL_HUES.rose });
+			});
+			readyApi.setMinimapMarks(marks);
+		};
+		markBlocked();
+		return readyApi.addEventListener(GridEventName.cellValueChanged, (event) => {
+			if (event.payload.colField === 'status') markBlocked();
+		});
+	}, [readyApi]);
 	useEffect(() => {
 		themeRef.current = theme;
 		const api = apiRef.current;
@@ -506,6 +626,10 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 			enableChart
 			showFloatingFilters={filterRow}
 			showFilterChipBar
+			showMinimap
+			view={VIEWS[viewId]}
+			onViewChange={(next) => setViewId((Object.keys(VIEWS) as NativeCellTypesView[]).find((id) => VIEWS[id] === next) ?? 'table')}
+			styleRules={STYLE_RULES}
 			sidebar={SIDEBAR}
 			workspace={createLocalStorageWorkspaceAdapter({ storageKey: 'native-cell-type-demo' })}
 			onGridReady={handleReady}
@@ -533,6 +657,32 @@ export default function NativeCellTypesDemo({ onGridReady, compact = false, them
 						<Filter className='w-3.5 h-3.5' />
 						Filter row
 					</button>
+					<button
+						onClick={() => setTeammates((v) => !v)}
+						aria-pressed={teammates}
+						className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border transition-colors ${
+							teammates ? 'border-slate-500 bg-slate-800 text-slate-100' : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'
+						}`}
+					>
+						<Users className='w-3.5 h-3.5' />
+						Teammates
+					</button>
+					<div className='flex items-center rounded-md border border-slate-800 p-0.5' role='radiogroup' aria-label='View'>
+						{VIEW_CHOICES.map(({ id, label, icon: Icon }) => (
+							<button
+								key={id}
+								role='radio'
+								aria-checked={viewId === id}
+								onClick={() => setViewId(id)}
+								className={`flex items-center gap-1.5 h-6 px-2 rounded text-[11px] font-medium transition-colors ${
+									viewId === id ? 'bg-slate-700 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+								}`}
+							>
+								<Icon className='w-3.5 h-3.5' />
+								{label}
+							</button>
+						))}
+					</div>
 					{!controlledTheme && (
 						<div className='flex flex-wrap items-center gap-1' role='radiogroup' aria-label='Grid theme'>
 							<Palette className='w-3.5 h-3.5 text-slate-500 mr-1' />

@@ -1,3 +1,4 @@
+import { sortReaderOf } from './sortKeys.js';
 import { compilePathGetter, type ColumnDef } from '../columnDef.js';
 import { createGridRowDataRef } from '../publicRowRef.js';
 import type { RowNode } from '../rowNode.js';
@@ -41,11 +42,22 @@ export function createRowPipelineContext<TData>(
 		return reader;
 	};
 
+	const sortReaders = new Map<string, (node: RowNode<TData>) => unknown>();
+	const sortReaderFor = (colId: string): ((node: RowNode<TData>) => unknown) => {
+		let reader = sortReaders.get(colId);
+		if (!reader) {
+			reader = sortReaderOf(columnsById.get(colId), readerFor(colId));
+			sortReaders.set(colId, reader);
+		}
+		return reader;
+	};
+
 	return {
 		columnsById,
 		reportFault,
 		getValue: (node, colId) => readerFor(colId)(node),
 		readerFor,
+		sortReaderFor,
 		getGroupKey: (node, groupDef: GroupDef<TData>) => {
 			const value = readerFor(groupDef.colId)(node);
 			const keyString = groupDef.keyCreator ? groupDef.keyCreator({ value, row: node.data, rowId: node.id }) : String(value ?? 'None');

@@ -1,3 +1,6 @@
+import type { GridViewConfig } from '../views.js';
+import { MinimapMarksStore, type GridMinimapMark } from '../minimap.js';
+import { PresenceStore, type GridCellFlash, type GridPresencePeer } from '../presence.js';
 import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import { canEditCell, isCellSelectable } from '../visualRow.js';
 import { AsyncTransactionQueue } from './AsyncTransactionQueue.js';
@@ -141,6 +144,10 @@ export class GridEngine<TRowData = unknown> {
 	public readonly columns: ColumnModel<TRowData>;
 	public readonly viewport: ViewportModel<TRowData>;
 	public readonly geometry: GeometryModel;
+	/** Peers' cursors and cell flashes, fed by the app; drawn by the renderer's presence layer. */
+	public readonly presence = new PresenceStore();
+	/** Marks the app adds to the minimap (search hits, bookmarks). */
+	public readonly minimapMarks = new MinimapMarksStore();
 	public readonly selection: SelectionModel;
 	public readonly cellAccess: CellAccessModel<TRowData>;
 	public readonly stateManager: StateManager<TRowData>;
@@ -495,6 +502,8 @@ export class GridEngine<TRowData = unknown> {
 			pinnedColumns: config.pinnedColumns,
 			showGroupPanel: config.showGroupPanel,
 			showFilterChipBar: config.showFilterChipBar,
+			showMinimap: config.showMinimap,
+			view: config.view ?? null,
 			showFloatingFilters: config.showFloatingFilters,
 			showStatusBar: config.showStatusBar,
 			pagination: config.pagination,
@@ -1150,6 +1159,15 @@ export class GridEngine<TRowData = unknown> {
 	public setColumnReorderEnabled(enabled: boolean): void {
 		this.columnFeature.setColumnReorderEnabled(enabled);
 	}
+	public setPresence(peers: readonly GridPresencePeer[]): void {
+		this.presence.set(peers);
+	}
+	public getPresence(): readonly GridPresencePeer[] {
+		return this.presence.peers;
+	}
+	public flashCells(cells: readonly GridCellFlash[]): void {
+		this.presence.flash(cells);
+	}
 	public setStyleRules(styleRules: InternalGridState<TRowData>['styleRules']): void {
 		this.stateFeature.setStyleRules(styleRules);
 	}
@@ -1159,6 +1177,18 @@ export class GridEngine<TRowData = unknown> {
 
 	public setShowFloatingFilters(enabled: boolean): void {
 		this.stateFeature.setShowFloatingFilters(enabled);
+	}
+	public setView(view: GridViewConfig<TRowData> | null): void {
+		this.stateFeature.setView(view);
+	}
+	public getView(): GridViewConfig<TRowData> | null {
+		return (this.getState().view ?? null) as GridViewConfig<TRowData> | null;
+	}
+	public setShowMinimap(enabled: boolean): void {
+		this.stateFeature.setShowMinimap(enabled);
+	}
+	public setMinimapMarks(marks: readonly GridMinimapMark[]): void {
+		this.minimapMarks.set(marks);
 	}
 	public setShowFilterChipBar(enabled: boolean): void {
 		this.stateFeature.setShowFilterChipBar(enabled);

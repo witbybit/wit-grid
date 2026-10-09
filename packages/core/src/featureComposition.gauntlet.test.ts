@@ -39,7 +39,7 @@ function createContainer(): HTMLDivElement {
 }
 
 function slotDomCount(rowsContainer: HTMLElement): number {
-	return Array.from(rowsContainer.children).filter((child) => !child.classList.contains('og-layer-exiting')).length;
+	return Array.from(rowsContainer.children).filter((child) => !child.className.startsWith('og-layer-')).length;
 }
 
 function drainRafQueue(callbacks: FrameRequestCallback[]): void {

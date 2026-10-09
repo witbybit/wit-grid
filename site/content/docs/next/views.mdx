@@ -1,0 +1,95 @@
+---
+title: Gallery & Calendar Views
+description: Show the same rows as a gallery of cards or on a month calendar — filters, sort and search included.
+icon: LayoutGrid
+---
+
+A view shows the grid's displayed rows another way. Filters, sort, search, the sidebar and the filter chips keep
+applying, edits go through the normal write path, and the table keeps its scroll and selection underneath, so
+switching back is instant.
+
+```tsx
+import { useState } from 'react';
+import { Grid, type ColumnDef, type GridViewConfig } from '@eregister/wit-grid-react';
+
+interface Task {
+	id: string;
+	task: string;
+	status: string;
+	owner: string;
+	progress: number;
+	budget: number;
+	schedule: { start: string; end: string };
+}
+interface Props {
+	rows: Task[];
+	columns: ColumnDef<Task>[];
+}
+declare function ViewSwitcher(props: { value: string; onChange: (view: string) => void }): JSX.Element;
+
+const VIEWS: Record<string, GridViewConfig<Task> | null> = {
+	table: null,
+	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'owner', 'progress', 'budget'] },
+	calendar: { kind: 'calendar', dateField: 'schedule', titleField: 'task' },
+};
+
+export function Tasks({ rows, columns }: Props) {
+	const [view, setView] = useState('table');
+	return (
+		<>
+			<ViewSwitcher value={view} onChange={setView} />
+			<Grid
+				rows={rows}
+				columns={columns}
+				getRowId={(row) => row.id}
+				view={VIEWS[view]}
+				onViewChange={(next) => setView(next ? next.kind : 'table')}
+			/>
+		</>
+	);
+}
+```
+
+Imperatively: `api.setView(config)`, `api.getView()`, and `null` returns to the table. `initialState.view` opens on a
+view. Keep configs stable (module constants or `useMemo`): a new object is a new view.
+
+## Gallery
+
+Cards with a title, an optional colour band and a few fields. Each field is drawn by **its column's own renderer**,
+so status pills, avatars, progress bars and currency look exactly as they do in the table. Only the cards in view
+exist and they are recycled as the gallery scrolls, so 100k rows scroll as smoothly as a dozen.
+
+| Option       | Default                         | What it does                                      |
+| ------------ | ------------------------------- | ------------------------------------------------- |
+| `titleField` | the first displayed column      | The card's title                                  |
+| `fields`     | the next four displayed columns | Fields on each card, in order                     |
+| `color`      | none                            | `(row) => colour`: a band along the card's top    |
+| `cardWidth`  | `260`                           | The narrowest a card gets; columns fill the width |
+
+## Calendar
+
+A month grid that places rows by a date field or a `{ start, end }` range field (the value
+[`dateRangeColumnType` and `timelineColumnType`](/docs/next/columns#more-cell-types) hold). Ranges span their days and
+repeat their label when they wrap into a new week; a crowded day shows **+N more**. Drag an entry to another day to
+move it: the value shifts by the days moved and is written back in the shape the cell held (date string, date-time,
+`Date`, timestamp, or range). While you drag, the days it will cover light up, the original dims and a tag shows the
+new dates and the shift; the entry pops into place on drop, and Escape cancels.
+
+**Click an entry** for its card: the dates and length, a few fields drawn by their columns' own renderers, buttons
+to nudge it a day earlier, a day later or a week later (the card stays open so you can watch it move), and **Open in
+table**.
+
+| Option         | Default                    | What it does                        |
+| -------------- | -------------------------- | ----------------------------------- |
+| `dateField`    | (required)                 | A date or date-range field          |
+| `titleField`   | the first displayed column | The entry's label                   |
+| `fields`       | the next three columns     | Fields on the entry's card          |
+| `color`        | the theme accent           | `(row) => colour` per entry         |
+| `initialDate`  | today                      | The month shown first               |
+| `weekStartsOn` | `1` (Monday)               | First day of the week, `0` = Sunday |
+| `editable`     | `true`                     | Drag entries to another day         |
+
+## Back to the table
+
+Double-clicking a card or a calendar entry opens its row in the table, scrolled into view and selected. The grid
+reports that change through `onViewChange` (and the snapshot's `view` key), so a controlled switcher stays in step.

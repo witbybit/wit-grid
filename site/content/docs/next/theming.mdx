@@ -4,7 +4,7 @@ description: Use built-in themes, switch at runtime, or compose your own theme f
 icon: Palette
 ---
 
-Wit Grid ships a shadcn-style, CSS-variable theming system: fourteen built-in themes, runtime switching with no
+Wit Grid ships a shadcn-style, CSS-variable theming system: sixteen built-in themes, runtime switching with no
 flash of the wrong theme, and full custom theme composition. All theme interaction goes through `GridApi` — the
 same handle you get from `onGridReady` or `useGridApi()`. There's no separate theming object to construct.
 
@@ -12,22 +12,24 @@ same handle you get from `onGridReady` or `useGridApi()`. There's no separate th
 
 Each theme has its own palette and typeface.
 
-| Theme              | Look                                              | Font              |
-| ------------------ | ------------------------------------------------- | ----------------- |
-| `dark` (default)   | Neutral graphite with an indigo accent            | Inter             |
-| `light`            | Crisp white with a blue accent                    | Inter             |
-| `ocean`            | Deep sea navy with a cyan glow                    | Plus Jakarta Sans |
-| `fjord`            | Arctic slate with frost-blue accents (Nord)       | IBM Plex Sans     |
-| `velvet`           | Midnight plum with a neon-pink accent             | DM Sans           |
-| `ember`            | Warm charcoal lit with amber                      | Space Grotesk     |
-| `forest`           | Deep pine with emerald highlights                 | Source Sans 3     |
-| `mono`             | A terminal: greys and a green cursor              | JetBrains Mono    |
-| `paper`            | Cream paper, ink and terracotta                   | Source Serif 4    |
-| `latte`            | Soft lavender-grey with a violet accent           | Lexend            |
-| `blossom`          | Rosewater and raspberry                           | Nunito            |
-| `spreadsheet`      | Excel / Google Sheets: hairlines, a green cursor  | Roboto            |
-| `dark-hc`          | Black, white and a bright blue focus              | System            |
-| `light-hc`         | White, black and a deep blue focus                | System            |
+| Theme            | Look                                             | Font              |
+| ---------------- | ------------------------------------------------ | ----------------- |
+| `dark` (default) | Neutral graphite with an indigo accent           | Inter             |
+| `light`          | Crisp white with a blue accent                   | Inter             |
+| `glass-dark`     | Frosted navy surfaces and a cool-blue accent     | Inter             |
+| `glass-light`    | Bright frosted surfaces and a cobalt-blue accent | Inter             |
+| `ocean`          | Deep sea navy with a cyan glow                   | Plus Jakarta Sans |
+| `fjord`          | Arctic slate with frost-blue accents (Nord)      | IBM Plex Sans     |
+| `velvet`         | Midnight plum with a neon-pink accent            | DM Sans           |
+| `ember`          | Warm charcoal lit with amber                     | Space Grotesk     |
+| `forest`         | Deep pine with emerald highlights                | Source Sans 3     |
+| `mono`           | A terminal: greys and a green cursor             | JetBrains Mono    |
+| `paper`          | Cream paper, ink and terracotta                  | Source Serif 4    |
+| `latte`          | Soft lavender-grey with a violet accent          | Lexend            |
+| `blossom`        | Rosewater and raspberry                          | Nunito            |
+| `spreadsheet`    | Excel / Google Sheets: hairlines, a green cursor | Roboto            |
+| `dark-hc`        | Black, white and a bright blue focus             | System            |
+| `light-hc`       | White, black and a deep blue focus               | System            |
 
 The fonts come from Google Fonts; add `BUILT_IN_THEME_FONTS_URL` to your page to load them all, or load only the
 ones you use. Without them each theme falls back to a system font stack.
@@ -120,6 +122,48 @@ export const acmeTheme: ThemeTokens = {
 	headerText: '#b0b0b0',
 };
 ```
+
+## Frosted glass surfaces
+
+Glass is an explicit theme opt-in. It gives floating menus, cell-editor popovers, tooltips, chart windows,
+sidebars, headers, and pinned rows a translucent tint and backdrop blur. It does not emulate refraction or
+distortion effects.
+
+```typescript
+export const glassTheme = createTheme({
+	appearance: 'dark',
+	font: "'Inter', system-ui, sans-serif",
+	background: '#0b1020',
+	surface: '#111a30',
+	raised: '#17213a',
+	text: '#edf3ff',
+	muted: '#a9b8d3',
+	border: '#2a3855',
+	borderStrong: '#465b82',
+	accent: '#7c9cff',
+	hover: '#18233d',
+	error: '#fb7185',
+	glass: {
+		blur: '24px',
+		saturation: '160%',
+		// Optional per-surface tint overrides:
+		tint: 'rgba(23, 33, 58, 0.46)',
+		headerTint: 'rgba(17, 26, 48, 0.42)',
+		pinnedTint: 'rgba(17, 26, 48, 0.52)',
+	},
+});
+```
+
+Use `glass: true` for the same treatment with palette-derived defaults, or select the ready-made
+`glass-dark` and `glass-light` themes. Users who request reduced transparency automatically receive solid
+surfaces instead.
+
+<Callout title="Performance" type="warn">
+	`backdrop-filter` is most expensive on persistent surfaces that repaint while content moves behind them.
+	Glass is therefore off by default. Menus and editors are low-cost; headers and pinned rows can add work during
+	scroll. Measure scrolling on your largest supported grid and reduce `blur` or disable `glass` if it affects
+	your frame budget.
+</Callout>
 
 Apply it declaratively (atomic, no flicker) or imperatively:
 

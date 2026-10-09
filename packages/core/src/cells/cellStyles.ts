@@ -22,10 +22,35 @@ export const CELL_STYLES = `
   --og-ct-track: color-mix(in srgb, var(--og-text-color) 11%, transparent);
   --og-ct-danger: var(--og-error, #ef4444);
   --og-ct-rating: #f5a524;
+  --og-ct-timeline-tick: color-mix(in srgb, var(--og-ct-accent) 45%, transparent);
+  --og-ct-timeline-quarter: color-mix(in srgb, #14b8a6 70%, transparent);
+  --og-ct-timeline-today: color-mix(in srgb, var(--og-ct-danger) 70%, transparent);
   --og-ct-radius: 6px;
 }
 
 /* ── Cells ─────────────────────────────────────────────────────────────── */
+/* Timeline: month lines and today on the track; the bar moves and resizes. */
+.og-ct-timeline { position: relative; flex: 1; align-self: stretch; margin: 0 -6px; }
+/* Month lines dashed: the track's --og-ct-ticks layers, masked into 3px dashes. Today stays solid on the track. */
+.og-ct-timeline::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: var(--og-ct-ticks, none);
+  -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px);
+  mask-image: repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px);
+}
+.og-ct-timeline-bar {
+  position: absolute; top: 50%; height: 18px; transform: translateY(-50%); min-width: 4px; box-sizing: border-box;
+  display: flex; align-items: center; padding: 0 6px; overflow: hidden; border-radius: 5px;
+  background: color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 75%, transparent);
+  transition: left .18s ease, width .18s ease;
+}
+.og-ct-timeline-bar[data-dragging] { transition: none; box-shadow: 0 2px 10px color-mix(in srgb, var(--og-ct-hue, var(--og-ct-accent)) 40%, transparent); }
+.og-ct-timeline-label { font-size: 11px; font-weight: 600; color: var(--og-ct-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar { cursor: grab; touch-action: none; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-dragging] { cursor: grabbing; }
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-edge="start"],
+.og-ct-timeline[data-editable] .og-ct-timeline-bar[data-edge="end"] { cursor: ew-resize; }
 .og-ct-cell { display: flex; align-items: center; gap: 6px; width: 100%; height: 100%; min-width: 0; overflow: hidden; }
 .og-ct-cell-end { justify-content: flex-end; }
 .og-ct-cell-center { justify-content: center; }
@@ -104,8 +129,9 @@ export const CELL_STYLES = `
 .og-ct-popover {
   position: fixed; z-index: 10000; box-sizing: border-box; min-width: 180px; max-width: min(440px, calc(100vw - 16px));
   padding: 4px; border-radius: 10px; border: 1px solid var(--og-popover-border);
-  /* Themes give popovers a slightly translucent colour: lay it over the opaque grid background. */
-  background: linear-gradient(var(--og-popover-bg), var(--og-popover-bg)), var(--og-bg-color);
+  background: var(--og-glass-popover-bg, linear-gradient(var(--og-popover-bg), var(--og-popover-bg)), var(--og-bg-color));
+  backdrop-filter: var(--og-glass-backdrop-filter, none);
+  -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   color: var(--og-popover-text, var(--og-text-color));
   box-shadow: 0 16px 36px -12px rgba(0, 0, 0, .45), 0 2px 8px -2px rgba(0, 0, 0, .2);
   font-family: var(--og-font-family); font-size: 13px; line-height: 1.35; outline: none; overflow-y: auto;

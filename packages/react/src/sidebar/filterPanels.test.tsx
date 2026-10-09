@@ -74,7 +74,9 @@ describe('the sidebar hosts the core filter editors', () => {
 		const api = setup('query');
 		fireEvent.click(await waitFor(() => screen.getByText('Add a condition')));
 		fireEvent.click(screen.getByLabelText('Column'));
-		const statusOption = [...document.querySelectorAll<HTMLElement>('.og-ct-popover .og-ct-option')].find((el) => el.textContent?.includes('Status'))!;
+		const statusOption = [...document.querySelectorAll<HTMLElement>('.og-ct-popover .og-ct-option')].find((el) =>
+			el.textContent?.includes('Status')
+		)!;
 		act(() => {
 			statusOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
 			statusOption.click();

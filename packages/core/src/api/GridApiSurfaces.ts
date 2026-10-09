@@ -1,3 +1,6 @@
+import type { GridViewConfig } from '../views.js';
+import type { GridMinimapMark } from '../minimap.js';
+import type { GridCellFlash, GridPresencePeer } from '../presence.js';
 import type { RowAnimationOptions } from '../renderer/rowAnimation.js';
 import type {
 	FilterModel,
@@ -161,6 +164,11 @@ export interface GridStructureApi<TRowData = unknown> {
 	getColumnDistinctValues(colField: string): (string | number | null)[];
 	getColumnDistinctValueSummary(colField: string): GridDistinctValueSummary;
 	setStyleRules(styleRules: GridStyleRule<TRowData>[] | undefined): void;
+	/** Shows other people in the grid: each peer's cell cursor with a name tag (pulsing while editing). Replaces the previous set. */
+	setPresence(peers: readonly GridPresencePeer[]): void;
+	getPresence(): readonly GridPresencePeer[];
+	/** Briefly highlights cells, e.g. when a peer's edit lands. */
+	flashCells(cells: readonly GridCellFlash[]): void;
 	/** The grouping configuration, or undefined when none is set. */
 	getGrouping(): GroupingConfig<TRowData> | undefined;
 	/** Replaces the grouping configuration. Changing the levels resets group expansion. */
@@ -206,7 +214,16 @@ export interface GridStructureApi<TRowData = unknown> {
 	setRowAnimation(options: RowAnimationOptions | undefined): void;
 	setShowFloatingFilters(enabled: boolean): void;
 	setShowFilterChipBar(enabled: boolean): void;
+	/** Shows the minimap: a strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	setShowMinimap(enabled: boolean): void;
+	/** Shows the displayed rows another way (a gallery of cards, a calendar); null returns to the table. */
+	setView(view: GridViewConfig<TRowData> | null): void;
+	getView(): GridViewConfig<TRowData> | null;
+	/** Rows the app marks on the minimap (search hits, bookmarks); replaces the previous set. */
+	setMinimapMarks(marks: readonly GridMinimapMark[]): void;
 	getVisibleColumnRange(): { colStart: number; colEnd: number; total: number };
+	/** The displayed rows in view, from `startIdx` to `endIdx` (display indexes). */
+	getVisibleRowRange(): { startIdx: number; endIdx: number };
 	getColumnState(): ColumnState[];
 	applyColumnState(states: ColumnState[], opts?: { applyOrder?: boolean }): void;
 	getGridState(): PersistedGridState;
@@ -333,7 +350,6 @@ export interface GridPluginRuntime<TRowData = unknown> extends GridApi<TRowData>
 	getVisualRow(index: number): VisualRow<TRowData> | null;
 	getVisualRowCount(): number;
 	getVisualIndexByRowId(rowId: string): number | null;
-	getVisibleRowRange(): { startIdx: number; endIdx: number };
 	getColumnIndex(colField: string): number;
 	getColumnField(colIndex: number): string | null;
 	getRowModel(): RowModel<TRowData> | null;

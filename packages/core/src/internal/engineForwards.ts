@@ -44,7 +44,7 @@ export const PUBLIC_ENGINE_FORWARDS = forwardTable(
 	`getRowId isRowLoading getFormula hasFormula setCellValue autoSizeColumn autoSizeAllColumns
 	getColumnDistinctValues getColumnDistinctValueSummary copyRange getDisplayedColumns getPinnedColumns
 	moveColumn setColumnReorderEnabled setSortModel setFilterModel setGroupBy addGroupBy removeGroupBy
-	moveGroupBy setShowGroupPanel setRowAnimation setShowFloatingFilters setShowFilterChipBar setStyleRules addEventListener
+	moveGroupBy setShowGroupPanel setRowAnimation setShowFloatingFilters setShowFilterChipBar setShowMinimap setMinimapMarks setView getView setStyleRules setPresence getPresence flashCells addEventListener
 	dispatchEvent setRowOrder flushTransactions subscribeToDomainVersions subscribeDomain getColumnIndex
 	getColumnField getColumnDef flushCellUpdatesSync undo redo setQueryModel`,
 	{

@@ -338,6 +338,12 @@ export interface ColumnDef<TRowData = unknown> {
 	hide?: boolean;
 	loading?: boolean;
 	valueGetter?: (params: ValueGetterParams<TRowData>) => unknown;
+	/**
+	 * What the column sorts by, from its value: an option's position, a label, a date's time. Every
+	 * client sort uses it (sorting, grouped sorting, re-sorting after an edit) and so do group rows
+	 * of this column. Default: the value itself.
+	 */
+	sortValue?: (value: unknown) => unknown;
 	valueGetterDependencies?: string[];
 	/**
 	 * Converts the raw cell value (from field, valueGetter, or formula) into a display string.
@@ -520,12 +526,58 @@ export interface HeaderCellStyleRule<TRowData = unknown> {
 	headerCellClass: string;
 }
 
+/**
+ * Conditional formatting: a cell's look comes from where its numeric value sits in its column's
+ * range over the displayed rows (or in `min`..`max` when given). Rules on one field stack.
+ */
+interface ValueScaleRuleBase {
+	field: string;
+	/** Fixed bottom of the range; defaults to the column's lowest displayed value. */
+	min?: number;
+	/** Fixed top of the range; defaults to the column's highest displayed value. */
+	max?: number;
+}
+
+/** A background tint blended across two or three colours (low → [mid →] high). */
+export interface ColorScaleRule extends ValueScaleRuleBase {
+	kind: 'colorScale';
+	/** Any CSS colours, low to high. Default red → amber → green. */
+	colors?: [string, string] | [string, string, string];
+	/** The value that takes the middle colour of a three-colour scale. Default: the range's middle. */
+	mid?: number;
+	/** Tint strength, 0..1. Default 0.24. */
+	opacity?: number;
+}
+
+/** A bar behind the value, growing from zero (negative values grow the other way). */
+export interface DataBarRule extends ValueScaleRuleBase {
+	kind: 'dataBar';
+	/** Default: the theme accent. */
+	color?: string;
+	/** Default: red. */
+	negativeColor?: string;
+}
+
+/** An icon before the value for the low, middle and high third of the range. */
+export interface IconSetRule extends ValueScaleRuleBase {
+	kind: 'iconSet';
+	/** Default 'arrows'. */
+	icons?: 'arrows' | 'dots' | 'signal';
+	/** Where the bands split, as fractions of the range. Default [1/3, 2/3]. */
+	thresholds?: [number, number];
+	/** Low values are good (latency, cost): flips which end gets the high icon. */
+	reverse?: boolean;
+}
+
+export type ValueScaleRule = ColorScaleRule | DataBarRule | IconSetRule;
+
 export type GridStyleRule<TRowData = unknown> =
 	| RowStyleRule<TRowData>
 	| GroupRowStyleRule<TRowData>
 	| DetailRowStyleRule<TRowData>
 	| CellStyleRule<TRowData>
-	| HeaderCellStyleRule<TRowData>;
+	| HeaderCellStyleRule<TRowData>
+	| ValueScaleRule;
 
 // ─── Path utilities ───────────────────────────────────────────────────────────
 

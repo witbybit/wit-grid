@@ -231,7 +231,8 @@ function periodInput(first: DateFilterCondition | null, compact: boolean, onInpu
 	for (const p of DATE_PERIODS) {
 		const chip = button('og-flt-period', p.label, () => {
 			chosen.value = chosen.value === p.value ? '' : p.value;
-			for (const other of grid.querySelectorAll('.og-flt-period')) other.setAttribute('aria-checked', String(other === chip && chosen.value !== ''));
+			for (const other of grid.querySelectorAll('.og-flt-period'))
+				other.setAttribute('aria-checked', String(other === chip && chosen.value !== ''));
 			onInput(true);
 		});
 		chip.setAttribute('role', 'radio');
@@ -242,7 +243,13 @@ function periodInput(first: DateFilterCondition | null, compact: boolean, onInpu
 	return { element: grid, input: chosen as HTMLInputElement | HTMLSelectElement };
 }
 
-function valueInputs(kind: ValueKind, def: ColumnFilterDef, condition: FilterCondition | null, onInput: (immediate: boolean) => void, compact = false) {
+function valueInputs(
+	kind: ValueKind,
+	def: ColumnFilterDef,
+	condition: FilterCondition | null,
+	onInput: (immediate: boolean) => void,
+	compact = false
+) {
 	const box = el('div', 'og-flt-values');
 	let inputs: (HTMLInputElement | HTMLSelectElement)[] = [];
 	const closers: (() => void)[] = [];

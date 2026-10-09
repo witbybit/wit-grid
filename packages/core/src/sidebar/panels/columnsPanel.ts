@@ -125,7 +125,9 @@ export const columnsPanel: SidebarPanel<any> = {
 				pill.draggable = true;
 				if (index > 0) zone.appendChild(el('span', 'og-sb-pill-sep', '›'));
 				pill.append(el('span', 'og-sb-pill-label', column ? labelOf(column) : field));
-				pill.appendChild(iconButton('x', `Stop grouping by ${column ? labelOf(column) : field}`, () => api.setGroupBy(by.filter((f) => f !== field)), 12));
+				pill.appendChild(
+					iconButton('x', `Stop grouping by ${column ? labelOf(column) : field}`, () => api.setGroupBy(by.filter((f) => f !== field)), 12)
+				);
 				pill.addEventListener('dragstart', (event) => {
 					drag = { kind: 'group', index };
 					event.dataTransfer?.setData('text/plain', field);
@@ -163,7 +165,9 @@ export const columnsPanel: SidebarPanel<any> = {
 			if (by.length > 0) {
 				const options = el('div', 'og-sb-group-options');
 				options.append(
-					switchRow('Subtotal rows', !!grouping?.totals?.groups, (on) => api.updateGrouping({ totals: { ...grouping?.totals, groups: on ? 'bottom' : false } })),
+					switchRow('Subtotal rows', !!grouping?.totals?.groups, (on) =>
+						api.updateGrouping({ totals: { ...grouping?.totals, groups: on ? 'bottom' : false } })
+					),
 					switchRow('Sticky group headers', !!grouping?.stickyHeaders, (on) => api.updateGrouping({ stickyHeaders: on }))
 				);
 				groups.appendChild(options);
@@ -193,7 +197,15 @@ export const columnsPanel: SidebarPanel<any> = {
 				seg.appendChild(b);
 			}
 			toolbar.appendChild(seg);
-			if (hiddenCount > 0) toolbar.appendChild(textButton('Show all', () => api.setColumnsVisible(all.map((c) => c.field), true)));
+			if (hiddenCount > 0)
+				toolbar.appendChild(
+					textButton('Show all', () =>
+						api.setColumnsVisible(
+							all.map((c) => c.field),
+							true
+						)
+					)
+				);
 
 			lists.textContent = '';
 			const shown = all.filter((c) => {
@@ -203,7 +215,9 @@ export const columnsPanel: SidebarPanel<any> = {
 			});
 			if (shown.length === 0) {
 				lists.appendChild(
-					query ? emptyState('search', 'No columns match', `Nothing is called “${query}”.`) : emptyState('eyeOff', 'Nothing here', view === 'hidden' ? 'Every column is shown.' : 'Every column is hidden.')
+					query
+						? emptyState('search', 'No columns match', `Nothing is called “${query}”.`)
+						: emptyState('eyeOff', 'Nothing here', view === 'hidden' ? 'Every column is shown.' : 'Every column is hidden.')
 				);
 				return;
 			}

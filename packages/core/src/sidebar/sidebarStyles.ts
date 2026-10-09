@@ -17,7 +17,8 @@ export const SIDEBAR_STYLES = `
 /* Rail */
 .og-sb-rail {
   width: 48px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0;
-  background: var(--og-header-bg); border-left: 1px solid var(--og-sb-line);
+  background: var(--og-glass-header-bg, var(--og-header-bg)); border-left: 1px solid var(--og-sb-line);
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
 }
 .og-sb[data-position='left'] .og-sb-rail { border-left: 0; border-right: 1px solid var(--og-sb-line); }
 .og-sb-tab {
@@ -25,6 +26,8 @@ export const SIDEBAR_STYLES = `
   border: 0; border-radius: 8px; background: transparent; color: var(--og-header-text); cursor: pointer;
   transition: background-color .15s ease, color .15s ease;
 }
+/* Every rail icon at the built-ins' 18px, so a custom panel's icon (any SVG markup) matches. */
+.og-sb-tab > svg { width: 18px; height: 18px; flex: none; }
 .og-sb-tab:hover { background: var(--og-sb-hover); color: var(--og-text-color); }
 .og-sb-tab:focus-visible { outline: 2px solid var(--og-sb-accent); outline-offset: 1px; }
 .og-sb-tab[aria-selected='true'] { background: color-mix(in srgb, var(--og-sb-accent) 16%, transparent); color: var(--og-sb-accent); }
@@ -42,7 +45,8 @@ export const SIDEBAR_STYLES = `
 
 /* Panel */
 .og-sb-panel {
-  width: 0; flex: none; overflow: hidden; background: var(--og-bg-color);
+  width: 0; flex: none; overflow: hidden; background: var(--og-glass-popover-bg, var(--og-bg-color));
+  backdrop-filter: var(--og-glass-backdrop-filter, none); -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   transition: width .22s cubic-bezier(.4, 0, .2, 1);
 }
 .og-sb[data-open] .og-sb-panel { width: var(--og-sb-width, 300px); border-left: 1px solid var(--og-sb-line); }

@@ -365,7 +365,12 @@ describe('statePersistence', () => {
 			if (!result.ok) throw new Error(result.reason);
 			expect(result.restore.stateMutation.queryModel).toEqual({
 				version: 1,
-				root: { kind: 'group', id: 'root', operator: 'or', children: [{ kind: 'group', id: 'g', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'id', filter: null }] }] },
+				root: {
+					kind: 'group',
+					id: 'root',
+					operator: 'or',
+					children: [{ kind: 'group', id: 'g', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'id', filter: null }] }],
+				},
 			});
 			expect(result.restore.stateMutation.filterModel).toEqual({ name: { type: 'text', operator: 'startsWith', value: 'A' } });
 		});

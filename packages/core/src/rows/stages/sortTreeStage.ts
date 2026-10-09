@@ -4,7 +4,7 @@ import type { RowNode } from '../../store.js';
 import { type ColumnDef } from '../../store.js';
 import type { GroupDef } from '../RowPipeline.js';
 import { createRowPipelineContext } from '../pipelineContext.js';
-import { compareSortKeys, toSortKey, type SortKey } from '../sortKeys.js';
+import { compareSortKeys, compareSortValues, toSortKey, type SortKey } from '../sortKeys.js';
 
 /**
  * Sorts every sibling list of the tree in place.
@@ -34,12 +34,16 @@ export function sortTreeStage<TData>(
 
 	const context = createRowPipelineContext(columns);
 	const descByField = new Map<string, boolean>();
+	const sortValueByField = new Map<string, (value: unknown) => unknown>();
 	for (const sortItem of activeSort ?? []) {
 		if (!descByField.has(sortItem.colId)) descByField.set(sortItem.colId, sortItem.sort === 'desc');
+		const sortValue = context.columnsById.get(sortItem.colId)?.sortValue;
+		if (sortValue) sortValueByField.set(sortItem.colId, sortValue);
 	}
 	const sorter: TreeSorter<TData> = {
 		sortModel: activeSort ?? [],
-		getters: (activeSort ?? []).map((sortItem) => context.readerFor(sortItem.colId)),
+		getters: (activeSort ?? []).map((sortItem) => context.sortReaderFor(sortItem.colId)),
+		sortValueByField,
 		descByField,
 		comparatorByField,
 	};
@@ -61,6 +65,8 @@ interface TreeSorter<TData> {
 	/** First sort-model entry per field decides the group direction (mirrors `sortModel.find`). */
 	descByField: Map<string, boolean>;
 	comparatorByField: Map<string, (a: unknown, b: unknown) => number>;
+	/** Sorted columns with a `sortValue`: their group rows order by it too. */
+	sortValueByField: Map<string, (value: unknown) => unknown>;
 }
 
 interface SiblingEntry<TData> {
@@ -71,7 +77,7 @@ interface SiblingEntry<TData> {
 
 function sortSiblings<TData>(children: RowTreeNode<TData>[], sorter: TreeSorter<TData>): void {
 	if (children.length < 2) return;
-	const { sortModel, getters, descByField, comparatorByField } = sorter;
+	const { sortModel, getters, descByField, comparatorByField, sortValueByField } = sorter;
 	const hasSort = sortModel.length > 0;
 	// Without a sort model only comparator-bearing group levels move.
 	if (!hasSort && !children.some((child) => child.kind === 'group' && comparatorByField.has(child.field))) return;
@@ -97,6 +103,9 @@ function sortSiblings<TData>(children: RowTreeNode<TData>[], sorter: TreeSorter<
 			const comparator = comparatorByField.get(a.field);
 			if (comparator) {
 				comparison = comparator(a.key, b.key);
+			} else if (hasSort && sortValueByField.has(a.field)) {
+				const sortValue = sortValueByField.get(a.field)!;
+				comparison = compareSortValues(sortValue(a.key), sortValue(b.key));
 			} else if (hasSort) {
 				if (a.keyString < b.keyString) comparison = -1;
 				else if (a.keyString > b.keyString) comparison = 1;

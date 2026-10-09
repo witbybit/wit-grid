@@ -145,6 +145,9 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 		this.portalMountManager.onUnmountHeaderMenu = callback;
 	}
 
+	/** Dragging a column out of the grid hides it. */
+	public dragOutHidesColumns = true;
+
 	constructor(engine: GridEngine<TRowData>, api?: InternalGridApi<TRowData>, interactionController: GridInteractionHandle | null = null) {
 		this.engine = engine;
 		this.api = api;
@@ -256,6 +259,8 @@ export class RenderEngine<TRowData = unknown> implements IGridRenderer<TRowData>
 			// insertion-index changes during a drag, not every pointer pixel.
 			schedulePaint: () => this.fullPaint(),
 			gridScheduler: defaultGridScheduler,
+			dragOutHides: () => this.dragOutHidesColumns,
+			hideColumn: (colField) => this.api?.setColumnVisible(colField, false),
 		});
 		// Feed the live column-reorder preview offset into the body bind path.
 		this.rowRenderer.columnShiftSource = (colIndex) => this.columnInteractions.getColumnShift(colIndex);

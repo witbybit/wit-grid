@@ -92,18 +92,33 @@ describe('workspace', () => {
 				sortModel: [{ colId: 'name', sort: 'desc' }],
 			},
 		});
-		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Liam', 'Ava']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.name)
+		).toEqual(['Liam', 'Ava']);
 		api.applyGridState({
 			v: 3,
 			state: {
 				filterModel: null,
 				queryModel: {
 					version: 1,
-					root: { kind: 'group', id: 'root', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }] },
+					root: {
+						kind: 'group',
+						id: 'root',
+						operator: 'and',
+						children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }],
+					},
 				},
 			},
 		});
-		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.name)
+		).toEqual(['Ava']);
 		api.destroy();
 	});
 
@@ -111,13 +126,23 @@ describe('workspace', () => {
 		const query = view('ava', {
 			queryModel: {
 				version: 1,
-				root: { kind: 'group', id: 'root', operator: 'and', children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }] },
+				root: {
+					kind: 'group',
+					id: 'root',
+					operator: 'and',
+					children: [{ kind: 'condition', id: 'c', columnId: 'name', filter: { type: 'text', operator: 'equals', value: 'Ava' } }],
+				},
 			},
 		});
 		const api = grid(memoryAdapter([query], 'ava'));
 		await settle();
 		expect(api.getWorkspaceState().activeViewId).toBe('ava');
-		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.name)
+		).toEqual(['Ava']);
 		api.destroy();
 	});
 

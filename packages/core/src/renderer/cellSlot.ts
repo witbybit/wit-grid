@@ -1,5 +1,6 @@
 export type CellContentMode = 'text' | 'portal' | 'loading' | 'empty' | 'fallback' | 'pending' | 'custom';
 
+import { findConditionalFormatPainter, type ConditionalFormatPainter } from '../styling/conditionalFormat.js';
 import type { CellRendererHandle, CellPlacement } from './cellRendererHandle.js';
 import { isMountedCellVisuallyFresh } from './visualFreshness.js';
 import type { ColumnDef, ColumnInstanceId } from '../columnDef.js';
@@ -313,6 +314,9 @@ export class CellSlot<TRowData = unknown> {
 	private rendererKeyColumnInstanceId: string | undefined = undefined;
 	private rendererKey = '';
 
+	/** The grid's conditional-format painter, found once the element is attached (slots never change grids). */
+	private formatPainter: ConditionalFormatPainter | undefined = undefined;
+
 	constructor(element: HTMLDivElement) {
 		this.cellInstanceId = `ci${++_cellInstanceCounter}`;
 		this.portalHostId = `${this.cellInstanceId}-ph`;
@@ -600,6 +604,11 @@ export class CellSlot<TRowData = unknown> {
 				}
 			}
 		}
+
+		// Conditional formatting (colour scales, data bars, icon sets) reads the cell's value and its
+		// column's range, so it is painted here — the one write path every bind goes through.
+		if (this.formatPainter === undefined) this.formatPainter = findConditionalFormatPainter(this.element) ?? undefined;
+		this.formatPainter?.paintCell(this.element, rowId, colField);
 
 		return domUpdated;
 	}

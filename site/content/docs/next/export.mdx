@@ -14,6 +14,10 @@ icon: FileDown
   `valueFormatter` text.
 - Column widths follow the grid; the header row is bold, frozen and has filter buttons.
 - Grouped and tree grids export as Excel outlines: group rows sit above their rows and collapse.
+- [Conditional formats](/docs/next/styling#conditional-formatting) become native Excel ones, so they stay live: edit a
+  number in Excel and its colour, bar or icon follows. Fixed `min` / `max` / `mid` carry over; hex and palette colours
+  are kept (lightened as the grid tints them), anything else falls back to Excel's own colours. Icon sets export as
+  3 arrows, 3 traffic lights and, for `signal`, Excel's 4 rating bars.
 
 ```typescript
 await api.exportExcel({ fileName: 'orders.xlsx', sheetName: 'Orders' });
@@ -25,16 +29,16 @@ await api.exportExcel({ columns: ['id', 'customer', 'total'], onlySelected: true
 const blob = await api.getExcel();
 ```
 
-| Option                           | Default            | What it does                                              |
-| -------------------------------- | ------------------ | --------------------------------------------------------- |
-| `fileName`                       | `'export.xlsx'`    | The downloaded file's name                                |
-| `sheetName`                      | `'Sheet1'`         | The worksheet's name                                      |
-| `columns`                        | displayed columns  | Column fields to export, in order                         |
-| `onlySelected` / `rowIds`        | all shown rows     | Only the selected rows, or these rows in this order       |
-| `includeHeader`                  | `true`             | The header row                                            |
-| `freezeHeader` / `autoFilter`    | `true`             | Keep the header in view; give it filter buttons           |
-| `includeGroups` / `includeTotals` | `true`            | Group and total rows of grouped grids                     |
-| `locale`                         | the browser's      | Locale for currency symbols                               |
+| Option                            | Default           | What it does                                        |
+| --------------------------------- | ----------------- | --------------------------------------------------- |
+| `fileName`                        | `'export.xlsx'`   | The downloaded file's name                          |
+| `sheetName`                       | `'Sheet1'`        | The worksheet's name                                |
+| `columns`                         | displayed columns | Column fields to export, in order                   |
+| `onlySelected` / `rowIds`         | all shown rows    | Only the selected rows, or these rows in this order |
+| `includeHeader`                   | `true`            | The header row                                      |
+| `freezeHeader` / `autoFilter`     | `true`            | Keep the header in view; give it filter buttons     |
+| `includeGroups` / `includeTotals` | `true`            | Group and total rows of grouped grids               |
+| `locale`                          | the browser's     | Locale for currency symbols                         |
 
 The workbook is written by the grid itself (no extra dependency) and compressed with the browser's
 `CompressionStream`. The grid's context menu has **Export All as Excel**.

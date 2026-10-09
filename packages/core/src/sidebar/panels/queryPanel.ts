@@ -50,10 +50,14 @@ export const queryPanel: SidebarPanel<any> = {
 			draft = applied() ?? createEmptyQueryModel();
 			render();
 		});
-		const apply = textButton('Apply', () => {
-			api.setQueryModel(countQueryNodes(draft.root).conditions > 0 ? draft : null);
-			syncFooter();
-		}, 'primary');
+		const apply = textButton(
+			'Apply',
+			() => {
+				api.setQueryModel(countQueryNodes(draft.root).conditions > 0 ? draft : null);
+				syncFooter();
+			},
+			'primary'
+		);
 		footer.append(status, reset, apply);
 		root.append(tree, footer);
 		container.appendChild(root);
@@ -102,7 +106,8 @@ export const queryPanel: SidebarPanel<any> = {
 				searchPlaceholder: 'Find a column…',
 				onSelect: (value) => {
 					picker?.close();
-					if (value && value !== condition.columnId) setRoot(updateNode(draft.root, condition.id, (node) => ({ ...node, columnId: value, filter: null }) as GridQueryNode));
+					if (value && value !== condition.columnId)
+						setRoot(updateNode(draft.root, condition.id, (node) => ({ ...node, columnId: value, filter: null }) as GridQueryNode));
 				},
 			});
 			picker = openCellPopover({ anchor, content: listbox.element, label: 'Column', matchAnchorWidth: true, onDismiss: () => (picker = null) });
@@ -119,11 +124,17 @@ export const queryPanel: SidebarPanel<any> = {
 			choose.setAttribute('aria-haspopup', 'listbox');
 			choose.append(el('span', 'og-sb-select-label', label ?? condition.columnId), icon('chevronRight', 14));
 			choose.addEventListener('click', () => pickColumn(choose, condition));
-			head.append(choose, iconButton('x', 'Remove condition', () => setRoot(updateNode(draft.root, condition.id, () => null)), 14));
+			head.append(
+				choose,
+				iconButton('x', 'Remove condition', () => setRoot(updateNode(draft.root, condition.id, () => null)), 14)
+			);
 			card.appendChild(head);
 			if (!label) {
 				const warn = el('div', 'og-sb-warn');
-				warn.append(icon('alert', 14), el('span', undefined, `“${condition.columnId}” is not a column any more. Pick another or remove this condition.`));
+				warn.append(
+					icon('alert', 14),
+					el('span', undefined, `“${condition.columnId}” is not a column any more. Pick another or remove this condition.`)
+				);
 				card.appendChild(warn);
 				return card;
 			}
@@ -163,7 +174,11 @@ export const queryPanel: SidebarPanel<any> = {
 				b.setAttribute('aria-checked', String(group.operator === value));
 				b.addEventListener('click', () => {
 					if (group.operator === value) return;
-					setRoot(depth === 0 ? { ...draft.root, operator: value } : updateNode(draft.root, group.id, (node) => ({ ...node, operator: value }) as GridQueryNode));
+					setRoot(
+						depth === 0
+							? { ...draft.root, operator: value }
+							: updateNode(draft.root, group.id, (node) => ({ ...node, operator: value }) as GridQueryNode)
+					);
 				});
 				seg.appendChild(b);
 			}
@@ -180,11 +195,21 @@ export const queryPanel: SidebarPanel<any> = {
 
 			const add = el('div', 'og-sb-qgroup-add');
 			const append = (node: GridQueryNode) =>
-				setRoot(depth === 0 ? { ...draft.root, children: [...draft.root.children, node] } : updateNode(draft.root, group.id, (g) => ({ ...(g as GridQueryGroup), children: [...(g as GridQueryGroup).children, node] })));
+				setRoot(
+					depth === 0
+						? { ...draft.root, children: [...draft.root.children, node] }
+						: updateNode(draft.root, group.id, (g) => ({ ...(g as GridQueryGroup), children: [...(g as GridQueryGroup).children, node] }))
+				);
 			add.appendChild(textButton('Condition', () => append(newCondition()), 'ghost', 'plus'));
 			if (depth < MAX_DEPTH)
 				add.appendChild(
-					textButton('Group', () => append({ kind: 'group', id: newId('g'), operator: group.operator === 'and' ? 'or' : 'and', children: [newCondition()] }), 'ghost', 'plus')
+					textButton(
+						'Group',
+						() =>
+							append({ kind: 'group', id: newId('g'), operator: group.operator === 'and' ? 'or' : 'and', children: [newCondition()] }),
+						'ghost',
+						'plus'
+					)
 				);
 			card.appendChild(add);
 			return card;
@@ -197,7 +222,9 @@ export const queryPanel: SidebarPanel<any> = {
 			if (columns().length === 0) {
 				tree.appendChild(emptyState('query', 'Nothing to query', 'None of the columns are filterable.'));
 			} else if (draft.root.children.length === 0) {
-				tree.appendChild(emptyState('query', 'No query yet', 'Combine conditions across columns with all / any, and nest groups for the rest.'));
+				tree.appendChild(
+					emptyState('query', 'No query yet', 'Combine conditions across columns with all / any, and nest groups for the rest.')
+				);
 				const start = textButton('Add a condition', () => setRoot({ ...draft.root, children: [newCondition()] }), 'subtle', 'plus');
 				start.classList.add('og-sb-add');
 				tree.appendChild(start);

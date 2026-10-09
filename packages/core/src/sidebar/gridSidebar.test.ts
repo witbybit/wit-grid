@@ -43,8 +43,7 @@ function setup(
 	document.body.appendChild(sidebar.element);
 	const tab = (id: string) => sidebar.element.querySelector<HTMLButtonElement>(`.og-sb-tab[data-panel="${id}"]`)!;
 	const body = () => sidebar.element.querySelector('.og-sb-body')!;
-	const byText = (text: string) =>
-		[...sidebar.element.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.trim() === text)!;
+	const byText = (text: string) => [...sidebar.element.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent?.trim() === text)!;
 	return { api, sidebar, tab, body, byText, mountPanel };
 }
 
@@ -75,7 +74,9 @@ describe('GridSidebar', () => {
 		]);
 		expect(tab('sort').querySelector('.og-sb-badge')!.textContent).toBe('2');
 		expect(tab('filters').hasAttribute('data-badged')).toBe(false);
-		sidebar.element.querySelector('.og-sb-panel')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+		sidebar.element
+			.querySelector('.og-sb-panel')!
+			.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
 		expect(api.getOpenPanel()).toBeNull();
 	});
 
@@ -85,7 +86,11 @@ describe('GridSidebar', () => {
 		const renderPanel = vi.fn();
 		const { tab } = setup({ panels: [{ id: 'notes', label: 'Notes', renderPanel }, 'sort'] }, mountPanel);
 		tab('notes').click();
-		expect(mountPanel).toHaveBeenCalledWith(expect.any(HTMLElement), expect.any(Function), expect.objectContaining({ close: expect.any(Function) }));
+		expect(mountPanel).toHaveBeenCalledWith(
+			expect.any(HTMLElement),
+			expect.any(Function),
+			expect.objectContaining({ close: expect.any(Function) })
+		);
 		tab('sort').click();
 		expect(unmount).toHaveBeenCalled();
 	});
@@ -118,7 +123,9 @@ describe('GridSidebar', () => {
 			{ colId: 'age', sort: 'desc' },
 			{ colId: 'name', sort: 'asc' },
 		]);
-		body().querySelectorAll<HTMLElement>('.og-sb-grip')[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+		body()
+			.querySelectorAll<HTMLElement>('.og-sb-grip')[1]
+			.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
 		expect(api.getStateSnapshot().sortModel).toEqual([
 			{ colId: 'name', sort: 'asc' },
 			{ colId: 'age', sort: 'desc' },
@@ -154,7 +161,8 @@ describe('GridSidebar', () => {
 		expect(api.getPinnedColumns().left).toBe(0);
 
 		// Drag Name below Age (both in the scrolling lane).
-		const drag = (type: string, target: HTMLElement) => target.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { clientY: 1000 }));
+		const drag = (type: string, target: HTMLElement) =>
+			target.dispatchEvent(Object.assign(new Event(type, { bubbles: true, cancelable: true }), { clientY: 1000 }));
 		drag('dragstart', rowOf('Name'));
 		drag('dragover', rowOf('Age'));
 		drag('drop', rowOf('Age'));
@@ -177,7 +185,12 @@ describe('GridSidebar', () => {
 		expect(root.operator).toBe('or');
 		expect(root.children[0]).toMatchObject({ kind: 'condition', columnId: 'name', filter: { value: 'Av' } });
 		expect(root.children[1]).toMatchObject({ kind: 'group', children: [{ kind: 'condition', filter: { value: 'Liam' } }] });
-		expect(api.rows().getAll().map((r) => r.name)).toEqual(['Ava', 'Liam']);
+		expect(
+			api
+				.rows()
+				.getAll()
+				.map((r) => r.name)
+		).toEqual(['Ava', 'Liam']);
 		// A query set elsewhere shows in the panel.
 		api.setQueryModel(null);
 		expect(body().textContent).toContain('No query yet');

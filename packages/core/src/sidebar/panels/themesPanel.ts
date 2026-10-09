@@ -59,7 +59,10 @@ export const themesPanel: SidebarPanel<any> = {
 			// The name in the theme's own font, the font named under it.
 			const label = el('span', 'og-sb-theme-name', meta?.label ?? name);
 			label.style.fontFamily = getBuiltInTheme(name).fontFamily;
-			caption.append(label, el('span', 'og-sb-theme-mode', [meta?.appearance === 'light' ? 'Light' : 'Dark', meta?.font].filter(Boolean).join(' · ')));
+			caption.append(
+				label,
+				el('span', 'og-sb-theme-mode', [meta?.appearance === 'light' ? 'Light' : 'Dark', meta?.font].filter(Boolean).join(' · '))
+			);
 			card.append(preview(name), caption, check);
 			card.addEventListener('click', () => api.switchTheme(name));
 			grid.appendChild(card);

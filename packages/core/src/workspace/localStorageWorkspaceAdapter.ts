@@ -61,7 +61,10 @@ export function createLocalStorageWorkspaceAdapter(options: { storageKey: string
 	}
 
 	const idOf = (entry: unknown) => (isRecord(entry) && typeof entry.id === 'string' ? entry.id : null);
-	const readViews = () => readRaw().map(parseViewDefinition).filter((view): view is GridViewDefinition => view !== null);
+	const readViews = () =>
+		readRaw()
+			.map(parseViewDefinition)
+			.filter((view): view is GridViewDefinition => view !== null);
 
 	return {
 		async listViews() {

@@ -1,3 +1,9 @@
+import { GridViewHost } from './views/gridViewHost.js';
+import { GridEventName } from '../api/GridEvents.js';
+import { MinimapLayer } from './minimapLayer.js';
+import { readInteractionState } from '../interaction/interactionState.js';
+import { PresenceLayer } from './presenceLayer.js';
+import { ConditionalFormatPainter, registerConditionalFormatPainter, unregisterConditionalFormatPainter } from '../styling/conditionalFormat.js';
 import { isHierarchyActive } from '../rows/hierarchyConfig.js';
 import type { GridEngine } from '../engine/GridEngine.js';
 import type { GeometryController } from './geometryController.js';
@@ -103,6 +109,123 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.container.appendChild(this.scrollViewport);
 
 		this.buildLayers();
+		this.mountConditionalFormatting(container);
+		this.mountPresence();
+		this.mountMinimap();
+		const viewLayer = this.layers.get('view');
+		if (viewLayer) this.viewHost = new GridViewHost(viewLayer, container, this.engine);
+	}
+
+	private viewHost: GridViewHost<TRowData> | null = null;
+
+	private minimapLayer: MinimapLayer | null = null;
+	private unsubscribeMinimap: (() => void) | null = null;
+
+	private mountMinimap(): void {
+		const layer = this.layers.get('minimap');
+		const viewport = this.scrollViewport;
+		if (!layer || !viewport) return;
+		const engine = this.engine;
+		// Identity → small id, so the version string notices replaced arrays without hashing them.
+		const ids = new WeakMap<object, number>();
+		let nextId = 0;
+		const idOf = (value: object) => {
+			let id = ids.get(value);
+			if (id === undefined) ids.set(value, (id = ++nextId));
+			return id;
+		};
+		const minimap = new MinimapLayer(layer, {
+			enabled: () => !!engine.getState().showMinimap,
+			rowCount: () => engine.getRowModel()?.getVisualRowCount() ?? 0,
+			indexOf: (rowId) => engine.getRowModel()?.getVisualIndexByRowId(rowId) ?? -1,
+			rowTop: (index) => {
+				const tops = engine.geometry.rowTops;
+				return index < tops.length ? tops[index] : engine.geometry.getTotalHeight(engine.getState().defaultRowHeight ?? 40);
+			},
+			selection: () => {
+				const interaction = readInteractionState(engine.getState());
+				const ranges: { start: number; end: number }[] = [];
+				const bounds = interaction.cellSelection.selection.bounds;
+				if (bounds) ranges.push({ start: bounds.minRow, end: bounds.maxRow });
+				const model = engine.getRowModel();
+				for (const rowId of interaction.rowSelection.selectedRowIds) {
+					const index = model?.getVisualIndexByRowId(rowId) ?? -1;
+					if (index >= 0) ranges.push({ start: index, end: index });
+				}
+				return ranges;
+			},
+			issues: () => {
+				const issues = engine.getState().integrity.validation.issues;
+				return issues.filter((issue): issue is typeof issue & { rowId: string } => issue.rowId !== undefined);
+			},
+			marks: () => engine.minimapMarks.marks,
+			version: () => {
+				const state = engine.getState();
+				const interaction = readInteractionState(state);
+				const bounds = interaction.cellSelection.selection.bounds;
+				return `${bounds ? `${bounds.minRow}-${bounds.maxRow}` : ''}|${idOf(interaction.rowSelection.selectedRowIds)}|${idOf(state.integrity.validation.issues)}|${engine.minimapMarks.version}`;
+			},
+			scrollToFraction: (fraction) => {
+				const total = engine.geometry.getTotalHeight(engine.getState().defaultRowHeight ?? 40);
+				viewport.scrollTop = Math.max(0, fraction * total - viewport.clientHeight / 2);
+			},
+		});
+		const offChange = engine.addEventListener(GridEventName.cellValueChanged, (event) => minimap.noteChange(event.payload.rowId));
+		const offMarks = engine.minimapMarks.subscribe(() => minimap.redraw());
+		this.minimapLayer = minimap;
+		this.unsubscribeMinimap = () => {
+			offChange();
+			offMarks();
+		};
+	}
+
+	private presenceLayer: PresenceLayer | null = null;
+
+	private mountPresence(): void {
+		const layer = this.layers.get('presence');
+		if (!layer) return;
+		const engine = this.engine;
+		this.presenceLayer = new PresenceLayer(
+			engine.presence,
+			() => {
+				const model = engine.getRowModel();
+				const geometry = engine.geometry;
+				return {
+					getVisualIndexByRowId: (rowId) => model?.getVisualIndexByRowId(rowId) ?? -1,
+					getVisualRowCount: () => model?.getVisualRowCount() ?? 0,
+					getColumnIndex: (field) => engine.getColumnIndex(field),
+					rowTops: geometry.rowTops,
+					rowHeights: geometry.rowHeights,
+					colLefts: geometry.colLefts,
+					colWidths: geometry.colWidths,
+				};
+			},
+			layer,
+			{ top: this.pinnedTopLayer, bottom: this.pinnedBottomLayer }
+		);
+	}
+
+	private mountConditionalFormatting(container: HTMLElement): void {
+		const engine = this.engine;
+		const painter = new ConditionalFormatPainter(
+			{
+				getRules: () => engine.getState().styleRules,
+				getValue: (rowId, field) => engine.getComputedCellValue(rowId, field),
+				getVersion: () => engine.getDomainVersions().rows + engine.getState().globalVersion,
+				forEachDisplayedRowId: (visit) => {
+					const model = engine.getRowModel();
+					if (!model || model.kind !== 'client') return false;
+					const count = model.getVisualRowCount();
+					for (let i = 0; i < count; i++) {
+						const row = model.getVisualRow(i);
+						if (row?.kind === 'data') visit(row.rowId);
+					}
+					return true;
+				},
+			},
+			container
+		);
+		registerConditionalFormatPainter(container, painter);
 	}
 
 	/**
@@ -161,6 +284,15 @@ export class ViewportRenderer<TRowData = unknown> {
 	}
 
 	public unmount(): void {
+		this.presenceLayer?.dispose();
+		this.presenceLayer = null;
+		this.unsubscribeMinimap?.();
+		this.unsubscribeMinimap = null;
+		this.minimapLayer?.dispose();
+		this.minimapLayer = null;
+		this.viewHost?.dispose();
+		this.viewHost = null;
+		if (this.container) unregisterConditionalFormatPainter(this.container);
 		this.themeManager?.unmount();
 		this.themeManager = null;
 
@@ -176,9 +308,7 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.lastAriaRowCount = -1;
 		this.lastAriaColCount = -1;
 		this.lastActiveDescendantId = null;
-		if (this.styleTag && this.styleTag.parentNode) {
-			this.styleTag.remove();
-		}
+		if (this.styleTag) releaseSharedStyles(this.styleTag);
 		this.container = null;
 		this.scrollViewport = null;
 		this.rowsContainer = null;
@@ -315,6 +445,9 @@ export class ViewportRenderer<TRowData = unknown> {
 
 	public syncLayoutPlan(plan: GridLayoutPlan): void {
 		this.layoutPlan = plan;
+		this.presenceLayer?.sync(plan);
+		this.minimapLayer?.sync(plan);
+		this.viewHost?.sync(plan);
 
 		this.syncAriaCounts();
 
@@ -422,8 +555,39 @@ export class ViewportRenderer<TRowData = unknown> {
 
 	private injectStyles(): void {
 		if (typeof document === 'undefined') return;
-		this.styleTag = document.createElement('style');
-		this.styleTag.textContent = CORE_STYLES + CELL_STYLES + SIDEBAR_STYLES + CHART_STYLES;
-		document.head.appendChild(this.styleTag);
+		this.styleTag = acquireSharedStyles(this.container?.ownerDocument ?? document);
 	}
+}
+
+/*
+ * The grid stylesheet (~120k characters) is static, so one copy per document serves every grid in it:
+ * each extra grid used to parse and keep its own copy, and the style recalculation that comes with
+ * it. Counted per document; the last grid to unmount removes it.
+ */
+const sharedStyles = new WeakMap<Document, { tag: HTMLStyleElement; users: number }>();
+
+function acquireSharedStyles(doc: Document): HTMLStyleElement {
+	const shared = sharedStyles.get(doc);
+	if (shared && shared.tag.isConnected) {
+		shared.users++;
+		return shared.tag;
+	}
+	const tag = doc.createElement('style');
+	tag.dataset.ogGridStyles = '';
+	tag.textContent = CORE_STYLES + CELL_STYLES + SIDEBAR_STYLES + CHART_STYLES;
+	doc.head.appendChild(tag);
+	sharedStyles.set(doc, { tag, users: 1 });
+	return tag;
+}
+
+function releaseSharedStyles(tag: HTMLStyleElement): void {
+	const doc = tag.ownerDocument;
+	const shared = sharedStyles.get(doc);
+	if (!shared || shared.tag !== tag) {
+		tag.remove();
+		return;
+	}
+	if (--shared.users > 0) return;
+	tag.remove();
+	sharedStyles.delete(doc);
 }

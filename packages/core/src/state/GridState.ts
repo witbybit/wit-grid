@@ -1,3 +1,4 @@
+import type { GridViewConfig } from '../views.js';
 import type { FilterModel, QuickFilterModel, SortDirection, SortModel } from '../rowModel.js';
 import type { GridQueryModel } from '../query/GridQueryModel.js';
 import type {
@@ -63,6 +64,8 @@ export interface GridModelState<TRowData = unknown> {
 	hierarchyColumn?: HierarchyColumnConfig<TRowData> | false;
 	showGroupPanel?: boolean;
 	showFilterChipBar?: boolean;
+	/** A strip beside the vertical scrollbar marking selection, recent edits, issues and app marks across all rows. */
+	showMinimap?: boolean;
 	pinnedColumns?: { left: number; right: number };
 
 	/** Show an always-visible inline filter row below the column headers. */
@@ -140,6 +143,8 @@ export type RowModelType = 'client' | 'infinite' | 'server';
  * Controls loading indicators, open panels, active editor, etc.
  */
 export interface GridUIState {
+	/** Another way to see the rows (gallery, calendar); absent or null shows the table. */
+	view?: GridViewConfig<any> | null;
 	loading?: boolean;
 	loadingSkeletonCount?: number;
 	activeEdit: ActiveEditState | null;

@@ -17,7 +17,7 @@ import { samePipelineColumns } from './columns/columnDiff.js';
 import { FlatTotals } from './rows/flatTotals.js';
 import { IncrementalRowIndex } from './rows/incrementalRowIndex.js';
 import { RowDependencyRegistry, classifyMutation, mutationAffectsSortKeys, type RowMutationImpact } from './rows/rowMutationClassifier.js';
-import { compareSortKeys, toSortKey, type SortKey } from './rows/sortKeys.js';
+import { compareSortKeys, sortReaderOf, toSortKey, type SortKey } from './rows/sortKeys.js';
 import type { PageWindow } from './rows/pageModel.js';
 import { RowDataStore } from './rows/RowDataStore.js';
 import type { RowDataStoreTransactionSnapshot } from './rows/RowDataStore.js';
@@ -796,7 +796,7 @@ export function applyClientSortAndFilter<TData>(
 			} else {
 				getter = () => undefined;
 			}
-			return getter;
+			return sortReaderOf(column, getter);
 		});
 
 		// One all-numeric column: sort the numbers directly (ties in source order, as below).
@@ -1309,7 +1309,7 @@ export class ClientRowModelController<TData = unknown>
 		const columnById = createColumnLookup(columns);
 		const sortGetters = sortModel.map((sortItem) => {
 			const col = columnById.get(sortItem.colId);
-			return col ? makeGetter(col) : (): undefined => undefined;
+			return col ? sortReaderOf(col, makeGetter(col)) : (): undefined => undefined;
 		});
 		const descending = sortModel.map((sortItem) => sortItem.sort === 'desc');
 		const dataStore = this.dataStore;

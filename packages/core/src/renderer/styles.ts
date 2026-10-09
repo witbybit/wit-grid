@@ -70,6 +70,17 @@ export const CORE_STYLES = `
     box-sizing: border-box;
   }
 
+  /* Glass variables are emitted only by themes that opt in. The fallback keeps the
+     default render path free of backdrop filtering. */
+  @media (prefers-reduced-transparency: reduce) {
+    .og-grid-container {
+      --og-glass-backdrop-filter: none;
+      --og-glass-popover-bg: var(--og-popover-bg);
+      --og-glass-header-bg: var(--og-header-bg);
+      --og-glass-pinned-bg: var(--og-header-bg);
+    }
+  }
+
   /*
    * Scroll viewport — single overflow container for both axes.
    * No CSS Grid: rows live in og-rows-container (block flow after the sticky header).
@@ -106,6 +117,484 @@ export const CORE_STYLES = `
     top: 0;
     left: 0;
     pointer-events: none;
+  }
+
+  /* ── Minimap: every displayed row on a strip beside the vertical scrollbar ─ */
+  .og-layer-minimap {
+    position: absolute;
+    width: 16px;
+    z-index: 30;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--og-text-color) 7%, var(--og-bg-color, transparent));
+    border-left: 1px solid color-mix(in srgb, var(--og-text-color) 16%, transparent);
+    box-shadow: -2px 0 6px color-mix(in srgb, var(--og-text-color) 8%, transparent);
+    transition: background-color 120ms ease;
+  }
+  .og-layer-minimap:hover {
+    background: color-mix(in srgb, var(--og-text-color) 11%, var(--og-bg-color, transparent));
+  }
+  .og-layer-minimap[hidden] {
+    display: none;
+  }
+  .og-minimap-canvas {
+    display: block;
+  }
+
+  /* ── Views: gallery and calendar over the table's area ────────────────────── */
+  .og-layer-view {
+    position: absolute;
+    left: 0;
+    right: 0;
+    z-index: 35;
+    display: flex;
+    background: var(--og-bg-color);
+    color: var(--og-text-color);
+  }
+  .og-layer-view[hidden] {
+    display: none;
+  }
+  .og-view-active > .og-scroll-viewport,
+  .og-view-active > .og-layer-minimap {
+    visibility: hidden;
+  }
+
+  .og-view-gallery {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+  }
+  .og-view-gallery-sizer {
+    position: relative;
+  }
+  .og-view-card {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+    padding: 0 12px;
+    overflow: hidden;
+    border: 1px solid var(--og-cell-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--og-text-color) 3%, var(--og-bg-color));
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .og-view-card:hover {
+    border-color: color-mix(in srgb, var(--og-focus-ring) 55%, transparent);
+    box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--og-focus-ring) 45%, transparent);
+  }
+  .og-view-card-band {
+    height: 4px;
+    margin: 0 -12px;
+  }
+  .og-view-card-title {
+    height: 36px;
+    line-height: 36px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 30px;
+  }
+  .og-view-field-label {
+    flex: none;
+    width: 84px;
+    font-size: 11px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-field-value {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .og-view-calendar {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px 12px;
+    box-sizing: border-box;
+  }
+  .og-view-cal-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .og-view-cal-button {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--og-cell-border);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .og-view-cal-button:hover {
+    background: color-mix(in srgb, var(--og-text-color) 7%, transparent);
+  }
+  .og-view-cal-label {
+    margin-left: 8px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .og-view-cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    font-size: 11px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+  }
+  .og-view-cal-weekdays > span {
+    padding: 4px 6px;
+  }
+  .og-view-cal-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    border-top: 1px solid var(--og-cell-border);
+    border-left: 1px solid var(--og-cell-border);
+  }
+  .og-view-cal-day {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0 4px;
+    overflow: hidden;
+    border-right: 1px solid var(--og-cell-border);
+    border-bottom: 1px solid var(--og-cell-border);
+  }
+  .og-view-cal-day[data-outside] {
+    background: color-mix(in srgb, var(--og-text-color) 3%, transparent);
+  }
+  .og-view-cal-day[data-outside] .og-view-cal-date {
+    opacity: 0.45;
+  }
+  /* Dragging: the days the entry will cover light up in the accent (a grey entry would barely show), its ends marked. */
+  .og-view-cal-day[data-drop-span] {
+    background: color-mix(in srgb, var(--og-focus-ring) 20%, transparent);
+    box-shadow: inset 0 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+    transition: background-color 0.12s ease;
+  }
+  .og-view-cal-day[data-drop-first] {
+    box-shadow: inset 2px 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+  }
+  .og-view-cal-day[data-drop-last] {
+    box-shadow: inset -2px 2px 0 var(--og-focus-ring), inset 0 -2px 0 var(--og-focus-ring);
+  }
+  .og-view-cal-day[data-drop-first][data-drop-last] {
+    box-shadow: inset 0 0 0 2px var(--og-focus-ring);
+  }
+  .og-view-cal-entry[data-drag-source] {
+    opacity: 0.3;
+  }
+  .og-view-cal-ghost {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 5;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--og-view-drag, var(--og-focus-ring));
+    border-left-width: 4px;
+    background: var(--og-bg-color);
+    box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.5);
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .og-view-cal-ghost strong {
+    font-weight: 600;
+  }
+  .og-view-cal-ghost span {
+    color: color-mix(in srgb, var(--og-text-color) 70%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .og-view-cal-ghost[hidden] {
+    display: none;
+  }
+  /* An entry's card: dates, fields drawn by their columns, and what can be done with it. */
+  .og-view-cal-popover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    width: 280px;
+    box-sizing: border-box;
+    padding: 0 12px 10px;
+    overflow: hidden;
+    border-radius: 10px;
+    border: 1px solid var(--og-cell-border);
+    background: var(--og-glass-popover-bg, var(--og-bg-color));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.55);
+    animation: og-view-pop-in 0.16s ease-out;
+  }
+  @keyframes og-view-pop-in {
+    from {
+      opacity: 0;
+      margin-top: -4px;
+    }
+  }
+  .og-view-pop-band {
+    height: 4px;
+    margin: 0 -12px;
+  }
+  .og-view-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .og-view-pop-head strong {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .og-view-pop-close {
+    width: 22px;
+    height: 22px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .og-view-pop-close:hover {
+    background: color-mix(in srgb, var(--og-text-color) 9%, transparent);
+  }
+  .og-view-pop-dates {
+    margin: 2px 0 6px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: color-mix(in srgb, var(--og-text-color) 70%, transparent);
+  }
+  .og-view-pop-fields {
+    padding: 2px 0 6px;
+    border-top: 1px solid var(--og-cell-border);
+  }
+  .og-view-pop-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--og-cell-border);
+  }
+  .og-view-pop-actions .og-view-cal-button {
+    height: 26px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .og-view-pop-actions [data-pop='open'] {
+    margin-left: auto;
+    border-color: color-mix(in srgb, var(--og-focus-ring) 60%, transparent);
+    color: var(--og-focus-ring);
+  }
+  .og-view-pop-tip {
+    margin-top: 8px;
+    font-size: 10px;
+    color: color-mix(in srgb, var(--og-text-color) 50%, transparent);
+  }
+
+  /* Dropped: the entry pops into its new days with a glow. */
+  .og-view-cal-entry[data-landed] {
+    animation: og-view-landed 0.9s cubic-bezier(0.2, 0.8, 0.2, 1.2);
+  }
+  @keyframes og-view-landed {
+    0% {
+      transform: scale(0.7);
+      opacity: 0;
+      box-shadow: 0 0 0 0 transparent;
+    }
+    35% {
+      transform: scale(1.04);
+      opacity: 1;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-view-entry, var(--og-focus-ring)) 45%, transparent);
+    }
+    100% {
+      transform: none;
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+  .og-view-cal-date {
+    align-self: flex-start;
+    min-width: 20px;
+    height: 20px;
+    margin-left: 4px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 20px;
+    text-align: center;
+  }
+  .og-view-cal-day[data-today] .og-view-cal-date {
+    background: var(--og-focus-ring);
+    color: var(--og-accent-contrast, #fff);
+    font-weight: 600;
+  }
+  .og-view-cal-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+  }
+  .og-view-cal-entry {
+    height: 18px;
+    line-height: 18px;
+    padding: 0 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: color-mix(in srgb, var(--og-view-entry, var(--og-focus-ring)) 26%, transparent);
+  }
+  .og-view-cal-entry[data-start] {
+    margin-left: 4px;
+    border-left: 3px solid var(--og-view-entry, var(--og-focus-ring));
+    border-radius: 4px 0 0 4px;
+  }
+  .og-view-cal-entry[data-end] {
+    margin-right: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+  }
+  .og-view-cal-entry:not([data-start]):not([data-week-start]) {
+    color: transparent;
+  }
+  .og-view-cal-entry[data-editable] {
+    cursor: grab;
+    touch-action: none;
+  }
+  .og-view-cal-entry[data-editable]:hover {
+    filter: brightness(1.18);
+  }
+  .og-view-calendar[data-dragging] .og-view-cal-entry {
+    cursor: grabbing;
+  }
+  .og-view-cal-more {
+    padding: 0 6px;
+    font-size: 10px;
+    line-height: 12px;
+    color: color-mix(in srgb, var(--og-text-color) 55%, transparent);
+  }
+
+  /* ── Presence: peers' cell cursors and cell flashes ─────────────────────── */
+  /* Content coordinates like the rows; pointer-inert, above the cells. */
+  .og-layer-presence {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  /* Cursors on pinned rows: a band inside the sticky pinned layer, above its rows. */
+  .og-presence-band {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 30;
+  }
+
+  .og-presence,
+  .og-cell-flash {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-sizing: border-box;
+  }
+
+  .og-presence {
+    border: 2px solid var(--og-presence-color);
+    border-radius: 3px;
+    transition: transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), width 240ms cubic-bezier(0.2, 0.8, 0.2, 1), height 240ms ease;
+  }
+  .og-presence-still {
+    transition: none;
+  }
+  .og-presence[data-editing] {
+    background: color-mix(in srgb, var(--og-presence-color) 14%, transparent);
+    animation: og-presence-pulse 1.4s ease-in-out infinite;
+  }
+
+  .og-presence-tag {
+    position: absolute;
+    left: -2px;
+    bottom: 100%;
+    padding: 1px 6px;
+    border-radius: 4px 4px 4px 0;
+    background: var(--og-presence-color);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .og-presence-tag-below {
+    bottom: auto;
+    top: 100%;
+    border-radius: 0 4px 4px 4px;
+  }
+  .og-presence[data-editing] .og-presence-tag::after {
+    content: ' ✎';
+  }
+
+  .og-cell-flash {
+    background: var(--og-flash-color, var(--og-focus-ring));
+    opacity: 0;
+    animation: og-cell-flash 900ms ease-out;
+  }
+
+  @keyframes og-presence-pulse {
+    50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--og-presence-color) 30%, transparent); }
+  }
+  @keyframes og-cell-flash {
+    from { opacity: 0.38; }
+    to { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .og-presence { transition: none; }
+    .og-presence[data-editing] { animation: none; }
+    .og-view-cal-entry[data-landed] { animation: none; }
+    .og-view-cal-popover { animation: none; }
   }
 
   /* ── Floating filter row ────────────────────────────────────────────────── */
@@ -311,7 +800,9 @@ export const CORE_STYLES = `
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     color: var(--og-text-color);
     font-size: 12px;
     user-select: none;
@@ -688,7 +1179,9 @@ export const CORE_STYLES = `
     overflow: hidden;
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   /* Left / right pin lanes — compositor-sticky so they never lag behind body rows. */
@@ -704,7 +1197,9 @@ export const CORE_STYLES = `
     pointer-events: auto;
     border-bottom: 2px solid var(--og-border-color);
     border-right: 1px solid var(--og-pin-left-border-color);
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-header-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   .og-scrolled-left .og-layer-header-left {
@@ -912,7 +1407,9 @@ export const CORE_STYLES = `
   }
 
   .og-row-pinned-top {
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-pinned-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     z-index: 25;
     border-bottom: 2px solid var(--og-border-color) !important;
   }
@@ -951,7 +1448,9 @@ export const CORE_STYLES = `
   }
 
   .og-row-pinned-bottom {
-    background-color: var(--og-header-bg);
+    background-color: var(--og-glass-pinned-bg, var(--og-header-bg));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
     z-index: 25;
     border-top: 2px solid var(--og-border-color) !important;
   }
@@ -1596,6 +2095,8 @@ export const CORE_STYLES = `
     pointer-events: none;
     white-space: nowrap;
     box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
   }
 
   .og-cell-pinned-left .og-cell-editor,
@@ -1765,6 +2266,29 @@ export const CORE_STYLES = `
     to { opacity: 1; }
   }
 
+  /* Out of the grid: letting go hides the column. */
+  .og-drag-ghost-hide {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--og-text-color) 12%, transparent);
+    color: var(--og-text-color);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+  }
+  .og-column-drag-ghost[data-hide] {
+    border-color: color-mix(in srgb, var(--og-text-color) 30%, transparent);
+    background: color-mix(in srgb, var(--og-header-bg) 92%, var(--og-text-color));
+  }
+  .og-column-drag-ghost[data-hide] > span:not(.og-drag-ghost-hide) {
+    opacity: 0.55;
+    text-decoration: line-through;
+  }
+  .og-column-drag-ghost[data-hide] .og-drag-ghost-hide { display: inline-flex; }
+
   /* SVG drag-handle icon injected by JS */
   .og-drag-ghost-icon {
     width: 10px;
@@ -1870,10 +2394,10 @@ export const CORE_STYLES = `
   .og-context-menu,
   .og-header-popover {
     position: fixed;
-    background: var(--og-popover-bg, rgba(15, 18, 26, 0.98));
-    backdrop-filter: blur(12px) saturate(140%);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    border: 1px solid var(--og-popover-border, rgba(255, 255, 255, 0.09));
+    background: var(--og-glass-popover-bg, var(--og-popover-bg, rgba(15, 18, 26, 0.98)));
+    backdrop-filter: var(--og-glass-backdrop-filter, none);
+    -webkit-backdrop-filter: var(--og-glass-backdrop-filter, none);
+    border: 1px solid var(--og-glass-border, var(--og-popover-border, rgba(255, 255, 255, 0.09)));
     border-radius: 10px;
     box-shadow:
       0 16px 40px -12px rgba(0, 0, 0, 0.55),

@@ -1137,7 +1137,7 @@ export class IncrementalRowIndex<TData> {
 		let entry = refresh ? undefined : this.sortEntries.get(node);
 		if (!entry) {
 			entry = {
-				keys: this.sortModel.map((s) => toSortKey(this.context.getValue(node, s.colId))),
+				keys: this.sortModel.map((s) => toSortKey(this.context.sortReaderFor(s.colId)(node))),
 				source: this.getSourceIndex(node.id) ?? 0,
 			};
 			this.sortEntries.set(node, entry);
