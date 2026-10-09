@@ -117,4 +117,33 @@ describe('timeline cells', () => {
 		bar.dispatchEvent(new PointerEvent('pointerup', { clientX: 90 }));
 		expect(editable.setCellValue).not.toHaveBeenCalled();
 	});
+
+	it('draws month lines dashed (quarters in their own colour), today solid, and names the day under the pointer', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date(2026, 4, 20, 12));
+		try {
+			const rows = [{ id: 'a', plan: { start: '2026-03-02', end: '2026-03-03' } }];
+			const { mount } = setup(rows, { range: { start: '2026-03-02', end: '2026-07-30' } });
+			const { track, handle } = mount(rows[0]);
+			const ticks = track.style.getPropertyValue('--og-ct-ticks');
+			// Apr, May, Jun, Jul: April and July start quarters (each line names its colour twice).
+			expect(ticks.match(/--og-ct-timeline-quarter/g)).toHaveLength(4);
+			expect(ticks.match(/--og-ct-timeline-tick\)/g)).toHaveLength(4);
+			expect(track.style.backgroundImage).toContain('--og-ct-timeline-today');
+
+			vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 150 } as DOMRect);
+			track.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, bubbles: true }));
+			expect(track.title).toMatch(/Mar/);
+			expect(track.title).toMatch(/\b2\b/);
+
+			// The day turns: the today line steps to the next day.
+			const before = track.style.backgroundImage;
+			vi.advanceTimersByTime(13 * 3_600_000);
+			expect(track.style.backgroundImage).not.toBe(before);
+			handle.destroy();
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });

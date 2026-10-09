@@ -22,7 +22,8 @@ export const CELL_STYLES = `
   --og-ct-track: color-mix(in srgb, var(--og-text-color) 11%, transparent);
   --og-ct-danger: var(--og-error, #ef4444);
   --og-ct-rating: #f5a524;
-  --og-ct-timeline-tick: color-mix(in srgb, var(--og-text-color) 10%, transparent);
+  --og-ct-timeline-tick: color-mix(in srgb, var(--og-ct-accent) 45%, transparent);
+  --og-ct-timeline-quarter: color-mix(in srgb, #14b8a6 70%, transparent);
   --og-ct-timeline-today: color-mix(in srgb, var(--og-ct-danger) 70%, transparent);
   --og-ct-radius: 6px;
 }
@@ -30,6 +31,13 @@ export const CELL_STYLES = `
 /* ── Cells ─────────────────────────────────────────────────────────────── */
 /* Timeline: month lines and today on the track; the bar moves and resizes. */
 .og-ct-timeline { position: relative; flex: 1; align-self: stretch; margin: 0 -6px; }
+/* Month lines dashed: the track's --og-ct-ticks layers, masked into 3px dashes. Today stays solid on the track. */
+.og-ct-timeline::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: var(--og-ct-ticks, none);
+  -webkit-mask-image: repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px);
+  mask-image: repeating-linear-gradient(to bottom, #000 0 3px, transparent 3px 6px);
+}
 .og-ct-timeline-bar {
   position: absolute; top: 50%; height: 18px; transform: translateY(-50%); min-width: 4px; box-sizing: border-box;
   display: flex; align-items: center; padding: 0 6px; overflow: hidden; border-radius: 5px;

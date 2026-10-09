@@ -8,6 +8,7 @@ import { parseCellDate } from './format.js';
 import { parseDateRange, writeDateRange, type DateRange } from './dateRange.js';
 import { resolveCellColor, type CellColor } from './palette.js';
 import { cell, writeValue } from './renderers.js';
+import { defaultGridScheduler, type GridScheduler } from '../renderer/gridScheduler.js';
 
 export interface TimelineCellOptions {
 	/** The span the column shows. Default: the column's earliest start to latest end, padded to whole weeks. */
@@ -30,18 +31,23 @@ const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(),
 const addDays = (date: Date, days: number) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 const daysBetween = (a: Date, b: Date) => Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / DAY_MS);
 
-/** The column's time scale, shared by its cells; they redraw together when it widens. */
+/** The column's time scale, shared by its cells; they redraw together when it widens or the day turns. */
 class TimelineScale {
 	start: Date;
 	end: Date;
+	/** Month starts, drawn dashed (quarter starts in their own colour). */
 	ticks = '';
+	/** Today, drawn solid. */
+	today = '';
 	private readonly cells = new Set<() => void>();
+	private midnight: ReturnType<GridScheduler['timeout']> | null = null;
 
 	constructor(
 		start: Date,
 		end: Date,
 		private readonly fixed: boolean,
-		private readonly showToday: boolean
+		private readonly showToday: boolean,
+		private readonly scheduler: GridScheduler = defaultGridScheduler
 	) {
 		this.start = start;
 		this.end = end;
@@ -57,35 +63,63 @@ class TimelineScale {
 		return daysBetween(this.start, date) / this.days;
 	}
 
+	/** The day at `fraction` of the scale. */
+	dateAt(fraction: number): Date {
+		return addDays(this.start, Math.floor(Math.min(1, Math.max(0, fraction)) * this.days));
+	}
+
 	/** Widens to include `range` (unless fixed); every mounted cell redraws. */
 	include(range: DateRange): void {
 		if (this.fixed || (range.start >= this.start && range.end <= this.end)) return;
 		const [start, end] = padToWeeks(range.start < this.start ? range.start : this.start, range.end > this.end ? range.end : this.end);
 		this.start = start;
 		this.end = end;
+		this.rebuild();
+	}
+
+	/** While any cell is mounted, the today line steps to the next day at midnight. */
+	register(redraw: () => void): () => void {
+		this.cells.add(redraw);
+		if (this.showToday && this.midnight === null) this.scheduleMidnight();
+		return () => {
+			this.cells.delete(redraw);
+			if (this.cells.size === 0 && this.midnight !== null) {
+				this.scheduler.clearTimeout(this.midnight);
+				this.midnight = null;
+			}
+		};
+	}
+
+	private scheduleMidnight(): void {
+		const now = new Date();
+		const next = addDays(startOfDay(now), 1);
+		this.midnight = this.scheduler.timeout(() => {
+			this.midnight = null;
+			this.rebuild();
+			if (this.cells.size > 0) this.scheduleMidnight();
+		}, next.getTime() - now.getTime() + 1000);
+	}
+
+	private rebuild(): void {
 		this.buildTicks();
 		for (const redraw of this.cells) redraw();
 	}
 
-	register(redraw: () => void): () => void {
-		this.cells.add(redraw);
-		return () => this.cells.delete(redraw);
-	}
-
-	/** Month starts (and today) as 1px background lines, one layer each. */
+	/** Month starts and today as background lines, one layer each. */
 	private buildTicks(): void {
-		const layers: string[] = [];
 		const line = (fraction: number, colour: string, width: number) => {
 			const at = `${(fraction * 100).toFixed(3)}%`;
-			layers.push(
-				`linear-gradient(to right, transparent calc(${at} - ${width / 2}px), ${colour} calc(${at} - ${width / 2}px), ${colour} calc(${at} + ${width / 2}px), transparent calc(${at} + ${width / 2}px))`
-			);
+			return `linear-gradient(to right, transparent calc(${at} - ${width / 2}px), ${colour} calc(${at} - ${width / 2}px), ${colour} calc(${at} + ${width / 2}px), transparent calc(${at} + ${width / 2}px))`;
 		};
+		const months: string[] = [];
 		const month = new Date(this.start.getFullYear(), this.start.getMonth() + 1, 1);
-		for (; month < this.end; month.setMonth(month.getMonth() + 1)) line(this.at(month), 'var(--og-ct-timeline-tick)', 1);
+		for (; month < this.end; month.setMonth(month.getMonth() + 1)) {
+			const colour = month.getMonth() % 3 === 0 ? 'var(--og-ct-timeline-quarter)' : 'var(--og-ct-timeline-tick)';
+			months.push(line(this.at(month), colour, 1));
+		}
+		this.ticks = months.join(', ') || 'none';
 		const today = startOfDay(new Date());
-		if (this.showToday && today > this.start && today < this.end) line(this.at(today), 'var(--og-ct-timeline-today)', 2);
-		this.ticks = layers.join(', ');
+		this.today = this.showToday && today > this.start && today < this.end ? line(this.at(today), 'var(--og-ct-timeline-today)', 2) : 'none';
 	}
 }
 
@@ -152,12 +186,17 @@ export function createTimelineRenderer(options: TimelineCellOptions = {}): DomCe
 			let shown: DateRange | null = null;
 			let preview: DateRange | null = null;
 			let ticks = '';
+			let today = '';
 			const lengthLabel = new Intl.DateTimeFormat(options.locale, { month: 'short', day: 'numeric' });
 
 			const draw = () => {
 				if (ticks !== scale.ticks) {
 					ticks = scale.ticks;
-					track.style.backgroundImage = ticks;
+					track.style.setProperty('--og-ct-ticks', ticks);
+				}
+				if (today !== scale.today) {
+					today = scale.today;
+					track.style.backgroundImage = today;
 				}
 				const range = preview ?? shown;
 				bar.hidden = !range;
@@ -192,6 +231,17 @@ export function createTimelineRenderer(options: TimelineCellOptions = {}): DomCe
 				if (rect.right - event.clientX < EDGE_PX) return 'end';
 				return 'move';
 			};
+			// Off the bar, the track names the day under the pointer (and today).
+			const dayLabel = new Intl.DateTimeFormat(options.locale, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+			const onTrackHover = (event: PointerEvent) => {
+				if (event.target !== track) return;
+				const rect = track.getBoundingClientRect();
+				if (rect.width <= 0) return;
+				const day = scale.dateAt((event.clientX - rect.left) / rect.width);
+				const text = daysBetween(startOfDay(new Date()), day) === 0 ? `Today, ${dayLabel.format(day)}` : dayLabel.format(day);
+				if (track.title !== text) track.title = text;
+			};
+			track.addEventListener('pointermove', onTrackHover);
 			const onHover = (event: PointerEvent) => {
 				if (!drag) bar.dataset.edge = modeAt(event);
 			};
@@ -239,6 +289,7 @@ export function createTimelineRenderer(options: TimelineCellOptions = {}): DomCe
 				update,
 				destroy: () => {
 					unregister();
+					track.removeEventListener('pointermove', onTrackHover);
 					bar.removeEventListener('pointermove', onHover);
 					bar.removeEventListener('pointerdown', onDown);
 					bar.removeEventListener('pointermove', onMove);
