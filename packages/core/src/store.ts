@@ -539,8 +539,8 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 	};
 
 	public getCsv = (options?: CsvExportOptions): string => toCsv(this, options);
-	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, this.state.columnWidths, options);
-	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, this.state.columnWidths, options);
+	public exportExcel = (options?: ExcelExportOptions): Promise<void> => exportToXlsx(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
+	public getExcel = (options?: ExcelExportOptions): Promise<Blob> => toXlsxBlob(this, { widths: this.state.columnWidths, styleRules: this.state.styleRules }, options);
 
 	/** Grouped / tree grids: every row of the hierarchy, all groups expanded (for export). */
 	public getHierarchyExportRows = (): VisualRow<TRowData>[] | null => {

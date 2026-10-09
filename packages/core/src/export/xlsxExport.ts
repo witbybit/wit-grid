@@ -4,7 +4,7 @@
  * their labels, column widths follow the grid, the header is bold, frozen and filterable, and
  * grouped grids export as Excel outlines that collapse.
  */
-import type { ColumnDef } from '../columnDef.js';
+import type { ColumnDef, GridStyleRule } from '../columnDef.js';
 import type { NumberCellOptions } from '../cells/format.js';
 import { parseCellDate } from '../cells/format.js';
 import { resolveColumnFilterDef } from '../filters/filterDef.js';
@@ -12,6 +12,7 @@ import { hierarchyColumnGroupColId, isHierarchyColumn } from '../rows/hierarchyC
 import type { VisualRow } from '../visualRow.js';
 import { exportDataRows, triggerDownload, type Exportable } from './csvExport.js';
 import { createZip } from './zip.js';
+import { columnName, conditionalFormattingXml } from './xlsxConditionalFormats.js';
 
 export interface ExcelExportOptions {
 	/** Downloaded file name. Default: 'export.xlsx' */
@@ -39,7 +40,7 @@ export interface ExcelExportOptions {
 
 type CellKind = 'number' | 'date' | 'text';
 
-interface ColumnPlan {
+export interface ColumnPlan {
 	col: ColumnDef<any>;
 	kind: CellKind;
 	/** Excel number format code, for number and date cells. */
@@ -50,13 +51,6 @@ interface ColumnPlan {
 
 const escapeXml = (text: string) =>
 	text.replace(/[&<>"]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;')).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
-
-/** A1-style column letters. */
-function columnName(index: number): string {
-	let name = '';
-	for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
-	return name;
-}
 
 function decimalsPattern(decimals: number | undefined, fallback: number): string {
 	const d = decimals ?? fallback;
@@ -151,7 +145,14 @@ interface SheetRow {
 }
 
 /** The workbook bytes of the export. */
-export async function toXlsx<TRowData>(api: Exportable<TRowData>, widths: Record<string, number>, options: ExcelExportOptions = {}): Promise<Uint8Array> {
+/** What the sheet takes from the grid besides its rows: column widths and the conditional formats to carry over. */
+export interface XlsxSheetContext {
+	widths: Record<string, number>;
+	styleRules?: readonly GridStyleRule<any>[];
+}
+
+export async function toXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxSheetContext, options: ExcelExportOptions = {}): Promise<Uint8Array> {
+	const { widths } = context;
 	const { includeHeader = true, onlySelected = false, rowIds, includeGroups = true, includeTotals = true, freezeHeader = true, autoFilter = true } = options;
 	const cols = (api.getDisplayedColumns() as unknown as ColumnDef<TRowData>[]).filter((col) => !options.columns || options.columns.includes(col.field));
 	const plans = planColumns(cols as ColumnDef<any>[], widths, options.locale);
@@ -235,6 +236,7 @@ export async function toXlsx<TRowData>(api: Exportable<TRowData>, widths: Record
 		rows.map((row, i) => `<row r="${i + 1}"${row.outlineLevel ? ` outlineLevel="${row.outlineLevel}"` : ''}>${row.cells.join('')}</row>`).join('') +
 		'</sheetData>' +
 		(includeHeader && autoFilter && rows.length > 1 && plans.length ? `<autoFilter ref="A1:${lastCol}${rows.length}"/>` : '') +
+		conditionalFormattingXml(context.styleRules, plans, includeHeader ? 2 : 1, rows.length) +
 		'</worksheet>';
 
 	const sheetName = escapeXml((options.sheetName ?? 'Sheet1').replace(/[\\/?*[\]:]/g, ' ').slice(0, 31) || 'Sheet1');
@@ -287,10 +289,10 @@ export async function toXlsx<TRowData>(api: Exportable<TRowData>, widths: Record
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 /** The export as a Blob (to upload, or to save yourself). */
-export async function toXlsxBlob<TRowData>(api: Exportable<TRowData>, widths: Record<string, number>, options: ExcelExportOptions = {}): Promise<Blob> {
-	return new Blob([(await toXlsx(api, widths, options)) as BlobPart], { type: XLSX_TYPE });
+export async function toXlsxBlob<TRowData>(api: Exportable<TRowData>, context: XlsxSheetContext, options: ExcelExportOptions = {}): Promise<Blob> {
+	return new Blob([(await toXlsx(api, context, options)) as BlobPart], { type: XLSX_TYPE });
 }
 
-export async function exportToXlsx<TRowData>(api: Exportable<TRowData>, widths: Record<string, number>, options: ExcelExportOptions = {}): Promise<void> {
-	triggerDownload(await toXlsxBlob(api, widths, options), options.fileName ?? 'export.xlsx');
+export async function exportToXlsx<TRowData>(api: Exportable<TRowData>, context: XlsxSheetContext, options: ExcelExportOptions = {}): Promise<void> {
+	triggerDownload(await toXlsxBlob(api, context, options), options.fileName ?? 'export.xlsx');
 }

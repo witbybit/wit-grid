@@ -56,6 +56,11 @@ export function createGridRuntimeComposition<TRowData>({
 }: GridRuntimeCompositionOptions<TRowData>): GridApi<TRowData> {
 	// Members that are a plain call into the engine are bound once on the runtime; the api shares them.
 	const engineForwards: Pick<GridApi<TRowData>, (typeof PUBLIC_ENGINE_FORWARD_NAMES)[number]> = pickMembers(runtime, PUBLIC_ENGINE_FORWARD_NAMES);
+	// Excel export carries column widths and the conditional formats.
+	const sheetContext = () => {
+		const state = runtime.engine.getState();
+		return { widths: state.columnWidths, styleRules: state.styleRules };
+	};
 	const api = {
 		...engineForwards,
 		getStateSnapshot: () => runtime.getStateSnapshot(),
@@ -93,8 +98,8 @@ export function createGridRuntimeComposition<TRowData>({
 		setDescendantsSelected: (id: string, selected: boolean) => runtime.setDescendantsSelected(id, selected),
 		exportCsv: (options?: CsvExportOptions) => exportToCsv(runtime, options),
 		getCsv: (options?: CsvExportOptions) => toCsv(runtime, options),
-		exportExcel: (options?: ExcelExportOptions) => exportToXlsx(runtime, runtime.engine.getState().columnWidths, options),
-		getExcel: (options?: ExcelExportOptions) => toXlsxBlob(runtime, runtime.engine.getState().columnWidths, options),
+		exportExcel: (options?: ExcelExportOptions) => exportToXlsx(runtime, sheetContext(), options),
+		getExcel: (options?: ExcelExportOptions) => toXlsxBlob(runtime, sheetContext(), options),
 		startEditing: (rowId: string, colFieldOrInstanceId: string, source?: 'keyboard' | 'mouse' | 'api') =>
 			runtime.startEditing(rowId, colFieldOrInstanceId, source),
 		updateEditDraft: (rowId: string, colFieldOrInstanceId: string, value: unknown) => runtime.updateEditDraft(rowId, colFieldOrInstanceId, value),
