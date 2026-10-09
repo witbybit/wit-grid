@@ -14,8 +14,14 @@ const GUIDES: Record<ViewKind, Guide> = {
 	table: {
 		title: 'The team workspace',
 		steps: [
-			{ name: 'Native cells', text: 'Status, people, dates, ranges, ratings and more are drawn by the grid core. Double-click or press Enter to edit.' },
-			{ name: 'Teammates, live', text: 'Ava, Leo and Mia move between cells and land edits; their cursors glide and the cells they change flash.' },
+			{
+				name: 'Native cells',
+				text: 'Status, people, dates, ranges, ratings and more are drawn by the grid core. Double-click or press Enter to edit.',
+			},
+			{
+				name: 'Teammates, live',
+				text: 'Ava, Leo and Mia move between cells and land edits; their cursors glide and the cells they change flash.',
+			},
 			{ name: 'Rows slide', text: 'Sorted by velocity, so an edit that changes it slides the row to its new place under the heat scale.' },
 			{ name: 'Timeline', text: 'Drag a bar to move a task, or an end to resize it. Every bar shares one time scale.' },
 			{ name: 'Gallery and calendar', text: 'Switch views above the grid: the same filtered, sorted rows as cards or on a calendar.' },
@@ -27,9 +33,15 @@ const GUIDES: Record<ViewKind, Guide> = {
 		steps: [
 			{ name: 'Same rows, by date', text: 'Every task sits on its due day. Filters, sort and search apply here exactly as in the table.' },
 			{ name: 'Click an entry', text: 'A card opens with its dates, status, priority and owner, and buttons to nudge it a day or a week.' },
-			{ name: 'Drag to reschedule', text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.' },
+			{
+				name: 'Drag to reschedule',
+				text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.',
+			},
 			{ name: 'Double-click', text: 'Opens the task in the table, scrolled to the middle and flashed, so you can edit every field.' },
-			{ name: 'Ranges span days', text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.' },
+			{
+				name: 'Ranges span days',
+				text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.',
+			},
 		],
 		note: 'Moves write through the normal API: sort order, conditional formats, the minimap and teammates all react, and undo works.',
 	},
