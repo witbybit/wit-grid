@@ -308,9 +308,7 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.lastAriaRowCount = -1;
 		this.lastAriaColCount = -1;
 		this.lastActiveDescendantId = null;
-		if (this.styleTag && this.styleTag.parentNode) {
-			this.styleTag.remove();
-		}
+		if (this.styleTag) releaseSharedStyles(this.styleTag);
 		this.container = null;
 		this.scrollViewport = null;
 		this.rowsContainer = null;
@@ -557,8 +555,39 @@ export class ViewportRenderer<TRowData = unknown> {
 
 	private injectStyles(): void {
 		if (typeof document === 'undefined') return;
-		this.styleTag = document.createElement('style');
-		this.styleTag.textContent = CORE_STYLES + CELL_STYLES + SIDEBAR_STYLES + CHART_STYLES;
-		document.head.appendChild(this.styleTag);
+		this.styleTag = acquireSharedStyles(this.container?.ownerDocument ?? document);
 	}
+}
+
+/*
+ * The grid stylesheet (~120k characters) is static, so one copy per document serves every grid in it:
+ * each extra grid used to parse and keep its own copy, and the style recalculation that comes with
+ * it. Counted per document; the last grid to unmount removes it.
+ */
+const sharedStyles = new WeakMap<Document, { tag: HTMLStyleElement; users: number }>();
+
+function acquireSharedStyles(doc: Document): HTMLStyleElement {
+	const shared = sharedStyles.get(doc);
+	if (shared && shared.tag.isConnected) {
+		shared.users++;
+		return shared.tag;
+	}
+	const tag = doc.createElement('style');
+	tag.dataset.ogGridStyles = '';
+	tag.textContent = CORE_STYLES + CELL_STYLES + SIDEBAR_STYLES + CHART_STYLES;
+	doc.head.appendChild(tag);
+	sharedStyles.set(doc, { tag, users: 1 });
+	return tag;
+}
+
+function releaseSharedStyles(tag: HTMLStyleElement): void {
+	const doc = tag.ownerDocument;
+	const shared = sharedStyles.get(doc);
+	if (!shared || shared.tag !== tag) {
+		tag.remove();
+		return;
+	}
+	if (--shared.users > 0) return;
+	tag.remove();
+	sharedStyles.delete(doc);
 }

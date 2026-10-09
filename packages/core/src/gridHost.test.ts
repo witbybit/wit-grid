@@ -278,4 +278,25 @@ describe('mountGridHost', () => {
 		host.destroy();
 		api.destroy();
 	});
+
+	it('shares one stylesheet per document across grids, removed with the last one', () => {
+		vi.stubGlobal('ResizeObserver', TestResizeObserver);
+		const make = () => {
+			const api = createClientGrid<{ id: string }>({ rows: [{ id: 'a' }], columns: [{ field: 'id', header: 'Id' }], getRowId: (r) => r.id });
+			const container = document.createElement('div');
+			document.body.appendChild(container);
+			return { api, host: mountGridHost(api, container) };
+		};
+		const sheets = () => document.head.querySelectorAll('style[data-og-grid-styles]').length;
+		const before = sheets();
+		const a = make();
+		const b = make();
+		expect(sheets()).toBe(before + 1);
+		a.host.destroy();
+		a.api.destroy();
+		expect(sheets()).toBe(before + 1);
+		b.host.destroy();
+		b.api.destroy();
+		expect(sheets()).toBe(before);
+	});
 });
