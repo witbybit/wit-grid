@@ -25,6 +25,8 @@ export const SIDEBAR_STYLES = `
   border: 0; border-radius: 8px; background: transparent; color: var(--og-header-text); cursor: pointer;
   transition: background-color .15s ease, color .15s ease;
 }
+/* Every rail icon at the built-ins' 18px, so a custom panel's icon (any SVG markup) matches. */
+.og-sb-tab > svg { width: 18px; height: 18px; flex: none; }
 .og-sb-tab:hover { background: var(--og-sb-hover); color: var(--og-text-color); }
 .og-sb-tab:focus-visible { outline: 2px solid var(--og-sb-accent); outline-offset: 1px; }
 .og-sb-tab[aria-selected='true'] { background: color-mix(in srgb, var(--og-sb-accent) 16%, transparent); color: var(--og-sb-accent); }
