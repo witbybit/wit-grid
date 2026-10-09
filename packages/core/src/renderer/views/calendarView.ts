@@ -267,7 +267,17 @@ export function createCalendarView<TRowData>(
 		const day = entry.closest<HTMLElement>('.og-view-cal-day');
 		if (!row || !range || !day) return;
 		event.preventDefault();
-		drag = { rowId: row.id, from: day.dataset.date!, range, title: fieldText(titleCol, row), x: event.clientX, y: event.clientY, moved: false, shift: null, pointerId: event.pointerId };
+		drag = {
+			rowId: row.id,
+			from: day.dataset.date!,
+			range,
+			title: fieldText(titleCol, row),
+			x: event.clientX,
+			y: event.clientY,
+			moved: false,
+			shift: null,
+			pointerId: event.pointerId,
+		};
 		root.style.setProperty('--og-view-drag', viewColour(config.color?.(row.data)) ?? 'var(--og-focus-ring)');
 		try {
 			grid.setPointerCapture(event.pointerId);
