@@ -280,11 +280,6 @@ export function createCalendarView<TRowData>(
 			pointerId: event.pointerId,
 		};
 		root.style.setProperty('--og-view-drag', viewColour(config.color?.(row.data)) ?? 'var(--og-focus-ring)');
-		try {
-			grid.setPointerCapture(event.pointerId);
-		} catch {
-			// The pointer is already gone (or synthetic): the drag still follows grid events.
-		}
 		document.addEventListener('keydown', onKeyDown, true);
 	};
 
@@ -294,6 +289,13 @@ export function createCalendarView<TRowData>(
 			// A press without movement stays a click (double-click opens the row).
 			if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < DRAG_THRESHOLD) return;
 			drag.moved = true;
+			// Capture only now: a captured press retargets its click to the grid, and a plain click
+			// on an entry must reach the entry (it opens the entry's card).
+			try {
+				grid.setPointerCapture(event.pointerId);
+			} catch {
+				// The pointer is already gone (or synthetic): the drag still follows grid events.
+			}
 			root.setAttribute('data-dragging', '');
 			for (const entry of entriesOf(drag.rowId)) entry.setAttribute('data-drag-source', '');
 			ghost.hidden = false;
