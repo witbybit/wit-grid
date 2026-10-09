@@ -21,7 +21,10 @@ export interface MinimapSource {
 	scrollToFraction(fraction: number): void;
 }
 
-const WIDTH = 10;
+const WIDTH = 16;
+/** Three lanes: selection on the left, app marks in the middle, recent edits on the right. Issues span all three. */
+const LANE = 4;
+const LANES = { selection: 1, marks: 6, edits: 11 } as const;
 const CHANGE_FADE_MS = 5000;
 const FADE_STEP_MS = 400;
 
@@ -122,44 +125,49 @@ export class MinimapLayer {
 		// Everything maps content pixels onto the strip, so marks line up with the view window.
 		const total = Math.max(1, plan.dimensions.totalRowsHeight);
 		const scale = height / total;
-		const markH = Math.max(2, height / rowCount);
+		const markH = Math.max(3, height / rowCount);
 		const y = (index: number) => Math.min(height - markH, this.source.rowTop(index) * scale);
 		const span = (start: number, end: number) => Math.max(markH, (this.source.rowTop(end + 1) - this.source.rowTop(start)) * scale);
-
-		// The view window.
-		// --og-minimap-* inherit, so they can be set on the grid or any ancestor; unset, the theme decides.
-		ctx.fillStyle = colour('--og-minimap-window', 'rgba(127,127,127,0.22)');
-		ctx.fillRect(0, plan.rows.visibleTop * scale, width, Math.max(6, (plan.rows.visibleBottom - plan.rows.visibleTop) * scale));
-
-		// Selection: the left lane.
 		const accent = colour('--og-minimap-selection', colour('--og-focus-ring', '#6d7cff'));
+
+		// The view window: a tinted, outlined thumb, so where you are reads at a glance; the outline goes on
+		// top of the marks so it never disappears under them.
+		// --og-minimap-* inherit, so they can be set on the grid or any ancestor; unset, the theme decides.
+		const windowColour = colour('--og-minimap-window', accent);
+		const windowTop = plan.rows.visibleTop * scale;
+		const windowH = Math.max(10, (plan.rows.visibleBottom - plan.rows.visibleTop) * scale);
+		ctx.fillStyle = windowColour;
+		ctx.globalAlpha = 0.22;
+		ctx.fillRect(0, windowTop, width, windowH);
+		ctx.globalAlpha = 1;
+
 		ctx.fillStyle = accent;
 		for (const range of this.source.selection()) {
 			const start = Math.max(0, range.start);
 			const end = Math.min(rowCount - 1, range.end);
 			if (end < start) continue;
-			ctx.fillRect(0, y(start), 4, span(start, end));
+			ctx.fillRect(LANES.selection, y(start), LANE, span(start, end));
 		}
 
-		// Recent edits: the right lane, fading as they age.
+		for (const mark of this.source.marks()) {
+			const index = this.source.indexOf(mark.rowId);
+			if (index < 0) continue;
+			ctx.fillStyle = mark.color ?? accent;
+			ctx.fillRect(LANES.marks, y(index), LANE, markH);
+		}
+
+		// Recent edits fade as they age.
 		const changeColour = colour('--og-minimap-change', '#f59e0b');
 		const now = this.now();
 		for (const [rowId, at] of this.changes) {
 			const index = this.source.indexOf(rowId);
 			if (index < 0) continue;
-			ctx.globalAlpha = Math.max(0.15, 1 - (now - at) / CHANGE_FADE_MS);
+			ctx.globalAlpha = Math.max(0.3, 1 - (now - at) / CHANGE_FADE_MS);
 			ctx.fillStyle = changeColour;
-			ctx.fillRect(6, y(index), 4, markH);
+			ctx.fillRect(LANES.edits, y(index), LANE, markH);
 		}
 		ctx.globalAlpha = 1;
 
-		// App marks, then issues on top: full width.
-		for (const mark of this.source.marks()) {
-			const index = this.source.indexOf(mark.rowId);
-			if (index < 0) continue;
-			ctx.fillStyle = mark.color ?? accent;
-			ctx.fillRect(1, y(index), width - 2, markH);
-		}
 		const error = colour('--og-minimap-error', '#ef4444');
 		const warning = colour('--og-minimap-warning', '#f59e0b');
 		for (const issue of this.source.issues()) {
@@ -168,6 +176,12 @@ export class MinimapLayer {
 			ctx.fillStyle = issue.severity === 'error' ? error : warning;
 			ctx.fillRect(0, y(index), width, markH);
 		}
+
+		ctx.fillStyle = windowColour;
+		ctx.fillRect(0, windowTop, width, 1.5);
+		ctx.fillRect(0, windowTop + windowH - 1.5, width, 1.5);
+		ctx.fillRect(0, windowTop, 1.5, windowH);
+		ctx.fillRect(width - 1.5, windowTop, 1.5, windowH);
 	}
 
 	private pruneChanges(): void {

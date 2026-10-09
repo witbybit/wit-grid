@@ -100,11 +100,11 @@ describe('MinimapLayer', () => {
 		const windowRect = rects[0];
 		expect(windowRect.y).toBe(60);
 		expect(windowRect.h).toBe(40);
-		const selection = rects.find((r) => r.w === 4 && r.x === 0)!;
+		const selection = rects.find((r) => r.w === 4 && r.x === 1)!;
 		expect(selection.y).toBe(20);
 		expect(selection.h).toBe(20);
 		expect(rects.find((r) => r.style === 'gold')!.y).toBe(180);
-		expect(rects.at(-1)!.y).toBe(100);
+		expect(rects.find((r) => r.style === '#ef4444')!.y).toBe(100);
 	});
 
 	it('redraws only when something it shows changed', () => {
@@ -121,7 +121,7 @@ describe('MinimapLayer', () => {
 		const { layer, sched, tick } = setup();
 		layer.sync(plan());
 		layer.noteChange('r30');
-		const edit = () => rects.find((r) => r.x === 6);
+		const edit = () => rects.find((r) => r.x === 11);
 		expect(edit()!.y).toBe(60);
 		expect(edit()!.alpha).toBe(1);
 		tick(2500);

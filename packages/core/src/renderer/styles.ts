@@ -111,11 +111,16 @@ export const CORE_STYLES = `
   /* ── Minimap: every displayed row on a strip beside the vertical scrollbar ─ */
   .og-layer-minimap {
     position: absolute;
-    width: 10px;
+    width: 16px;
     z-index: 30;
     cursor: pointer;
-    background: color-mix(in srgb, var(--og-text-color) 5%, transparent);
-    border-left: 1px solid color-mix(in srgb, var(--og-text-color) 10%, transparent);
+    background: color-mix(in srgb, var(--og-text-color) 7%, var(--og-bg-color, transparent));
+    border-left: 1px solid color-mix(in srgb, var(--og-text-color) 16%, transparent);
+    box-shadow: -2px 0 6px color-mix(in srgb, var(--og-text-color) 8%, transparent);
+    transition: background-color 120ms ease;
+  }
+  .og-layer-minimap:hover {
+    background: color-mix(in srgb, var(--og-text-color) 11%, var(--og-bg-color, transparent));
   }
   .og-layer-minimap[hidden] {
     display: none;

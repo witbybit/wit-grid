@@ -9,6 +9,7 @@ import {
 	BUILT_IN_THEME_METADATA,
 	BUILT_IN_THEME_ORDER,
 	Grid,
+	GridEventName,
 	getBuiltInTheme,
 	comboboxColumnType,
 	currencyColumnType,
@@ -592,6 +593,21 @@ export default function NativeCellTypesDemo({
 		if (!readyApi || !teammates) return;
 		return startTeammates(readyApi, { edits: TEAMMATE_EDITS });
 	}, [readyApi, teammates]);
+	// Blocked tasks marked on the minimap, kept current as statuses change.
+	useEffect(() => {
+		if (!readyApi) return;
+		const markBlocked = () => {
+			const marks: { rowId: string; color: string }[] = [];
+			readyApi.forEachNode((node) => {
+				if (node.data?.status === 'blocked') marks.push({ rowId: node.id, color: CELL_HUES.rose });
+			});
+			readyApi.setMinimapMarks(marks);
+		};
+		markBlocked();
+		return readyApi.addEventListener(GridEventName.cellValueChanged, (event) => {
+			if (event.payload.colField === 'status') markBlocked();
+		});
+	}, [readyApi]);
 	useEffect(() => {
 		themeRef.current = theme;
 		const api = apiRef.current;

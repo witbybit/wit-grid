@@ -15,13 +15,13 @@ Or at runtime: `api.setShowMinimap(true)`.
 
 ## What it marks
 
-| Mark              | Where              | Colour                         |
-| ----------------- | ------------------ | ------------------------------ |
-| The view window   | the strip's height | a soft band                    |
-| Selection         | left lane          | the theme accent               |
-| Recent edits      | right lane         | amber, fading over 5 seconds   |
-| Validation issues | full width         | red (errors), amber (warnings) |
-| Your marks        | full width         | your colour                    |
+| Mark              | Where              | Colour                                  |
+| ----------------- | ------------------ | --------------------------------------- |
+| The view window   | the strip's height | an outlined, tinted band (theme accent) |
+| Selection         | left lane          | the theme accent                        |
+| Your marks        | middle lane        | your colour                             |
+| Recent edits      | right lane         | amber, fading over 5 seconds            |
+| Validation issues | full width         | red (errors), amber (warnings)          |
 
 Marks map content height onto the strip, so they line up with the view window even when rows differ in height.
 The strip is drawn on one canvas and only redraws when something it shows changed.
