@@ -1,6 +1,8 @@
 import type { AdapterFilterMount } from './filters/filterEditors.js';
 import { GridSidebar } from './sidebar/gridSidebar.js';
 import { GridChartWindow } from './charts/chartWindow.js';
+import { WorkspaceMount } from './renderer/workspace/workspaceMount.js';
+import type { GridWorkspaceOptions } from './views.js';
 import type { AdapterPanelMount, GridSidebarConfig } from './sidebar/sidebarTypes.js';
 import { RenderEngine } from './renderer/renderEngine.js';
 import type { RenderStats } from './renderer/renderTelemetry.js';
@@ -68,6 +70,12 @@ export interface GridHostOptions<TRowData = unknown> {
 	mountPanel?: AdapterPanelMount;
 	/** The chart window, opened with `api.openChart()` (and the context menu's Chart range). */
 	chart?: boolean;
+	/**
+	 * The record workspace around the grid: a command bar (view tabs, search, filter / sort / group /
+	 * fields, undo, presence), the record inspector, bulk actions and a command palette, shared by the
+	 * table and every view. Its code loads on mount; grids without it never load it.
+	 */
+	workspace?: GridWorkspaceOptions<TRowData> | boolean;
 	/** Dragging a column header out of the grid hides the column. Default true. */
 	dragOutHidesColumns?: boolean;
 	autoRowHeight?: boolean;
@@ -199,14 +207,22 @@ export function mountGridHost<TRowData>(
 	if (options.dragOutHidesColumns === false) renderEngine.dragOutHidesColumns = false;
 	if (options.autoRowHeight) renderEngine.setAutoRowHeight(true);
 
-	// With a sidebar the container becomes a shell: the grid and the sidebar side by side.
-	const shell = !!options.sidebar;
+	// With a sidebar or a workspace the container becomes a shell: the grid (inside the workspace)
+	// and the sidebar side by side.
+	const workspaceOptions = options.workspace ? (options.workspace === true ? {} : options.workspace) : null;
+	const shell = !!options.sidebar || !!workspaceOptions;
 	const gridElement = shell ? document.createElement('div') : container;
+	const workspaceRoot = workspaceOptions ? document.createElement('div') : null;
 	if (shell) {
 		gridElement.className = 'og-shell-grid';
 		container.classList.add('og-shell');
-		container.appendChild(gridElement);
+		if (workspaceRoot) {
+			workspaceRoot.className = 'og-ws-root';
+			workspaceRoot.appendChild(gridElement);
+			container.appendChild(workspaceRoot);
+		} else container.appendChild(gridElement);
 	}
+	if (workspaceRoot) renderEngine.viewportRenderer.externalWorkspace = true;
 
 	// Bind live runtime ports — exclusive: only one host may be active at a time.
 	const bindResult = internalApi.bindRuntimePorts({
@@ -250,6 +266,13 @@ export function mountGridHost<TRowData>(
 
 	host.setContainerElement(gridElement);
 	renderEngine.mount(gridElement);
+	let workspace: WorkspaceMount<TRowData> | null = null;
+	if (workspaceRoot && workspaceOptions) {
+		// The workspace wears the grid's theme scope, so its bar and inspector follow the grid's theme.
+		const scope = gridElement.dataset.ogThemeScope;
+		if (scope) workspaceRoot.dataset.ogThemeScope = scope;
+		workspace = new WorkspaceMount(engine, workspaceRoot, gridElement, workspaceOptions);
+	}
 
 	let sidebar: GridSidebar<TRowData> | null = null;
 	const setSidebar = (config: GridSidebarConfig<TRowData> | null) => {
@@ -389,10 +412,12 @@ export function mountGridHost<TRowData>(
 			sidebar?.destroy();
 			sidebar = null;
 			chartWindow?.destroy();
+			workspace?.dispose();
 			renderEngine.unmount();
 			internalApi.unbindRuntimePorts(binding);
 			if (shell) {
 				gridElement.remove();
+				workspaceRoot?.remove();
 				container.classList.remove('og-shell');
 				delete container.dataset.ogSidebar;
 			}

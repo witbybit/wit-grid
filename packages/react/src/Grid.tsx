@@ -1,5 +1,5 @@
-import { createClientGrid, createInfiniteGrid, createServerSideGrid, createLocalStorageAdapter } from '@eregister/wit-grid-core';
-import type { GridViewConfig, RowAnimationOptions } from '@eregister/wit-grid-core';
+import { createClientGrid, createInfiniteGrid, createServerSideGrid, createLocalStorageAdapter, isWorkspaceAdapter } from '@eregister/wit-grid-core';
+import type { GridViewConfig, GridWorkspaceOptions, RowAnimationOptions } from '@eregister/wit-grid-core';
 import { useEffect, useLayoutEffect, useMemo, useRef, useInsertionEffect, type PropsWithChildren } from 'react';
 
 /** useLayoutEffect in the browser, useEffect on the server (where layout effects warn and never run). */
@@ -21,7 +21,7 @@ import type {
 import type { GridReadyEvent, StyleRule, ColumnTypeDefinition } from './types.js';
 import type { GridCapabilitiesConfig } from '@eregister/wit-grid-core';
 
-type GridShellProps<TRowData> = Omit<GridViewProps<TRowData>, 'api'>;
+type GridShellProps<TRowData> = Omit<GridViewProps<TRowData>, 'api' | 'workspace'>;
 const DEFAULT_PAGE_SIZE = 100;
 
 /**
@@ -39,7 +39,11 @@ interface GridCommonProps<TRowData> extends GridShellProps<TRowData> {
 	getRowId?: (row: TRowData) => string;
 	initialState?: Partial<GridInitialState<TRowData>>;
 	persistence?: string | GridPersistenceAdapter;
-	workspace?: GridWorkspaceAdapter;
+	/**
+	 * The record workspace (view tabs, inspector, bulk actions, command palette) with its options, or
+	 * only a saved-views adapter (no workspace UI). Initial-only.
+	 */
+	workspace?: GridWorkspaceAdapter | GridWorkspaceOptions<TRowData> | boolean;
 	rowOverscanPx?: number;
 	colBuffer?: number;
 	overscanAdaptive?: boolean;
@@ -227,6 +231,9 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		getRowHeight,
 	});
 
+	// `workspace` is the saved-views adapter alone, or the workspace UI's options (which may hold one).
+	const savedViews = isWorkspaceAdapter(workspace) ? workspace : workspace && typeof workspace === 'object' ? workspace.savedViews : undefined;
+	const workspaceUi = isWorkspaceAdapter(workspace) ? undefined : (workspace as GridWorkspaceOptions<TRowData> | boolean | undefined);
 	const api = useMemo(() => {
 		// Normalize string persistence key to a GridPersistenceAdapter so core always receives the adapter type.
 		const resolvedPersistence = typeof persistence === 'string' ? createLocalStorageAdapter(persistence) : persistence;
@@ -255,7 +262,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				blockSize,
 				getRowId: stableGetRowId,
 				persistence: resolvedPersistence,
-				workspace,
+				workspace: savedViews,
 				rowSelection,
 				dataIntegrity,
 				capabilities,
@@ -270,7 +277,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 				blockSize,
 				getRowId: stableGetRowId,
 				persistence: resolvedPersistence,
-				workspace,
+				workspace: savedViews,
 				rowSelection,
 				dataIntegrity,
 				capabilities,
@@ -285,7 +292,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 			getRowId: stableGetRowId,
 			getRowHeight: getRowHeight ? (row) => getRowHeightRef.current?.(row as TRowData) : undefined,
 			persistence: resolvedPersistence,
-			workspace,
+			workspace: savedViews,
 			rowSelection,
 			dataIntegrity,
 			capabilities,
@@ -426,7 +433,7 @@ export function Grid<TRowData = unknown>(props: GridRootProps<TRowData>) {
 		<GridProvider api={api}>
 			<div style={{ display: 'flex', height: '100%', width: '100%', flexDirection: 'column' }}>
 				<div style={{ minHeight: 0, flex: 1 }}>
-					<GridView<TRowData> {...viewProps} api={api} />
+					<GridView<TRowData> {...viewProps} workspace={workspaceUi || undefined} api={api} />
 				</div>
 				{children ? <div style={{ flexShrink: 0 }}>{children}</div> : null}
 			</div>

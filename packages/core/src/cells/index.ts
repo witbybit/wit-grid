@@ -83,3 +83,4 @@ export type { CascadeOption, CascadeCellOptions } from './cascade.js';
 export type { ColorCellOptions } from './color.js';
 export type { LongTextCellOptions } from './longText.js';
 export type { SegmentedCellOptions, SwitchCellOptions } from './renderers.js';
+export type { ColumnSchema, ColumnValueKind } from './fieldSchema.js';

@@ -22,6 +22,7 @@ const PerformanceLab = lazy(() => import('./pages/PerformanceLab'));
 const FlightRecorderLab = lazy(() => import('./pages/FlightRecorderLab'));
 const SidebarPanelsDemo = lazy(() => import('./pages/SidebarPanelsDemo'));
 const NativeCellTypesDemo = lazy(() => import('@eregister/wit-grid-examples/native-cell-types'));
+const RecordWorkspaceDemo = lazy(() => import('@eregister/wit-grid-examples/record-workspace'));
 const RealtimeGroupingDemo = lazy(() => import('@eregister/wit-grid-examples/realtime-grouping'));
 const RowMultiSelectDemo = lazy(() => import('./pages/RowMultiSelectDemo'));
 const CrudValidationDemo = lazy(() => import('./pages/CrudValidationDemo'));
@@ -38,6 +39,7 @@ const KanbanBoardDemo = lazy(() => import('@eregister/wit-grid-examples/kanban-b
 const DocsShowcase = lazy(() => import('./pages/DocsShowcase'));
 
 const PAGES: readonly GridPageType[] = [
+	'workspace',
 	'docs',
 	'devtools',
 	'perf',
@@ -254,6 +256,7 @@ export default function App() {
 		if (activePage === 'nested') return <NestedTablesGrouping {...commonGridProps} />;
 		if (activePage === 'panels') return <SidebarPanelsDemo {...commonGridProps} />;
 		if (activePage === 'native') return <NativeCellTypesDemo {...commonGridProps} />;
+		if (activePage === 'workspace') return <RecordWorkspaceDemo />;
 		if (activePage === 'grouping') return <RealtimeGroupingDemo {...commonGridProps} />;
 		if (activePage === 'multiselect') return <RowMultiSelectDemo {...commonGridProps} />;
 		if (activePage === 'wide') return <WideGridDemo {...commonGridProps} />;
@@ -272,6 +275,7 @@ export default function App() {
 
 	const showRightSidebar = !(
 		[
+			'workspace',
 			'docs',
 			'crud',
 			'projects',
@@ -287,7 +291,7 @@ export default function App() {
 		] as GridPageType[]
 	).includes(activePage);
 
-	const showTitleBanner = !(['crud', 'advancedfilters', 'panels', 'kanban'] as GridPageType[]).includes(activePage);
+	const showTitleBanner = !(['crud', 'advancedfilters', 'panels', 'kanban', 'workspace'] as GridPageType[]).includes(activePage);
 
 	return (
 		<DemoGridApiScope value={contextValue}>

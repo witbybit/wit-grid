@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { GridApi } from '@eregister/wit-grid-react';
 
-type ViewKind = 'table' | 'gallery' | 'calendar';
+type ViewKind = 'table' | 'gallery' | 'calendar' | 'kanban' | 'gantt';
 
 interface Guide {
 	title: string;
@@ -24,7 +24,10 @@ const GUIDES: Record<ViewKind, Guide> = {
 			},
 			{ name: 'Rows slide', text: 'Sorted by velocity, so an edit that changes it slides the row to its new place under the heat scale.' },
 			{ name: 'Timeline', text: 'Drag a bar to move a task, or an end to resize it. Every bar shares one time scale.' },
-			{ name: 'Gallery and calendar', text: 'Switch views above the grid: the same filtered, sorted rows as cards or on a calendar.' },
+			{
+				name: 'Views',
+				text: 'Switch views above the grid: the same filtered, sorted rows as cards, a calendar, a Kanban board or Gantt timeline.',
+			},
 		],
 		note: 'The strip beside the scrollbar is the minimap: selection, recent edits and issues across every row.',
 	},
@@ -32,12 +35,15 @@ const GUIDES: Record<ViewKind, Guide> = {
 		title: 'How the calendar works',
 		steps: [
 			{ name: 'Same rows, by date', text: 'Every task sits on its due day. Filters, sort and search apply here exactly as in the table.' },
-			{ name: 'Click an entry', text: 'A card opens with its dates, status, priority and owner, and buttons to nudge it a day or a week.' },
+			{
+				name: 'Click an entry',
+				text: 'Select a record. Ctrl/Cmd-click toggles selection; Shift-click selects a range. Selection stays with you across views.',
+			},
 			{
 				name: 'Drag to reschedule',
 				text: 'Grab an entry and drop it on another day. The days it will cover light up and a tag shows the new date; Esc cancels.',
 			},
-			{ name: 'Double-click', text: 'Opens the task in the table, scrolled to the middle and flashed, so you can edit every field.' },
+			{ name: 'Double-click', text: 'Opens record details beside the view. Edit fields here, or choose Open in grid for tabular work.' },
 			{
 				name: 'Ranges span days',
 				text: 'Point the calendar at a { start, end } field (like Timeline) and entries stretch across the days they cover.',
@@ -51,9 +57,38 @@ const GUIDES: Record<ViewKind, Guide> = {
 			{ name: 'Cards, not rows', text: 'Each task is a card: its title, a status-coloured band and the fields you choose.' },
 			{ name: 'Native fields', text: 'Status pills, avatars, progress and currency are drawn by the same cell renderers as the table.' },
 			{ name: 'Virtualized', text: 'Only the cards in view exist; they are recycled as you scroll, so 100k rows stay smooth.' },
-			{ name: 'Double-click a card', text: 'Opens the task in the table, scrolled into view and flashed.' },
+			{ name: 'Double-click a card', text: 'Opens record details beside the view. Enter does the same; right-click for contextual actions.' },
 		],
 		note: 'Filters, sort and search from the sidebar and the chips apply to the gallery too.',
+	},
+	kanban: {
+		title: 'How the Kanban board works',
+		steps: [
+			{
+				name: 'Status columns',
+				text: 'Every status option is a column, with its count and total. The board follows the grid’s filters, sort and search.',
+			},
+			{
+				name: 'Move work',
+				text: 'Drag a card — or the whole selection — to another column. Alt + arrows move the focused card. One undo step each.',
+			},
+			{ name: 'Swimlanes', text: 'Group (in the toolbar) splits every column into lanes by team, owner or priority.' },
+			{ name: 'Inspect', text: 'Click a card: the inspector edits every field with its column’s own editor. Ctrl/⌘ K opens every command.' },
+		],
+		note: 'A card waiting on unfinished work after its planned start is marked blocked.',
+	},
+	gantt: {
+		title: 'How the Gantt schedule works',
+		steps: [
+			{ name: 'One outline, one timeline', text: 'Task names and bars share rows and scrolling; summaries roll up their children.' },
+			{
+				name: 'Move and resize',
+				text: 'Drag a bar to move it, an end to resize it, the knob to set progress. Successors follow, after you see the impact.',
+			},
+			{ name: 'Link', text: 'Drag the round handle onto another bar to make it wait on this one. Cycles are refused.' },
+			{ name: 'Scale', text: 'Days to years, Today and Fit in the toolbar; critical path, baselines and workload toggle there too.' },
+		],
+		note: 'The inspector gains Schedule, Dependencies and Resources tabs for the selected task.',
 	},
 };
 

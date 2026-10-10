@@ -76,7 +76,11 @@ export function startTeammates<TRowData>(api: GridApi<TRowData>, options: Teamma
 				const node = api.getRowNode(cell.rowId);
 				if (!paused && node?.data) {
 					const current = (node.data as Record<string, unknown>)[cell.field];
-					const result = api.setCellValue(cell.rowId, cell.field, options.edits[cell.field](current));
+					// A teammate's edit arrives from elsewhere: it is not this user's to undo.
+					const result = api.transaction({
+						cells: [{ rowId: cell.rowId, colField: cell.field, value: options.edits[cell.field](current) }],
+						origin: 'remote',
+					});
 					if (result.status === 'applied') api.flashCells([{ ...cell, color: peer.color }]);
 				}
 				publish();

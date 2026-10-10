@@ -11,6 +11,7 @@ import {
 	type AdapterFilterMount,
 	type AdapterPanelMount,
 	type GridSidebarConfig as CoreGridSidebarConfig,
+	type GridWorkspaceOptions,
 } from '@eregister/wit-grid-core';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GridAdapterContext, GridFilterMountContext } from './gridContext.js';
@@ -53,6 +54,12 @@ export interface GridViewProps<TRowData = unknown> {
 	/** Full-width total rows (`grouping.display: 'row'`); otherwise totals are cell rows drawn by the grid. */
 	totalRowRenderer?: (ctx: GroupRenderContext<TRowData>) => ReactNode;
 	sidebar?: GridSidebarConfig<TRowData>;
+	/**
+	 * The record workspace around the grid: view tabs, search, filter / sort / group / fields, the
+	 * record inspector, bulk actions and a command palette, shared by the table and every view.
+	 * Initial-only.
+	 */
+	workspace?: GridWorkspaceOptions<TRowData> | boolean;
 	enableChart?: boolean;
 	/** Dragging a column header out of the grid hides the column. Default true. */
 	dragOutHidesColumns?: boolean;
@@ -84,10 +91,12 @@ export function GridView<TRowData = unknown>({
 	detailRowRenderer,
 	totalRowRenderer,
 	sidebar,
+	workspace,
 	enableChart = false,
 	dragOutHidesColumns = true,
 	autoRowHeight,
 }: GridViewProps<TRowData>) {
+	const workspaceRef = useRef(workspace);
 	const portalStore = useMemo(() => createPortalStore<TRowData>(), []);
 	// Custom filter components render through the portal tree, so they keep the grid's React context.
 	const filterMount = useMemo<AdapterFilterMount>(
@@ -201,6 +210,7 @@ export function GridView<TRowData = unknown>({
 			mountFilter: filterMount,
 			sidebar: sidebarRef.current as CoreGridSidebarConfig<TRowData> | undefined,
 			mountPanel: panelMount,
+			workspace: workspaceRef.current,
 			chart: enableChart,
 			dragOutHidesColumns,
 			headerMenu: {

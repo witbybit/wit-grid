@@ -33,9 +33,7 @@ describe('glass themes', () => {
 	});
 
 	it('supports custom glass surface values and ships both glass presets', () => {
-		const css = themeToCSSVariables(
-			createTheme({ ...palette, glass: { blur: '12px', saturation: '125%', tint: 'rgba(1, 2, 3, .6)' } })
-		);
+		const css = themeToCSSVariables(createTheme({ ...palette, glass: { blur: '12px', saturation: '125%', tint: 'rgba(1, 2, 3, .6)' } }));
 
 		expect(css).toContain('--og-glass-backdrop-filter: blur(12px) saturate(125%)');
 		expect(css).toContain('--og-glass-popover-bg: rgba(1, 2, 3, .6)');

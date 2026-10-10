@@ -49,6 +49,18 @@ const promotedShowcases = [
 		sourcePath: 'packages/examples/src/showcases/GroupingStickyDemo.tsx',
 	},
 	{
+		id: 'record-workspace',
+		title: 'Record workspace',
+		description:
+			'One roadmap as a table, gallery, calendar, Kanban board and Gantt schedule: shared selection, inspector, undo, bulk edits and a command palette.',
+		category: 'Views',
+		level: 'advanced',
+		tags: ['views', 'kanban', 'gantt', 'gallery', 'calendar', 'workspace', 'inspector'],
+		docs: '/docs/next/views',
+		showcase: true,
+		sourcePath: 'packages/examples/src/showcases/RecordWorkspaceDemo.tsx',
+	},
+	{
 		id: 'native-cell-types',
 		title: 'Native cell types',
 		description: 'Every built-in cell type (select, multi-select, combobox, person, date, number, progress, rating) with themed editors.',

@@ -118,39 +118,6 @@ body {
 	color: var(--color-fd-primary-foreground);
 }
 
-/* Table / Gallery / Calendar for the team workspace: a quieter segmented control than the tabs. */
-.wg-hero-views {
-	/* Centred on the 36px tab strip. */
-	margin-top: 3px;
-	display: inline-flex;
-	gap: 2px;
-	padding: 2px;
-	border-radius: 8px;
-	border: 1px solid var(--color-fd-border);
-	background: var(--color-fd-background);
-}
-
-.wg-hero-view {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	height: 24px;
-	padding: 0 9px;
-	border-radius: 6px;
-	font-size: 12px;
-	color: color-mix(in srgb, var(--color-fd-foreground) 65%, transparent);
-	cursor: pointer;
-}
-
-.wg-hero-view:hover {
-	color: var(--color-fd-foreground);
-}
-
-.wg-hero-view[aria-checked='true'] {
-	background: var(--color-fd-accent);
-	color: var(--color-fd-foreground);
-}
-
 .wg-hero-lead {
 	display: flex;
 	flex-direction: column;
@@ -217,6 +184,69 @@ body {
 	}
 	.wg-hero-themes {
 		margin-left: 0;
+	}
+}
+
+/* Full screen: the showcase (switcher and grid) covers the window, above the site chrome. */
+.wg-hero-fullscreen {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 28px;
+	margin-top: 4px;
+	margin-left: auto;
+	padding: 0 10px;
+	border-radius: 7px;
+	border: 1px solid var(--color-fd-border);
+	background: var(--color-fd-background);
+	font-size: 12px;
+	font-weight: 500;
+	color: color-mix(in srgb, var(--color-fd-foreground) 78%, transparent);
+	cursor: pointer;
+	transition:
+		background-color 0.15s ease,
+		color 0.15s ease;
+}
+
+.wg-hero-themes + .wg-hero-fullscreen {
+	margin-left: 0;
+}
+
+.wg-hero-fullscreen:hover {
+	color: var(--color-fd-foreground);
+	background: var(--color-fd-accent);
+}
+
+.wg-hero-fullscreen:focus-visible {
+	outline: 2px solid var(--color-fd-primary);
+	outline-offset: 2px;
+}
+
+.wg-hero-full {
+	position: fixed;
+	inset: 0;
+	z-index: 1000;
+	display: flex;
+	flex-direction: column;
+	background: var(--color-fd-background);
+}
+
+.wg-hero-full .wg-hero-grid {
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
+}
+
+/* The landing stage isolates its stacking; full screen has to rise above the site navigation. */
+.wg-landing-bg:has(.wg-hero-full),
+.wg-hero-grid-frame:has(.wg-hero-full) {
+	isolation: auto;
+	z-index: auto;
+}
+
+@media (max-width: 640px) {
+	.wg-hero-fullscreen span {
+		display: none;
 	}
 }
 
@@ -2141,6 +2171,394 @@ body {
 	animation: wg-v-grow-x 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 	transform-origin: left;
 }
+/* One record, every view: the tab strip over the projections. */
+.wg-v-views-tabs {
+	grid-column: 1 / -1;
+	display: flex;
+	gap: 3px;
+	padding: 3px;
+	border-radius: 8px;
+	box-shadow: inset 0 0 0 1px var(--line);
+	justify-self: start;
+}
+.wg-v-views-tabs span {
+	padding: 2px 8px;
+	border-radius: 5px;
+	font-size: 10px;
+}
+.wg-v-views-tabs span[data-on] {
+	color: var(--color-fd-foreground);
+	background: color-mix(in srgb, var(--hue) 22%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 45%, transparent);
+}
+
+/* Kanban */
+.wg-v-kanban {
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 7px;
+	width: 92%;
+	align-self: flex-start;
+}
+.wg-v-kanban-col {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding: 5px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--color-fd-foreground) 3%, transparent);
+	box-shadow: inset 0 0 0 1px var(--line);
+}
+.wg-v-kanban-head {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	font-size: 9.5px;
+}
+.wg-v-kanban-head i {
+	width: 6px;
+	height: 6px;
+	border-radius: 99px;
+	background: var(--h);
+}
+.wg-v-kanban-head strong {
+	font-weight: 600;
+	color: var(--color-fd-foreground);
+}
+.wg-v-kanban-head em {
+	margin-left: auto;
+	font-style: normal;
+	font-size: 9px;
+}
+.wg-v-kanban-card,
+.wg-v-kanban-ghost {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 5px 6px;
+	border-radius: 6px;
+	background: var(--color-fd-card);
+	box-shadow:
+		inset 2px 0 0 var(--h, var(--hue)),
+		inset 0 0 0 1px var(--line);
+}
+.wg-v-kanban-card > b,
+.wg-v-kanban-ghost > b {
+	height: 4px;
+	border-radius: 3px;
+	background: var(--ink);
+}
+.wg-v-kanban-card span,
+.wg-v-kanban-ghost span {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.wg-v-kanban-card span i,
+.wg-v-kanban-ghost span i {
+	width: 8px;
+	height: 8px;
+	border-radius: 99px;
+	background: color-mix(in srgb, var(--h, var(--hue)) 70%, transparent);
+}
+.wg-v-kanban-card span b,
+.wg-v-kanban-ghost span b {
+	width: 40%;
+	height: 3px;
+	border-radius: 3px;
+	background: var(--line);
+}
+.wg-v-kanban-slot {
+	display: grid;
+	place-items: center;
+	height: 26px;
+	border-radius: 6px;
+	border: 1.5px dashed color-mix(in srgb, var(--hue) 60%, transparent);
+	color: var(--hue);
+	font-size: 9px;
+	background: color-mix(in srgb, var(--hue) 7%, transparent);
+}
+.wg-v-kanban-ghost {
+	--h: #3b82f6;
+	position: absolute;
+	left: 26%;
+	top: 64px;
+	width: 30%;
+	transform: rotate(4deg);
+	box-shadow:
+		inset 2px 0 0 var(--h),
+		inset 0 0 0 1px var(--line),
+		0 10px 22px -8px rgba(0, 0, 0, 0.55);
+	animation: wg-v-kanban-fly 3.2s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+}
+@keyframes wg-v-kanban-fly {
+	0%,
+	12% {
+		transform: translate(-90%, -26px) rotate(0deg);
+		opacity: 0;
+	}
+	30% {
+		opacity: 1;
+	}
+	62%,
+	88% {
+		transform: translate(18%, 4px) rotate(4deg);
+		opacity: 1;
+	}
+	100% {
+		transform: translate(18%, 4px) rotate(4deg);
+		opacity: 0;
+	}
+}
+
+/* Gantt */
+.wg-v-gantt {
+	display: grid;
+	grid-template-columns: 34% 1fr;
+	width: 94%;
+	align-self: flex-start;
+	border-radius: 8px;
+	box-shadow: inset 0 0 0 1px var(--line);
+	overflow: hidden;
+}
+.wg-v-gantt-outline > div {
+	height: 20px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 8px;
+	font-size: 9.5px;
+	border-bottom: 1px solid var(--line);
+	white-space: nowrap;
+}
+.wg-v-gantt-outline > div[data-summary] {
+	font-weight: 650;
+	color: var(--color-fd-foreground);
+}
+.wg-v-gantt-outline em {
+	font-style: normal;
+	opacity: 0.7;
+	width: 16px;
+}
+.wg-v-gantt-chart {
+	position: relative;
+	border-left: 1px solid var(--line);
+	background: repeating-linear-gradient(90deg, transparent 0 calc(20% - 1px), var(--line) calc(20% - 1px) 20%);
+}
+.wg-v-gantt-chart svg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+}
+.wg-v-gantt-chart path {
+	fill: none;
+	stroke: var(--ink);
+	stroke-width: 1.2;
+	vector-effect: non-scaling-stroke;
+}
+.wg-v-gantt-bar,
+.wg-v-gantt-summary {
+	position: absolute;
+	height: 12px;
+	border-radius: 3px;
+	background: linear-gradient(90deg, var(--h) var(--p), color-mix(in srgb, var(--h) 28%, transparent) var(--p));
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--h) 70%, transparent);
+	transform-origin: left;
+	animation: wg-v-grow-x 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.wg-v-gantt-summary {
+	height: 6px;
+}
+.wg-v-gantt-bar[data-critical] {
+	box-shadow:
+		inset 0 0 0 1px var(--h),
+		0 0 0 1.5px #f43f5e;
+}
+.wg-v-gantt-diamond {
+	position: absolute;
+	width: 9px;
+	height: 9px;
+	margin-left: -4px;
+	transform: rotate(45deg);
+	background: #f59e0b;
+	box-shadow: 0 0 0 1.5px #f43f5e;
+}
+.wg-v-gantt-today {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 47%;
+	border-left: 1.5px dashed #ef4444;
+}
+.wg-v-gantt-impact {
+	position: absolute;
+	right: 6px;
+	bottom: 4px;
+	padding: 2px 7px;
+	border-radius: 6px;
+	font-size: 9.5px;
+	font-weight: 600;
+	color: #f59e0b;
+	background: color-mix(in srgb, #f59e0b 14%, var(--color-fd-card));
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, #f59e0b 40%, transparent);
+}
+
+/* Command palette */
+.wg-v-palette {
+	width: 88%;
+	align-self: flex-start;
+	border-radius: 10px;
+	background: var(--color-fd-card);
+	box-shadow:
+		inset 0 0 0 1px var(--line),
+		0 14px 30px -14px rgba(0, 0, 0, 0.5);
+	overflow: hidden;
+}
+.wg-v-palette-search {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 7px 10px;
+	border-bottom: 1px solid var(--line);
+	color: var(--color-fd-foreground);
+	font-size: 11px;
+}
+.wg-v-palette-search span::after {
+	content: '';
+	display: inline-block;
+	width: 1px;
+	height: 11px;
+	margin-left: 2px;
+	vertical-align: -1px;
+	background: var(--hue);
+	animation: wg-v-caret 1s steps(1) infinite;
+}
+@keyframes wg-v-caret {
+	50% {
+		opacity: 0;
+	}
+}
+.wg-v-palette-search kbd {
+	font-size: 9px;
+	padding: 1px 5px;
+	border-radius: 4px;
+	box-shadow: inset 0 0 0 1px var(--line);
+}
+.wg-v-palette-item {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	margin: 3px;
+	padding: 4px 7px;
+	border-radius: 6px;
+	font-size: 10px;
+	white-space: nowrap;
+}
+.wg-v-palette-item em {
+	font-style: normal;
+	opacity: 0.7;
+}
+.wg-v-palette-item[data-on] {
+	color: var(--color-fd-foreground);
+	background: color-mix(in srgb, var(--hue) 18%, transparent);
+}
+
+/* Bulk edit */
+.wg-v-bulk {
+	position: relative;
+	width: 90%;
+	align-self: flex-start;
+}
+.wg-v-bulk-cards {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+}
+.wg-v-bulk-cards > div {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	padding: 8px;
+	border-radius: 8px;
+	background: var(--color-fd-card);
+	box-shadow:
+		inset 0 3px 0 var(--h),
+		inset 0 0 0 1px var(--line);
+}
+.wg-v-bulk-cards > div[data-on] {
+	box-shadow:
+		inset 0 3px 0 var(--h),
+		inset 0 0 0 1.5px color-mix(in srgb, var(--hue) 80%, transparent);
+	background: color-mix(in srgb, var(--hue) 7%, var(--color-fd-card));
+}
+.wg-v-bulk-cards i {
+	width: 10px;
+	height: 10px;
+	border-radius: 3px;
+	box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.wg-v-bulk-cards [data-on] i {
+	background: var(--hue);
+	box-shadow: none;
+}
+.wg-v-bulk-cards b {
+	height: 4px;
+	border-radius: 3px;
+	background: var(--ink);
+}
+.wg-v-bulk-cards b + b {
+	width: 60%;
+}
+.wg-v-bulk-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: max-content;
+	margin: 12px auto 0;
+	padding: 4px 5px 4px 10px;
+	border-radius: 9px;
+	background: var(--color-fd-card);
+	box-shadow:
+		inset 0 0 0 1px var(--line),
+		0 12px 24px -12px rgba(0, 0, 0, 0.55);
+	font-size: 10px;
+	animation: wg-v-rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.wg-v-bulk-bar strong {
+	padding-right: 6px;
+	margin-right: 2px;
+	border-right: 1px solid var(--line);
+	color: var(--color-fd-foreground);
+	font-weight: 600;
+}
+.wg-v-bulk-bar span {
+	padding: 2px 6px;
+	border-radius: 5px;
+}
+.wg-v-bulk-bar span:first-of-type {
+	background: color-mix(in srgb, var(--hue) 16%, transparent);
+	color: var(--color-fd-foreground);
+}
+@keyframes wg-v-rise {
+	from {
+		transform: translateY(10px);
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.wg-v-kanban-ghost,
+	.wg-v-gantt-bar,
+	.wg-v-gantt-summary,
+	.wg-v-palette-search span::after,
+	.wg-v-bulk-bar {
+		animation: none;
+	}
+}
+
 @keyframes wg-v-grow-x {
 	from {
 		transform: scaleX(0);

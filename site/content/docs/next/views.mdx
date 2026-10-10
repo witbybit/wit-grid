@@ -1,95 +1,254 @@
 ---
-title: Gallery & Calendar Views
-description: Show the same rows as a gallery of cards or on a month calendar — filters, sort and search included.
+title: Views and the record workspace
+description: One record model, many projections — table, gallery, calendar, Kanban and Gantt share selection, writes, undo and the inspector.
 icon: LayoutGrid
 ---
 
-A view shows the grid's displayed rows another way. Filters, sort, search, the sidebar and the filter chips keep
-applying, edits go through the normal write path, and the table keeps its scroll and selection underneath, so
-switching back is instant.
+A view shows the grid's displayed records another way: a **gallery** of cards, a **calendar**, a **Kanban** board or
+a **Gantt** schedule. Views are projections, not separate widgets. Every one of them:
+
+- reads the **same records** — filters, sort and search keep applying;
+- reads the **same field meanings** (title, status, owner, schedule…), set once;
+- writes through the **same transaction pipeline** — validation, capabilities, one undo step per gesture;
+- shares **selection, the focused record and the inspector**, so switching views keeps your place.
+
+## The workspace
+
+`workspace` wraps the grid in a command bar (view tabs, search, Filter / Sort / Group / Fields, undo, presence), a
+record inspector, bulk actions and a command palette. Tell it once what the fields mean and every view is ready:
 
 ```tsx
-import { useState } from 'react';
-import { Grid, type ColumnDef, type GridViewConfig } from '@eregister/wit-grid-react';
+import { useMemo } from 'react';
+import { Grid, type ColumnDef, type GridWorkspaceOptions } from '@eregister/wit-grid-react';
 
 interface Task {
 	id: string;
-	task: string;
+	title: string;
 	status: string;
 	owner: string;
+	team: string;
+	schedule: { start: string; end: string };
 	progress: number;
 	budget: number;
-	schedule: { start: string; end: string };
+	dependsOn: string[];
+	parent: string | null;
 }
 interface Props {
 	rows: Task[];
 	columns: ColumnDef<Task>[];
 }
-declare function ViewSwitcher(props: { value: string; onChange: (view: string) => void }): JSX.Element;
 
-const VIEWS: Record<string, GridViewConfig<Task> | null> = {
-	table: null,
-	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'owner', 'progress', 'budget'] },
-	calendar: { kind: 'calendar', dateField: 'schedule', titleField: 'task' },
-};
-
-export function Tasks({ rows, columns }: Props) {
-	const [view, setView] = useState('table');
-	return (
-		<>
-			<ViewSwitcher value={view} onChange={setView} />
-			<Grid
-				rows={rows}
-				columns={columns}
-				getRowId={(row) => row.id}
-				view={VIEWS[view]}
-				onViewChange={(next) => setView(next ? next.kind : 'table')}
-			/>
-		</>
+export function Roadmap({ rows, columns }: Props) {
+	const workspace = useMemo<GridWorkspaceOptions<Task>>(
+		() => ({
+			title: 'Engineering roadmap',
+			records: {
+				title: 'title',
+				status: 'status',
+				owner: 'owner',
+				team: 'team',
+				schedule: 'schedule',
+				progress: 'progress',
+				value: 'budget',
+				dependencies: 'dependsOn',
+				parent: 'parent',
+			},
+			views: [
+				{ id: 'table', name: 'Table', view: null },
+				{ id: 'board', name: 'Board', view: { kind: 'kanban', swimlaneField: 'team', wipLimits: { doing: 12 } } },
+				{ id: 'plan', name: 'Plan', view: { kind: 'gantt', zoom: 'week', criticalPath: true } },
+				{ id: 'cards', name: 'Cards', view: { kind: 'gallery', layout: 'medium' } },
+			],
+		}),
+		[]
 	);
+	return <Grid rows={rows} columns={columns} getRowId={(row) => row.id} rowSelection='multiple' workspace={workspace} />;
 }
 ```
 
-Imperatively: `api.setView(config)`, `api.getView()`, and `null` returns to the table. `initialState.view` opens on a
-view. Keep configs stable (module constants or `useMemo`): a new object is a new view.
+Without `views`, the tabs are Table plus each built-in view the records support (a calendar needs a date, a board a
+status, a schedule a date range). Imperatively, `api.setView(config)` / `api.getView()` switch views; `null` is the
+table.
+
+**Opt-in by cost.** The workspace and each view load on first use (code-split), and their stylesheet is injected
+only then. A grid that stays a table never downloads any of it. Calling `api.setView()` on a grid without the
+workspace still works: the view opens over the table with its own command bar.
+
+## Record roles
+
+`records` maps meanings to fields. Anything left out is inferred from the columns' **schema** — column types say
+what they hold (`select` with its options and colours, `person`, `progress`, `dateRange`…) — and their names.
+
+| Role           | Used for                                           | Inferred from                         |
+| -------------- | -------------------------------------------------- | ------------------------------------- |
+| `title`        | Card and bar labels, the inspector title           | the first text column                 |
+| `key`          | The short id beside the title (T-1172)             | a `key` / `code` column, else row id  |
+| `status`       | Board columns, done / blocked state, colours       | a select named status / stage / state |
+| `priority`     | Pills on cards                                     | a select named priority / severity    |
+| `owner`        | Avatars, assignment, resource load                 | a person column                       |
+| `team`         | The natural swimlane                               | a select named team / squad / area    |
+| `labels`       | Tag pills                                          | a tags / multi-select column          |
+| `schedule`     | Gantt bars, calendar spans (`{ start, end }`)      | a date range column                   |
+| `start`, `end` | Separate start and end date fields                 | dates named start / end               |
+| `due`          | Due chips, calendar days                           | a date named due / deadline           |
+| `progress`     | Progress bars and fills                            | a progress column                     |
+| `value`        | Column, lane and section totals                    | a currency column                     |
+| `dependencies` | Links: `T-12`, `T-12SS+2d`, or `{ id, type, lag }` | a column named depends / predecessors |
+| `parent`       | The Gantt outline (summary tasks)                  | a column named parent                 |
+| `baseline`     | Baseline bars and schedule variance                | a date range named baseline           |
+| `milestone`    | Milestone diamonds                                 | a checkbox named milestone            |
+| `cover`        | Gallery cover images                               | a URL column named cover / image      |
+| `rank`         | Manual card order within a board column            | a column named rank / order           |
+
+`doneValues` and `blockedValues` say which statuses mean done and blocked (default: the last option, and options
+labelled blocked / on hold). A view's own `records` override the workspace's for that view.
+
+## Kanban
+
+```ts
+import type { KanbanViewConfig } from '@eregister/wit-grid-react';
+
+const board: KanbanViewConfig = { kind: 'kanban', swimlaneField: 'team', wipLimits: { doing: 12, review: 8 }, wipPolicy: 'block' };
+```
+
+Columns are the status options in order (every option, even empty ones), each with its count, WIP limit and total.
+Swimlanes split every column by another field. Cards show identity, value, priority, team or labels, owner, due date,
+progress and counts. Drag cards — or the whole selection — between columns and lanes; with a `rank` role the drop
+indicator places them between neighbours (fractional ranks: one write per card). A drop the limit or permissions
+refuse shows why and writes nothing. **Alt + ←/→** moves the focused card(s), **Alt + ↑/↓** reorders. A card waiting
+on unfinished predecessors after its planned start is **blocked**.
+
+| Option                   | Meaning                                                  |
+| ------------------------ | -------------------------------------------------------- |
+| `columnField`            | Board columns. Default: the status role                  |
+| `swimlaneField`          | Lanes inside each column (`null` for none)               |
+| `columns`                | Column order and labels; unlisted values follow          |
+| `wipLimits`, `wipPolicy` | Limits per column; `warn` (default) or `block`           |
+| `aggregate`              | The header number, e.g. `{ fn: 'sum', field: 'points' }` |
+| `density`, `columnWidth` | `comfortable` / `compact` cards; column width            |
+| `collapsedColumns`       | Columns collapsed at first                               |
+
+## Gantt
+
+```ts
+import type { GanttViewConfig } from '@eregister/wit-grid-react';
+
+const plan: GanttViewConfig = {
+	kind: 'gantt',
+	zoom: 'week',
+	criticalPath: true,
+	autoSchedule: 'push',
+	calendar: { workingDays: [1, 2, 3, 4, 5], holidays: ['2026-12-25'] },
+};
+```
+
+The task outline and the timeline are **one row projection with one scroll authority** — they cannot drift apart.
+The outline has WBS numbers, summary tasks (spans and duration-weighted progress roll up) and milestones; the
+timeline draws progress-filled bars, baselines (amber when late), dependency connectors (finish-to-start,
+start-to-start, finish-to-finish, start-to-finish, with lag), the critical path, weekends and today, from day to year
+zoom, with a minimap.
+
+Drag a bar to move it, its ends to resize it, the progress handle to set progress, and the round handle onto another
+bar to link it (links that would make a task wait on itself are refused). Moves keep the working-day duration. With
+auto-scheduling, successors follow: you see the **impact** — every task that moves and by how many working days —
+and choose to reschedule them, move only this task, or cancel. The whole reschedule is one undo step.
+
+The inspector gains **Schedule** (dates, duration, slack, baseline variance), **Dependencies** (types, add / remove)
+and **Resources** (the owner's concurrent load during the task, over-allocated days).
+
+| Option                                      | Meaning                                                         |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `zoom`                                      | `day`, `week` (default), `month`, `quarter`, `year`             |
+| `calendar`                                  | Working days and holidays: durations, lags and moves count them |
+| `autoSchedule`                              | `push` (default), `tight` (as early as links allow) or `off`    |
+| `confirmReschedule`                         | Show the impact before writing (default true)                   |
+| `dependencies`, `baseline`, `criticalPath`  | Layers to draw                                                  |
+| `taskPaneWidth`, `rowHeight`, `initialDate` | Layout and the first day shown                                  |
 
 ## Gallery
 
-Cards with a title, an optional colour band and a few fields. Each field is drawn by **its column's own renderer**,
-so status pills, avatars, progress bars and currency look exactly as they do in the table. Only the cards in view
-exist and they are recycled as the gallery scrolls, so 100k rows scroll as smoothly as a dozen.
+```ts
+import type { GalleryViewConfig } from '@eregister/wit-grid-react';
 
-| Option       | Default                         | What it does                                      |
-| ------------ | ------------------------------- | ------------------------------------------------- |
-| `titleField` | the first displayed column      | The card's title                                  |
-| `fields`     | the next four displayed columns | Fields on each card, in order                     |
-| `color`      | none                            | `(row) => colour`: a band along the card's top    |
-| `cardWidth`  | `260`                           | The narrowest a card gets; columns fill the width |
+const cards: GalleryViewConfig = { kind: 'gallery', layout: 'large', cover: 'image', groupBy: 'status', fields: ['labels'] };
+```
+
+Cards in sections (collapsible, with counts, totals and average progress), four layouts (`small`, `medium`, `large`,
+`compact` rows), and covers from an image field, a generated preview or none. Each section starts with a quick-add
+card when the workspace has `createRecord`. Cards are virtualized and the column count follows the width.
 
 ## Calendar
 
-A month grid that places rows by a date field or a `{ start, end }` range field (the value
-[`dateRangeColumnType` and `timelineColumnType`](/docs/next/columns#more-cell-types) hold). Ranges span their days and
-repeat their label when they wrap into a new week; a crowded day shows **+N more**. Drag an entry to another day to
-move it: the value shifts by the days moved and is written back in the shape the cell held (date string, date-time,
-`Date`, timestamp, or range). While you drag, the days it will cover light up, the original dims and a tag shows the
-new dates and the shift; the entry pops into place on drop, and Escape cancels.
+Records on a month grid by their schedule (or due date): multi-day spans are packed into lanes so a bar stays on one
+line, crowded days show **+N more**, drag an entry to another day (or **Alt + arrows**), and **+** on a day adds a record
+there.
 
-**Click an entry** for its card: the dates and length, a few fields drawn by their columns' own renderers, buttons
-to nudge it a day earlier, a day later or a week later (the card stays open so you can watch it move), and **Open in
-table**.
+## Selection, keyboard and the inspector
 
-| Option         | Default                    | What it does                        |
-| -------------- | -------------------------- | ----------------------------------- |
-| `dateField`    | (required)                 | A date or date-range field          |
-| `titleField`   | the first displayed column | The entry's label                   |
-| `fields`       | the next three columns     | Fields on the entry's card          |
-| `color`        | the theme accent           | `(row) => colour` per entry         |
-| `initialDate`  | today                      | The month shown first               |
-| `weekStartsOn` | `1` (Monday)               | First day of the week, `0` = Sunday |
-| `editable`     | `true`                     | Drag entries to another day         |
+| Keys                        | Does                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| Click                       | Select and open in the inspector                           |
+| Ctrl / ⌘ click, Shift click | Toggle, or select a range in the view's order              |
+| Arrows, Home, End           | Move between records                                       |
+| Enter                       | Open in the inspector · **I** toggles it                   |
+| Space                       | Toggle selection · **Ctrl/⌘ A** selects all                |
+| Esc                         | Close the inspector, then clear the selection              |
+| Ctrl / ⌘ Z, Y               | Undo, redo                                                 |
+| Ctrl / ⌘ K                  | Command palette: views, records, bulk edits, view commands |
+| /                           | Search                                                     |
 
-## Back to the table
+The inspector edits every field with **its column's own editor**, shows dependencies both ways, and has tabs for
+comments, activity (every edit made in the grid, with old and new values), files and links. With two or more records
+selected, the bulk bar moves, assigns, re-prioritises, shifts dates, duplicates or deletes them — each one
+transaction.
 
-Double-clicking a card or a calendar entry opens its row in the table, scrolled into view and selected. The grid
-reports that change through `onViewChange` (and the snapshot's `view` key), so a controlled switcher stays in step.
+## Collaboration
+
+`collaboration` connects the inspector and cards to your backend. Every member is optional; the inspector shows the
+tabs it can fill.
+
+```ts
+import type { RecordCollaboration } from '@eregister/wit-grid-react';
+
+declare const backend: {
+	comments(id: string): Promise<{ id: string; author: { id: string; name: string }; body: string; createdAt: number }[]>;
+	addComment(id: string, body: string): Promise<void>;
+};
+
+const collaboration: RecordCollaboration = {
+	me: { id: 'u1', name: 'Ava Chen' },
+	listComments: (id) => backend.comments(id),
+	addComment: (id, body) => backend.addComment(id, body),
+};
+```
+
+Edits arriving from collaborators should be written with `origin: 'remote'`: they apply, notify and redraw like
+any other change, but stay out of this user's undo history.
+
+```ts
+import type { GridApi } from '@eregister/wit-grid-react';
+
+declare const api: GridApi<{ id: string; status: string }>;
+api.transaction({ cells: [{ rowId: 'T-1172', colField: 'status', value: 'review' }], origin: 'remote' });
+```
+
+`api.setPresence()` peers show on the records their cursors are on, in every view.
+
+## Headless
+
+The projections are plain functions in the core, usable without the workspace (custom views, servers, tests):
+`resolveRecordRoles` and `RecordReader`, `groupRecords` / `aggregateRecords`, `buildBoard` / `planBoardMove`,
+`rankBetween`, `ScheduleModel` (outline, rollups, violations, slack, critical path, `autoSchedule`), `WorkCalendar`,
+`TimeScale` and `resourceLoad`.
+
+```ts
+import { RecordReader, resolveRecordRoles, ScheduleModel, WorkCalendar, type RecordRow } from '@eregister/wit-grid-react';
+
+declare const columns: import('@eregister/wit-grid-react').ColumnDef<unknown>[];
+declare const rows: RecordRow<unknown>[];
+
+const reader = new RecordReader(columns, resolveRecordRoles(columns));
+const schedule = new ScheduleModel(rows, reader, new WorkCalendar());
+const late = schedule.violations();
+const { changes } = schedule.autoSchedule({ mode: 'push' });
+```

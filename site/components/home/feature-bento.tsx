@@ -2,6 +2,10 @@ import {
 	BarChart3,
 	Boxes,
 	CalendarRange,
+	CheckSquare,
+	Command,
+	GanttChart,
+	KanbanSquare,
 	Database,
 	FileSpreadsheet,
 	Filter,
@@ -269,10 +273,17 @@ function MinimapVisual() {
 	);
 }
 
-/** The same rows as cards, on a calendar and on a timeline. */
+/** One record model, five projections: the tab strip, cards, a calendar and a timeline. */
 function ViewsVisual() {
 	return (
 		<div className='wg-v-views' aria-hidden>
+			<div className='wg-v-views-tabs'>
+				{['Table', 'Gallery', 'Calendar', 'Kanban', 'Gantt'].map((tab) => (
+					<span key={tab} data-on={tab === 'Kanban' || undefined}>
+						{tab}
+					</span>
+				))}
+			</div>
 			<div className='wg-v-views-cards'>
 				{['Launch', 'Pricing', 'Onboarding', 'Billing'].map((title, i) => (
 					<div key={title} style={{ ['--h' as string]: ['#22c55e', '#f59e0b', '#6d7cff', '#ec4899'][i] }}>
@@ -295,6 +306,152 @@ function ViewsVisual() {
 				<i style={{ marginLeft: '6%', width: '38%', ['--h' as string]: '#6d7cff' }} />
 				<i style={{ marginLeft: '30%', width: '44%', ['--h' as string]: '#22c55e' }} />
 				<i style={{ marginLeft: '58%', width: '30%', ['--h' as string]: '#f59e0b' }} />
+			</div>
+		</div>
+	);
+}
+
+/** A board: status columns with WIP counts, a card in flight and the slot it will land in. */
+function KanbanVisual() {
+	const columns: [string, string, string, number][] = [
+		['To do', '#3b82f6', '4', 3],
+		['Doing', '#f59e0b', '3 / 4', 2],
+		['Done', '#22c55e', '6', 2],
+	];
+	return (
+		<div className='wg-v-kanban' aria-hidden>
+			{columns.map(([name, hue, count, cards], c) => (
+				<div key={name} className='wg-v-kanban-col' style={{ ['--h' as string]: hue }}>
+					<div className='wg-v-kanban-head'>
+						<i />
+						<strong>{name}</strong>
+						<em>{count}</em>
+					</div>
+					{Array.from({ length: cards }, (_, i) => (
+						<div key={i} className='wg-v-kanban-card'>
+							<b style={{ width: `${55 + ((i * 17 + c * 11) % 35)}%` }} />
+							<span>
+								<i />
+								<b />
+							</span>
+						</div>
+					))}
+					{c === 1 && <div className='wg-v-kanban-slot'>Drop here</div>}
+				</div>
+			))}
+			<div className='wg-v-kanban-ghost'>
+				<b />
+				<span>
+					<i />
+					<b />
+				</span>
+			</div>
+		</div>
+	);
+}
+
+/** A schedule: outline and bars on one row model, links, the critical path and today. */
+function GanttVisual() {
+	const rows: {
+		wbs: string;
+		name: string;
+		left: number;
+		width: number;
+		progress: number;
+		kind: 'summary' | 'task' | 'milestone';
+		hue?: string;
+		critical?: boolean;
+	}[] = [
+		{ wbs: '1', name: 'Launch plan', left: 4, width: 82, progress: 46, kind: 'summary' },
+		{ wbs: '1.1', name: 'Research', left: 4, width: 24, progress: 100, kind: 'task', hue: '#22c55e' },
+		{ wbs: '1.2', name: 'Design', left: 30, width: 24, progress: 70, kind: 'task', hue: '#6d7cff', critical: true },
+		{ wbs: '1.3', name: 'Build', left: 56, width: 26, progress: 20, kind: 'task', hue: '#f59e0b', critical: true },
+		{ wbs: '1.4', name: 'Launch', left: 85, width: 0, progress: 0, kind: 'milestone', critical: true },
+	];
+	return (
+		<div className='wg-v-gantt' aria-hidden>
+			<div className='wg-v-gantt-outline'>
+				{rows.map((row) => (
+					<div key={row.wbs} data-summary={row.kind === 'summary' || undefined}>
+						<em>{row.wbs}</em>
+						{row.name}
+					</div>
+				))}
+			</div>
+			<div className='wg-v-gantt-chart'>
+				<span className='wg-v-gantt-today' />
+				{rows.map((row, i) =>
+					row.kind === 'milestone' ? (
+						<i key={row.wbs} className='wg-v-gantt-diamond' style={{ left: `${row.left}%`, top: `${i * 20 + 6}px` }} />
+					) : (
+						<i
+							key={row.wbs}
+							className={row.kind === 'summary' ? 'wg-v-gantt-summary' : 'wg-v-gantt-bar'}
+							data-critical={row.critical || undefined}
+							style={{
+								left: `${row.left}%`,
+								width: `${row.width}%`,
+								top: `${i * 20 + (row.kind === 'summary' ? 7 : 4)}px`,
+								['--h' as string]: row.hue ?? '#60a5fa',
+								['--p' as string]: `${row.progress}%`,
+							}}
+						/>
+					)
+				)}
+				<svg viewBox='0 0 100 100' preserveAspectRatio='none'>
+					<path d='M28 30 H29 V50 H30' />
+					<path d='M54 50 H55 V70 H56' />
+					<path d='M82 70 H85 V86' />
+				</svg>
+				<span className='wg-v-gantt-impact'>Reschedule 3 tasks · +2d</span>
+			</div>
+		</div>
+	);
+}
+
+/** Ctrl / ⌘ K: every view and record action, fuzzy-searched. */
+function PaletteVisual() {
+	const items: [string, string, boolean?][] = [
+		['Switch to Kanban', 'Views', true],
+		['Move selection to In review', 'Selection'],
+		['Zoom to weeks', 'Schedule'],
+		['Show the critical path', 'Schedule'],
+	];
+	return (
+		<div className='wg-v-palette' aria-hidden>
+			<div className='wg-v-palette-search'>
+				<span>sw kan</span>
+				<kbd>⌘K</kbd>
+			</div>
+			{items.map(([label, group, on]) => (
+				<div key={label} className='wg-v-palette-item' data-on={on || undefined}>
+					<span>{label}</span>
+					<em>{group}</em>
+				</div>
+			))}
+		</div>
+	);
+}
+
+/** Several cards selected, and the bar that edits them all in one undo step. */
+function BulkVisual() {
+	return (
+		<div className='wg-v-bulk' aria-hidden>
+			<div className='wg-v-bulk-cards'>
+				{['#6d7cff', '#f59e0b', '#22c55e', '#ec4899'].map((hue, i) => (
+					<div key={hue} data-on={i < 3 || undefined} style={{ ['--h' as string]: hue }}>
+						<i />
+						<b />
+						<b />
+					</div>
+				))}
+			</div>
+			<div className='wg-v-bulk-bar'>
+				<strong>3 selected</strong>
+				<span>Move to</span>
+				<span>Assign</span>
+				<span>Priority</span>
+				<span>Dates</span>
 			</div>
 		</div>
 	);
@@ -331,6 +488,42 @@ const FEATURES: Feature[] = [
 		hue: '#22c55e',
 	},
 	{
+		title: 'One record, every view',
+		description:
+			'Table, gallery, calendar, Kanban and Gantt read the same records and the same field meanings. Selection, the inspector and undo follow you between them.',
+		icon: CalendarRange,
+		tag: 'workspace',
+		visual: ViewsVisual,
+		size: 'wide',
+		hue: '#6d7cff',
+	},
+	{
+		title: 'A board that runs the work',
+		description: 'Status columns with WIP limits and totals, swimlanes, multi-card drag with a drop slot, blocked work flagged.',
+		icon: KanbanSquare,
+		tag: "kind: 'kanban'",
+		visual: KanbanVisual,
+		hue: '#f59e0b',
+	},
+	{
+		title: 'A Gantt that schedules',
+		description:
+			'Outline and timeline on one row model: dependencies with lag, working calendars, the critical path, baselines and workload. You see the knock-on before a move reschedules anything.',
+		icon: GanttChart,
+		tag: "autoSchedule: 'push'",
+		visual: GanttVisual,
+		size: 'wide',
+		hue: '#22c55e',
+	},
+	{
+		title: 'Inspector & command palette',
+		description: 'Every field edited by its column’s own editor, with comments and activity; Ctrl/⌘ K reaches every view and record action.',
+		icon: Command,
+		tag: 'Ctrl + K',
+		visual: PaletteVisual,
+		hue: '#a855f7',
+	},
+	{
 		title: 'One filter, every surface',
 		description: 'A column’s filterDef drives the header funnel, floating row, sidebar, chips and query builder — relative dates included.',
 		icon: Filter,
@@ -355,10 +548,11 @@ const FEATURES: Feature[] = [
 		hue: '#10b981',
 	},
 	{
-		title: 'Sidebar & saved views',
-		description: 'Columns, filters, sort, query, views and data integrity in one panel; save a layout, set a default, revert.',
+		title: 'Saved views, personal or shared',
+		description:
+			'A view keeps its filters, sort, columns and the view itself — a board with swimlanes, a schedule at a zoom. Saved views are tabs, yours or the team’s.',
 		icon: PanelRight,
-		tag: 'sidebar',
+		tag: 'api.saveView()',
 		visual: SidebarVisual,
 		hue: '#f59e0b',
 	},
@@ -397,7 +591,8 @@ const FEATURES: Feature[] = [
 	},
 	{
 		title: 'Teammates, live in the grid',
-		description: 'Feed in who is where: their cursors glide between cells with name tags, follow rows through sorts and pulse while they type.',
+		description:
+			'Feed in who is where: cursors glide between cells, rings sit on the cards and bars they are on, and their edits stay out of your undo.',
 		icon: Users,
 		tag: 'api.setPresence()',
 		visual: PresenceVisual,
@@ -421,13 +616,14 @@ const FEATURES: Feature[] = [
 		hue: '#14b8a6',
 	},
 	{
-		title: 'Gallery, calendar and timeline',
-		description: 'The same filtered, sorted rows as cards or on a calendar, and a Gantt column you drag to reschedule.',
-		icon: CalendarRange,
-		tag: 'api.setView()',
-		visual: ViewsVisual,
+		title: 'Bulk edits, one undo step',
+		description:
+			'Select across any view and move, assign, re-prioritise or shift dates for all of them: one transaction, validated and undoable.',
+		icon: CheckSquare,
+		tag: 'api.transaction()',
+		visual: BulkVisual,
 		size: 'wide',
-		hue: '#6d7cff',
+		hue: '#14b8a6',
 	},
 ];
 

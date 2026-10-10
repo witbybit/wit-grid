@@ -346,6 +346,11 @@ export interface GridTransaction<TRowData = unknown> {
 	cells?: GridCellWrite[];
 	/** Where the cell writes come from, for validation policy and history. Default: 'api'. */
 	source?: 'api' | 'paste' | 'fill';
+	/**
+	 * Who made the change. `remote` changes (a collaborator's edit arriving over the app's realtime
+	 * channel) apply and notify like any other, but stay out of this user's undo history. Default `local`.
+	 */
+	origin?: 'local' | 'remote';
 	columns?: ColumnDef<TRowData>[];
 	sortModel?: SortModel | null;
 	filterModel?: FilterModel | null;

@@ -4,6 +4,11 @@
 	"extraction": "typescript-ast",
 	"exports": [
 		{
+			"name": "aggregateRecords",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "AggregationDef",
 			"kind": "type",
 			"source": "./types.js"
@@ -19,8 +24,18 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "BoardModel",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "BooleanFilterCondition",
 			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "buildBoard",
+			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
@@ -409,6 +424,16 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "DependencyLink",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "DependencyType",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "DetailRowStyleRule",
 			"kind": "type",
 			"source": "./types.js"
@@ -505,6 +530,11 @@
 		},
 		{
 			"name": "GalleryViewConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "GanttViewConfig",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
@@ -809,14 +839,29 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "GridViewKind",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "GridWorkspaceAdapter",
 			"kind": "type",
 			"source": "./types.js"
 		},
 		{
+			"name": "GridWorkspaceOptions",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "GridWorkspaceState",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "GridWorkspaceTab",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "GridWriteBlockedEventPayload",
@@ -832,6 +877,11 @@
 			"name": "GroupDef",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "groupRecords",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "GroupRenderContext",
@@ -897,6 +947,11 @@
 			"name": "isDomCellRenderer",
 			"kind": "value",
 			"source": "./types.js"
+		},
+		{
+			"name": "KanbanViewConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "linkedRecordColumnType",
@@ -1029,6 +1084,11 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "planBoardMove",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "ProgressCellOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -1044,6 +1104,11 @@
 			"source": "./types.js"
 		},
 		{
+			"name": "rankBetween",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "RatingCellOptions",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -1051,6 +1116,61 @@
 		{
 			"name": "ratingColumnType",
 			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordActivityEntry",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordCollaboration",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordComment",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordCounts",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordFile",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordLink",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordPerson",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordReader",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordRoles",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordRolesConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "RecordRow",
+			"kind": "type",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
@@ -1071,6 +1191,16 @@
 		{
 			"name": "ResolveConflictOptions",
 			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "resolveRecordRoles",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "resourceLoad",
+			"kind": "value",
 			"source": "@eregister/wit-grid-core"
 		},
 		{
@@ -1107,6 +1237,21 @@
 			"name": "SaveViewOptions",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "ScheduleChange",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ScheduleModel",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "ScheduleTask",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		},
 		{
 			"name": "SegmentedCellOptions",
@@ -1254,6 +1399,16 @@
 			"source": "@eregister/wit-grid-core"
 		},
 		{
+			"name": "TimeScale",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "TimeZoom",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
 			"name": "TooltipParams",
 			"kind": "type",
 			"source": "@eregister/wit-grid-core"
@@ -1292,6 +1447,16 @@
 			"name": "VisualRow",
 			"kind": "type",
 			"source": "./types.js"
+		},
+		{
+			"name": "WorkCalendar",
+			"kind": "value",
+			"source": "@eregister/wit-grid-core"
+		},
+		{
+			"name": "WorkCalendarConfig",
+			"kind": "type",
+			"source": "@eregister/wit-grid-core"
 		}
 	],
 	"interfaces": [
@@ -1321,7 +1486,8 @@
 				{
 					"name": "workspace",
 					"optional": true,
-					"type": "GridWorkspaceAdapter"
+					"type": "GridWorkspaceAdapter | GridWorkspaceOptions<TRowData> | boolean",
+					"description": "The record workspace (view tabs, inspector, bulk actions, command palette) with its options, or\r\nonly a saved-views adapter (no workspace UI). Initial-only."
 				},
 				{
 					"name": "rowOverscanPx",
@@ -1422,7 +1588,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1479,7 +1645,8 @@
 				{
 					"name": "workspace",
 					"optional": true,
-					"type": "GridWorkspaceAdapter"
+					"type": "GridWorkspaceAdapter | GridWorkspaceOptions<TRowData> | boolean",
+					"description": "The record workspace (view tabs, inspector, bulk actions, command palette) with its options, or\r\nonly a saved-views adapter (no workspace UI). Initial-only."
 				},
 				{
 					"name": "rowOverscanPx",
@@ -1580,7 +1747,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1636,7 +1803,8 @@
 				{
 					"name": "workspace",
 					"optional": true,
-					"type": "GridWorkspaceAdapter"
+					"type": "GridWorkspaceAdapter | GridWorkspaceOptions<TRowData> | boolean",
+					"description": "The record workspace (view tabs, inspector, bulk actions, command palette) with its options, or\r\nonly a saved-views adapter (no workspace UI). Initial-only."
 				},
 				{
 					"name": "rowOverscanPx",
@@ -1737,7 +1905,7 @@
 					"name": "rowAnimation",
 					"optional": true,
 					"type": "RowAnimationOptions",
-					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\nwhich changes animate. Live: a change applies from the next animation."
+					"description": "How rows animate when a sort, live value change, expansion or detail moves them: style\r\n('slide' | 'fade' | 'none'), duration, easing ('smooth' | 'snappy' | 'spring' | CSS), stagger, and\r\nwhich changes animate. Live: a change applies from the next animation."
 				},
 				{
 					"name": "rowDragMode",
@@ -1839,7 +2007,7 @@
 					"name": "groupRowRenderer",
 					"optional": true,
 					"type": "(ctx: GroupRenderContext<TRowData>) => ReactNode",
-					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
+					"description": "Full-width group rows (`grouping.display: 'row'`). Without one — or with the default cell-row\r\ndisplay — the grid draws group rows itself. A `grouping.rowRenderer` spec takes precedence. Receives the `GroupRenderContext`."
 				},
 				{
 					"name": "detailRowRenderer",
@@ -1857,6 +2025,12 @@
 					"name": "sidebar",
 					"optional": true,
 					"type": "GridSidebarConfig<TRowData>"
+				},
+				{
+					"name": "workspace",
+					"optional": true,
+					"type": "GridWorkspaceOptions<TRowData> | boolean",
+					"description": "The record workspace around the grid: view tabs, search, filter / sort / group / fields, the\r\nrecord inspector, bulk actions and a command palette, shared by the table and every view.\r\nInitial-only."
 				},
 				{
 					"name": "enableChart",

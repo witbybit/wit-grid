@@ -13,6 +13,7 @@ import NativeCellTypesDemo from '../showcases/NativeCellTypesDemo.js';
 import RealtimeDashboard from '../showcases/RealtimeDashboard.js';
 import RealtimeGroupingDemo from '../showcases/RealtimeGroupingDemo.js';
 import RowDragDemo from '../showcases/RowDragDemo.js';
+import RecordWorkspaceDemo from '../showcases/RecordWorkspaceDemo.js';
 
 const SHOWCASES: Record<string, ComponentType<Record<string, unknown>>> = {
 	// jsdom is slow to repaint, so the gauntlet runs a small universe on a slow trickle of ticks.
@@ -28,6 +29,7 @@ const SHOWCASES: Record<string, ComponentType<Record<string, unknown>>> = {
 	'row-drag': RowDragDemo as ComponentType<Record<string, unknown>>,
 	'grouping-sticky': GroupingStickyDemo as ComponentType<Record<string, unknown>>,
 	clipboard: ClipboardDemo as ComponentType<Record<string, unknown>>,
+	'record-workspace': RecordWorkspaceDemo as ComponentType<Record<string, unknown>>,
 };
 
 // PR runs use a couple of fixed seeds; GAUNTLET_SEEDS / GAUNTLET_STEPS widen it for nightly runs,

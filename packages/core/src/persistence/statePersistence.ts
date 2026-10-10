@@ -1,6 +1,7 @@
 import { freezeGroupingConfig, groupByColIds, type GroupingConfig, type StickyHeadersOptions } from '../rows/hierarchyConfig.js';
 import type { TotalPlacement } from '../visualRow.js';
 import type { ColumnDef } from '../columnDef.js';
+import type { GridViewConfig, GridViewKind } from '../views.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
 import type { SortModel, FilterModel } from '../rowModel.js';
 import { restoreQueryModel, type GridQueryModel } from '../query/GridQueryModel.js';
@@ -26,6 +27,22 @@ export interface SerializedGridState {
 	/** The serializable part of the grouping configuration. */
 	grouping?: PersistedGrouping;
 	pinnedColumns?: { left: number; right: number };
+	/**
+	 * The view the grid shows (`null` for the table): its JSON-safe configuration. Functions (a
+	 * `color` callback) are not persisted; the view falls back to its defaults for them.
+	 */
+	view?: SerializedViewConfig | null;
+}
+
+/** A view configuration as JSON: `kind` plus its plain options. */
+export type SerializedViewConfig = { kind: GridViewKind } & Record<string, unknown>;
+
+const VIEW_KINDS: readonly string[] = ['gallery', 'calendar', 'kanban', 'gantt'];
+
+function toSerializedView(view: GridViewConfig<any> | null | undefined): SerializedViewConfig | null {
+	if (!view) return null;
+	// Functions drop out and dates become ISO strings, exactly as JSON would store them.
+	return JSON.parse(JSON.stringify(view)) as SerializedViewConfig;
 }
 
 export interface PersistedGrouping {
@@ -163,6 +180,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		'themeName',
 		'grouping',
 		'pinnedColumns',
+		'view',
 	]);
 	for (const key of Object.keys(raw)) {
 		if (!allowedKeys.has(key)) {
@@ -218,6 +236,13 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		};
 	}
 
+	if (raw.view !== undefined && raw.view !== null && (!isRecord(raw.view) || !VIEW_KINDS.includes(raw.view.kind as string))) {
+		return {
+			ok: false,
+			error: `[wit-grid] persisted grid state field \`state.view\` must be null or a view configuration with \`kind\` ${VIEW_KINDS.join(', ')}.`,
+		};
+	}
+
 	const value: SerializedGridState = {
 		columnWidths: raw.columnWidths as SerializedGridState['columnWidths'],
 		columnOrder: raw.columnOrder as SerializedGridState['columnOrder'],
@@ -228,6 +253,7 @@ function parseSerializedGridState(raw: unknown): SerializedGridStateParseResult 
 		themeName: raw.themeName as SerializedGridState['themeName'],
 		grouping: raw.grouping as SerializedGridState['grouping'],
 		pinnedColumns: raw.pinnedColumns as SerializedGridState['pinnedColumns'],
+		view: raw.view as SerializedGridState['view'],
 	};
 	return {
 		ok: true,
@@ -370,6 +396,8 @@ function extractSerializedGridState<TRowData>(state: InternalGridState<TRowData>
 		themeName: state.themeName,
 		grouping: toPersistedGrouping(state.grouping),
 		pinnedColumns: pins && (pins.left > 0 || pins.right > 0) ? pins : undefined,
+		// The table is the default: only a view is recorded (older states and table-only grids are unchanged).
+		view: state.view ? toSerializedView(state.view) : undefined,
 	};
 }
 
@@ -426,7 +454,17 @@ function mergeColumnOrder<T extends { field: string }>(current: readonly T[], sa
  * Scroll position, selection, active edit, etc. are intentionally excluded to
  * avoid flooding network adapters on every pointer event.
  */
-export const PERSISTED_STATE_KEYS = ['columns', 'columnWidths', 'sortModel', 'filterModel', 'queryModel', 'themeName', 'grouping', 'pinnedColumns'];
+export const PERSISTED_STATE_KEYS = [
+	'columns',
+	'columnWidths',
+	'sortModel',
+	'filterModel',
+	'queryModel',
+	'themeName',
+	'grouping',
+	'pinnedColumns',
+	'view',
+];
 
 /**
  * Wire persistence to the grid via key-specific subscriptions.
@@ -587,6 +625,12 @@ export function preparePersistedGridStateRestore<TRowData>(
 	}
 	if (s.pinnedColumns !== undefined) {
 		stateMutation.pinnedColumns = s.pinnedColumns;
+	}
+	if (s.view !== undefined) {
+		// The same config again is the same view: keep the live object (and its callbacks), no remount.
+		const live = (current.view ?? null) as GridViewConfig<TRowData> | null;
+		stateMutation.view =
+			JSON.stringify(toSerializedView(live)) === JSON.stringify(s.view) ? live : (s.view as unknown as GridViewConfig<TRowData> | null);
 	}
 
 	return { ok: true, restore: { stateMutation } };

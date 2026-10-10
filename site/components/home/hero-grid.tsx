@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTheme } from 'next-themes';
-import { Activity, CalendarDays, LayoutGrid, Table2, Users } from 'lucide-react';
+import { Activity, LayoutDashboard, Maximize2, Minimize2 } from 'lucide-react';
 import { BUILT_IN_THEME_METADATA, BUILT_IN_THEME_ORDER, getBuiltInTheme, type BuiltInThemeName } from '@eregister/wit-grid-react';
 
 const loading = (label: string) =>
@@ -16,23 +16,21 @@ const RealtimeDashboard = dynamic(() => import('@eregister/wit-grid-examples/rea
 	loading: loading('Loading live grid…'),
 });
 
-const NativeCellTypes = dynamic(() => import('@eregister/wit-grid-examples/native-cell-types'), {
+const RecordWorkspace = dynamic(() => import('@eregister/wit-grid-examples/record-workspace'), {
 	ssr: false,
-	loading: loading('Loading cell editors…'),
+	loading: loading('Loading the workspace…'),
 });
 
-type HeroDemo = 'desk' | 'cells';
+type HeroDemo = 'desk' | 'workspace';
 
 const DEMOS: { id: HeroDemo; label: string; hint: string; icon: typeof Activity }[] = [
-	{ id: 'cells', label: 'Team workspace', hint: 'Teammates editing live: double-click any cell to join in', icon: Users },
+	{
+		id: 'workspace',
+		label: 'Record workspace',
+		hint: 'One roadmap as a table, gallery, calendar, Kanban board and Gantt — switch views, your place stays',
+		icon: LayoutDashboard,
+	},
 	{ id: 'desk', label: 'Live market desk', hint: 'Thousands of updates a second', icon: Activity },
-];
-
-type CellsView = 'table' | 'gallery' | 'calendar';
-const CELL_VIEWS: { id: CellsView; label: string; icon: typeof Activity }[] = [
-	{ id: 'table', label: 'Table', icon: Table2 },
-	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
-	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
 ];
 
 /** Every built-in grid theme, with its background and accent for the swatch. */
@@ -44,16 +42,44 @@ const THEMES = BUILT_IN_THEME_ORDER.map((name) => {
 export function HeroGrid() {
 	const { resolvedTheme } = useTheme();
 	const siteTheme: BuiltInThemeName = resolvedTheme === 'light' ? 'glass-light' : 'glass-dark';
-	const [demo, setDemo] = useState<HeroDemo>('cells');
-	// The cell demo follows the site's light / dark mode until a theme is picked here.
+	const [demo, setDemo] = useState<HeroDemo>('workspace');
+	// The workspace follows the site's light / dark mode until a theme is picked here.
 	const [pickedTheme, setPickedTheme] = useState<BuiltInThemeName | null>(null);
-	// The team workspace as a table, a gallery of cards or a calendar of the plan.
-	const [cellsView, setCellsView] = useState<CellsView>('table');
 	const gridTheme = pickedTheme ?? siteTheme;
 	const active = DEMOS.find((d) => d.id === demo)!;
 
+	// Full screen: the showcase covers the window, and the browser goes full screen when it allows.
+	// The document (not the showcase) is what goes full screen, so the grid's popovers and menus — which
+	// live in <body> — stay visible.
+	const [full, setFull] = useState(false);
+	const closeButton = useRef<HTMLButtonElement>(null);
+	const enter = useCallback(() => {
+		setFull(true);
+		const root = document.documentElement;
+		if (!document.fullscreenElement && root.requestFullscreen) root.requestFullscreen().catch(() => {});
+	}, []);
+	const exit = useCallback(() => {
+		setFull(false);
+		if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(() => {});
+	}, []);
+	useEffect(() => {
+		if (!full) return;
+		// Leaving browser full screen (Esc, F11) leaves the showcase's too.
+		const onChange = () => {
+			if (!document.fullscreenElement) setFull(false);
+		};
+		document.addEventListener('fullscreenchange', onChange);
+		const overflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		closeButton.current?.focus({ preventScroll: true });
+		return () => {
+			document.removeEventListener('fullscreenchange', onChange);
+			document.body.style.overflow = overflow;
+		};
+	}, [full]);
+
 	return (
-		<div>
+		<div className={full ? 'wg-hero-full' : undefined}>
 			<div className='wg-hero-switcher'>
 				{/* The tabs with their hint underneath, so the controls fit on one row beside them. */}
 				<div className='wg-hero-lead'>
@@ -78,24 +104,7 @@ export function HeroGrid() {
 					</div>
 					<span className='wg-hero-hint'>{active.hint}</span>
 				</div>
-				{demo === 'cells' && (
-					<div className='wg-hero-views' role='radiogroup' aria-label='View'>
-						{CELL_VIEWS.map(({ id, label, icon: Icon }) => (
-							<button
-								key={id}
-								type='button'
-								role='radio'
-								aria-checked={cellsView === id}
-								className='wg-hero-view'
-								onClick={() => setCellsView(id)}
-							>
-								<Icon aria-hidden size={13} />
-								{label}
-							</button>
-						))}
-					</div>
-				)}
-				{demo === 'cells' && (
+				{demo === 'workspace' && (
 					<div className='wg-hero-themes' role='radiogroup' aria-label='Grid theme'>
 						{THEMES.map((t) => (
 							<button
@@ -113,13 +122,21 @@ export function HeroGrid() {
 						<span className='wg-hero-theme-label'>{BUILT_IN_THEME_METADATA[gridTheme].label}</span>
 					</div>
 				)}
+				<button
+					ref={closeButton}
+					type='button'
+					className='wg-hero-fullscreen'
+					aria-pressed={full}
+					aria-label={full ? 'Exit full screen' : 'Full screen'}
+					title={full ? 'Exit full screen (Esc)' : 'Full screen'}
+					onClick={full ? exit : enter}
+				>
+					{full ? <Minimize2 aria-hidden size={14} /> : <Maximize2 aria-hidden size={14} />}
+					<span>{full ? 'Exit full screen' : 'Full screen'}</span>
+				</button>
 			</div>
 			<div id='wg-hero-demo' role='tabpanel' className='wg-hero-grid'>
-				{demo === 'desk' ? (
-					<RealtimeDashboard compact theme={siteTheme} />
-				) : (
-					<NativeCellTypes compact theme={gridTheme} view={cellsView} onViewChange={setCellsView} />
-				)}
+				{demo === 'desk' ? <RealtimeDashboard compact theme={siteTheme} /> : <RecordWorkspace theme={gridTheme} />}
 			</div>
 		</div>
 	);

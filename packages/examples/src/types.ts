@@ -11,7 +11,8 @@ export type WitGridExampleCategory =
 	| 'Editing'
 	| 'Grouping'
 	| 'Validation'
-	| 'Rendering';
+	| 'Rendering'
+	| 'Views';
 
 export type WitGridExampleMeta = {
 	id: string;

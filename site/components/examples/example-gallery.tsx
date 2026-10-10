@@ -13,6 +13,7 @@ import {
 	ListFilter,
 	Pencil,
 	Layers,
+	LayoutDashboard,
 	ShieldCheck,
 	Zap,
 	Maximize2,
@@ -36,6 +37,7 @@ const CATEGORY_ORDER: WitGridExampleMeta['category'][] = [
 	'Grouping',
 	'Validation',
 	'Rendering',
+	'Views',
 ];
 
 const CATEGORY_ICONS: Record<WitGridExampleMeta['category'], LucideIcon> = {
@@ -48,6 +50,7 @@ const CATEGORY_ICONS: Record<WitGridExampleMeta['category'], LucideIcon> = {
 	Grouping: Layers,
 	Validation: ShieldCheck,
 	Rendering: Zap,
+	Views: LayoutDashboard,
 };
 
 const previewModules = {

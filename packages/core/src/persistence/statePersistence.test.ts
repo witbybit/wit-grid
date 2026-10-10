@@ -9,6 +9,7 @@ import {
 	type PersistedGridState,
 	type SerializedGridState,
 	validateSchemaVersion,
+	validatePersistedGridState,
 } from './statePersistence.js';
 import type { ColumnDef } from '../store.js';
 import type { GridInitialState, InternalGridState } from '../state/GridState.js';
@@ -457,5 +458,23 @@ describe('statePersistence', () => {
 			expect(areRowHeightsEqual({ '1': 40 }, { '1': 40, '2': 50 })).toBe(false);
 			expect(areRowHeightsEqual({ '1': 40 }, { '1': 42 })).toBe(false);
 		});
+	});
+});
+
+describe('persisted views', () => {
+	it('records the shown view as JSON (callbacks dropped) and restores it', () => {
+		const view = { kind: 'kanban', swimlaneField: 'team', wipLimits: { doing: 3 }, color: () => 'red' };
+		const state = { columns: [{ field: 'team', header: 'Team' }], columnWidths: {}, view } as unknown as InternalGridState;
+		const persisted = extractPersistedState(state);
+		expect(persisted.state.view).toEqual({ kind: 'kanban', swimlaneField: 'team', wipLimits: { doing: 3 } });
+		const restored = preparePersistedGridStateRestore(persisted, { ...state, view: null } as unknown as InternalGridState);
+		expect(restored.ok && restored.restore.stateMutation.view).toEqual({ kind: 'kanban', swimlaneField: 'team', wipLimits: { doing: 3 } });
+		// Restoring the view already shown keeps the live object (and its callbacks).
+		const same = preparePersistedGridStateRestore(persisted, state);
+		expect(same.ok && same.restore.stateMutation.view).toBe(view);
+	});
+
+	it('rejects unknown view kinds', () => {
+		expect(validatePersistedGridState({ v: GRID_STATE_SCHEMA_VERSION, state: { view: { kind: 'pivot' } } })).toMatch(/state.view/);
 	});
 });

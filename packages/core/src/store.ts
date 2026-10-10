@@ -836,17 +836,17 @@ export class GridStore<TRowData = unknown> implements InternalGridApi<TRowData> 
 			options?: GridTransactionOptions
 		): GridTransactionResult<TRowData> | Promise<GridTransactionResult<TRowData>>;
 	} = ((transaction: GridTransaction<TRowData>, options?: GridTransactionOptions) => {
-		const { rows, cells, source } = transaction;
+		const { rows, cells, source, origin } = transaction;
 		const hasState = !!transaction.columns || 'sortModel' in transaction || 'filterModel' in transaction || !!transaction.pins;
 		const applyState = hasState ? () => this.applyTransactionState(transaction) : undefined;
 		if (rows) this.assertClientStructuralRowModel('transaction');
-		const engineTransaction = { rows, cells, source, applyState };
+		const engineTransaction = { rows, cells, source, origin, applyState };
 		if (options?.async) return this.engine.transactionAsync(engineTransaction);
 		if (!applyState) return this.engine.transaction(engineTransaction);
 		let result: GridTransactionResult<TRowData> | undefined;
 		this.engine.batch(() => {
 			applyState();
-			result = this.engine.transaction({ rows, cells, source });
+			result = this.engine.transaction({ rows, cells, source, origin });
 		});
 		return result!;
 	}) as GridStore<TRowData>['transaction'];

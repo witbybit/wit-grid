@@ -131,7 +131,42 @@ export type {
 export type { GridInitialState } from './state/GridState.js';
 export type { GridPresencePeer, GridPresenceCell, GridCellFlash } from './presence.js';
 export type { GridMinimapMark } from './minimap.js';
-export type { GridViewConfig, GalleryViewConfig, CalendarViewConfig } from './views.js';
+export type {
+	GridViewConfig,
+	GridViewKind,
+	GalleryViewConfig,
+	CalendarViewConfig,
+	KanbanViewConfig,
+	GanttViewConfig,
+	ViewAggregate,
+	GridWorkspaceOptions,
+	GridWorkspaceTab,
+	RecordCollaboration,
+	RecordComment,
+	RecordFile,
+	RecordLink,
+	RecordPerson,
+	RecordCounts,
+	RecordActivityEntry,
+} from './views.js';
+export { isWorkspaceAdapter } from './views.js';
+// The record kernel: what fields mean, and the projections every view is built on (usable headless).
+export { resolveRecordRoles, RecordReader, parseDependencies, writeDependencies } from './records/recordModel.js';
+export type { RecordRolesConfig, RecordRoles, RecordRole, RecordRow, DependencyLink, DependencyType } from './records/recordModel.js';
+export { groupRecords, aggregateRecords } from './records/recordGroups.js';
+export type { RecordGroup, RecordAggregate, GroupRecordsOptions } from './records/recordGroups.js';
+export { buildBoard, planBoardMove } from './records/board.js';
+export type { BoardModel, BoardColumn, BoardLane, BoardOptions, BoardMove, BoardMovePlan } from './records/board.js';
+export { rankBetween, ranksBetween } from './records/rank.js';
+export { ScheduleModel } from './records/schedule/scheduleModel.js';
+export type { ScheduleTask, ScheduleChange, DependencyViolation, AutoScheduleOptions, AutoScheduleResult } from './records/schedule/scheduleModel.js';
+export { WorkCalendar } from './records/schedule/workCalendar.js';
+export type { WorkCalendarConfig } from './records/schedule/workCalendar.js';
+export { TimeScale } from './records/schedule/timeScale.js';
+export type { TimeZoom, TimeTick } from './records/schedule/timeScale.js';
+export { resourceLoad } from './records/schedule/resources.js';
+export type { ResourceLoad } from './records/schedule/resources.js';
+export type { Day, DaySpan } from './records/days.js';
 export type {
 	VisualRowModel,
 	RowModelViewportAccess,

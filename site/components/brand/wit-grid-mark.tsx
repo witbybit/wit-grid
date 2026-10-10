@@ -53,8 +53,7 @@ export function WitGridWordmark({ animated = false, className }: { animated?: bo
 			</svg>
 			<span aria-hidden>
 				<span className='wg-word-i'>
-					ı
-					{/* The i's dot: a hollow ring that, animated, crawls in, squares off into a selection and back. */}
+					ı{/* The i's dot: a hollow ring that, animated, crawls in, squares off into a selection and back. */}
 					<svg className='wg-word-dot' viewBox='0 0 20 20' overflow='visible'>
 						<rect className='wg-word-dot-shape' x='2' y='2' width='16' height='16' rx='8' pathLength='100' />
 					</svg>

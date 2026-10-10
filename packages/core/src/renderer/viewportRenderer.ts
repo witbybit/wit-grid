@@ -1,4 +1,4 @@
-import { GridViewHost } from './views/gridViewHost.js';
+import { WorkspaceMount } from './workspace/workspaceMount.js';
 import { GridEventName } from '../api/GridEvents.js';
 import { MinimapLayer } from './minimapLayer.js';
 import { readInteractionState } from '../interaction/interactionState.js';
@@ -112,11 +112,14 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.mountConditionalFormatting(container);
 		this.mountPresence();
 		this.mountMinimap();
+		// Views draw over the table in the view layer, unless the host mounted a workspace around it.
 		const viewLayer = this.layers.get('view');
-		if (viewLayer) this.viewHost = new GridViewHost(viewLayer, container, this.engine);
+		if (viewLayer && !this.externalWorkspace) this.viewHost = new WorkspaceMount(this.engine, viewLayer, null, {});
 	}
 
-	private viewHost: GridViewHost<TRowData> | null = null;
+	/** The host (gridHost) mounts the workspace around the grid: no view layer workspace. */
+	public externalWorkspace = false;
+	private viewHost: WorkspaceMount<TRowData> | null = null;
 
 	private minimapLayer: MinimapLayer | null = null;
 	private unsubscribeMinimap: (() => void) | null = null;
@@ -447,7 +450,6 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.layoutPlan = plan;
 		this.presenceLayer?.sync(plan);
 		this.minimapLayer?.sync(plan);
-		this.viewHost?.sync(plan);
 
 		this.syncAriaCounts();
 

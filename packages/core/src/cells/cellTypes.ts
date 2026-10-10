@@ -53,7 +53,7 @@ import {
 
 /** The column settings a type supplies; the column's own settings win over them. */
 export type ColumnTypeDefinition<TRowData = unknown> = Partial<
-	Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef' | 'sortValue'>
+	Pick<ColumnDef<TRowData>, 'renderer' | 'cellEditor' | 'valueFormatter' | 'filterDef' | 'sortValue' | 'schema'>
 >;
 
 /** Options as objects or bare values. */
@@ -107,6 +107,7 @@ function optionsStoreFor(input: readonly CellOptionInput[], config: CellOptionsS
 
 export function checkboxColumnType(): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'checkbox' },
 		renderer: { kind: 'dom', renderer: createCheckboxRenderer() },
 		// Toggles on press; Enter / F2 toggles too, with nothing to type.
 		cellEditor: { kind: 'dom', editor: createToggleEditor() },
@@ -118,6 +119,7 @@ export function checkboxColumnType(): ColumnTypeDefinition<any> {
 /** An on / off switch: toggles on press, or Enter. Optional labels beside it ('Active' / 'Paused'). */
 export function switchColumnType(options: SwitchCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'checkbox' },
 		renderer: { kind: 'dom', renderer: createSwitchRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createToggleEditor() },
 		valueFormatter: ({ value }) => (isCheckedCellValue(value) ? (options.onLabel ?? 'On') : (options.offLabel ?? 'Off')),
@@ -132,6 +134,7 @@ export function segmentedColumnType(
 ): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, {});
 	return {
+		schema: { kind: 'select', options: store },
 		renderer: { kind: 'dom', renderer: createSegmentedRenderer(store.options, config) },
 		cellEditor: { kind: 'dom', editor: createSelectEditor(store) },
 		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
@@ -143,6 +146,7 @@ export function segmentedColumnType(
 /** A colour: swatch and hex code; the editor offers a palette, a hex field and the system picker. */
 export function colorColumnType(options: ColorCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'color' },
 		renderer: { kind: 'dom', renderer: createColorRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createColorEditor(options) },
 		valueFormatter: ({ value }) => normalizeHexColor(value)?.toUpperCase() ?? '',
@@ -153,6 +157,7 @@ export function colorColumnType(options: ColorCellOptions = {}): ColumnTypeDefin
 /** Notes and descriptions: a clamped preview, edited in a textarea popover (Ctrl / ⌘ + Enter saves). */
 export function longTextColumnType(options: LongTextCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'longText' },
 		renderer: { kind: 'dom', renderer: createLongTextRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createLongTextEditor(options) },
 	};
@@ -161,6 +166,7 @@ export function longTextColumnType(options: LongTextCellOptions = {}): ColumnTyp
 /** A start and end date: “Mar 4 – 18, 2026”, picked on a two-month calendar with presets. */
 export function dateRangeColumnType(options: DateRangeCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'dateRange' },
 		renderer: { kind: 'dom', renderer: createDateRangeRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createDateRangeEditor(options) },
 		valueFormatter: ({ value }) => {
@@ -177,6 +183,7 @@ export function dateRangeColumnType(options: DateRangeCellOptions = {}): ColumnT
  */
 export function timelineColumnType(options: TimelineCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'dateRange' },
 		renderer: { kind: 'dom', renderer: createTimelineRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createDateRangeEditor({ locale: options.locale }) },
 		valueFormatter: ({ value }) => {
@@ -194,6 +201,7 @@ export function timelineColumnType(options: TimelineCellOptions = {}): ColumnTyp
 export function cascadeColumnType(options: CascadeCellOptions): ColumnTypeDefinition<any> {
 	const store = createCascadeStore(options);
 	return {
+		schema: { kind: 'path' },
 		renderer: { kind: 'dom', renderer: createCascadeRenderer(store) },
 		cellEditor: { kind: 'dom', editor: createCascadeEditor(store) },
 		valueFormatter: ({ value }) => {
@@ -212,6 +220,7 @@ export function cascadeColumnType(options: CascadeCellOptions): ColumnTypeDefini
 /** A small chart of the cell's numbers: line, area, bar or win / loss. Display only. */
 export function sparklineColumnType(options: SparklineCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'sparkline' },
 		renderer: { kind: 'dom', renderer: createSparklineRenderer(options) },
 		valueFormatter: ({ value }) => parseSparklineValues(value).join(', '),
 		filterDef: { type: 'none' },
@@ -220,6 +229,7 @@ export function sparklineColumnType(options: SparklineCellOptions = {}): ColumnT
 
 export function numberColumnType(options: NumberCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: options.format === 'currency' ? 'currency' : options.format === 'percent' ? 'percent' : 'number', number: options },
 		renderer: { kind: 'dom', renderer: createNumberRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor(options) },
 		valueFormatter: ({ value }) => formatCellNumber(value, options) ?? '',
@@ -238,6 +248,7 @@ export function percentColumnType(options: NumberCellOptions = {}): ColumnTypeDe
 
 export function dateColumnType(options: DateCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: options.withTime ? 'datetime' : 'date' },
 		renderer: { kind: 'dom', renderer: createDateRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createDateEditor(options) },
 		valueFormatter: ({ value }) => formatCellDate(value, options) ?? '',
@@ -260,6 +271,7 @@ export function selectColumnType(
 ): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, config);
 	return {
+		schema: { kind: 'select', options: store },
 		renderer: { kind: 'dom', renderer: createSelectRenderer(store, config) },
 		cellEditor: { kind: 'dom', editor: createSelectEditor(store, config) },
 		valueFormatter: ({ value }) => (value == null ? '' : labelOf(store, String(value))),
@@ -286,6 +298,7 @@ export function multiSelectColumnType(
 ): ColumnTypeDefinition<any> {
 	const store = optionsStoreFor(input, config);
 	return {
+		schema: { kind: config.creatable ? 'tags' : 'multiSelect', options: store, multiple: true },
 		renderer: { kind: 'dom', renderer: createMultiSelectRenderer(store, config) },
 		cellEditor: { kind: 'dom', editor: createMultiSelectEditor(store, config) },
 		valueFormatter: ({ value }) =>
@@ -314,6 +327,7 @@ export function linkedRecordColumnType(input: readonly CellOptionInput[], config
 	const multiple = config.multiple ?? true;
 	const editorConfig: SelectEditorOptions = { searchable: true, searchPlaceholder: 'Find a record\u2026', ...config, variant: 'record' };
 	return {
+		schema: { kind: 'linkedRecord', options: store, multiple },
 		renderer: {
 			kind: 'dom',
 			renderer: createMultiSelectRenderer(store, {
@@ -341,6 +355,7 @@ export function tagsColumnType(
 
 export function ratingColumnType(options: RatingCellOptions = {}): ColumnTypeDefinition<any> {
 	return {
+		schema: { kind: 'rating', max: options.max ?? 5 },
 		renderer: { kind: 'dom', renderer: createRatingRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor({ min: 0, max: options.max ?? 5, step: 1, decimals: 0 }) },
 		filterDef: { type: 'number', stars: options.max ?? 5, min: 0, max: options.max ?? 5, step: 1 },
@@ -350,6 +365,7 @@ export function ratingColumnType(options: RatingCellOptions = {}): ColumnTypeDef
 export function progressColumnType(options: ProgressCellOptions = {}): ColumnTypeDefinition<any> {
 	const max = options.max ?? 100;
 	return {
+		schema: { kind: 'progress', max },
 		renderer: { kind: 'dom', renderer: createProgressRenderer(options) },
 		cellEditor: { kind: 'dom', editor: createNumberEditor({ min: 0, max, step: max / 20 }) },
 		// A 0–1 bar reads as a percent; its filter takes percents too.
@@ -358,11 +374,11 @@ export function progressColumnType(options: ProgressCellOptions = {}): ColumnTyp
 }
 
 export function urlColumnType(options: Omit<LinkCellOptions, 'kind'> = {}): ColumnTypeDefinition<any> {
-	return { renderer: { kind: 'dom', renderer: createLinkRenderer({ ...options, kind: 'url' }) } };
+	return { schema: { kind: 'url' }, renderer: { kind: 'dom', renderer: createLinkRenderer({ ...options, kind: 'url' }) } };
 }
 
 export function emailColumnType(options: Omit<LinkCellOptions, 'kind'> = {}): ColumnTypeDefinition<any> {
-	return { renderer: { kind: 'dom', renderer: createLinkRenderer({ ...options, kind: 'email' }) } };
+	return { schema: { kind: 'email' }, renderer: { kind: 'dom', renderer: createLinkRenderer({ ...options, kind: 'email' }) } };
 }
 
 /**
@@ -375,6 +391,7 @@ export function personColumnType(
 	const store = createCellOptionsStore(config.people ?? [], config);
 	const editable = store.options.length > 0 || !!store.fetch;
 	return {
+		schema: { kind: 'person', options: store, multiple: !!config.multiple },
 		renderer: { kind: 'dom', renderer: createPersonRenderer({ ...config, people: store }) },
 		cellEditor: editable ? { kind: 'dom', editor: createPersonEditor(store, config) } : undefined,
 		valueFormatter: ({ value }) =>

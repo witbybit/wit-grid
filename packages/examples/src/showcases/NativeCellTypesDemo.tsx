@@ -414,18 +414,33 @@ const STYLE_RULES: StyleRule<TaskRow>[] = [
 	{ kind: 'iconSet', field: 'velocity', icons: 'arrows' },
 ];
 
-// The same rows, other ways: cards and a calendar over the plan (filters and sort apply).
+// The same rows, other ways: cards, a calendar, a board and a schedule (filters and sort apply).
 const statusColour = (row: TaskRow) => STATUS.find((s) => s.value === row?.status)?.color;
+// Every view reads the same record roles: what the task's title, status, owner and schedule are.
+const ROLES = {
+	title: 'task',
+	status: 'status',
+	owner: 'owner',
+	priority: 'priority',
+	progress: 'progress',
+	value: 'budget',
+	schedule: 'schedule',
+	due: 'due',
+};
 const VIEWS: Record<NativeCellTypesView, GridViewConfig<TaskRow> | null> = {
 	table: null,
-	gallery: { kind: 'gallery', titleField: 'task', fields: ['status', 'priority', 'owner', 'progress', 'budget'], color: statusColour },
+	gallery: { kind: 'gallery', records: ROLES, fields: ['priority', 'owner'], color: statusColour },
 	// Placed by the due date: one day per task keeps the month readable (range fields span their days).
-	calendar: { kind: 'calendar', dateField: 'due', titleField: 'task', fields: ['status', 'priority', 'owner'], color: statusColour },
+	calendar: { kind: 'calendar', records: { ...ROLES, schedule: 'due' }, color: statusColour },
+	kanban: { kind: 'kanban', records: ROLES, color: statusColour },
+	gantt: { kind: 'gantt', records: ROLES, initialDate: '2026-09-01', color: statusColour },
 };
 const VIEW_CHOICES = [
 	{ id: 'table', label: 'Table', icon: Table2 },
 	{ id: 'gallery', label: 'Gallery', icon: LayoutGrid },
 	{ id: 'calendar', label: 'Calendar', icon: CalendarDays },
+	{ id: 'kanban', label: 'Kanban', icon: Box },
+	{ id: 'gantt', label: 'Gantt', icon: CalendarDays },
 ] as const;
 
 // What simulated teammates change, and how: each edit goes through the normal API.
@@ -529,12 +544,12 @@ interface NativeCellTypesDemoProps {
 	 * grid follows this prop. Without it the demo keeps its own picker, starting on `'dark'`.
 	 */
 	theme?: BuiltInThemeName;
-	/** The view, when the host picks it (the docs hero): table, gallery or calendar. */
+	/** The view, when the host picks it (the docs hero). */
 	view?: NativeCellTypesView;
 	onViewChange?: (view: NativeCellTypesView) => void;
 }
 
-export type NativeCellTypesView = 'table' | 'gallery' | 'calendar';
+export type NativeCellTypesView = 'table' | 'gallery' | 'calendar' | 'kanban' | 'gantt';
 
 // The grid's own sidebar: columns, the same filter editors as the header funnel, sort and the query builder.
 // A custom panel of our own beside the built-in ones: the guide for whichever view is showing.

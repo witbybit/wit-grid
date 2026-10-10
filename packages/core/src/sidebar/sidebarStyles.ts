@@ -3,6 +3,9 @@ export const SIDEBAR_STYLES = `
 .og-shell { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .og-shell[data-og-sidebar='left'] { flex-direction: row-reverse; }
 .og-shell-grid { flex: 1 1 auto; min-width: 0; height: 100%; position: relative; }
+/* The record workspace wraps the grid (its bar, stage and inspector load into it). */
+.og-ws-root { flex: 1 1 auto; min-width: 0; height: 100%; position: relative; display: flex; flex-direction: column; }
+.og-ws-root > .og-shell-grid { flex: 1 1 auto; min-height: 0; }
 
 .og-sb {
   --og-sb-accent: var(--og-focus-ring);

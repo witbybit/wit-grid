@@ -119,6 +119,12 @@ export default function ShowroomLeftSidebar({ activePage, leftSidebarCollapsed, 
 			icon: PanelRight,
 		},
 		{
+			id: 'workspace',
+			label: 'Record Workspace',
+			subtitle: 'Table · Kanban · Gantt · Gallery',
+			icon: LayoutDashboard,
+		},
+		{
 			id: 'native',
 			label: 'Native Cell Types',
 			subtitle: 'Checkbox · Tags · Date · More',

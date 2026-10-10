@@ -13,6 +13,7 @@
 		"./data-integrity": "./src/showcases/DataIntegrityLab.tsx",
 		"./infinite-server-scroll": "./src/showcases/InfiniteServerScroll.tsx",
 		"./native-cell-types": "./src/showcases/NativeCellTypesDemo.tsx",
+		"./record-workspace": "./src/showcases/RecordWorkspaceDemo.tsx",
 		"./grouping-sticky": "./src/showcases/GroupingStickyDemo.tsx",
 		"./row-drag": "./src/showcases/RowDragDemo.tsx",
 		"./realtime-dashboard": "./src/showcases/RealtimeDashboard.tsx",

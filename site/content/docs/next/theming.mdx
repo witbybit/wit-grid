@@ -158,11 +158,10 @@ Use `glass: true` for the same treatment with palette-derived defaults, or selec
 `glass-dark` and `glass-light` themes. Users who request reduced transparency automatically receive solid
 surfaces instead.
 
-<Callout title="Performance" type="warn">
-	`backdrop-filter` is most expensive on persistent surfaces that repaint while content moves behind them.
-	Glass is therefore off by default. Menus and editors are low-cost; headers and pinned rows can add work during
-	scroll. Measure scrolling on your largest supported grid and reduce `blur` or disable `glass` if it affects
-	your frame budget.
+<Callout title='Performance' type='warn'>
+	`backdrop-filter` is most expensive on persistent surfaces that repaint while content moves behind them. Glass is therefore off by default. Menus
+	and editors are low-cost; headers and pinned rows can add work during scroll. Measure scrolling on your largest supported grid and reduce `blur`
+	or disable `glass` if it affects your frame budget.
 </Callout>
 
 Apply it declaratively (atomic, no flicker) or imperatively:

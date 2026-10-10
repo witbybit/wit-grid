@@ -895,6 +895,8 @@ export class GridEngine<TRowData = unknown> {
 		const execution = this.changeApplier.commitDetailed({
 			reason: hasRows && cells.length > 0 ? 'data:transaction' : hasRows ? 'rows:apply-transaction' : 'data:batch-cell-values',
 			domainMutations,
+			// A collaborator's change is not this user's to undo.
+			historyPolicy: transaction.origin === 'remote' ? 'suppress' : undefined,
 		});
 		this.scheduleAutoValidationForCommittedWrites(this.collectCommittedWriteCells(execution.appliedMutations), source);
 
@@ -1773,6 +1775,8 @@ export interface GridEngineTransaction<TRowData> {
 	rows?: RowDataTransaction<TRowData>;
 	cells?: readonly GridCellWrite[];
 	source?: 'api' | 'paste' | 'fill';
+	/** `remote`: a collaborator's change, kept out of the undo history. */
+	origin?: 'local' | 'remote';
 	/** Grid state (columns, sort, filter, pins) applied in the same batch, before the data commit. */
 	applyState?: () => void;
 }

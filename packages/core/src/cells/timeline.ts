@@ -93,11 +93,14 @@ class TimelineScale {
 	private scheduleMidnight(): void {
 		const now = new Date();
 		const next = addDays(startOfDay(now), 1);
-		this.midnight = this.scheduler.timeout(() => {
-			this.midnight = null;
-			this.rebuild();
-			if (this.cells.size > 0) this.scheduleMidnight();
-		}, next.getTime() - now.getTime() + 1000);
+		this.midnight = this.scheduler.timeout(
+			() => {
+				this.midnight = null;
+				this.rebuild();
+				if (this.cells.size > 0) this.scheduleMidnight();
+			},
+			next.getTime() - now.getTime() + 1000
+		);
 	}
 
 	private rebuild(): void {

@@ -9,6 +9,7 @@ import type { GridRowDataRef } from './publicRowRef.js';
 import type { GridApi as PublicGridApi } from './api/GridApiSurfaces.js';
 import type { TotalVisualRow } from './visualRow.js';
 import type { ColumnFilterDef } from './filters/filterDef.js';
+import type { ColumnSchema } from './cells/fieldSchema.js';
 
 // ─── Value getter / setter / validator params ─────────────────────────────────
 
@@ -335,6 +336,11 @@ export interface ColumnDef<TRowData = unknown> {
 	width?: number;
 	/** Named column type registered via `columnTypes` on the grid options. Resolved in the React layer. */
 	type?: string;
+	/**
+	 * What the column's values are: kind, options and their colours. Column types set it; record
+	 * surfaces (inspector, board columns, schedule bars, bulk edit) read it instead of being configured.
+	 */
+	schema?: ColumnSchema;
 	hide?: boolean;
 	loading?: boolean;
 	valueGetter?: (params: ValueGetterParams<TRowData>) => unknown;

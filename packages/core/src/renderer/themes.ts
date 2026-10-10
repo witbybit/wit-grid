@@ -233,9 +233,9 @@ export function createTheme(p: ThemePalette): ThemeTokens {
 		? {
 				blur: p.glass === true ? '24px' : (p.glass.blur ?? '24px'),
 				saturation: p.glass === true ? '160%' : (p.glass.saturation ?? '160%'),
-			tint: p.glass === true ? alpha(p.raised, dark ? 0.46 : 0.58) : (p.glass.tint ?? alpha(p.raised, dark ? 0.46 : 0.58)),
-			headerTint: p.glass === true ? alpha(p.surface, dark ? 0.42 : 0.54) : (p.glass.headerTint ?? alpha(p.surface, dark ? 0.42 : 0.54)),
-			pinnedTint: p.glass === true ? alpha(p.surface, dark ? 0.52 : 0.62) : (p.glass.pinnedTint ?? alpha(p.surface, dark ? 0.52 : 0.62)),
+				tint: p.glass === true ? alpha(p.raised, dark ? 0.46 : 0.58) : (p.glass.tint ?? alpha(p.raised, dark ? 0.46 : 0.58)),
+				headerTint: p.glass === true ? alpha(p.surface, dark ? 0.42 : 0.54) : (p.glass.headerTint ?? alpha(p.surface, dark ? 0.42 : 0.54)),
+				pinnedTint: p.glass === true ? alpha(p.surface, dark ? 0.52 : 0.62) : (p.glass.pinnedTint ?? alpha(p.surface, dark ? 0.52 : 0.62)),
 			}
 		: undefined;
 	return {
