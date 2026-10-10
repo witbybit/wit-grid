@@ -113,7 +113,9 @@ export class ViewportRenderer<TRowData = unknown> {
 		this.mountPresence();
 		this.mountMinimap();
 		// Views draw over the table in the view layer, unless the host mounted a workspace around it.
+		// The layer covers the table, so it stays hidden until a view shows in it (never, with an external workspace).
 		const viewLayer = this.layers.get('view');
+		if (viewLayer) viewLayer.hidden = true;
 		if (viewLayer && !this.externalWorkspace) this.viewHost = new WorkspaceMount(this.engine, viewLayer, null, {});
 	}
 

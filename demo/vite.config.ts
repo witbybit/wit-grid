@@ -30,6 +30,7 @@ export default defineConfig({
 		dedupe: ['react', 'react-dom'],
 	},
 	server: {
-		port: 5173,
+		// Tools that assign a port (preview runners) pass PORT; otherwise the usual 5173.
+		port: Number(process.env.PORT) || 5173,
 	},
 });

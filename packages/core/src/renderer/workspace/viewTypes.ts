@@ -6,6 +6,7 @@ import type { RecordReader, RecordRow } from '../../records/recordModel.js';
 import type { GridViewConfig, GridWorkspaceOptions, RecordCounts } from '../../views.js';
 import type { WorkspaceIconName } from './icons.js';
 import type { MenuItem } from './ui.js';
+import type { RecordMotion } from './motion.js';
 
 export interface WriteOutcome {
 	/** Every write was applied. */
@@ -91,6 +92,8 @@ export interface WorkspaceViewContext<TRowData = unknown> {
 	/** A record's accent colour (view `color`, else its status colour). */
 	accent(row: RecordRow<TRowData>): string | undefined;
 
+	/** How records move (the grid's row-animation policy, in two dimensions). */
+	readonly motion: RecordMotion;
 	/** Changes this view's configuration (density, swimlanes, zoom); the view tab keeps it. */
 	updateView(patch: Partial<GridViewConfig<TRowData>>): void;
 	/** Per-view navigation memory (scroll, zoom, collapsed groups), kept across view switches. */
@@ -103,7 +106,51 @@ export interface WorkspaceViewContext<TRowData = unknown> {
 	confirm(dialog: WorkspaceDialog): Promise<'confirm' | 'alternate' | 'cancel'>;
 }
 
+export interface SettingOption {
+	value: string;
+	label: string;
+	/** Palette name or CSS colour shown as a dot. */
+	color?: string;
+}
+
+/** One customizable option of a view, described as data; the settings panel draws and edits it. */
+export type ViewSetting =
+	| { kind: 'select'; id: string; label: string; value: string; options: readonly SettingOption[]; hint?: string; onChange(value: string): void }
+	| { kind: 'segmented'; id: string; label: string; value: string; options: readonly SettingOption[]; onChange(value: string): void }
+	| { kind: 'toggle'; id: string; label: string; value: boolean; hint?: string; onChange(value: boolean): void }
+	| {
+			kind: 'fields';
+			id: string;
+			label: string;
+			value: readonly string[];
+			options: readonly SettingOption[];
+			hint?: string;
+			onChange(value: string[]): void;
+	  }
+	| { kind: 'weekdays'; id: string; label: string; value: readonly number[]; onChange(value: number[]): void }
+	| {
+			kind: 'limits';
+			id: string;
+			label: string;
+			rows: readonly (SettingOption & { limit: number | null; hidden?: boolean })[];
+			hint?: string;
+			onChange(value: string, limit: number | null): void;
+			onToggle?(value: string, visible: boolean): void;
+	  };
+
+export interface ViewSettingsSection {
+	title: string;
+	settings: ViewSetting[];
+}
+
 export interface WorkspaceView {
+	/**
+	 * The view's configuration changed (a setting, a saved view): re-project in place, keeping scroll and
+	 * selection. Without it the host remounts the view.
+	 */
+	update?(config: GridViewConfig<any>): void;
+	/** What the Customize panel offers for this view. */
+	settings?(): ViewSettingsSection[];
 	/** Redraw from the current records (data, filter, sort, selection or size changed). */
 	render(): void;
 	destroy(): void;

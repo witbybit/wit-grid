@@ -7,7 +7,14 @@ import { FieldValue } from '../fieldValue.js';
 import { icon } from '../icons.js';
 import { blockedBadge, countsLine, labelPills, optionPill, personChip, presenceDots } from '../recordParts.js';
 import { button, formatDay, formatNumber, h, hue, pill, progressBar } from '../ui.js';
-import type { WorkspaceCommand, WorkspaceMetric, WorkspaceView, WorkspaceViewContext, WorkspaceViewModule } from '../viewTypes.js';
+import type {
+	ViewSettingsSection,
+	WorkspaceCommand,
+	WorkspaceMetric,
+	WorkspaceView,
+	WorkspaceViewContext,
+	WorkspaceViewModule,
+} from '../viewTypes.js';
 import { addViewStyles } from '../workspaceStyles.js';
 
 type Layout = NonNullable<GalleryViewConfig['layout']>;
@@ -17,7 +24,8 @@ const SECTION_H = 46;
 const OVERSCAN = 500;
 const MIN_WIDTH: Record<Layout, number> = { small: 210, medium: 268, large: 340, compact: 360 };
 const COVER_H: Record<Layout, number> = { small: 84, medium: 112, large: 170, compact: 0 };
-const BODY_H: Record<Layout, number> = { small: 128, medium: 156, large: 168, compact: 132 };
+// Body heights fit their content (title, pills, people, progress, footer) without squeezing it.
+const BODY_H: Record<Layout, number> = { small: 150, medium: 162, large: 176, compact: 136 };
 const LAYOUT_LABEL: Record<Layout, string> = { small: 'Small', medium: 'Medium', large: 'Large', compact: 'Compact rows' };
 
 interface Slot {
@@ -44,9 +52,12 @@ function generatedCover(seed: string, colour: string): string {
 	return `linear-gradient(${angle}deg, color-mix(in srgb, ${colour} 85%, #000) 0%, color-mix(in srgb, ${colour} 55%, hsl(${shift} 70% 50%)) 60%, color-mix(in srgb, ${colour} 40%, #fff) 130%)`;
 }
 
-function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: GalleryViewConfig<T>): WorkspaceView {
+function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, initial: GalleryViewConfig<T>): WorkspaceView {
 	addViewStyles(host.ownerDocument, 'gallery', GALLERY_STYLES);
-	let layout: Layout = context.memory('layout', config.layout ?? 'medium');
+	let config = initial;
+	const motion = context.motion;
+	let layout: Layout = config.layout ?? 'medium';
+	let painted = false;
 	const scroller = h('div', 'og-ws-gallery', { role: 'grid', 'aria-label': 'Gallery' });
 	const canvas = h('div', 'og-ws-gallery-canvas');
 	const empty = h('div', 'og-ws-empty', { hidden: true });
@@ -66,11 +77,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	let frame = 0;
 	let groupField: string | null = null;
 
-	const coverMode = () => {
-		const mode = context.memory<GalleryViewConfig['cover'] | null>('cover', null) ?? config.cover;
-		if (mode) return mode;
-		return reader.roles.cover ? 'image' : 'generated';
-	};
+	const coverMode = () => config.cover ?? (reader.roles.cover ? 'image' : 'generated');
 	const cardHeight = () =>
 		layout === 'compact' ? BODY_H.compact : (coverMode() === 'none' ? 0 : COVER_H[layout]) + BODY_H[layout] + fieldsFor().length * 26;
 	const fieldsFor = () =>
@@ -294,7 +301,6 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			)
 		);
 		el.append(select);
-		el.style.transform = `translateY(${section.y}px)`;
 		return el;
 	};
 
@@ -302,15 +308,21 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		if (collapsedSections.has(key)) collapsedSections.delete(key);
 		else collapsedSections.add(key);
 		context.remember('collapsed', [...collapsedSections]);
-		render();
+		render(true);
 	};
 
-	const paint = () => {
+	/**
+	 * Draws the cards in view. `glide` (data, settings, collapse or a reflow — not a scroll): cards move
+	 * to their new slots, new ones settle in, ones that left the gallery fade out.
+	 */
+	const paint = (glide = false) => {
 		frame = 0;
+		// The width changed (a resize, the inspector opening): reflow, gliding cards to their new columns.
 		if ((scroller.clientWidth || 0) !== projectedWidth && scroller.clientWidth) {
-			render();
+			render(true);
 			return;
 		}
+		let entering = 0;
 		const top = scroller.scrollTop - OVERSCAN;
 		const bottom = scroller.scrollTop + (scroller.clientHeight || 800) + OVERSCAN;
 		const height = cardHeight();
@@ -329,6 +341,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			const slot = slots[i];
 			wanted.add(slot.id);
 			let card = cards.get(slot.id);
+			const fresh = !card;
 			if (!card) {
 				if (slot.add) card = { element: addCard(slot.section), fields: [], version: null };
 				else {
@@ -345,9 +358,10 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				delete card.element.dataset.stale;
 			}
 			const el = card.element;
-			el.style.transform = `translate(${slot.x}px, ${slot.y}px)`;
 			el.style.width = `${cardWidth}px`;
 			el.style.height = `${height}px`;
+			motion.place(el, slot.x, slot.y, glide);
+			if (fresh && glide && painted) motion.enter(el, Math.min(entering++, 12) * 18);
 			if (slot.row) {
 				el.toggleAttribute('data-selected', selected.has(slot.id));
 				el.toggleAttribute('data-focused', focused === slot.id);
@@ -359,28 +373,42 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		for (const [id, card] of cards)
 			if (!wanted.has(id) && !card.element.contains(document.activeElement)) {
 				card.fields.forEach((field) => field.destroy());
-				card.element.remove();
 				cards.delete(id);
+				// Gone from the gallery (filtered, deleted, collapsed away): fade. Scrolled away: just go.
+				if (glide && !slotById.has(id)) motion.leave(card.element);
+				else {
+					motion.forget(card.element);
+					card.element.remove();
+				}
 			}
 		const wantedSections = new Set<string>();
 		for (const section of sections) {
 			if (section.y > bottom || section.y + SECTION_H < top) continue;
 			wantedSections.add(section.group.key);
-			const existing = headers.get(section.group.key);
-			if (existing && !existing.dataset.stale) continue;
-			existing?.remove();
-			const el = sectionHeader(section);
-			headers.set(section.group.key, el);
-			canvas.append(el);
+			let el = headers.get(section.group.key);
+			if (!el || el.dataset.stale) {
+				const next = sectionHeader(section);
+				if (el) {
+					el.replaceChildren(...next.childNodes);
+					delete el.dataset.stale;
+				} else {
+					el = next;
+					headers.set(section.group.key, el);
+					canvas.append(el);
+				}
+			}
+			motion.place(el, 0, section.y, glide);
 		}
 		for (const [key, el] of headers)
 			if (!wantedSections.has(key)) {
-				el.remove();
 				headers.delete(key);
+				motion.forget(el);
+				el.remove();
 			}
+		painted = true;
 	};
 
-	const render = () => {
+	const render = (glide = false) => {
 		project();
 		const nothing = order.length === 0;
 		empty.hidden = !nothing;
@@ -397,34 +425,117 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		}
 		for (const card of cards.values()) card.element.dataset.stale = '1';
 		for (const el of headers.values()) el.dataset.stale = '1';
-		paint();
+		paint(glide && painted);
 	};
 
 	scroller.addEventListener(
 		'scroll',
 		() => {
 			context.remember('scroll', scroller.scrollTop);
-			if (!frame) frame = defaultGridScheduler.raf(paint);
+			if (!frame) frame = defaultGridScheduler.raf(() => paint(false));
 		},
 		{ passive: true }
 	);
 
-	const setLayout = (next: Layout) => {
-		layout = next;
-		context.remember('layout', layout);
-		for (const card of cards.values()) {
-			card.fields.forEach((field) => field.destroy());
-			card.element.remove();
-		}
-		cards.clear();
-		render();
-		refreshTools();
-	};
-	const setCover = (next: NonNullable<GalleryViewConfig['cover']>) => {
-		context.remember('cover', next);
-		for (const card of cards.values()) card.element.dataset.stale = '1';
-		render();
-		refreshTools();
+	// Layout and cover are the view's configuration: saved with it, changed in place.
+	const setLayout = (next: Layout) => context.updateView({ layout: next });
+	const setCover = (next: NonNullable<GalleryViewConfig['cover']>) => context.updateView({ cover: next });
+
+	const settings = (): ViewSettingsSection[] => {
+		const groupFields = context
+			.columns()
+			.filter((col) => col.schema && ['select', 'person', 'checkbox', 'tags', 'multiSelect'].includes(col.schema.kind));
+		const numberFields = context
+			.columns()
+			.filter((col) => col.schema && ['number', 'currency', 'percent', 'progress', 'rating'].includes(col.schema.kind));
+		const aggregate = config.aggregate
+			? `${config.aggregate.fn}:${config.aggregate.field ?? ''}`
+			: reader.roles.value
+				? `sum:${reader.roles.value}`
+				: 'count:';
+		return [
+			{
+				title: 'Cards',
+				settings: [
+					{
+						kind: 'segmented',
+						id: 'layout',
+						label: 'Size',
+						value: layout,
+						options: (['small', 'medium', 'large', 'compact'] as Layout[]).map((value) => ({
+							value,
+							label: value === 'compact' ? 'Rows' : LAYOUT_LABEL[value],
+						})),
+						onChange: (value) => setLayout(value as Layout),
+					},
+					{
+						kind: 'segmented',
+						id: 'cover',
+						label: 'Cover',
+						value: coverMode(),
+						options: [
+							...(reader.roles.cover ? [{ value: 'image', label: 'Image' }] : []),
+							{ value: 'generated', label: 'Generated' },
+							{ value: 'none', label: 'None' },
+						],
+						onChange: (value) => setCover(value as 'image'),
+					},
+					{
+						kind: 'toggle',
+						id: 'coverFit',
+						label: 'Show the whole image',
+						hint: 'Fit covers inside the card instead of filling it.',
+						value: config.coverFit === 'contain',
+						onChange: (value) => context.updateView({ coverFit: value ? 'contain' : 'cover' }),
+					},
+					{
+						kind: 'fields',
+						id: 'fields',
+						label: 'Extra fields',
+						hint: 'Up to three on medium and large cards, one on small.',
+						value: config.fields ?? [],
+						options: context
+							.columns()
+							.filter((col) => !Object.values(reader.roles).includes(col.field))
+							.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+						onChange: (value) => context.updateView({ fields: value }),
+					},
+				],
+			},
+			{
+				title: 'Sections',
+				settings: [
+					{
+						kind: 'select',
+						id: 'groupBy',
+						label: 'Group by',
+						value: groupField ?? '',
+						options: [
+							{ value: '', label: 'No sections' },
+							...groupFields.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+						],
+						onChange: (value) => context.updateView({ groupBy: value || null }),
+					},
+					{
+						kind: 'select',
+						id: 'aggregate',
+						label: 'Section total',
+						value: aggregate,
+						options: [
+							{ value: 'count:', label: 'Card count' },
+							...numberFields.flatMap((col) => [
+								{ value: `sum:${col.field}`, label: `Sum of ${col.header ?? col.field}` },
+								{ value: `avg:${col.field}`, label: `Average ${col.header ?? col.field}` },
+							]),
+						],
+						onChange: (value) => {
+							const [fn, field] = value.split(':');
+							context.updateView({ aggregate: fn === 'count' ? { fn: 'count' } : { fn: fn as 'sum', field } });
+						},
+					},
+				],
+			},
+		];
 	};
 
 	let layoutButton: HTMLButtonElement | null = null;
@@ -484,7 +595,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			run: () => {
 				sections.forEach((section) => collapsedSections.add(section.group.key));
 				context.remember('collapsed', [...collapsedSections]);
-				render();
+				render(true);
 			},
 		},
 		{
@@ -496,7 +607,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			run: () => {
 				collapsedSections.clear();
 				context.remember('collapsed', []);
-				render();
+				render(true);
 			},
 		},
 	];
@@ -504,13 +615,22 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	let restored = false;
 	return {
 		render() {
-			render();
+			render(restored);
 			if (!restored) {
 				restored = true;
 				scroller.scrollTop = context.memory('scroll', 0);
-				paint();
+				paint(false);
 			}
 		},
+		update(next) {
+			config = next as GalleryViewConfig<T>;
+			layout = config.layout ?? 'medium';
+			// Every card redraws in its new shape and glides to its new slot.
+			for (const card of cards.values()) card.element.dataset.stale = '1';
+			render(true);
+			refreshTools();
+		},
+		settings,
 		order: () => order,
 		reveal(id) {
 			let slot = slotById.get(id);
@@ -519,7 +639,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				const key = row && groupField ? (reader.values(row, groupField)[0] ?? '') : '*';
 				if (!collapsedSections.delete(key)) return null;
 				context.remember('collapsed', [...collapsedSections]);
-				render();
+				render(true);
 				slot = slotById.get(id);
 				if (!slot) return null;
 			}
@@ -577,6 +697,7 @@ const GALLERY_STYLES = `
 .og-ws-gallery-body .og-ws-card-check { position: static; }
 .og-ws-gallery-card:hover .og-ws-card-check, .og-ws-gallery-card[data-selected] .og-ws-card-check, .og-ws-card-check:focus-visible { opacity: 1; }
 .og-ws-gallery-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 11px 13px 11px; }
+.og-ws-gallery-body > * { flex-shrink: 0; }
 .og-ws-gallery-head { display: flex; align-items: center; gap: 8px; }
 .og-ws-gallery-due { display: inline-flex; align-items: center; gap: 6px; }
 .og-ws-gallery-due > span:last-child { display: flex; flex-direction: column; line-height: 1.15; font-size: 11.5px; }

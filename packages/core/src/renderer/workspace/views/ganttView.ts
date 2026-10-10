@@ -13,13 +13,23 @@ import { icon } from '../icons.js';
 import { optionPill, personChip } from '../recordParts.js';
 import { dependencyWrite, progressWrite, spanWrites } from '../recordWrites.js';
 import { avatar, button, formatDay, h, hue, progressBar } from '../ui.js';
-import type { InspectorTab, WorkspaceCommand, WorkspaceMetric, WorkspaceView, WorkspaceViewContext, WorkspaceViewModule } from '../viewTypes.js';
+import type {
+	InspectorTab,
+	WorkspaceCommand,
+	WorkspaceMetric,
+	WorkspaceView,
+	WorkspaceViewContext,
+	WorkspaceViewModule,
+	ViewSettingsSection,
+} from '../viewTypes.js';
 import { addViewStyles } from '../workspaceStyles.js';
 
 const HEAD_H = 54;
 const OVERSCAN_ROWS = 8;
 const PAD_DAYS: Record<TimeZoom, number> = { day: 7, week: 21, month: 60, quarter: 120, year: 240 };
 const ZOOM_LABEL: Record<TimeZoom, string> = { day: 'Days', week: 'Weeks', month: 'Months', quarter: 'Quarters', year: 'Years' };
+/** Toolbar toggle keys to their configuration fields. */
+const CONFIG_KEY = { deps: 'dependencies', baseline: 'baseline', critical: 'criticalPath', workload: 'workload' } as const;
 const SVG = 'http://www.w3.org/2000/svg';
 
 type DragMode = 'move' | 'start' | 'end' | 'progress' | 'link';
@@ -37,20 +47,27 @@ interface Drag {
 	line?: SVGPathElement;
 }
 
-function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: GanttViewConfig<T>): WorkspaceView {
+function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, initial: GanttViewConfig<T>): WorkspaceView {
 	addViewStyles(host.ownerDocument, 'gantt', GANTT_STYLES);
-	const rowH = Math.max(28, Math.floor(config.rowHeight ?? 36));
-	const calendar = new WorkCalendar(config.calendar);
-	let zoom: TimeZoom = context.memory('zoom', config.zoom ?? 'week');
+	let config = initial;
+	const motion = context.motion;
+	let rowH = Math.max(28, Math.floor(config.rowHeight ?? 36));
+	let calendar = new WorkCalendar(config.calendar);
+	let zoom: TimeZoom = config.zoom ?? 'week';
+	let painted = false;
+	/** A day to centre on once the next render has laid out the new scale (zoom, fit). */
+	let pendingCenter: Day | null = null;
+	/** Layers, zoom, scheduling: the view's configuration (saved with it, changed in place). */
+	const configure = (patch: Partial<GanttViewConfig<T>>) => context.updateView(patch);
 	// The outline's width: the user's (kept across switches), else the config's, else a share of the view.
 	let paneWidth: number =
 		context.memory<number | null>('paneWidth', null) ??
 		Math.round(Math.min(config.taskPaneWidth ?? 470, Math.max(260, (host.clientWidth || 1200) * 0.42)));
-	let showDeps: boolean = context.memory('deps', config.dependencies ?? true);
-	let showBaseline: boolean = context.memory('baseline', config.baseline ?? true);
-	let showCritical: boolean = context.memory('critical', config.criticalPath ?? false);
-	let showWorkload: boolean = context.memory('workload', false);
-	let mode: 'off' | 'push' | 'tight' = context.memory('autoSchedule', config.autoSchedule ?? 'push');
+	let showDeps = config.dependencies ?? true;
+	let showBaseline = config.baseline ?? true;
+	let showCritical = config.criticalPath ?? false;
+	let showWorkload = config.workload ?? false;
+	let mode: 'off' | 'push' | 'tight' = config.autoSchedule ?? 'push';
 	const collapsed = new Set<string>(context.memory<string[]>('collapsed', []));
 
 	const root = h('div', 'og-ws-gantt');
@@ -224,6 +241,9 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				);
 				el.style.transform = `translateX(${tick.x}px)`;
 				el.style.width = `${tick.width}px`;
+				// The period under the left edge keeps its label in view (it slides out with the period).
+				const hidden = scroller.scrollLeft - tick.x;
+				if (hidden > 0) el.style.paddingLeft = `${8 + Math.min(hidden, Math.max(0, tick.width - 130))}px`;
 				return el;
 			})
 		);
@@ -346,7 +366,6 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		element.setAttribute('aria-label', label);
 		element.title = label;
 		if (task.milestone) {
-			element.style.transform = `translateX(${x + timeScale.dayWidth / 2 - 9}px)`;
 			element.style.width = '18px';
 			element.append(
 				h('span', 'og-ws-gantt-diamond'),
@@ -362,7 +381,6 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				element.append(h('span', 'og-ws-gantt-handle og-ws-gantt-link-handle', { 'data-handle': 'link', title: 'Drag to link a successor' }));
 			return;
 		}
-		element.style.transform = `translateX(${x}px)`;
 		element.style.width = `${width}px`;
 		const fill = h('span', 'og-ws-gantt-fill');
 		fill.style.width = `${task.progress * 100}%`;
@@ -399,8 +417,16 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	};
 
 	const baselineEls = new Map<string, HTMLElement>();
-	const paintRows = () => {
+	/** Where a task's bar starts (milestones centre their diamond on the day). */
+	const barX = (task: ScheduleTask<T>) =>
+		task.span ? (task.milestone ? timeScale.x(task.span.start) + timeScale.dayWidth / 2 - 9 : timeScale.x(task.span.start)) : 0;
+	/**
+	 * Draws the rows in view. `glide` (data, collapse, settings — not scroll or zoom): rows slide to their
+	 * new place in the outline and bars to their new dates, so a reschedule is seen happening.
+	 */
+	const paintRows = (glide = false) => {
 		frame = 0;
+		let entering = 0;
 		const { first, last } = visibleRange();
 		const selected = context.selected();
 		const focused = context.focused();
@@ -411,6 +437,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			wanted.add(task.id);
 			const top = i * rowH;
 			let outlineRow = outlineRows.get(task.id);
+			const fresh = !outlineRow;
 			if (!outlineRow) {
 				const fields: FieldValue<T>[] = [];
 				outlineRow = { element: buildOutlineRow(task, fields), fields, version: task.row.data };
@@ -421,7 +448,8 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				outlineRow.version = task.row.data;
 				delete outlineRow.element.dataset.stale;
 			}
-			outlineRow.element.style.transform = `translateY(${top}px)`;
+			motion.place(outlineRow.element, 0, top, glide);
+			if (fresh && glide && painted) motion.enter(outlineRow.element, Math.min(entering++, 12) * 16);
 			outlineRow.element.toggleAttribute('data-selected', selected.has(task.id));
 			outlineRow.element.toggleAttribute('data-focused', focused === task.id);
 			outlineRow.element.tabIndex = focused === task.id ? 0 : -1;
@@ -437,7 +465,9 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				bar.version = task.row.data;
 				delete bar.element.dataset.stale;
 			}
-			bar.element.style.top = `${top}px`;
+			bar.element.dataset.top = String(top);
+			motion.place(bar.element, barX(task), top, glide);
+			if (fresh && glide && painted) motion.enter(bar.element, Math.min(entering, 12) * 16);
 			bar.element.toggleAttribute('data-selected', selected.has(task.id));
 			// Baseline beneath the bar.
 			const baseline = showBaseline && task.baseline && task.span ? task.baseline : null;
@@ -449,8 +479,8 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					bars.prepend(baseEl);
 				}
 				const { x, width } = barGeometry(baseline);
-				baseEl.style.transform = `translate(${x}px, ${top + rowH - 9}px)`;
 				baseEl.style.width = `${width}px`;
+				motion.place(baseEl, x, top + rowH - 9, glide);
 				const variance = model.variance(task.id) ?? 0;
 				baseEl.toggleAttribute('data-late', variance > 0);
 				baseEl.title = `Baseline ${formatDay(fromDay(baseline.start))} – ${formatDay(fromDay(baseline.end))}${variance ? ` · ${variance > 0 ? '+' : ''}${variance}d` : ''}`;
@@ -462,13 +492,22 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		for (const [id, entry] of outlineRows)
 			if (!wanted.has(id) && !entry.element.contains(document.activeElement)) {
 				entry.fields.forEach((field) => field.destroy());
-				entry.element.remove();
 				outlineRows.delete(id);
+				// Collapsed away or filtered out: fade. Scrolled away: just go.
+				if (glide && !indexById.has(id)) motion.leave(entry.element);
+				else {
+					motion.forget(entry.element);
+					entry.element.remove();
+				}
 			}
 		for (const [id, entry] of barEls)
 			if (!wanted.has(id) && drag?.task.id !== id) {
-				entry.element.remove();
 				barEls.delete(id);
+				if (glide && !indexById.has(id)) motion.leave(entry.element);
+				else {
+					motion.forget(entry.element);
+					entry.element.remove();
+				}
 			}
 		for (const [id, element] of baselineEls)
 			if (!wanted.has(id)) {
@@ -488,6 +527,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		paintScale();
 		paintWorkload();
 		paintMinimapWindow();
+		painted = true;
 	};
 
 	const WL_ROW = 30;
@@ -665,7 +705,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		if (!frame) frame = defaultGridScheduler.raf(paintRows);
 	};
 
-	const render = () => {
+	const render = (glide = false) => {
 		if (drag) return;
 		project();
 		const scheduled = reader.roles.schedule || reader.roles.start || reader.roles.due;
@@ -684,14 +724,14 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		for (const entry of barEls.values()) entry.element.dataset.stale = '1';
 		layoutFrame();
 		paintMinimap();
-		paintRows();
+		paintRows(glide && painted);
 	};
 
 	const toggleTask = (id: string) => {
 		if (collapsed.has(id)) collapsed.delete(id);
 		else collapsed.add(id);
 		context.remember('collapsed', [...collapsed]);
-		render();
+		render(true);
 	};
 
 	const canSchedule = (row: RecordRow<T>) => {
@@ -712,12 +752,8 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 
 	const setZoom = (next: TimeZoom) => {
 		if (next === zoom) return;
-		const center = centerDay();
-		zoom = next;
-		context.remember('zoom', zoom);
-		render();
-		scrollToDay(center);
-		toolbarRefresh();
+		pendingCenter = centerDay();
+		configure({ zoom: next });
 	};
 
 	const fit = () => {
@@ -726,12 +762,11 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		const visible = Math.max(200, scroller.clientWidth - paneWidth - 40);
 		const days = extent.end - extent.start + 1;
 		const best = TIME_ZOOMS.find((candidate) => days * ZOOM_DAY_WIDTH[candidate] <= visible) ?? 'year';
-		const center = Math.round((extent.start + extent.end) / 2);
-		zoom = best;
-		context.remember('zoom', zoom);
-		render();
-		scrollToDay(center);
-		toolbarRefresh();
+		pendingCenter = Math.round((extent.start + extent.end) / 2);
+		if (best === zoom) {
+			scrollToDay(pendingCenter);
+			pendingCenter = null;
+		} else configure({ zoom: best });
 	};
 
 	// ─── Writes: moves with auto-scheduling and an impact preview ───────
@@ -970,7 +1005,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		drag.delta = Math.round(dx / timeScale.dayWidth);
 		const next = previewSpan(drag)!;
 		const geometry = barGeometry(next);
-		drag.bar.style.transform = `translateX(${drag.task.milestone ? geometry.x + timeScale.dayWidth / 2 - 9 : geometry.x}px)`;
+		drag.bar.style.transform = `translate(${drag.task.milestone ? geometry.x + timeScale.dayWidth / 2 - 9 : geometry.x}px, ${drag.bar.dataset.top ?? 0}px)`;
 		if (!drag.task.milestone) drag.bar.style.width = `${geometry.width}px`;
 		const days = calendar.duration(next, drag.task.milestone);
 		showTip(`${formatDay(fromDay(next.start))} – ${formatDay(fromDay(next.end))} · ${days}d`, geometry.x, drag.bar);
@@ -979,7 +1014,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	const showTip = (text: string, x: number, bar: HTMLElement) => {
 		tip.hidden = false;
 		tip.textContent = text;
-		tip.style.transform = `translate(${Math.max(0, x)}px, ${parseFloat(bar.style.top) - 30}px)`;
+		tip.style.transform = `translate(${Math.max(0, x)}px, ${Number(bar.dataset.top ?? 0) - 30}px)`;
 	};
 
 	const endDrag = () => {
@@ -1098,7 +1133,10 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 
 	let zoomButton: HTMLButtonElement | null = null;
 	const toggles: { key: string; el: HTMLButtonElement; get: () => boolean }[] = [];
+	let autoButton: HTMLButtonElement | null = null;
 	const toolbarRefresh = () => {
+		if (autoButton)
+			autoButton.querySelector('.og-ws-btn-label')!.textContent = mode === 'off' ? 'Manual' : mode === 'tight' ? 'Auto: tight' : 'Auto: push';
 		if (zoomButton) zoomButton.querySelector('.og-ws-btn-label')!.textContent = ZOOM_LABEL[zoom];
 		for (const toggle of toggles) toggle.el.setAttribute('aria-pressed', String(toggle.get()));
 	};
@@ -1119,18 +1157,12 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		);
 		const fitButton = button({ icon: 'fit', label: 'Fit', title: 'Fit the project' }, fit);
 		const toggle = (
-			key: string,
+			key: keyof typeof CONFIG_KEY,
 			label: string,
 			iconName: 'dependency' | 'baseline' | 'critical' | 'resource',
-			get: () => boolean,
-			set: (value: boolean) => void
+			get: () => boolean
 		) => {
-			const el = button({ icon: iconName, label, pressed: get() }, () => {
-				set(!get());
-				context.remember(key, get());
-				render();
-				toolbarRefresh();
-			});
+			const el = button({ icon: iconName, label, pressed: get() }, () => configure({ [CONFIG_KEY[key]]: !get() }));
 			el.classList.add('og-ws-toggle');
 			toggles.push({ key, el, get });
 			return el;
@@ -1146,11 +1178,8 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					{ label: 'Reschedule everything now', icon: 'sparkle', run: () => void rescheduleAll() },
 				])
 		);
-		const setMode = (next: typeof mode) => {
-			mode = next;
-			context.remember('autoSchedule', mode);
-			auto.querySelector('.og-ws-btn-label')!.textContent = mode === 'off' ? 'Manual' : mode === 'tight' ? 'Auto: tight' : 'Auto: push';
-		};
+		const setMode = (next: typeof mode) => configure({ autoSchedule: next });
+		autoButton = auto;
 		return h(
 			'div',
 			'og-ws-group og-ws-gantt-tools',
@@ -1163,37 +1192,112 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			zoomIn,
 			fitButton,
 			h('span', 'og-ws-sep'),
-			toggle(
-				'deps',
-				'Dependencies',
-				'dependency',
-				() => showDeps,
-				(v) => (showDeps = v)
-			),
-			toggle(
-				'baseline',
-				'Baseline',
-				'baseline',
-				() => showBaseline,
-				(v) => (showBaseline = v)
-			),
-			toggle(
-				'critical',
-				'Critical path',
-				'critical',
-				() => showCritical,
-				(v) => (showCritical = v)
-			),
-			toggle(
-				'workload',
-				'Workload',
-				'resource',
-				() => showWorkload,
-				(v) => (showWorkload = v)
-			),
+			toggle('deps', 'Dependencies', 'dependency', () => showDeps),
+			toggle('baseline', 'Baseline', 'baseline', () => showBaseline),
+			toggle('critical', 'Critical path', 'critical', () => showCritical),
+			toggle('workload', 'Workload', 'resource', () => showWorkload),
 			auto
 		);
 	};
+
+	const settings = (): ViewSettingsSection[] => [
+		{
+			title: 'Timeline',
+			settings: [
+				{
+					kind: 'segmented',
+					id: 'zoom',
+					label: 'Time scale',
+					value: zoom,
+					options: TIME_ZOOMS.map((value) => ({ value, label: ZOOM_LABEL[value] })),
+					onChange: (value) => setZoom(value as TimeZoom),
+				},
+				{
+					kind: 'segmented',
+					id: 'rowHeight',
+					label: 'Row height',
+					value: String(rowH <= 30 ? 28 : rowH >= 44 ? 46 : 36),
+					options: [
+						{ value: '28', label: 'Compact' },
+						{ value: '36', label: 'Default' },
+						{ value: '46', label: 'Roomy' },
+					],
+					onChange: (value) => configure({ rowHeight: Number(value) }),
+				},
+				{ kind: 'toggle', id: 'deps', label: 'Dependencies', value: showDeps, onChange: (value) => configure({ dependencies: value }) },
+				{
+					kind: 'toggle',
+					id: 'baseline',
+					label: 'Baselines',
+					hint: 'Amber when a task finishes later than planned.',
+					value: showBaseline,
+					onChange: (value) => configure({ baseline: value }),
+				},
+				{
+					kind: 'toggle',
+					id: 'critical',
+					label: 'Critical path',
+					value: showCritical,
+					onChange: (value) => configure({ criticalPath: value }),
+				},
+				{
+					kind: 'toggle',
+					id: 'workload',
+					label: 'People’s workload',
+					value: showWorkload,
+					onChange: (value) => configure({ workload: value }),
+				},
+			],
+		},
+		{
+			title: 'Scheduling',
+			settings: [
+				{
+					kind: 'segmented',
+					id: 'autoSchedule',
+					label: 'When a task moves',
+					value: mode,
+					options: [
+						{ value: 'push', label: 'Push' },
+						{ value: 'tight', label: 'Keep tight' },
+						{ value: 'off', label: 'Manual' },
+					],
+					onChange: (value) => configure({ autoSchedule: value as 'push' }),
+				},
+				{
+					kind: 'toggle',
+					id: 'confirm',
+					label: 'Preview the impact first',
+					value: config.confirmReschedule !== false,
+					onChange: (value) => configure({ confirmReschedule: value }),
+				},
+				{
+					kind: 'weekdays',
+					id: 'workingDays',
+					label: 'Working days',
+					value: config.calendar?.workingDays ?? [1, 2, 3, 4, 5],
+					onChange: (value) => configure({ calendar: { ...config.calendar, workingDays: value } }),
+				},
+			],
+		},
+		{
+			title: 'Outline',
+			settings: [
+				{
+					kind: 'fields',
+					id: 'fields',
+					label: 'Extra columns',
+					hint: 'Shown after owner, status and progress while the outline is wide enough.',
+					value: config.fields ?? [],
+					options: context
+						.columns()
+						.filter((col) => !Object.values(reader.roles).includes(col.field))
+						.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+					onChange: (value) => configure({ fields: value }),
+				},
+			],
+		},
+	];
 
 	const rescheduleAll = async () => {
 		const { changes } = model.autoSchedule({ mode: mode === 'off' ? 'push' : mode });
@@ -1275,48 +1379,28 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			label: `${showCritical ? 'Hide' : 'Show'} the critical path`,
 			group: 'Schedule',
 			icon: 'critical',
-			run: () => {
-				showCritical = !showCritical;
-				context.remember('critical', showCritical);
-				render();
-				toolbarRefresh();
-			},
+			run: () => configure({ criticalPath: !showCritical }),
 		},
 		{
 			id: 'gantt:deps',
 			label: `${showDeps ? 'Hide' : 'Show'} dependencies`,
 			group: 'Schedule',
 			icon: 'dependency',
-			run: () => {
-				showDeps = !showDeps;
-				context.remember('deps', showDeps);
-				render();
-				toolbarRefresh();
-			},
+			run: () => configure({ dependencies: !showDeps }),
 		},
 		{
 			id: 'gantt:baseline',
 			label: `${showBaseline ? 'Hide' : 'Show'} baselines`,
 			group: 'Schedule',
 			icon: 'baseline',
-			run: () => {
-				showBaseline = !showBaseline;
-				context.remember('baseline', showBaseline);
-				render();
-				toolbarRefresh();
-			},
+			run: () => configure({ baseline: !showBaseline }),
 		},
 		{
 			id: 'gantt:workload',
 			label: `${showWorkload ? 'Hide' : 'Show'} people’s workload`,
 			group: 'Schedule',
 			icon: 'resource',
-			run: () => {
-				showWorkload = !showWorkload;
-				context.remember('workload', showWorkload);
-				render();
-				toolbarRefresh();
-			},
+			run: () => configure({ workload: !showWorkload }),
 		},
 		{
 			id: 'gantt:reschedule',
@@ -1518,7 +1602,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	const [savedLeft, savedTop] = context.memory<[number, number] | null>('scroll', null) ?? [NaN, NaN];
 	return {
 		render() {
-			render();
+			render(restored);
 			if (!restored) {
 				restored = true;
 				if (Number.isFinite(savedLeft)) {
@@ -1528,9 +1612,33 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					const date = parseCellDate(config.initialDate);
 					if (date) scrollToDay(toDay(date), 'start');
 				} else scrollToDay(today());
-				paintRows();
+				paintRows(false);
 			}
 		},
+		update(next) {
+			const before = config;
+			config = next as GanttViewConfig<T>;
+			const rescale = (config.zoom ?? 'week') !== zoom || Math.max(28, Math.floor(config.rowHeight ?? 36)) !== rowH;
+			const center = pendingCenter ?? centerDay();
+			pendingCenter = null;
+			zoom = config.zoom ?? 'week';
+			rowH = Math.max(28, Math.floor(config.rowHeight ?? 36));
+			if (JSON.stringify(before.calendar) !== JSON.stringify(config.calendar)) calendar = new WorkCalendar(config.calendar);
+			showDeps = config.dependencies ?? true;
+			showBaseline = config.baseline ?? true;
+			showCritical = config.criticalPath ?? false;
+			showWorkload = config.workload ?? false;
+			mode = config.autoSchedule ?? 'push';
+			if (rescale) {
+				// A new scale is a new picture: it cross-fades in, centred where you were looking.
+				render(false);
+				scrollToDay(center);
+				paintRows(false);
+				motion.slideIn(chart, 0, 0);
+			} else render(true);
+			toolbarRefresh();
+		},
+		settings,
 		order: () => tasks.map((task) => task.id),
 		reveal(id) {
 			let index = indexById.get(id);

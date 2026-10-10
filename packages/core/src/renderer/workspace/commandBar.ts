@@ -8,8 +8,10 @@ import { button, h, hue, openPanel } from './ui.js';
 import type { WorkspaceHost } from './workspaceHost.js';
 import { VIEW_META } from './viewMeta.js';
 import { openCreateViewDialog, openTabMenu } from './viewManager.js';
+import { renderSettings } from './settingsPanel.js';
 import type { CellPopover } from '../../cells/popover.js';
 import type { ColumnValueKind } from '../../cells/fieldSchema.js';
+import type { WorkspaceMetric } from './viewTypes.js';
 
 const OPTION_KINDS: readonly ColumnValueKind[] = ['select', 'multiSelect', 'person', 'tags', 'linkedRecord', 'checkbox'];
 
@@ -34,6 +36,8 @@ export class CommandBar<TRowData> {
 	private readonly sortButton: HTMLButtonElement;
 	private readonly groupButton: HTMLButtonElement;
 	private readonly fieldsButton: HTMLButtonElement;
+	private readonly customizeButton: HTMLButtonElement;
+	private readonly tabIndicator: HTMLElement;
 	private readonly saveButton: HTMLButtonElement;
 	private popover: CellPopover | null = null;
 	private toolsFor: unknown = null;
@@ -42,6 +46,8 @@ export class CommandBar<TRowData> {
 	constructor(private readonly host: WorkspaceHost<TRowData>) {
 		const api = host.engine.getApiRef();
 		this.tabs = h('div', 'og-ws-tabs', { role: 'tablist', 'aria-label': 'Views' });
+		// A pill that slides under the active tab.
+		this.tabIndicator = h('span', 'og-ws-tab-indicator', { 'aria-hidden': 'true' });
 		this.search = h('input', 'og-ws-search-input', { type: 'search', placeholder: 'Search records…', 'aria-label': 'Search records' });
 		this.search.addEventListener('input', () => {
 			if (this.searchTimer) defaultGridScheduler.clearTimeout(this.searchTimer);
@@ -88,6 +94,7 @@ export class CommandBar<TRowData> {
 		this.sortButton = button({ icon: 'sort', label: 'Sort' }, () => this.openSort());
 		this.groupButton = button({ icon: 'group', label: 'Group' }, () => this.openGroup());
 		this.fieldsButton = button({ icon: 'fields', label: 'Fields' }, () => this.openFields());
+		this.customizeButton = button({ icon: 'settings', label: 'Customize', title: 'Customize this view' }, () => this.openCustomize());
 		const second = h(
 			'div',
 			'og-ws-bar-row og-ws-bar-sub',
@@ -95,10 +102,46 @@ export class CommandBar<TRowData> {
 			this.count,
 			this.viewTools,
 			h('span', 'og-ws-spacer'),
-			h('span', 'og-ws-group', null, this.filterButton, this.sortButton, this.groupButton, this.fieldsButton)
+			h('span', 'og-ws-group', null, this.filterButton, this.sortButton, this.groupButton, this.fieldsButton, this.customizeButton)
 		);
 		this.summary = h('div', 'og-ws-summary', { role: 'list', 'aria-label': 'Summary' });
 		this.element = h('div', 'og-ws-bar', { role: 'toolbar', 'aria-label': 'Workspace' }, top, second, this.summary);
+	}
+
+	/** The active tab's pill glides to it (and resizes) when the tab changes. */
+	private moveIndicator(): void {
+		const active = this.tabs.querySelector<HTMLElement>('.og-ws-tab[aria-selected="true"]');
+		const indicator = this.tabIndicator;
+		indicator.hidden = !active;
+		if (!active) return;
+		const left = active.offsetLeft;
+		const width = active.offsetWidth;
+		const previous = indicator.dataset.place;
+		const place = `${left}:${width}`;
+		if (previous === place) return;
+		indicator.dataset.place = place;
+		indicator.style.transform = `translateX(${left}px)`;
+		indicator.style.width = `${width}px`;
+		if (previous && this.host.motion.enabled) {
+			const [fromLeft, fromWidth] = previous.split(':').map(Number);
+			indicator.animate(
+				[
+					{ transform: `translateX(${fromLeft}px)`, width: `${fromWidth}px` },
+					{ transform: `translateX(${left}px)`, width: `${width}px` },
+				],
+				{ duration: 260, easing: 'cubic-bezier(.2,.8,.2,1)' }
+			);
+		}
+	}
+
+	/** The view's settings, applied as they change (saved views mark them as unsaved). */
+	private openCustomize(): void {
+		const host = this.host;
+		const kind = host.getViewConfig()?.kind;
+		if (!kind) return;
+		const panel = h('div', 'og-ws-settings');
+		renderSettings(panel, () => host.viewSettings(), `Customize ${VIEW_META[kind].label}`);
+		this.open(this.customizeButton, panel, 'Customize view');
 	}
 
 	focusSearch(): void {
@@ -144,7 +187,7 @@ export class CommandBar<TRowData> {
 			});
 			const add = button({ icon: 'plus', title: 'New view', className: 'og-ws-tab-add' }, () => void openCreateViewDialog(host));
 			nodes.push(add);
-			this.tabs.replaceChildren(...nodes);
+			this.tabs.replaceChildren(this.tabIndicator, ...nodes);
 		}
 		for (const el of this.tabs.querySelectorAll<HTMLElement>('.og-ws-tab')) {
 			const on = el.dataset.tab === active.id;
@@ -166,6 +209,8 @@ export class CommandBar<TRowData> {
 		const config = host.getViewConfig();
 		const grouping = config ? this.viewGroupField(config) : null;
 		this.groupButton.hidden = !!config && grouping === undefined;
+		this.customizeButton.hidden = !config;
+		this.moveIndicator();
 		this.badge(this.groupButton, config ? (grouping ? 1 : 0) : api.getGroupBy().length);
 		this.refreshCount();
 		const view = host.getView();
@@ -175,33 +220,56 @@ export class CommandBar<TRowData> {
 			const tools = view?.toolbar?.();
 			if (tools) this.viewTools.append(tools);
 		}
-		const metrics = view?.summary?.() ?? [];
-		this.summary.hidden = metrics.length === 0;
-		this.summary.replaceChildren(
-			...metrics.map((metric) => {
-				const value = h('strong', 'og-ws-metric-value', null);
-				if (metric.tone) {
-					const dot = h('span', 'og-ws-dot');
-					dot.style.background = metric.tone;
-					value.append(dot);
-				}
-				value.append(metric.value);
-				const card = h(
-					'div',
-					'og-ws-metric',
-					{ role: 'listitem', title: metric.title },
-					h('span', 'og-ws-metric-label', null, metric.label),
-					value
-				);
-				if (metric.meter != null) {
-					const fill = h('span', 'og-ws-meter-fill');
-					fill.style.width = `${Math.max(0, Math.min(1, metric.meter)) * 100}%`;
-					card.append(h('span', 'og-ws-meter', null, fill));
-				}
-				return card;
-			})
-		);
+		this.drawMetrics(view?.summary?.() ?? []);
 	}
+
+	/**
+	 * The summary strip, keyed by label: a metric that changes counts to its new value and its meter
+	 * eases to the new width (cards are kept, not rebuilt).
+	 */
+	private drawMetrics(metrics: readonly WorkspaceMetric[]): void {
+		this.summary.hidden = metrics.length === 0;
+		const wanted = new Set(metrics.map((metric) => metric.label));
+		for (const [label, card] of this.metricCards)
+			if (!wanted.has(label)) {
+				card.element.remove();
+				this.metricCards.delete(label);
+			}
+		metrics.forEach((metric, index) => {
+			let card = this.metricCards.get(metric.label);
+			if (!card) {
+				const dot = h('span', 'og-ws-dot');
+				const text = h('span', 'og-ws-metric-number');
+				const value = h('strong', 'og-ws-metric-value', null, dot, text);
+				const fill = h('span', 'og-ws-meter-fill');
+				const meter = h('span', 'og-ws-meter', null, fill);
+				const element = h('div', 'og-ws-metric', { role: 'listitem' }, h('span', 'og-ws-metric-label', null, metric.label), value, meter);
+				card = { element, dot, text, fill, meter, value: '' };
+				this.metricCards.set(metric.label, card);
+				text.textContent = metric.value;
+				card.value = metric.value;
+			}
+			if (this.summary.children[index] !== card.element) this.summary.insertBefore(card.element, this.summary.children[index] ?? null);
+			card.element.title = metric.title ?? '';
+			card.dot.hidden = !metric.tone;
+			if (metric.tone) card.dot.style.background = metric.tone;
+			card.meter.hidden = metric.meter == null;
+			if (metric.meter != null) card.fill.style.width = `${Math.max(0, Math.min(1, metric.meter)) * 100}%`;
+			if (card.value !== metric.value) {
+				const from = parseMetric(card.value);
+				const to = parseMetric(metric.value);
+				// Same shape (prefix, decimals, suffix): count between the numbers; otherwise swap.
+				if (from && to && from.prefix === to.prefix && from.suffix === to.suffix && from.decimals === to.decimals)
+					this.host.motion.tween(card.text, from.value, to.value, (value) => to.prefix + formatMetric(value, to.decimals) + to.suffix);
+				else card.text.textContent = metric.value;
+				card.value = metric.value;
+			}
+		});
+	}
+	private readonly metricCards = new Map<
+		string,
+		{ element: HTMLElement; dot: HTMLElement; text: HTMLElement; fill: HTMLElement; meter: HTMLElement; value: string }
+	>();
 
 	refreshCount(): void {
 		const host = this.host;
@@ -430,4 +498,18 @@ export class CommandBar<TRowData> {
 		if (this.searchTimer) defaultGridScheduler.clearTimeout(this.searchTimer);
 		this.popover?.close();
 	}
+}
+
+/** A metric's number between its prefix and suffix ("$4.9M" → $, 4.9, M). */
+function parseMetric(text: string): { prefix: string; value: number; decimals: number; suffix: string } | null {
+	const match = /^([^\d-]*)(-?[\d,]*\.?\d+)(.*)$/.exec(text);
+	if (!match) return null;
+	const digits = match[2].replace(/,/g, '');
+	const value = Number(digits);
+	if (!Number.isFinite(value)) return null;
+	return { prefix: match[1], value, decimals: digits.includes('.') ? digits.split('.')[1].length : 0, suffix: match[3] };
+}
+
+function formatMetric(value: number, decimals: number): string {
+	return value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }

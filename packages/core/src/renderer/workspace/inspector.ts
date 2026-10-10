@@ -75,20 +75,37 @@ export class Inspector<TRowData> {
 
 	open(id: string): void {
 		if (this.host.options.inspector === false) return;
-		if (this.recordId === id && !this.element.hidden) return;
+		if (this.recordId === id && !this.element.hidden && !this.element.hasAttribute('data-leaving')) return;
+		const switching = this.recordId !== null && !this.element.hidden;
 		this.recordId = id;
+		this.element.removeAttribute('data-leaving');
 		this.element.hidden = false;
 		this.host.root.setAttribute('data-inspecting', '');
 		this.render();
+		// Another record in the open inspector: the body cross-fades rather than snapping.
+		if (switching && this.host.motion.enabled) {
+			this.body.removeAttribute('data-switching');
+			void this.body.offsetWidth;
+			this.body.setAttribute('data-switching', '');
+		}
 	}
 
 	close(): void {
 		const id = this.recordId;
 		this.teardown();
 		this.recordId = null;
-		this.element.hidden = true;
 		this.host.root.removeAttribute('data-inspecting');
-		this.host.scheduleRender();
+		const hide = () => {
+			// Reopened while leaving: stay.
+			if (this.recordId !== null) return;
+			this.element.hidden = true;
+			this.element.removeAttribute('data-leaving');
+			this.host.scheduleRender();
+		};
+		if (this.host.motion.enabled && !this.element.hidden) {
+			this.element.setAttribute('data-leaving', '');
+			this.element.addEventListener('animationend', hide, { once: true });
+		} else hide();
 		if (id) this.host.getView()?.reveal(id)?.focus({ preventScroll: true });
 	}
 

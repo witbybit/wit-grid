@@ -1,4 +1,4 @@
-import { MAX_STAGGER_SPAN_MS, resolveRowAnimation, type ResolvedRowAnimation, type RowAnimationOptions } from './rowAnimation.js';
+import { animationsEnabled, MAX_STAGGER_SPAN_MS, resolveRowAnimation, type ResolvedRowAnimation, type RowAnimationOptions } from './rowAnimation.js';
 import type { RowSlot } from './rowSlot.js';
 
 /**
@@ -79,16 +79,7 @@ export class LayoutTransitionController<TRowData = unknown> {
 
 	/** True when WAAPI is usable and the user has not requested reduced motion. */
 	private animationsEnabled(): boolean {
-		if (typeof document === 'undefined') return false;
-		if (typeof (HTMLElement.prototype as { animate?: unknown }).animate !== 'function') return false;
-		try {
-			if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-				if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
-			}
-		} catch {
-			/* matchMedia may throw in some test envs — treat as no preference */
-		}
-		return true;
+		return animationsEnabled();
 	}
 
 	/** True when this kind of change animates under the grid's row animation options. */

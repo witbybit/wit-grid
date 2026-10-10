@@ -7,8 +7,15 @@ import { defaultGridScheduler } from '../../gridScheduler.js';
 import { FieldValue } from '../fieldValue.js';
 import { icon } from '../icons.js';
 import { blockedBadge, countsLine, dueChip, initials, labelPills, optionPill, personChip, presenceDots, progressLine } from '../recordParts.js';
-import { button, formatNumber, h, hue, pulse } from '../ui.js';
-import type { WorkspaceView, WorkspaceViewContext, WorkspaceViewModule, WorkspaceMetric, WorkspaceCommand } from '../viewTypes.js';
+import { button, formatNumber, h, hue } from '../ui.js';
+import type {
+	ViewSettingsSection,
+	WorkspaceCommand,
+	WorkspaceMetric,
+	WorkspaceView,
+	WorkspaceViewContext,
+	WorkspaceViewModule,
+} from '../viewTypes.js';
 
 const GAP = 10;
 const PAD = 12;
@@ -16,6 +23,8 @@ const HEAD_H = 76;
 const LANE_HEAD_H = 46;
 const COLLAPSED_W = 46;
 const OVERSCAN = 400;
+/** Cards entering together cascade, capped so a big change still settles quickly. */
+const ENTER_STAGGER = 18;
 
 interface CellBox {
 	x: number;
@@ -54,18 +63,21 @@ interface Drag {
 	lastY: number;
 }
 
-function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: KanbanViewConfig<T>): WorkspaceView {
+function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, initial: KanbanViewConfig<T>): WorkspaceView {
+	let config = initial;
+	const motion = context.motion;
 	const scroller = h('div', 'og-ws-board', { role: 'grid', 'aria-label': 'Board' });
 	const head = h('div', 'og-ws-board-head');
 	const canvas = h('div', 'og-ws-board-canvas');
 	const empty = h('div', 'og-ws-empty', { hidden: true });
 	scroller.append(head, canvas);
 	host.append(scroller, empty);
-	scroller.dataset.density = config.density ?? 'comfortable';
-	const columnWidth = Math.max(220, config.columnWidth ?? 280);
 	const collapsedColumns = new Set<string>(context.memory('collapsedColumns', [...(config.collapsedColumns ?? [])]));
 	const collapsedLanes = new Set<string>(context.memory<string[]>('collapsedLanes', []));
 	const cards = new Map<string, { element: HTMLElement; fields: FieldValue<T>[]; version: unknown }>();
+	// The frame — headers, lanes, cell backgrounds — is keyed too, so columns glide when they collapse, hide or move.
+	const headers = new Map<string, HTMLElement>();
+	const laneHeads = new Map<string, HTMLElement>();
 	const cellElements = new Map<string, HTMLElement>();
 	let reader: RecordReader<T> = context.reader();
 	let board: BoardModel<T> = { columns: [], lanes: [], blocked: new Set(), placement: new Map() };
@@ -75,8 +87,11 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	let drag: Drag | null = null;
 	let frame = 0;
 	let autoScroll = 0;
+	let painted = false;
 	const indicator = h('div', 'og-ws-drop-indicator', { hidden: true });
 	const dropHint = h('div', 'og-ws-drop-hint', { hidden: true });
+
+	const columnWidth = () => Math.max(220, config.columnWidth ?? 280);
 
 	const fieldsFor = () =>
 		(config.fields ?? [])
@@ -96,12 +111,20 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			laneField: config.swimlaneField ?? undefined,
 			columnOrder: config.columns,
 			wipLimits: config.wipLimits,
-			valueField: config.aggregate?.field ?? reader.roles.value,
+			// A count needs no field; otherwise the configured field, else the value role.
+			valueField: config.aggregate ? config.aggregate.field : reader.roles.value,
 			valueAggregate: config.aggregate?.fn,
 			useRank: !!reader.roles.rank && !sorted,
 			lookup: (id) => context.lookup(id),
 		};
 		board = buildBoard(context.rows(), reader, options);
+		// Hidden columns, and empty ones when asked, drop out of the board (their records stay in the grid).
+		const hidden = new Set(config.hiddenColumns ?? []);
+		if (hidden.size || config.hideEmptyColumns)
+			board = {
+				...board,
+				columns: board.columns.filter((column) => !hidden.has(column.key) && !(config.hideEmptyColumns && column.rows.length === 0)),
+			};
 	};
 
 	const measure = () => {
@@ -113,7 +136,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		const columnW = new Map<string, number>();
 		let x = PAD;
 		for (const column of board.columns) {
-			const width = collapsedColumns.has(column.key) ? COLLAPSED_W : columnWidth;
+			const width = collapsedColumns.has(column.key) ? COLLAPSED_W : columnWidth();
 			columnX.set(column.key, x);
 			columnW.set(column.key, width);
 			x += width + GAP;
@@ -144,17 +167,58 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					if (!collapsedColumns.has(column.key)) for (const row of lane.cells.get(column.key)!.cards) order.push(row.id);
 	};
 
-	// ─── Headers, lanes and cell backgrounds (rebuilt on render; few elements) ─────
+	// ─── Column actions ─────────────────────────────────────────────────
+
+	/** The board's column order as values (for `columns`), skipping the no-value column. */
+	const columnOrder = () => board.columns.map((column) => column.key).filter((key) => key !== '');
+
+	const moveColumn = (key: string, step: -1 | 1) => {
+		const keys = columnOrder();
+		const at = keys.indexOf(key);
+		const to = at + step;
+		if (at < 0 || to < 0 || to >= keys.length) return;
+		[keys[at], keys[to]] = [keys[to], keys[at]];
+		context.updateView({ columns: keys });
+	};
+
+	const setColumnHidden = (key: string, hidden: boolean) => {
+		const current = new Set(config.hiddenColumns ?? []);
+		if (hidden) current.add(key);
+		else current.delete(key);
+		context.updateView({ hiddenColumns: [...current] });
+	};
+
+	const setLimit = (key: string, limit: number | null) => {
+		const limits = { ...(config.wipLimits ?? {}) };
+		if (limit == null) delete limits[key];
+		else limits[key] = limit;
+		context.updateView({ wipLimits: limits });
+	};
+
+	const askLimit = async (key: string) => {
+		const column = board.columns.find((candidate) => candidate.key === key);
+		if (!column) return;
+		const input = h('input', 'og-ws-input', { type: 'number', min: 0, step: 1, placeholder: 'No limit', 'aria-label': 'Work-in-progress limit' });
+		input.value = column.limit == null ? '' : String(column.limit);
+		const body = h(
+			'div',
+			'og-ws-create-view',
+			null,
+			h('p', 'og-ws-hint', null, `At most this many cards in ${column.label}. Leave empty for no limit.`),
+			input
+		);
+		defaultGridScheduler.timeout(() => input.select(), 0);
+		const answer = await context.confirm({ title: `WIP limit for ${column.label}`, body, confirm: 'Set limit' });
+		if (answer !== 'confirm') return;
+		setLimit(key, input.value === '' ? null : Math.max(0, Math.round(Number(input.value))));
+	};
 
 	const columnMenu = (anchor: HTMLElement, key: string) => {
 		const column = board.columns.find((candidate) => candidate.key === key)!;
 		const ids = board.lanes.flatMap((lane) => lane.cells.get(key)!.map((row) => row.id));
+		const keys = columnOrder();
+		const at = keys.indexOf(key);
 		context.menu(anchor, [
-			{
-				label: collapsedColumns.has(key) ? 'Expand column' : 'Collapse column',
-				icon: collapsedColumns.has(key) ? 'expand' : 'collapse',
-				run: () => toggleColumn(key),
-			},
 			{
 				label: `Select ${ids.length} cards`,
 				icon: 'check',
@@ -163,7 +227,15 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			},
 			{ label: 'Add a card here', icon: 'plus', disabled: !context.create, run: () => void quickAdd(key, board.lanes[0]?.key ?? SINGLE_LANE) },
 			'separator',
-			{ label: column.limit != null ? `WIP limit: ${column.limit}` : 'No WIP limit', icon: 'alert', disabled: true },
+			{ label: column.limit != null ? `WIP limit: ${column.limit}…` : 'Set a WIP limit…', icon: 'alert', run: () => void askLimit(key) },
+			{ label: 'Move left', icon: 'chevronLeft', disabled: at <= 0, run: () => moveColumn(key, -1) },
+			{ label: 'Move right', icon: 'chevronRight', disabled: at < 0 || at >= keys.length - 1, run: () => moveColumn(key, 1) },
+			{
+				label: collapsedColumns.has(key) ? 'Expand column' : 'Collapse column',
+				icon: collapsedColumns.has(key) ? 'expand' : 'collapse',
+				run: () => toggleColumn(key),
+			},
+			{ label: 'Hide column', icon: 'close', run: () => setColumnHidden(key, true) },
 		]);
 	};
 
@@ -171,14 +243,14 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		if (collapsedColumns.has(key)) collapsedColumns.delete(key);
 		else collapsedColumns.add(key);
 		context.remember('collapsedColumns', [...collapsedColumns]);
-		render();
+		render(true);
 	};
 
 	const toggleLane = (key: string) => {
 		if (collapsedLanes.has(key)) collapsedLanes.delete(key);
 		else collapsedLanes.add(key);
 		context.remember('collapsedLanes', [...collapsedLanes]);
-		render();
+		render(true);
 	};
 
 	const quickAdd = async (column: string, lane: string) => {
@@ -197,22 +269,49 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		return formatNumber(value, { currency, compact: value >= 1e6 });
 	};
 
-	const drawFrame = () => {
+	// ─── Frame: headers, lanes, cell backgrounds (keyed; they glide) ─────
+
+	/** Reuses the keyed element (or makes one), fills it, and places it; unused ones leave. */
+	const reconcile = (map: Map<string, HTMLElement>, wanted: Set<string>, glide: boolean) => {
+		for (const [key, element] of map)
+			if (!wanted.has(key)) {
+				map.delete(key);
+				if (glide) motion.leave(element);
+				else element.remove();
+			}
+	};
+
+	const keyed = (map: Map<string, HTMLElement>, key: string, parent: HTMLElement, make: () => HTMLElement, glide: boolean): HTMLElement => {
+		let element = map.get(key);
+		if (!element) {
+			element = make();
+			map.set(key, element);
+			parent.append(element);
+			if (glide && painted) defaultGridScheduler.raf(() => motion.enter(element!));
+		}
+		return element;
+	};
+
+	const drawFrame = (glide: boolean) => {
 		const editable = config.editable !== false && !!options.columnField;
-		head.replaceChildren();
 		head.style.width = `${layout.width}px`;
+		const wantedHeads = new Set<string>();
 		for (const column of board.columns) {
+			wantedHeads.add(column.key);
 			const collapsed = collapsedColumns.has(column.key);
-			const colour = hue(column.color, column.key || 'none');
-			const count = column.limit != null ? `${column.rows.length} / ${column.limit}` : String(column.rows.length);
-			const header = h('div', `og-ws-col-head${collapsed ? ' og-ws-collapsed' : ''}${column.over ? ' og-ws-over' : ''}`, {
-				'data-column': column.key,
-				role: 'columnheader',
-				title: column.over ? `Over the WIP limit of ${column.limit}` : undefined,
-			});
-			header.style.left = `${layout.columnX.get(column.key)}px`;
+			const header = keyed(
+				headers,
+				column.key,
+				head,
+				() => h('div', 'og-ws-col-head', { 'data-column': column.key, role: 'columnheader' }),
+				glide
+			);
+			header.className = `og-ws-col-head${collapsed ? ' og-ws-collapsed' : ''}${column.over ? ' og-ws-over' : ''}`;
+			header.title = column.over ? `Over the WIP limit of ${column.limit}` : '';
 			header.style.width = `${layout.columnW.get(column.key)}px`;
-			header.style.setProperty('--og-ws-hue', colour);
+			header.style.setProperty('--og-ws-hue', hue(column.color, column.key || 'none'));
+			motion.place(header, layout.columnX.get(column.key)!, 8, glide);
+			const count = column.limit != null ? `${column.rows.length} / ${column.limit}` : String(column.rows.length);
 			const name = h(
 				'button',
 				'og-ws-col-name',
@@ -223,46 +322,55 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			name.addEventListener('click', () => toggleColumn(column.key));
 			const badge = h('span', `og-ws-count-badge${column.over ? ' og-ws-over' : ''}`, null, count);
 			if (collapsed) {
-				header.append(name, badge);
-			} else {
-				const more = button({ icon: 'more', title: `${column.label} actions` });
-				more.addEventListener('click', () => columnMenu(more, column.key));
-				const add = context.create
-					? button({ icon: 'plus', title: `Add to ${column.label}` }, () => void quickAdd(column.key, board.lanes[0]?.key ?? SINGLE_LANE))
-					: null;
-				const top = h('div', 'og-ws-col-top', null, name, badge, h('span', 'og-ws-spacer'), more, add);
-				const total = column.total != null ? h('div', 'og-ws-col-total', null, money(column.total)) : null;
-				if (!editable) top.append(icon('lock', 13));
-				header.append(
-					top,
-					total ?? h('div', 'og-ws-col-total og-ws-hint', null, `${column.rows.length === 1 ? '1 card' : `${column.rows.length} cards`}`)
-				);
-				if (column.limit != null) {
-					const meter = h('span', 'og-ws-wip');
-					const fill = h('span', 'og-ws-wip-fill');
-					fill.style.width = `${Math.min(1, column.rows.length / Math.max(1, column.limit)) * 100}%`;
-					meter.append(fill);
-					header.append(meter);
-				}
+				header.replaceChildren(name, badge);
+				continue;
 			}
-			head.append(header);
+			const more = button({ icon: 'more', title: `${column.label} actions` });
+			more.addEventListener('click', () => columnMenu(more, column.key));
+			const add = context.create
+				? button({ icon: 'plus', title: `Add to ${column.label}` }, () => void quickAdd(column.key, board.lanes[0]?.key ?? SINGLE_LANE))
+				: null;
+			const top = h('div', 'og-ws-col-top', null, name, badge, h('span', 'og-ws-spacer'), more, add);
+			if (!editable) top.append(icon('lock', 13));
+			const total =
+				column.total != null
+					? h('div', 'og-ws-col-total', null, money(column.total))
+					: h('div', 'og-ws-col-total og-ws-hint', null, column.rows.length === 1 ? '1 card' : `${column.rows.length} cards`);
+			header.replaceChildren(top, total);
+			if (column.limit != null) {
+				const fill = h('span', 'og-ws-wip-fill');
+				fill.style.width = `${Math.min(1, column.rows.length / Math.max(1, column.limit)) * 100}%`;
+				header.append(h('span', 'og-ws-wip', null, fill));
+			}
 		}
-		// Lanes and cells.
-		canvas.replaceChildren();
-		cellElements.clear();
+		reconcile(headers, wantedHeads, glide);
+		// Document order follows board order (reading and tab order), moved only when it changed.
+		const headerOrder = board.columns.map((column) => headers.get(column.key)!);
+		if (headerOrder.some((element, i) => head.children[i] !== element)) head.append(...headerOrder);
+
 		canvas.style.width = `${layout.width}px`;
 		canvas.style.height = `${layout.height}px`;
 		const single = layout.lanes.length === 1 && layout.lanes[0].key === SINGLE_LANE;
+		const wantedLanes = new Set<string>();
+		const wantedCells = new Set<string>();
 		for (const lane of layout.lanes) {
 			const model = board.lanes.find((candidate) => candidate.key === lane.key)!;
 			if (!single) {
-				const laneHead = h('div', 'og-ws-lane-head', { 'data-lane': lane.key, role: 'rowheader' });
-				laneHead.style.top = `${lane.top}px`;
+				wantedLanes.add(lane.key);
+				const laneHead = keyed(
+					laneHeads,
+					lane.key,
+					canvas,
+					() => h('div', 'og-ws-lane-head', { 'data-lane': lane.key, role: 'rowheader' }),
+					glide
+				);
 				laneHead.style.width = `${layout.width - PAD * 2}px`;
+				motion.place(laneHead, PAD, lane.top, glide);
 				const chevron = button(
-					{ icon: lane.collapsed ? 'chevronRight' : 'chevronDown', title: lane.collapsed ? 'Expand lane' : 'Collapse lane' },
+					{ icon: 'chevronDown', title: lane.collapsed ? 'Expand lane' : 'Collapse lane', className: 'og-ws-chevron' },
 					() => toggleLane(lane.key)
 				);
+				chevron.toggleAttribute('data-collapsed', lane.collapsed);
 				const mark = h('span', 'og-ws-lane-mark', null, initials(model.label || '—') || '—');
 				mark.style.setProperty('--og-ws-hue', hue(model.color, model.label || lane.key));
 				const counts = h('span', 'og-ws-lane-counts');
@@ -282,24 +390,24 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					h('span', 'og-ws-hint', null, `${model.count} ${model.count === 1 ? 'card' : 'cards'}`),
 					model.total != null ? h('span', 'og-ws-lane-total', null, money(model.total)) : null
 				);
-				const add = context.create
-					? button({ icon: 'plus', title: `Add to ${model.label}` }, () => void quickAdd(board.columns[0]?.key ?? '', lane.key))
-					: null;
-				laneHead.append(sticky, h('span', 'og-ws-spacer'), counts);
-				if (add) laneHead.append(add);
-				canvas.append(laneHead);
+				laneHead.replaceChildren(sticky, h('span', 'og-ws-spacer'), counts);
+				if (context.create)
+					laneHead.append(
+						button({ icon: 'plus', title: `Add to ${model.label}` }, () => void quickAdd(board.columns[0]?.key ?? '', lane.key))
+					);
 			}
 			if (lane.collapsed) continue;
 			for (const column of board.columns) {
 				const cell = lane.cells.get(column.key)!;
-				const bg = h('div', `og-ws-cell${collapsedColumns.has(column.key) ? ' og-ws-collapsed' : ''}`, {
-					'data-cell': `${lane.key}\u0000${column.key}`,
-				});
-				bg.style.left = `${cell.x}px`;
-				bg.style.top = `${lane.body - 4}px`;
+				const key = `${lane.key}\u0000${column.key}`;
+				wantedCells.add(key);
+				const bg = keyed(cellElements, key, canvas, () => h('div', 'og-ws-cell', { 'data-cell': key }), glide);
+				const collapsed = collapsedColumns.has(column.key);
+				bg.classList.toggle('og-ws-collapsed', collapsed);
 				bg.style.width = `${cell.width}px`;
 				bg.style.height = `${lane.top + lane.height - lane.body - GAP + 8}px`;
-				if (collapsedColumns.has(column.key)) {
+				motion.place(bg, cell.x, lane.body - 4, glide);
+				if (collapsed) {
 					const vertical = h(
 						'button',
 						'og-ws-cell-collapsed',
@@ -307,17 +415,17 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 						`${column.label} · ${cell.cards.length}`
 					);
 					vertical.addEventListener('click', () => toggleColumn(column.key));
-					bg.append(vertical);
+					bg.replaceChildren(vertical);
 				} else if (context.create) {
 					const add = h('button', 'og-ws-cell-add', { type: 'button' }, icon('plus', 14), 'Add card');
 					add.style.top = `${cell.cards.length * layout.pitch + 4}px`;
 					add.addEventListener('click', () => void quickAdd(column.key, lane.key));
-					bg.append(add);
-				}
-				cellElements.set(`${lane.key}\u0000${column.key}`, bg);
-				canvas.append(bg);
+					bg.replaceChildren(add);
+				} else bg.replaceChildren();
 			}
 		}
+		reconcile(laneHeads, wantedLanes, glide);
+		reconcile(cellElements, wantedCells, glide);
 		canvas.append(indicator, dropHint);
 	};
 
@@ -334,8 +442,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		for (const field of fields) field.destroy();
 		fields.length = 0;
 		const roles = reader.roles;
-		const accent = context.accent(row) ?? 'var(--og-focus-ring)';
-		element.style.setProperty('--og-ws-accent', accent);
+		element.style.setProperty('--og-ws-accent', context.accent(row) ?? 'var(--og-ws-line-strong)');
 		const blocked = board.blocked.has(row.id);
 		element.toggleAttribute('data-blocked', blocked);
 		element.toggleAttribute('data-done', reader.isDone(row));
@@ -380,7 +487,11 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		if (config.density !== 'compact') element.append(h('div', 'og-ws-card-foot', null, countsLine(context, row, reader) ?? h('span')));
 	};
 
-	const paintCards = () => {
+	/**
+	 * Draws the cards in view. `glide` (a data or settings change, not a scroll): cards that moved glide
+	 * to their new place, new ones settle in, and ones that left the board fade out.
+	 */
+	const paintCards = (glide = false) => {
 		frame = 0;
 		const top = scroller.scrollTop - OVERSCAN;
 		const bottom = scroller.scrollTop + (scroller.clientHeight || 800) + OVERSCAN;
@@ -389,6 +500,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		const visible = new Set<string>();
 		const selected = context.selected();
 		const focused = context.focused();
+		let entering = 0;
 		for (const lane of layout.lanes) {
 			if (lane.collapsed || lane.top > bottom || lane.top + lane.height < top) continue;
 			for (const column of board.columns) {
@@ -401,6 +513,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					const row = cell.cards[i] as RecordRow<T>;
 					visible.add(row.id);
 					let card = cards.get(row.id);
+					const fresh = !card;
 					if (!card) {
 						const built = buildCard(row);
 						card = { ...built, version: row.data };
@@ -412,9 +525,10 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 						delete card.element.dataset.stale;
 					}
 					const el = card.element;
-					el.style.transform = `translate(${cell.x}px, ${cell.y + i * layout.pitch}px)`;
 					el.style.width = `${cell.width}px`;
 					el.style.height = `${layout.cardH}px`;
+					motion.place(el, cell.x, cell.y + i * layout.pitch, glide);
+					if (fresh && glide && painted) motion.enter(el, Math.min(entering++, 12) * ENTER_STAGGER);
 					el.toggleAttribute('data-selected', selected.has(row.id));
 					el.toggleAttribute('data-focused', focused === row.id);
 					el.tabIndex = focused === row.id ? 0 : -1;
@@ -426,16 +540,22 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			if (!visible.has(id)) {
 				if (card.element.contains(document.activeElement)) continue;
 				for (const field of card.fields) field.destroy();
-				card.element.remove();
 				cards.delete(id);
+				// Off the board (filtered out, deleted, hidden column): fade. Scrolled away: just go.
+				if (glide && !board.placement.has(id)) motion.leave(card.element);
+				else {
+					motion.forget(card.element);
+					card.element.remove();
+				}
 			}
+		painted = true;
 	};
 
 	const schedulePaint = () => {
-		if (!frame) frame = defaultGridScheduler.raf(paintCards);
+		if (!frame) frame = defaultGridScheduler.raf(() => paintCards(false));
 	};
 
-	const render = () => {
+	const render = (glide = false) => {
 		project();
 		if (!board.columns.length) {
 			scroller.hidden = true;
@@ -447,7 +567,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 					'og-ws-hint',
 					null,
 					options.columnField
-						? (config.emptyText ?? 'No records match. Adjust the filters or search.')
+						? (config.emptyText ?? 'Every column is hidden. Show some in Customize.')
 						: 'Add a select column named Status, or set `records.status`.'
 				)
 			);
@@ -469,9 +589,9 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		}
 		for (const card of cards.values()) card.element.dataset.stale = '1';
 		measure();
-		drawFrame();
+		drawFrame(glide && painted);
 		for (const card of cards.values()) canvas.append(card.element);
-		paintCards();
+		paintCards(glide && painted);
 	};
 
 	// ─── Drag and drop ───────────────────────────────────────────────────
@@ -501,34 +621,42 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			el.removeAttribute('data-drop');
 			el.removeAttribute('data-rejected');
 		}
-		indicator.hidden = true;
-		dropHint.hidden = true;
-		if (!drag?.target) return;
+		if (!drag?.target) {
+			indicator.hidden = true;
+			dropHint.hidden = true;
+			return;
+		}
 		const { column, lane, index } = drag.target;
 		const cellEl = cellElements.get(`${lane}\u0000${column}`);
 		cellEl?.setAttribute(drag.rejected ? 'data-rejected' : 'data-drop', '');
 		const box = layout.lanes.find((candidate) => candidate.key === lane)?.cells.get(column);
 		if (!box) return;
 		const columnModel = board.columns.find((candidate) => candidate.key === column)!;
+		const moving = new Set(drag.ids);
+		const count = box.cards.filter((row) => !moving.has(row.id)).length;
+		if (!drag.rejected && options.useRank) {
+			dropHint.hidden = true;
+			const wasHidden = indicator.hidden;
+			indicator.hidden = false;
+			indicator.style.width = `${box.width}px`;
+			// The insertion line glides between slots.
+			motion.place(indicator, box.x, box.y + index * layout.pitch - GAP / 2 - 1, !wasHidden);
+			return;
+		}
+		indicator.hidden = true;
+		const wasHidden = dropHint.hidden;
+		dropHint.hidden = false;
 		if (drag.rejected) {
-			dropHint.hidden = false;
 			dropHint.className = 'og-ws-drop-hint og-ws-rejected';
 			dropHint.replaceChildren(icon('blocked'), h('strong', null, null, 'Can’t drop here'), h('span', null, null, drag.rejected));
-		} else if (options.useRank) {
-			indicator.hidden = false;
-			indicator.style.transform = `translate(${box.x}px, ${box.y + index * layout.pitch - GAP / 2 - 1}px)`;
-			indicator.style.width = `${box.width}px`;
-			return;
 		} else {
-			dropHint.hidden = false;
 			dropHint.className = 'og-ws-drop-hint';
 			dropHint.replaceChildren(icon('plus'), h('strong', null, null, 'Drop here'), h('span', null, null, `Move to ${columnModel.label}`));
 		}
-		const moving = new Set(drag.ids);
-		const count = box.cards.filter((row) => !moving.has(row.id)).length;
-		dropHint.style.transform = `translate(${box.x}px, ${box.y + (options.useRank ? index : count) * layout.pitch}px)`;
 		dropHint.style.width = `${box.width}px`;
 		dropHint.style.height = `${layout.cardH}px`;
+		motion.place(dropHint, box.x, box.y + count * layout.pitch, !wasHidden);
+		if (wasHidden) motion.enter(dropHint);
 	};
 
 	const evaluate = (target: Drag['target']): string | null => {
@@ -569,7 +697,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	const onPointerDown = (event: PointerEvent) => {
 		if (event.button !== 0 || config.editable === false) return;
 		const element = (event.target as Element).closest<HTMLElement>('.og-ws-kanban-card[data-draggable]');
-		if (!element || (event.target as Element).closest('button, a, input')) return;
+		if (!element || (event.target as Element).closest('button, a, input, [data-quick-field]')) return;
 		const id = element.dataset.recordId!;
 		const selected = context.selected();
 		const ids = selected.has(id) && selected.size > 1 ? order.filter((candidate) => selected.has(candidate)) : [id];
@@ -604,7 +732,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 				const ghost = source.cloneNode(true) as HTMLElement;
 				ghost.className = 'og-ws-card og-ws-kanban-card og-ws-drag-ghost';
 				ghost.removeAttribute('data-record-id');
-				ghost.style.transform = '';
+				ghost.style.transform = `translate(${event.clientX + 10}px, ${event.clientY + 6}px)`;
 				ghost.style.width = `${source.offsetWidth}px`;
 				if (drag.ids.length > 1) ghost.append(h('span', 'og-ws-drag-count', null, String(drag.ids.length)));
 				drag.ghost = ghost;
@@ -615,14 +743,32 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			scroller.setAttribute('data-dragging', '');
 			for (const id of drag.ids) cards.get(id)?.element.setAttribute('data-drag-source', '');
 		}
-		if (drag.ghost) drag.ghost.style.transform = `translate(${event.clientX + 10}px, ${event.clientY + 6}px) rotate(2deg)`;
+		// The ghost leans into the direction of travel.
+		if (drag.ghost) {
+			const tilt = Math.max(-6, Math.min(6, (event.movementX || 0) * 0.6));
+			drag.ghost.style.transform = `translate(${event.clientX + 10}px, ${event.clientY + 6}px) rotate(${2 + tilt}deg)`;
+		}
 		updateTarget();
 		if (!autoScroll) autoScroll = defaultGridScheduler.raf(edgeScroll);
 	};
 
-	const endDrag = () => {
+	const endDrag = (dropped = false) => {
 		if (!drag) return;
-		drag.ghost?.remove();
+		const ghost = drag.ghost;
+		// Cancelled: the ghost flies back to its card; dropped: it fades as the card lands.
+		if (ghost && !dropped && motion.enabled) {
+			const source = cards.get(drag.ids[0])?.element.getBoundingClientRect();
+			if (source) {
+				const back = ghost.animate(
+					[{ transform: ghost.style.transform }, { transform: `translate(${source.left}px, ${source.top}px)`, opacity: 0.4 }],
+					{
+						duration: 220,
+						easing: 'cubic-bezier(.2,.8,.2,1)',
+					}
+				);
+				back.onfinish = () => ghost.remove();
+			} else ghost.remove();
+		} else ghost?.remove();
 		if (scroller.hasPointerCapture?.(drag.pointerId)) scroller.releasePointerCapture(drag.pointerId);
 		scroller.removeAttribute('data-dragging');
 		for (const card of cards.values()) card.element.removeAttribute('data-drag-source');
@@ -636,7 +782,8 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		if (!drag || event.pointerId !== drag.pointerId) return;
 		const state = drag;
 		if (state.moved) cards.get(state.ids[0])?.element.setAttribute('data-drag-suppress-click', '');
-		endDrag();
+		const accepted = state.moved && !!state.target && !state.rejected;
+		endDrag(accepted);
 		if (!state.moved || !state.target) return;
 		if (state.rejected) {
 			context.toast(state.rejected, 'warn');
@@ -663,12 +810,12 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		);
 		for (const warning of plan.warnings) context.toast(warning, 'warn');
 		if (outcome.ok)
-			defaultGridScheduler.raf(() => {
+			defaultGridScheduler.timeout(() => {
 				for (const id of state.ids) {
 					const el = cards.get(id)?.element;
-					if (el) pulse(el, 'og-ws-landed');
+					if (el) motion.flash(el);
 				}
-			});
+			}, 320);
 	};
 
 	const onPointerCancel = () => endDrag();
@@ -755,31 +902,159 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 		return out;
 	};
 
+	// ─── Toolbar, settings, commands ────────────────────────────────────
+
+	let lanesButton: HTMLButtonElement | null = null;
+	let densityButton: HTMLButtonElement | null = null;
+	const laneFieldOptions = () =>
+		context.columns().filter((col) => col.schema && ['select', 'person'].includes(col.schema.kind) && col.field !== options.columnField);
+	const refreshToolbar = () => {
+		if (lanesButton)
+			lanesButton.querySelector('.og-ws-btn-label')!.textContent = config.swimlaneField
+				? `Lanes: ${reader.column(config.swimlaneField)?.header ?? config.swimlaneField}`
+				: 'No lanes';
+		if (densityButton) densityButton.querySelector('.og-ws-btn-label')!.textContent = config.density === 'compact' ? 'Compact' : 'Comfortable';
+	};
 	const toolbar = () => {
-		const density = button({ icon: 'layout', label: config.density === 'compact' ? 'Compact' : 'Comfortable', title: 'Card density' }, () => {
-			context.updateView({ density: config.density === 'compact' ? 'comfortable' : 'compact' });
-		});
-		const lanes = button(
-			{
-				icon: 'group',
-				label: config.swimlaneField ? `Lanes: ${reader.column(config.swimlaneField)?.header ?? config.swimlaneField}` : 'No lanes',
-				title: 'Swimlanes',
-			},
-			() => {
-				const candidates = context
-					.columns()
-					.filter((col) => col.schema && ['select', 'person'].includes(col.schema.kind) && col.field !== options.columnField);
-				context.menu(lanes, [
-					{ label: 'No swimlanes', checked: !config.swimlaneField, run: () => context.updateView({ swimlaneField: null }) },
-					...candidates.map((col) => ({
-						label: col.header ?? col.field,
-						checked: config.swimlaneField === col.field,
-						run: () => context.updateView({ swimlaneField: col.field }),
-					})),
-				]);
-			}
+		densityButton = button({ icon: 'layout', label: 'Comfortable', title: 'Card size' }, () =>
+			context.updateView({ density: config.density === 'compact' ? 'comfortable' : 'compact' })
 		);
-		return h('div', 'og-ws-group', null, lanes, density);
+		lanesButton = button({ icon: 'group', label: 'No lanes', title: 'Swimlanes' }, () =>
+			context.menu(lanesButton!, [
+				{ label: 'No swimlanes', checked: !config.swimlaneField, run: () => context.updateView({ swimlaneField: null }) },
+				...laneFieldOptions().map((col) => ({
+					label: col.header ?? col.field,
+					checked: config.swimlaneField === col.field,
+					run: () => context.updateView({ swimlaneField: col.field }),
+				})),
+			])
+		);
+		refreshToolbar();
+		return h('div', 'og-ws-group', null, lanesButton, densityButton);
+	};
+
+	const settings = (): ViewSettingsSection[] => {
+		const optionFields = context.columns().filter((col) => col.schema && ['select', 'person', 'checkbox'].includes(col.schema.kind));
+		const numberFields = context
+			.columns()
+			.filter((col) => col.schema && ['number', 'currency', 'percent', 'progress', 'rating'].includes(col.schema.kind));
+		const all = buildBoard(context.rows(), reader, options).columns;
+		const hidden = new Set(config.hiddenColumns ?? []);
+		const aggregate = config.aggregate
+			? `${config.aggregate.fn}:${config.aggregate.field ?? ''}`
+			: options.valueField
+				? `sum:${options.valueField}`
+				: 'count:';
+		return [
+			{
+				title: 'Board',
+				settings: [
+					{
+						kind: 'select',
+						id: 'columnField',
+						label: 'Columns',
+						value: options.columnField,
+						options: optionFields.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+						onChange: (value) =>
+							context.updateView({ columnField: value, columns: undefined, wipLimits: undefined, hiddenColumns: undefined }),
+					},
+					{
+						kind: 'select',
+						id: 'swimlaneField',
+						label: 'Swimlanes',
+						value: config.swimlaneField ?? '',
+						options: [
+							{ value: '', label: 'None' },
+							...laneFieldOptions().map((col) => ({ value: col.field, label: col.header ?? col.field })),
+						],
+						onChange: (value) => context.updateView({ swimlaneField: value || null }),
+					},
+					{
+						kind: 'select',
+						id: 'aggregate',
+						label: 'Column total',
+						value: aggregate,
+						options: [
+							{ value: 'count:', label: 'Card count' },
+							...numberFields.flatMap((col) => [
+								{ value: `sum:${col.field}`, label: `Sum of ${col.header ?? col.field}` },
+								{ value: `avg:${col.field}`, label: `Average ${col.header ?? col.field}` },
+							]),
+						],
+						onChange: (value) => {
+							const [fn, field] = value.split(':');
+							context.updateView({ aggregate: fn === 'count' ? { fn: 'count' } : { fn: fn as 'sum', field } });
+						},
+					},
+					{
+						kind: 'toggle',
+						id: 'hideEmpty',
+						label: 'Hide empty columns',
+						value: !!config.hideEmptyColumns,
+						onChange: (value) => context.updateView({ hideEmptyColumns: value }),
+					},
+				],
+			},
+			{
+				title: 'Columns',
+				settings: [
+					{
+						kind: 'limits',
+						id: 'limits',
+						label: 'Visibility and WIP limits',
+						hint: 'Empty limit means none.',
+						rows: all.map((column) => ({
+							value: column.key,
+							label: column.label,
+							color: column.color,
+							limit: config.wipLimits?.[column.key] ?? null,
+							hidden: hidden.has(column.key),
+						})),
+						onChange: (key, limit) => setLimit(key, limit),
+						onToggle: (key, visible) => setColumnHidden(key, !visible),
+					},
+					{
+						kind: 'segmented',
+						id: 'wipPolicy',
+						label: 'Over the limit',
+						value: config.wipPolicy ?? 'warn',
+						options: [
+							{ value: 'warn', label: 'Warn' },
+							{ value: 'block', label: 'Refuse the drop' },
+						],
+						onChange: (value) => context.updateView({ wipPolicy: value as 'warn' | 'block' }),
+					},
+				],
+			},
+			{
+				title: 'Cards',
+				settings: [
+					{
+						kind: 'segmented',
+						id: 'density',
+						label: 'Card size',
+						value: config.density ?? 'comfortable',
+						options: [
+							{ value: 'compact', label: 'Compact' },
+							{ value: 'comfortable', label: 'Comfortable' },
+						],
+						onChange: (value) => context.updateView({ density: value as 'compact' }),
+					},
+					{
+						kind: 'fields',
+						id: 'fields',
+						label: 'Extra fields',
+						hint: 'Title, status, owner, dates and progress are always drawn.',
+						value: config.fields ?? [],
+						options: context
+							.columns()
+							.filter((col) => !Object.values(reader.roles).includes(col.field))
+							.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+						onChange: (value) => context.updateView({ fields: value }),
+					},
+				],
+			},
+		];
 	};
 
 	const commands = (): WorkspaceCommand[] => [
@@ -789,6 +1064,13 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			group: 'Board',
 			icon: (collapsedColumns.has(column.key) ? 'expand' : 'collapse') as 'expand' | 'collapse',
 			run: () => toggleColumn(column.key),
+		})),
+		...(config.hiddenColumns ?? []).map((key) => ({
+			id: `kanban:show:${key}`,
+			label: `Show column “${reader.option(options.columnField, key)?.label ?? key}”`,
+			group: 'Board',
+			icon: 'expand' as const,
+			run: () => setColumnHidden(key, false),
 		})),
 		{
 			id: 'kanban:density',
@@ -806,7 +1088,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			run: () => {
 				board.lanes.forEach((lane) => collapsedLanes.add(lane.key));
 				context.remember('collapsedLanes', [...collapsedLanes]);
-				render();
+				render(true);
 			},
 		},
 		{
@@ -818,7 +1100,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			run: () => {
 				collapsedLanes.clear();
 				context.remember('collapsedLanes', []);
-				render();
+				render(true);
 			},
 		},
 	];
@@ -826,19 +1108,29 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 	let restored = false;
 	return {
 		render() {
-			render();
+			render(restored);
 			if (!restored) {
 				restored = true;
 				scroller.scrollLeft = savedLeft;
 				scroller.scrollTop = savedTop;
-				paintCards();
+				paintCards(false);
 			}
 		},
+		update(next) {
+			const before = config;
+			config = next as KanbanViewConfig<T>;
+			// A new card shape rebuilds every card; position-only changes glide them.
+			if (before.density !== config.density || before.fields !== config.fields || before.colorField !== config.colorField)
+				for (const card of cards.values()) card.element.dataset.stale = '1';
+			render(true);
+			refreshToolbar();
+		},
+		settings,
 		order: () => order,
 		reveal(id) {
 			const place = board.placement.get(id);
 			if (!place) return null;
-			if (collapsedLanes.delete(place.lane) || collapsedColumns.delete(place.column)) render();
+			if (collapsedLanes.delete(place.lane) || collapsedColumns.delete(place.column)) render(true);
 			const lane = layout.lanes.find((candidate) => candidate.key === place.lane);
 			const cell = lane?.cells.get(place.column);
 			if (!cell) return null;
@@ -851,7 +1143,7 @@ function create<T>(host: HTMLElement, context: WorkspaceViewContext<T>, config: 
 			if (cell.x < scroller.scrollLeft) scroller.scrollLeft = cell.x - PAD;
 			else if (cell.x + cell.width > scroller.scrollLeft + scroller.clientWidth)
 				scroller.scrollLeft = cell.x + cell.width - scroller.clientWidth + PAD;
-			paintCards();
+			paintCards(false);
 			return cards.get(id)?.element ?? null;
 		},
 		onKey(event, id) {

@@ -18,8 +18,10 @@ interface ViewConfigBase<TRowData> {
 	records?: RecordRolesConfig;
 	/** Extra fields drawn on each record with their columns' renderers, in this order. */
 	fields?: string[];
-	/** The record's accent colour (any CSS colour or palette name). Default: its status option's colour. */
+	/** The record's accent colour (any CSS colour or palette name). Wins over `colorField`. */
 	color?: (row: TRowData) => string | undefined;
+	/** Accent records by this field's option colours (priority, team…). Default: the status role; `null` for none. */
+	colorField?: string | null;
 	/** Records can be moved, rescheduled and edited from the view. Default true. */
 	editable?: boolean;
 	/** Shown when filters or search leave nothing to show. */
@@ -65,6 +67,10 @@ export interface KanbanViewConfig<TRowData = unknown> extends ViewConfigBase<TRo
 	density?: 'compact' | 'comfortable';
 	/** Columns collapsed at first. */
 	collapsedColumns?: readonly string[];
+	/** Columns (values) not shown at all. */
+	hiddenColumns?: readonly string[];
+	/** Hide columns without cards. Default false (every option is a column). */
+	hideEmptyColumns?: boolean;
 	/** The board column width. Default 280. */
 	columnWidth?: number;
 }
@@ -81,6 +87,8 @@ export interface GanttViewConfig<TRowData = unknown> extends ViewConfigBase<TRow
 	baseline?: boolean;
 	/** Highlight the critical path. Default false. */
 	criticalPath?: boolean;
+	/** Show each person's workload under the schedule. Default false. */
+	workload?: boolean;
 	/**
 	 * After a move: `push` moves successors later when a link requires it, `tight` keeps them as early
 	 * as their links allow, `off` leaves them (violations are flagged). Default `push`.
@@ -102,6 +110,10 @@ export interface CalendarViewConfig<TRowData = unknown> extends ViewConfigBase<T
 	initialDate?: string | Date;
 	/** First day of the week, 0 = Sunday. Default 1 (Monday). */
 	weekStartsOn?: number;
+	/** A month grid, or one week with taller days. Default `month`. */
+	mode?: 'month' | 'week';
+	/** Show Saturday and Sunday. Default true. */
+	showWeekends?: boolean;
 }
 
 export type GridViewConfig<TRowData = unknown> =

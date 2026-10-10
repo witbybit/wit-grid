@@ -19,7 +19,10 @@ export function optionPill<T>(
 	const value = reader.value(row, field);
 	if (value == null || value === '') return null;
 	const text = String(Array.isArray(value) ? value[0] : value);
-	return pill(reader.option(field, text), text, variant);
+	const el = pill(reader.option(field, text), text, variant);
+	// Pressing it edits the field in place (the workspace opens its options).
+	el.dataset.quickField = field;
+	return el;
 }
 
 export function labelPills<T>(reader: RecordReader<T>, row: RecordRow<T>, field: string | undefined, max = 2): HTMLElement | null {
@@ -38,7 +41,7 @@ export function personChip<T>(reader: RecordReader<T>, row: RecordRow<T>, field:
 	const values = reader.values(row, field);
 	if (!values.length) return null;
 	const people = values.map((value) => ({ value, person: reader.option(field, value) as PersonOption | undefined }));
-	const chip = h('span', 'og-ws-person');
+	const chip = h('span', 'og-ws-person', { 'data-quick-field': field });
 	if (people.length === 1) {
 		chip.append(avatar(people[0].person, people[0].value));
 		if (withName) chip.append(h('span', 'og-ws-person-name', null, people[0].person?.label ?? people[0].value));
@@ -106,10 +109,17 @@ export function initials(name: string): string {
 		.join('');
 }
 
-/** The record's accent: the view's colour function, else its status colour. */
-export function recordAccent<T>(reader: RecordReader<T>, row: RecordRow<T>, color?: (data: T) => string | undefined): string | undefined {
+/** The record's accent: the view's colour function, else its colour field's option (status by default). */
+export function recordAccent<T>(
+	reader: RecordReader<T>,
+	row: RecordRow<T>,
+	color?: (data: T) => string | undefined,
+	colorField?: string | null
+): string | undefined {
 	const custom = color?.(row.data);
 	if (custom) return hue(custom);
-	const status = reader.status(row);
-	return status ? hue(reader.option(reader.roles.status, status)?.color, status) : undefined;
+	const field = colorField === undefined ? reader.roles.status : colorField;
+	if (!field) return undefined;
+	const value = reader.values(row, field)[0];
+	return value ? hue(reader.option(field, value)?.color, value) : undefined;
 }

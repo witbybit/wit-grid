@@ -74,6 +74,25 @@ table.
 only then. A grid that stays a table never downloads any of it. Calling `api.setView()` on a grid without the
 workspace still works: the view opens over the table with its own command bar.
 
+## Customize, and changes in place
+
+Every view has a **Customize** panel (the sliders button in the command bar) with its own options — board columns,
+swimlanes, totals, WIP limits and hidden columns; card size, covers and fields; time scale, row height, layers,
+auto-scheduling and working days; month or week, weekends — plus **Colour by** (`colorField`) for all of them.
+Settings are the view's configuration, so they are saved with a saved view (and mark it as changed until you save).
+
+A changed setting **re-projects the live view in place**: no remount, scroll and selection kept, and records glide to
+their new places. Pills on cards and schedule rows edit in place too: press a status, priority, team or owner pill
+for its options (one write, one undo step).
+
+### Motion
+
+Records glide when they move (a drop, a reschedule, a setting, a collapse), new ones settle in, ones that leave fade
+out, and views slide in from their tab's side. It is the grid's own row-animation policy, applied in two dimensions:
+`rowAnimation` (`api.setRowAnimation`) sets the style, duration and easing for the table and every view alike —
+`style: 'none'` turns it all off — and users who prefer reduced motion get none. Only transform and opacity animate;
+scrolling never does.
+
 ## Record roles
 
 `records` maps meanings to fields. Anything left out is inferred from the columns' **schema** — column types say
@@ -127,6 +146,10 @@ on unfinished predecessors after its planned start is **blocked**.
 | `aggregate`              | The header number, e.g. `{ fn: 'sum', field: 'points' }` |
 | `density`, `columnWidth` | `comfortable` / `compact` cards; column width            |
 | `collapsedColumns`       | Columns collapsed at first                               |
+| `hiddenColumns`          | Column values not shown                                  |
+| `hideEmptyColumns`       | Hide columns without cards                               |
+
+A column's menu sets its WIP limit, moves it left or right (`columns`), collapses or hides it.
 
 ## Gantt
 
@@ -163,6 +186,7 @@ and **Resources** (the owner's concurrent load during the task, over-allocated d
 | `autoSchedule`                              | `push` (default), `tight` (as early as links allow) or `off`    |
 | `confirmReschedule`                         | Show the impact before writing (default true)                   |
 | `dependencies`, `baseline`, `criticalPath`  | Layers to draw                                                  |
+| `workload`                                  | Each person's load under the schedule, over-allocation flagged  |
 | `taskPaneWidth`, `rowHeight`, `initialDate` | Layout and the first day shown                                  |
 
 ## Gallery
@@ -179,9 +203,10 @@ card when the workspace has `createRecord`. Cards are virtualized and the column
 
 ## Calendar
 
-Records on a month grid by their schedule (or due date): multi-day spans are packed into lanes so a bar stays on one
-line, crowded days show **+N more**, drag an entry to another day (or **Alt + arrows**), and **+** on a day adds a record
-there.
+Records on a month grid — or one week (`mode: 'week'`) — by their schedule (or due date): multi-day spans are packed
+into lanes so a bar stays on one line, crowded days show **+N more**, drag an entry to another day (or **Alt + arrows**),
+and **+** on a day adds a record there. `showWeekends: false` hides Saturday and Sunday (bars clip to the shown days),
+`weekStartsOn` picks the first day; months and weeks slide in as you step through them.
 
 ## Selection, keyboard and the inspector
 

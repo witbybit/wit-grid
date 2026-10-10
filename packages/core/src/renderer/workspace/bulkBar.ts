@@ -69,6 +69,7 @@ export class BulkBar<TRowData> {
 		const col = reader.column(field);
 		const items: (MenuItem | 'separator')[] = reader.options(field).map((option) => ({
 			label: option.label ?? option.value,
+			color: option.color ?? option.value,
 			run: () => this.writeAll(field, col?.schema?.multiple ? [option.value] : option.value, `${verb} ${option.label ?? option.value}`),
 		}));
 		items.push('separator', { label: 'Clear', icon: 'close', run: () => this.writeAll(field, null, `${col?.header ?? field} cleared`) });

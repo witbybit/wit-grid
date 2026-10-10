@@ -6,7 +6,9 @@ import { dateRangeColumnType, personColumnType, progressColumnType, selectColumn
 import type { ColumnDef } from '../../columnDef.js';
 import type { GridViewConfig, GridWorkspaceOptions } from '../../views.js';
 import { fuzzyScore } from './commandPalette.js';
-import { packWeek } from './views/calendarView.js';
+import { dayColumns, packWeek } from './views/calendarView.js';
+import { RecordMotion } from './motion.js';
+import { acquireWorkspaceStyles, addViewStyles, releaseWorkspaceStyles } from './workspaceStyles.js';
 
 interface Task {
 	id: string;
@@ -389,6 +391,12 @@ describe('views as saved, shareable tabs', () => {
 		return { api, container, host };
 	}
 
+	it('leaves the table’s own view layer hidden, so it never covers the table', async () => {
+		const { container, host } = await mountSaved();
+		expect(container.querySelector<HTMLElement>('.og-layer-view')?.hidden).toBe(true);
+		host.destroy();
+	});
+
 	it('creates a view from the dialog, saves it, and opens it as a tab', async () => {
 		const { api, container, host } = await mountSaved();
 		click(container.querySelector('.og-ws-tab-add')!);
@@ -429,5 +437,148 @@ describe('views as saved, shareable tabs', () => {
 		await vi.waitFor(() => expect(api.getWorkspaceState().dirty).toBe(false));
 		expect(api.getWorkspaceState().views[0].state.state.sortModel).toEqual([{ colId: 'title', sort: 'desc' }]);
 		host.destroy();
+	});
+});
+
+describe('settings change views in place', () => {
+	it('re-projects the board without remounting it, and hides or reorders columns', async () => {
+		const env = await mount();
+		await showView(env, { kind: 'kanban' });
+		const board = env.container.querySelector('.og-ws-board');
+		const heads = () => [...env.container.querySelectorAll<HTMLElement>('.og-ws-col-head')].map((head) => head.dataset.column);
+		const view = () => env.api.getView() as import('../../views.js').KanbanViewConfig<Task>;
+		env.api.setView({ ...view(), hiddenColumns: ['done'] });
+		flushFrames();
+		expect(env.container.querySelector('.og-ws-board')).toBe(board);
+		expect(heads()).toEqual(['todo', 'doing']);
+		env.api.setView({ ...view(), hiddenColumns: [], columns: ['done', 'todo', 'doing'] });
+		flushFrames();
+		expect(heads()).toEqual(['done', 'todo', 'doing']);
+		env.host.destroy();
+	});
+});
+
+describe('settings and quick edits', () => {
+	it('hides empty columns and draws the WIP limits set in Customize', async () => {
+		const env = await mount();
+		await showView(env, { kind: 'kanban' });
+		click(env.container.querySelector('.og-ws-btn[title="Customize this view"]')!);
+		const panel = document.querySelector<HTMLElement>('.og-ws-settings')!;
+		expect([...panel.querySelectorAll('.og-ws-section-label')].map((label) => label.textContent)).toEqual([
+			'Board',
+			'Columns',
+			'Cards',
+			'Records',
+		]);
+		click(panel.querySelector('[role="switch"][aria-label="Hide empty columns"]')!);
+		expect((env.api.getView() as { hideEmptyColumns?: boolean }).hideEmptyColumns).toBe(true);
+		const limit = document.querySelector<HTMLInputElement>('.og-ws-settings input[aria-label="Doing limit"]')!;
+		limit.value = '1';
+		limit.dispatchEvent(new Event('change'));
+		expect((env.api.getView() as { wipLimits?: Record<string, number> }).wipLimits).toEqual({ doing: 1 });
+		flushFrames();
+		expect(env.container.querySelector('.og-ws-col-head[data-column="doing"]')?.classList.contains('og-ws-over')).toBe(true);
+		env.host.destroy();
+	});
+
+	it('sets a field from the pill on a card', async () => {
+		const env = await mount();
+		await showView(env, { kind: 'kanban', swimlaneField: null });
+		const pill = env.container.querySelector<HTMLElement>('[data-record-id="a"] [data-quick-field="owner"]')!;
+		expect(pill).not.toBeNull();
+		click(pill);
+		// The record was not selected: the pill edits instead.
+		expect(env.api.getSelectedRowIds()).toEqual([]);
+		const menu = document.querySelector<HTMLElement>('.og-ws-menu[aria-label="Set Owner"]')!;
+		expect([...menu.querySelectorAll('.og-ws-menu-item')].map((item) => item.textContent?.trim())).toEqual(['Ava', 'Clear']);
+		click([...menu.querySelectorAll<HTMLElement>('.og-ws-menu-item')].find((item) => item.textContent?.includes('Clear'))!);
+		expect(env.api.getCellValue('a', 'owner')).toBeNull();
+		env.api.undo();
+		expect(env.api.getCellValue('a', 'owner')).toBe('ava');
+		env.host.destroy();
+	});
+
+	it('keeps the Gantt’s scale and layers in its configuration (saved with the view)', async () => {
+		const env = await mount();
+		await showView(env, { kind: 'gantt' });
+		click([...env.container.querySelectorAll<HTMLElement>('.og-ws-gantt-tools button')].find((button) => button.title === 'Zoom out')!);
+		expect((env.api.getView() as { zoom?: string }).zoom).toBe('month');
+		click(
+			[...env.container.querySelectorAll<HTMLElement>('.og-ws-gantt-tools button')].find((button) => button.textContent === 'Critical path')!
+		);
+		expect((env.api.getView() as { criticalPath?: boolean }).criticalPath).toBe(true);
+		// Still the same view element: changed in place.
+		expect(env.container.querySelectorAll('.og-ws-gantt')).toHaveLength(1);
+		env.host.destroy();
+	});
+
+	it('shows one week, with or without weekends', async () => {
+		const env = await mount();
+		await showView(env, { kind: 'calendar', mode: 'week', showWeekends: false, initialDate: '2026-10-05' });
+		expect(env.container.querySelectorAll('.og-ws-cal-week')).toHaveLength(1);
+		expect([...env.container.querySelectorAll<HTMLElement>('.og-ws-cal-day')].map((day) => day.dataset.day)).toEqual([
+			'2026-10-05',
+			'2026-10-06',
+			'2026-10-07',
+			'2026-10-08',
+			'2026-10-09',
+		]);
+		// Task a spans Mon–Fri of that week: one bar across all five shown days.
+		const entry = env.container.querySelector<HTMLElement>('.og-ws-cal-entry[data-record-id="a"]')!;
+		expect(entry.style.width).toBe('calc(100% - 6px)');
+		env.host.destroy();
+	});
+});
+
+describe('calendar columns', () => {
+	it('maps week indexes to shown columns and clips bars to shown days', () => {
+		const monday = dayColumns(1, false);
+		expect(monday.shown).toEqual([0, 1, 2, 3, 4]);
+		expect(monday.clip(3, 6)).toEqual([3, 4]);
+		expect(monday.clip(5, 6)).toBeNull();
+		const sunday = dayColumns(0, false);
+		expect(sunday.shown).toEqual([1, 2, 3, 4, 5]);
+		expect(dayColumns(1, true).count).toBe(7);
+	});
+});
+
+describe('record motion', () => {
+	it('follows the grid’s row-animation policy', () => {
+		const animate = vi.fn(() => ({ onfinish: null }) as unknown as Animation);
+		const original = HTMLElement.prototype.animate;
+		HTMLElement.prototype.animate = animate as never;
+		try {
+			let options: { style?: 'slide' | 'fade' | 'none' } | undefined;
+			const motion = new RecordMotion(() => options);
+			motion.refresh();
+			const el = document.createElement('div');
+			motion.place(el, 0, 0, true);
+			motion.place(el, 40, 0, true);
+			expect(animate).toHaveBeenCalledTimes(1);
+			expect(el.style.transform).toBe('translate(40px, 0px)');
+			options = { style: 'none' };
+			motion.refresh();
+			expect(motion.enabled).toBe(false);
+			motion.place(el, 80, 0, true);
+			expect(animate).toHaveBeenCalledTimes(1);
+			// Leaving without motion removes at once.
+			document.body.append(el);
+			motion.leave(el);
+			expect(el.isConnected).toBe(false);
+		} finally {
+			HTMLElement.prototype.animate = original;
+		}
+	});
+});
+
+describe('workspace stylesheets', () => {
+	it('keeps view sheets after the shared sheet, also across a remount', () => {
+		const first = acquireWorkspaceStyles(document);
+		addViewStyles(document, 'test-view', '.x{}');
+		releaseWorkspaceStyles(first);
+		const again = acquireWorkspaceStyles(document);
+		const sheets = [...document.head.querySelectorAll('style')];
+		expect(sheets.indexOf(again)).toBeLessThan(sheets.indexOf(document.head.querySelector('style[data-og-view-styles="test-view"]')!));
+		releaseWorkspaceStyles(again);
 	});
 });

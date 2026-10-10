@@ -71,3 +71,20 @@ export function resolveRowAnimation(options: RowAnimationOptions | undefined): R
 		},
 	};
 }
+
+/**
+ * Motion can play: the Web Animations API exists (not jsdom / SSR) and the user has not asked for
+ * reduced motion. The one check every animated surface uses (table rows, workspace views).
+ */
+export function animationsEnabled(): boolean {
+	if (typeof document === 'undefined') return false;
+	if (typeof (HTMLElement.prototype as { animate?: unknown }).animate !== 'function') return false;
+	try {
+		if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+			if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+		}
+	} catch {
+		/* matchMedia may throw in some test envs — treat as no preference */
+	}
+	return true;
+}

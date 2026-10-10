@@ -15,7 +15,16 @@ import { BulkBar } from './bulkBar.js';
 import { Inspector } from './inspector.js';
 import { recordAccent } from './recordParts.js';
 import { h, openMenu, type MenuItem } from './ui.js';
-import type { WorkspaceCommand, WorkspaceDialog, WorkspaceView, WorkspaceViewContext, WorkspaceViewModule, WriteOutcome } from './viewTypes.js';
+import type {
+	ViewSettingsSection,
+	WorkspaceCommand,
+	WorkspaceDialog,
+	WorkspaceView,
+	WorkspaceViewContext,
+	WorkspaceViewModule,
+	WriteOutcome,
+} from './viewTypes.js';
+import { RecordMotion } from './motion.js';
 import { acquireWorkspaceStyles, releaseWorkspaceStyles } from './workspaceStyles.js';
 import type { WorkspaceIconName } from './icons.js';
 
@@ -76,6 +85,8 @@ export class WorkspaceHost<TRowData> {
 	private destroyed = false;
 	private presenceByRecord = new Map<string, GridPresencePeer[]>();
 	readonly context: WorkspaceViewContext<TRowData>;
+	/** Record motion under the grid's row-animation policy (shared by every view). */
+	readonly motion: RecordMotion;
 
 	constructor(params: WorkspaceHostParams<TRowData>) {
 		this.engine = params.engine;
@@ -91,6 +102,7 @@ export class WorkspaceHost<TRowData> {
 		this.stage.append(this.surface);
 		const main = h('div', 'og-ws-main', null, this.stage);
 		this.toasts = h('div', 'og-ws-toasts', { role: 'status', 'aria-live': 'polite' });
+		this.motion = new RecordMotion(() => this.engine.rowAnimation);
 		this.context = this.createContext();
 		this.activeTab = this.tabFor(this.currentView());
 		this.bar = new CommandBar(this);
@@ -245,7 +257,26 @@ export class WorkspaceHost<TRowData> {
 		const shown = this.tabConfigs.get(this.activeTab.id) ?? this.activeTab.view;
 		// A saved view's tab stays active while it shows that kind of view (its config object may be a restored copy).
 		const keep = shown === config || (!!this.activeTab.saved && (shown?.kind ?? null) === (config?.kind ?? null));
+		const previousTab = this.activeTab;
 		if (!keep) this.activeTab = this.tabFor(config);
+		// Same kind of view, new settings: the live view re-projects in place (scroll, selection and focus kept).
+		if (!force && config && this.view?.update && this.viewConfig?.kind === config.kind) {
+			this.viewConfig = config;
+			this.readerCache = null;
+			this.rowsCache = null;
+			this.motion.refresh();
+			this.view.update(config);
+			this.bar.refresh();
+			this.inspector.refresh();
+			this.paintSelection();
+			return;
+		}
+		// Views slide in from the side of their tab.
+		const tabs = this.tabs();
+		const from = tabs.findIndex((tab) => tab.id === previousTab.id);
+		const to = tabs.findIndex((tab) => tab.id === this.activeTab.id);
+		const direction: -1 | 0 | 1 = from < 0 || to < 0 || from === to ? 0 : to > from ? 1 : -1;
+		this.motion.refresh();
 		this.viewConfig = config;
 		this.readerCache = null;
 		this.unmountView();
@@ -256,6 +287,7 @@ export class WorkspaceHost<TRowData> {
 		if (this.table) {
 			this.table.toggleAttribute('inert', !showTable);
 			this.table.classList.toggle('og-ws-table-hidden', !showTable);
+			if (showTable && direction) this.motion.slideIn(this.table, direction);
 		}
 		this.root.hidden = !this.table && showTable;
 		this.bar.refresh();
@@ -275,6 +307,7 @@ export class WorkspaceHost<TRowData> {
 				this.surface.append(host);
 				this.view = module.create(host, this.context, config);
 				this.view.render();
+				this.motion.slideIn(host, direction);
 				this.bar.refresh();
 				this.inspector.refresh();
 				this.bulk.refresh();
@@ -285,6 +318,34 @@ export class WorkspaceHost<TRowData> {
 				this.surface.replaceChildren(h('div', 'og-ws-empty', null, `This view could not load: ${String(error?.message ?? error)}`));
 			}
 		);
+	}
+
+	/** The Customize panel: the view's own settings, then those every view shares. */
+	viewSettings(): ViewSettingsSection[] {
+		const config = this.viewConfig;
+		if (!config) return [];
+		const reader = this.reader();
+		const colourFields = this.recordColumns().filter(
+			(col) => col.schema && ['select', 'person', 'multiSelect', 'tags'].includes(col.schema.kind)
+		);
+		const current = config.colorField === undefined ? (reader.roles.status ?? '') : (config.colorField ?? '');
+		const shared: ViewSettingsSection = {
+			title: 'Records',
+			settings: [
+				{
+					kind: 'select',
+					id: 'colorField',
+					label: 'Colour by',
+					value: current,
+					options: [
+						{ value: '', label: 'No colour' },
+						...colourFields.map((col) => ({ value: col.field, label: col.header ?? col.field })),
+					],
+					onChange: (value) => this.updateView({ colorField: value || null }),
+				},
+			],
+		};
+		return [...(this.view?.settings?.() ?? []), shared];
 	}
 
 	private unmountView(): void {
@@ -489,7 +550,14 @@ export class WorkspaceHost<TRowData> {
 			openInTable: (id, field) => this.openInTable(id, field),
 			presence: (id) => this.presenceByRecord.get(id) ?? [],
 			counts: (id) => this.options.collaboration?.counts?.(id),
-			accent: (row) => recordAccent(this.reader(), row, this.viewConfig?.color as ((data: TRowData) => string | undefined) | undefined),
+			accent: (row) =>
+				recordAccent(
+					this.reader(),
+					row,
+					this.viewConfig?.color as ((data: TRowData) => string | undefined) | undefined,
+					this.viewConfig?.colorField
+				),
+			motion: this.motion,
 			memory: (key, initial) => {
 				const memory = this.memory();
 				return (memory.has(key) ? memory.get(key) : initial) as never;
@@ -708,6 +776,47 @@ export class WorkspaceHost<TRowData> {
 		openMenu(target, items, 'Record actions');
 	}
 
+	/**
+	 * The options of a field as a menu at the pill pressed: one press sets it (several people / tags
+	 * toggle). False when the field has no options or cannot be edited here.
+	 */
+	private quickEdit(anchor: HTMLElement, id: string, field: string): boolean {
+		const reader = this.reader();
+		const options = reader.options(field);
+		const row = this.lookup(id);
+		if (!row || !options.length || !this.engine.getApiRef().canEdit(id, field)) return false;
+		const multiple = !!reader.column(field)?.schema?.multiple;
+		const current = new Set(reader.values(row, field));
+		const header = reader.column(field)?.header ?? field;
+		const items: (MenuItem | 'separator')[] = [{ heading: true, label: header }];
+		for (const option of options) {
+			const on = current.has(option.value);
+			items.push({
+				label: option.label ?? option.value,
+				color: option.color ?? option.value,
+				checked: on,
+				run: () => {
+					const label = option.label ?? option.value;
+					if (!multiple) {
+						if (!on) this.write([{ rowId: id, colField: field, value: option.value }], `${header}: ${label}`);
+						return;
+					}
+					const next = on ? [...current].filter((value) => value !== option.value) : [...current, option.value];
+					const previous = reader.value(row, field);
+					this.write([{ rowId: id, colField: field, value: typeof previous === 'string' ? next.join(',') : next }], `${header} updated`);
+				},
+			});
+		}
+		if (current.size)
+			items.push('separator', {
+				label: 'Clear',
+				icon: 'close',
+				run: () => this.write([{ rowId: id, colField: field, value: multiple ? [] : null }], `${header} cleared`),
+			});
+		openMenu(anchor, items, `Set ${header}`);
+		return true;
+	}
+
 	// ─── Feedback ────────────────────────────────────────────────────────
 
 	toast(message: string, tone: 'info' | 'warn' | 'error' | 'success' = 'info', action?: { label: string; run: () => void }): void {
@@ -783,6 +892,7 @@ export class WorkspaceHost<TRowData> {
 
 	private renderNow(): void {
 		this.rowsCache = null;
+		this.motion.refresh();
 		this.view?.render();
 		this.paintSelection();
 		this.bar.refresh();
@@ -883,6 +993,19 @@ export class WorkspaceHost<TRowData> {
 
 	private onClick = (event: MouseEvent): void => {
 		const element = this.recordFrom(event.target);
+		// A pill on a record (status, priority, owner): edit that field right there.
+		const quick = (event.target as Element).closest<HTMLElement>('[data-quick-field]');
+		if (
+			element &&
+			quick &&
+			!event.shiftKey &&
+			!event.ctrlKey &&
+			!event.metaKey &&
+			this.quickEdit(quick, element.dataset.recordId!, quick.dataset.quickField!)
+		) {
+			event.stopPropagation();
+			return;
+		}
 		if (!element || (event.target as Element).closest('button, input, textarea, select, a, [data-no-select]')) return;
 		if (element.hasAttribute('data-drag-suppress-click')) {
 			element.removeAttribute('data-drag-suppress-click');

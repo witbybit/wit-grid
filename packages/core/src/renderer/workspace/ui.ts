@@ -114,6 +114,8 @@ export function formatNumber(value: number | null, options: { currency?: string;
 export interface MenuItem {
 	label: string;
 	icon?: WorkspaceIconName;
+	/** An option's colour, shown as a dot (instead of an icon). */
+	color?: string;
 	hint?: string;
 	checked?: boolean;
 	disabled?: boolean;
@@ -143,7 +145,12 @@ export function openMenu(anchor: HTMLElement, items: readonly (MenuItem | 'separ
 			'aria-checked': item.checked === undefined ? undefined : String(item.checked),
 			disabled: item.disabled,
 		});
-		el.append(item.icon ? icon(item.icon) : h('span', 'og-ws-icon'), h('span', 'og-ws-menu-label', null, item.label));
+		let lead: HTMLElement = item.icon ? icon(item.icon) : h('span', 'og-ws-icon');
+		if (item.color) {
+			lead = h('span', 'og-ws-icon', null, h('span', 'og-ws-dot'));
+			(lead.firstChild as HTMLElement).style.background = hue(item.color, item.label);
+		}
+		el.append(lead, h('span', 'og-ws-menu-label', null, item.label));
 		if (item.checked) el.append(icon('check', 14));
 		else if (item.hint) el.append(h('kbd', 'og-ws-kbd', null, item.hint));
 		el.addEventListener('click', () => {
